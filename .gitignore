@@ -1,3 +1,5 @@
 
 # Ignore target folders
 **/target
+## Ignore boot folder
+/boot
