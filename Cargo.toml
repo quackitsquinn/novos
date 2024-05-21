@@ -1,0 +1,7 @@
+[package]
+name = "novos"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+kernel = {path = "kernel", artifact = "bin", target = "x86_64-unknown-none"}

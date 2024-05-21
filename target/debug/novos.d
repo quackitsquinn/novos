@@ -1,0 +1,1 @@
+/Users/3091312/Documents/Programming\ Stuff/novos/target/debug/novos: /Users/3091312/Documents/Programming\ Stuff/novos/kernel/src/main.rs /Users/3091312/Documents/Programming\ Stuff/novos/src/main.rs

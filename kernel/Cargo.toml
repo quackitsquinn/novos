@@ -1,0 +1,17 @@
+[package]
+name = "kernel"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+[[bin]]
+name = "kernel"
+test = false
+bench = false
+
+[profile.release]
+panic = "abort"
+
+[profile.dev]
+panic = "abort"
