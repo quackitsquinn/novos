@@ -3,12 +3,18 @@ name = "kernel"
 version = "0.1.0"
 edition = "2021"
 
-[dependencies]
-
 [[bin]]
 name = "kernel"
 test = false
 bench = false
+
+[dependencies]
+bitflags = "2.5.0"
+lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
+spin = "0.9.8"
+uart_16550 = "0.3.0"
+# for some reason, x86_64 bops uart_16550 into working. I don't know why.
+x86_64 = "0.15.1"
 
 [profile.release]
 panic = "abort"
