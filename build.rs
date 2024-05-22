@@ -92,6 +92,7 @@ fn make_iso(out_dir: &str, kernel_bin: &str) {
         &limine!("BOOTIA32.EFI")
     );
     let mut iso = Command::new("xorriso");
+    // This is roughly taken from the limine example. Just in rust rather than bash
     let iso = iso.args(&[
         "-as",
         "mkisofs",
@@ -111,9 +112,13 @@ fn make_iso(out_dir: &str, kernel_bin: &str) {
         &out_base!("novos.iso"),
     ]);
     println!("{:?}", format!("{:?}", iso).replace("\"", ""));
-    let output = iso.output().expect("Failed to create iso");
-    println!("status: {}", output.status);
-    println!("stdout: {}", String::from_utf8_lossy(&output.stdout));
+    let output = iso.output();
+    if let Ok(output) = output {
+        println!("status: {}", output.status);
+        println!("stdout: {}", String::from_utf8_lossy(&output.stdout));
+    } else {
+        println!("Failed to create iso: {:?}", output);
+    }
 }
 
 fn make_hdd(out_dir: &str, kernel_bin_dir: &str) {}
