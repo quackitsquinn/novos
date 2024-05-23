@@ -32,6 +32,7 @@ version = "0.1.0"
 dependencies = [
  "bitflags 2.5.0",
  "lazy_static",
+ "limine",
  "spin 0.9.8",
  "uart_16550",
  "x86_64",
@@ -44,6 +45,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 dependencies = [
  "spin 0.5.2",
+]
+
+[[package]]
+name = "limine"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "846c87e24d089e8717a61098cba72b378e3525c46a87cf75b71352dcf668e68c"
+dependencies = [
+ "bitflags 2.5.0",
 ]
 
 [[package]]

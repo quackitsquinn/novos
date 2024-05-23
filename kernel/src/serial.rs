@@ -37,6 +37,8 @@ pub fn write_str(s: &str) {
 pub fn _print(args: core::fmt::Arguments) {
     use core::fmt::Write;
     if PORT.get().unwrap().is_locked() {
+        // If the port is locked, we can't write to it, so just return.
+        // TODO: Use a Vec as a buffer when the allocator is implemented.
         return;
     }
     PORT.get().unwrap().lock().write_fmt(args).unwrap();

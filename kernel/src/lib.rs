@@ -7,6 +7,7 @@ pub(crate) use spin::{Mutex, Once};
 
 pub(crate) type OnceMut<T> = Once<Mutex<T>>;
 
+pub mod display;
 pub mod serial;
 
 /// Halts the CPU indefinitely.
