@@ -3,7 +3,7 @@ use limine::framebuffer::Framebuffer as LimineFramebuffer;
 use crate::sprintln;
 
 use super::color::Color;
-
+/// A representation of a framebuffer.
 pub struct Framebuffer {
     width: usize,
     height: usize,
@@ -16,6 +16,7 @@ pub struct Framebuffer {
 }
 
 impl Framebuffer {
+    /// Create a new framebuffer.
     pub fn new(fb: &LimineFramebuffer) -> Framebuffer {
         if fb.bpp() % 8 != 0 {
             panic!("Non-byte aligned framebuffers are not supported.");
@@ -44,29 +45,74 @@ impl Framebuffer {
             },
         }
     }
-
+    /// Get the width of the framebuffer.
     pub fn width(&self) -> usize {
         self.width
     }
-
+    /// Get the height of the framebuffer.
     pub fn height(&self) -> usize {
         self.height
     }
-
+    /// Get the pitch of the framebuffer. (The number of bytes per row of the framebuffer.)
     pub fn pitch(&self) -> usize {
         self.pitch
     }
-
+    /// Gets the underlying buffer.
     pub fn buffer(&mut self) -> &mut [u8] {
         self.buffer
     }
-
+    /// Set a pixel at a specific location.
     #[inline]
     pub fn set_px(&mut self, x: usize, y: usize, color: Color) {
         assert!(x < self.width && y < self.height, "Pixel out of bounds");
         let offset = (y * self.pitch) + (x * (self.bpp as usize));
         color.to_slice(&mut self.buffer[offset..offset + self.bpp as usize]);
     }
-}
+    /// Draws a scaled pixel at a specific location.
+    /// The origin is the top left corner.
+    #[inline]
+    pub fn draw_scaled_px(&mut self, x: usize, y: usize, scale: usize, color: Color) {
+        for i in 0..scale {
+            for j in 0..scale {
+                self.set_px(x + i, y + j, color);
+            }
+        }
+    }
 
-unsafe impl Send for Framebuffer {}
+    /// Draws a 8xn sprite at a specific location.
+    /// The origin is the top left corner.
+    #[inline]
+    pub fn draw_sprite(&mut self, x: usize, y: usize, sprite: &[u8], color: Color) {
+        for (i, byte) in sprite.iter().enumerate() {
+            for bit in 0..8 {
+                if byte & (1 << bit) != 0 {
+                    self.set_px(x + bit, y + (i % 8), color);
+                }
+            }
+        }
+    }
+    /// Draws a scaled 8xn sprite at a specific location.
+    /// The origin is the top left corner.
+    #[inline]
+    pub fn draw_scaled_sprite(
+        &mut self,
+        x: usize,
+        y: usize,
+        scale: usize,
+        sprite: &[u8],
+        color: Color,
+    ) {
+        for (i, byte) in sprite.iter().enumerate() {
+            for bit in 0..8 {
+                if byte & (1 << bit) != 0 {
+                    self.draw_scaled_px(x + bit * scale, y + (i % 8) * scale, scale, color);
+                }
+            }
+        }
+    }
+
+    /// Clears the framebuffer with a specific color.
+    pub fn clear(&mut self) {
+        self.buffer.fill(0);
+    }
+}
