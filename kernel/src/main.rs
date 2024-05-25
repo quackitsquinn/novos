@@ -13,4 +13,5 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
 pub extern "C" fn _start() -> ! {
     kernel::init_kernel();
     sprintln!("Hello World!");
+    kernel::hlt_loop();
 }
