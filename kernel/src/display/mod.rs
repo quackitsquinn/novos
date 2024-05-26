@@ -1,8 +1,11 @@
 use limine::request::FramebufferRequest;
 use spin::Mutex;
 
+mod character;
 pub mod color;
 mod framebuffer;
+
+pub use character::get_char;
 
 pub static LIMINE_FRAMEBUFFERS: FramebufferRequest = FramebufferRequest::new();
 
