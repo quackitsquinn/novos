@@ -6,6 +6,8 @@ pub fn main() {
         .arg("target/artifacts/novos.iso") // We don't use a bios specific iso because it supports both
         .arg("-serial")
         .arg("stdio")
+        .arg("-m")
+        .arg("1G")
         .spawn()
         .expect("Failed to start qemu-system-x86_64");
     let _ = command

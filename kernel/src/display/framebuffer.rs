@@ -91,6 +91,7 @@ impl Framebuffer {
             }
         }
     }
+
     /// Draws a scaled 8xn sprite at a specific location.
     /// The origin is the top left corner.
     #[inline]
@@ -114,5 +115,10 @@ impl Framebuffer {
     /// Clears the framebuffer with a specific color.
     pub fn clear(&mut self) {
         self.buffer.fill(0);
+    }
+
+    /// Gets the size of the framebuffer.
+    pub fn size(&self) -> (usize, usize) {
+        (self.width, self.height)
     }
 }

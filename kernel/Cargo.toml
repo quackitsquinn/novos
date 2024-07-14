@@ -9,6 +9,7 @@ test = false
 bench = false
 
 [dependencies]
+arrayvec = { version = "0.7.4", default-features = false }
 bitflags = "2.5.0"
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 limine = "0.2.0"

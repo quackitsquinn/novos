@@ -33,13 +33,24 @@ pub fn write_str(s: &str) {
     });
 }
 
+static mut MISSED_MSG: bool = false;
+
 #[doc(hidden)]
 pub fn _print(args: core::fmt::Arguments) {
     use core::fmt::Write;
     if PORT.get().unwrap().is_locked() {
         // If the port is locked, we can't write to it, so just return.
         // TODO: Use a Vec as a buffer when the allocator is implemented.
+        unsafe {
+            MISSED_MSG = true;
+        }
         return;
+    } else if unsafe { MISSED_MSG } {
+        // If we missed a message, print a message saying so.
+        write_str("Missed message\n");
+        unsafe {
+            MISSED_MSG = false;
+        }
     }
     PORT.get().unwrap().lock().write_fmt(args).unwrap();
 }
