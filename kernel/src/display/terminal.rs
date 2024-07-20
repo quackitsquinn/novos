@@ -7,7 +7,7 @@ use crate::{display::terminal, sprintln};
 
 use super::{color::Color, screen_char::ScreenChar};
 
-const MAX_HEIGHT: usize = 16;
+const MAX_HEIGHT: usize = 32;
 const MAX_WIDTH: usize = MAX_HEIGHT * 2;
 pub struct Terminal {
     // x, y -> row, column

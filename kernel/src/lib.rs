@@ -27,6 +27,16 @@ pub fn hlt_loop() -> ! {
     }
 }
 
+static DISPLAY_INITIALIZED: Once<()> = Once::new();
+
+/// Returns true if the display has been initialized. Intended for use in stuff like panic functions, which can occur before the display is initialized.
+pub fn display_init() -> bool {
+    if DISPLAY_INITIALIZED.is_completed() {
+        return true;
+    }
+    return false;
+}
+
 pub fn init_kernel() {
     serial::init();
     gdt::init_gdt();
@@ -42,4 +52,5 @@ pub fn init_kernel() {
     sprintln!("Initialized framebuffer");
     lazy_static::initialize(&display::TERMINAL);
     sprintln!("Initialized terminal");
+    DISPLAY_INITIALIZED.call_once(|| ());
 }
