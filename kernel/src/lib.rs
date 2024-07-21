@@ -1,5 +1,6 @@
 #![no_std]
 #![no_main]
+#![feature(abi_x86_interrupt)]
 
 use core::arch::asm;
 
@@ -10,6 +11,7 @@ pub(crate) type OnceMut<T> = Once<Mutex<T>>;
 
 pub mod display;
 mod gdt;
+pub mod interrupts;
 pub mod serial;
 
 /// Because we need a relatively big stack for the display, we need to request a bigger stack size
@@ -39,11 +41,14 @@ pub fn display_init() -> bool {
 
 pub fn init_kernel() {
     serial::init();
+    println!("Initialized serial");
     gdt::init_gdt();
-    sprintln!("Initialized serial");
+    println!("Initialized GDT");
+    interrupts::init();
+    println!("Initialized interrupts");
     sprintln!("Checking if bootloader has provided stack size");
     // If the response is present, the bootloader has provided our requested stack size.
-    if let Some(stack_size) = STACK_REQUEST.get_response() {
+    if let Some(_) = STACK_REQUEST.get_response() {
         sprintln!("Bootloader has provided stack size: 0x{:x}", STACK_SIZE);
     } else {
         sprintln!("Bootloader has not provided stack size");

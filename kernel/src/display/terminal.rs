@@ -80,7 +80,7 @@ impl Terminal {
     }
 
     pub fn push_char(&mut self, c: char, color: Color) {
-        sprintln!("Pushing char: {}", c);
+        //sprintln!("Pushing char: {}", c);
         if c == '\n' {
             self.newline();
             return;
@@ -100,7 +100,7 @@ impl Terminal {
     }
 
     pub fn push_str(&mut self, s: &str, color: Color) {
-        sprintln!("Pushing string: {}", s);
+        //sprintln!("Pushing string: {}", s);
         for c in s.chars() {
             self.push_char(c, color);
         }
@@ -153,7 +153,6 @@ impl Terminal {
 
 impl Write for Terminal {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
-        sprintln!("Writing string: {}", s);
         self.push_str(s, Color::new(255, 255, 255));
         Ok(())
     }
@@ -162,8 +161,10 @@ impl Write for Terminal {
 #[doc(hidden)]
 pub fn _print(args: core::fmt::Arguments) {
     use core::fmt::Write;
-    sprintln!("Printing to terminal");
-    write!(super::TERMINAL.lock(), "{}", args).unwrap();
+    crate::serial::_print(args);
+    if crate::display_init() {
+        write!(super::TERMINAL.lock(), "{}", args).unwrap();
+    }
 }
 
 #[macro_export]

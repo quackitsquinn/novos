@@ -2,7 +2,7 @@
 #![no_main]
 
 use kernel::{
-    display::{self, color::Color},
+    display::{self, color::Color, terminal},
     println, sprintln,
 };
 
@@ -20,6 +20,5 @@ pub extern "C" fn _start() -> ! {
     kernel::init_kernel();
     sprintln!("Hello, World!");
     println!("Hello, World!");
-    panic!("i did yo mom");
     kernel::hlt_loop();
 }
