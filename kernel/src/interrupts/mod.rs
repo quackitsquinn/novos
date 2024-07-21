@@ -6,6 +6,8 @@ use x86_64::{
     },
 };
 
+pub mod hardware;
+
 use crate::println;
 
 static IDT: Once<InterruptDescriptorTable> = Once::new();
@@ -38,14 +40,21 @@ extern "x86-interrupt" fn page_fault_handler(
 }
 
 pub fn init() {
+    // Initialize hardware interrupts
+    println!("Defining hardware interrupts");
+    hardware::define_hardware();
     IDT.call_once(|| {
         let mut idt = InterruptDescriptorTable::new();
         set_general_handler!(&mut idt, general_handler);
         idt.page_fault.set_handler_fn(page_fault_handler);
-        for (i, handler) in CUSTOM_HANDLERS.lock().iter().enumerate() {
-            if let Some(handler) = handler {
-                idt[i as u8 + 32].set_handler_fn(*handler);
-            }
+        for (i, handler) in CUSTOM_HANDLERS
+            .lock()
+            .iter()
+            .enumerate()
+            .filter(|(_, h)| h.is_some())
+            .map(|(i, h)| (i, h.unwrap()))
+        {
+            idt[i as u8 + 32].set_handler_fn(handler);
         }
         // println!("{:?}", idt.breakpoint);
         //       println!("{:?}", idt);
@@ -53,6 +62,8 @@ pub fn init() {
     });
     // Load the IDT now that it is & 'static
     IDT.get().unwrap().load();
+    println!("Initializing hardware interrupts");
+    hardware::init();
 }
 
 const BASIC_HANDLERS: [&'static str; 32] = [

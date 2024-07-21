@@ -13,6 +13,7 @@ arrayvec = { version = "0.7.4", default-features = false }
 bitflags = "2.5.0"
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 limine = "0.2.0"
+pic8259 = "0.11.0"
 spin = "0.9.8"
 uart_16550 = "0.3.0"
 # for some reason, x86_64 bops uart_16550 into working. I don't know why.

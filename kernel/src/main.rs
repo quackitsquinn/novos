@@ -1,8 +1,12 @@
 #![no_std]
 #![no_main]
+#![feature(abi_x86_interrupt)]
+
+use core::arch::asm;
 
 use kernel::{
     display::{self, color::Color, terminal},
+    interrupts::hardware::timer,
     println, sprintln,
 };
 
@@ -18,7 +22,12 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
     kernel::init_kernel();
-    sprintln!("Hello, World!");
-    println!("Hello, World!");
+    x86_64::instructions::interrupts::enable();
+    loop {
+        let mut t = display::TERMINAL.lock();
+        t.set_position(0, 0);
+        drop(t);
+        println!("clk: {} sec: {}", timer::get_ticks(), timer::get_seconds());
+    }
     kernel::hlt_loop();
 }
