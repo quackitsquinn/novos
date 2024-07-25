@@ -101,12 +101,15 @@ impl Framebuffer {
         y: usize,
         scale: usize,
         sprite: &[u8],
-        color: Color,
+        foreground: Color,
+        background: Color,
     ) {
         for (i, byte) in sprite.iter().enumerate() {
             for bit in 0..8 {
                 if byte & (1 << bit) != 0 {
-                    self.draw_scaled_px(x + bit * scale, y + (i % 8) * scale, scale, color);
+                    self.draw_scaled_px(x + bit * scale, y + (i % 8) * scale, scale, foreground);
+                } else {
+                    self.draw_scaled_px(x + bit * scale, y + (i % 8) * scale, scale, background);
                 }
             }
         }

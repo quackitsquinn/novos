@@ -7,7 +7,7 @@ use core::arch::asm;
 use kernel::{
     display::{self, color::Color, terminal},
     interrupts::hardware::timer,
-    println, sprintln,
+    println, sprintln, terminal,
 };
 
 #[panic_handler]
@@ -22,11 +22,11 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
     kernel::init_kernel();
+    sprintln!("Initialized kernel");
     x86_64::instructions::interrupts::enable();
+    sprintln!("Enabled interrupts");
     loop {
-        let mut t = display::TERMINAL.lock();
-        t.set_position(0, 0);
-        drop(t);
+        terminal!().set_position(0, 0);
         println!("clk: {} sec: {}", timer::get_ticks(), timer::get_seconds());
     }
     kernel::hlt_loop();

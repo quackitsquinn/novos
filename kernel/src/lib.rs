@@ -53,9 +53,8 @@ pub fn init_kernel() {
     } else {
         sprintln!("Bootloader has not provided stack size");
     }
-    lazy_static::initialize(&display::FRAMEBUFFER);
-    sprintln!("Initialized framebuffer");
-    lazy_static::initialize(&display::TERMINAL);
-    sprintln!("Initialized terminal");
+    sprintln!("Initializing display");
+    display::init();
     DISPLAY_INITIALIZED.call_once(|| ());
+    sprintln!("Kernel initialized");
 }

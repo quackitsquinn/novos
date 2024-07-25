@@ -3,7 +3,7 @@ use core::arch::asm;
 use pic8259::ChainedPics;
 use spin::Mutex;
 
-use crate::println;
+use crate::{println, sprintln};
 
 pub mod timer;
 
@@ -42,7 +42,9 @@ pub fn init() {
     unsafe {
         let mut p = PICS.lock();
         // Unmask interrupts (afaik it's lsb first? idk)
-        p.write_masks(0b11111100, 0b11111111);
+        p.write_masks(0b11111110, 0b11111111);
         p.initialize();
     }
+    sprintln!("Initialized hardware interrupts.. enabling interrupts");
+    x86_64::instructions::interrupts::enable();
 }

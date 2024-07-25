@@ -3,11 +3,11 @@ use core::fmt::Write;
 use arrayvec::ArrayVec;
 use spin::{Mutex, Once};
 
-use crate::{display::terminal, sprintln};
+use crate::{display::terminal, framebuffer, sprintln, terminal};
 
-use super::{color::Color, screen_char::ScreenChar};
+use super::{color::Color, framebuffer, screen_char::ScreenChar};
 
-const MAX_HEIGHT: usize = 32;
+const MAX_HEIGHT: usize = 16;
 const MAX_WIDTH: usize = MAX_HEIGHT * 2;
 pub struct Terminal {
     // x, y -> row, column
@@ -20,7 +20,8 @@ pub struct Terminal {
 
 impl Terminal {
     pub fn new() -> Self {
-        let size = super::FRAMEBUFFER.lock().size();
+        //   sprintln!("Getting fb size");
+        let size = framebuffer!().size();
         let char_size = ((size.0 / 8) as u32, (size.1 / 8) as u32);
         let mut s = Self {
             chars: Self::make_vec(char_size),
@@ -29,6 +30,7 @@ impl Terminal {
             size,
             scale: 1,
         };
+        // sprintln!("Setting scale");
         // Default to 2x scale because 90% of the time 8px is too small
         s.set_scale(2);
         s
@@ -133,12 +135,13 @@ impl Terminal {
         let buf_char = self.chars[x as usize][y as usize];
         let charac = buf_char.character();
         let sprite = super::get_char(charac);
-        super::FRAMEBUFFER.lock().draw_scaled_sprite(
+        framebuffer!().draw_scaled_sprite(
             x as usize * 8 * self.scale as usize,
             y as usize * 8 * self.scale as usize,
             self.scale as usize,
             &sprite,
-            buf_char.color(),
+            buf_char.foreground(),
+            buf_char.background(),
         );
     }
 
@@ -163,7 +166,7 @@ pub fn _print(args: core::fmt::Arguments) {
     use core::fmt::Write;
     crate::serial::_print(args);
     if crate::display_init() {
-        write!(super::TERMINAL.lock(), "{}", args).unwrap();
+        write!(*terminal!(), "{}", args).unwrap();
     }
 }
 
