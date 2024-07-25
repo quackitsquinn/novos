@@ -16,7 +16,7 @@ pub mod serial;
 
 /// Because we need a relatively big stack for the display, we need to request a bigger stack size
 /// from the bootloader.
-const STACK_SIZE: u64 = 0x32000; // 0xCF8
+const STACK_SIZE: u64 = 0x64000; // 0xCF8
 #[used]
 static STACK_REQUEST: StackSizeRequest = StackSizeRequest::new().with_size(STACK_SIZE);
 
