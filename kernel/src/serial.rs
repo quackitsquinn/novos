@@ -58,7 +58,7 @@ pub fn _print(args: core::fmt::Arguments) {
 #[macro_export]
 macro_rules! sprint {
     ($($arg:tt)*) => {
-        $crate::serial::_print(format_args!($($arg)*));
+        $crate::serial::_print(format_args!($($arg)*))
     };
 }
 /// Serial print with newline
@@ -71,7 +71,7 @@ macro_rules! sprintln {
         $crate::sprint!(concat!($fmt, "\n"));
     };
     ($fmt:expr, $($arg:tt)*) => {
-        $crate::sprint!(concat!($fmt, "\n"), $($arg)*);
+        $crate::sprint!(concat!($fmt, "\n"), $($arg)*)
     };
 
 }
