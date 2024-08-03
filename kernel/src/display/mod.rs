@@ -10,27 +10,25 @@ pub mod terminal;
 
 pub use character::get_char;
 
-use crate::sprintln;
+use crate::{sprintln, util::OnceMutex};
 
 pub static LIMINE_FRAMEBUFFERS: FramebufferRequest = FramebufferRequest::new();
 
-pub static FRAMEBUFFER: Once<Mutex<Framebuffer>> = Once::new();
-pub static TERMINAL: Once<Mutex<terminal::Terminal>> = Once::new();
+pub static FRAMEBUFFER: OnceMutex<Framebuffer> = OnceMutex::new();
+pub static TERMINAL: OnceMutex<terminal::Terminal> = OnceMutex::new();
 
 pub fn init() {
     sprintln!("Creating framebuffer");
-    FRAMEBUFFER.call_once(|| {
-        Mutex::new(Framebuffer::new(
-            &LIMINE_FRAMEBUFFERS
-                .get_response()
-                .unwrap()
-                .framebuffers()
-                .next()
-                .unwrap(),
-        ))
-    });
+    FRAMEBUFFER.init(Framebuffer::new(
+        &LIMINE_FRAMEBUFFERS
+            .get_response()
+            .unwrap()
+            .framebuffers()
+            .next()
+            .unwrap(),
+    ));
     sprintln!("Framebuffer initialized.. Creating terminal");
-    TERMINAL.call_once(|| Mutex::new(terminal::Terminal::new()));
+    TERMINAL.init(terminal::Terminal::new());
     sprintln!("Terminal initialized");
 }
 
@@ -38,7 +36,7 @@ pub fn init() {
 #[macro_export]
 macro_rules! terminal {
     () => {
-        $crate::display::TERMINAL.get().unwrap().lock()
+        $crate::display::TERMINAL.get()
     };
 }
 
@@ -46,6 +44,6 @@ macro_rules! terminal {
 #[macro_export]
 macro_rules! framebuffer {
     () => {
-        $crate::display::FRAMEBUFFER.get().unwrap().lock()
+        $crate::display::FRAMEBUFFER.get()
     };
 }

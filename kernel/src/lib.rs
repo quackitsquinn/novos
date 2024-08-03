@@ -7,12 +7,11 @@ use core::arch::asm;
 use limine::request::StackSizeRequest;
 pub(crate) use spin::{Mutex, Once};
 
-pub(crate) type OnceMut<T> = Once<Mutex<T>>;
-
 pub mod display;
 mod gdt;
 pub mod interrupts;
 pub mod serial;
+mod util;
 
 /// Because we need a relatively big stack for the display, we need to request a bigger stack size
 /// from the bootloader.

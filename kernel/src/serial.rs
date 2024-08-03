@@ -4,25 +4,25 @@
 //! I would use that, but I 1. wanted to write my own, and 2. couldn't figure out how to get cargo
 //! to stop reporting the correct struct as configured out.
 
-use crate::{Mutex, Once, OnceMut};
+use crate::{util::OnceMutex, Mutex, Once};
 use core::arch::asm;
 use uart_16550::SerialPort;
 use x86_64::instructions::interrupts::without_interrupts;
 
 const SERIAL_PORT_NUM: u16 = 0x3F8;
 
-static PORT: OnceMut<SerialPort> = OnceMut::new();
+static PORT: OnceMutex<SerialPort> = OnceMutex::new();
 
 pub fn init() {
-    PORT.call_once(|| {
+    PORT.init({
         let mut port = unsafe { SerialPort::new(SERIAL_PORT_NUM) };
         port.init();
-        Mutex::new(port)
+        port
     });
 }
 
 pub fn write_byte(byte: u8) {
-    PORT.get().unwrap().lock().send(byte);
+    PORT.get().send(byte);
 }
 
 pub fn write_str(s: &str) {
@@ -38,7 +38,7 @@ static mut MISSED_MSG: bool = false;
 #[doc(hidden)]
 pub fn _print(args: core::fmt::Arguments) {
     use core::fmt::Write;
-    if PORT.get().unwrap().is_locked() {
+    if PORT.is_locked() {
         // If the port is locked, we can't write to it, so just return.
         // TODO: Use a Vec as a buffer when the allocator is implemented.
         unsafe {
@@ -52,7 +52,7 @@ pub fn _print(args: core::fmt::Arguments) {
             MISSED_MSG = false;
         }
     }
-    PORT.get().unwrap().lock().write_fmt(args).unwrap();
+    PORT.get().write_fmt(args).unwrap();
 }
 /// Serial print
 #[macro_export]
