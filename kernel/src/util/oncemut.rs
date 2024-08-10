@@ -16,7 +16,7 @@ impl<'a, T> OnceMutex<T> {
     }
 
     pub fn try_get(&self) -> Option<MutexGuard<T>> {
-        self.inner.get().unwrap().try_lock()
+        self.inner.get()?.try_lock()
     }
 
     pub fn mutex(&self) -> &'a Mutex<T> {
