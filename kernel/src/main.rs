@@ -2,7 +2,7 @@
 #![no_main]
 #![feature(abi_x86_interrupt)]
 
-use core::arch::asm;
+use core::{alloc, arch::asm};
 
 use kernel::{
     display::{self, color::Color, terminal},
@@ -25,9 +25,11 @@ pub extern "C" fn _start() -> ! {
     sprintln!("Initialized kernel");
     x86_64::instructions::interrupts::enable();
     sprintln!("Enabled interrupts");
-    loop {
-        terminal!().set_position(0, 0);
-        println!("clk: {} sec: {}", timer::get_ticks(), timer::get_seconds());
-    }
+    // Write at a arbitrary position in the defined heap
+    unsafe { ((kernel::memory::HEAP_MEM_OFFSET + 0x2000) as *mut u8).write_volatile(0x42) };
+    // loop {
+    //     terminal!().set_position(0, 0);
+    //     println!("clk: {} sec: {}", timer::get_ticks(), timer::get_seconds());
+    // }
     kernel::hlt_loop();
 }

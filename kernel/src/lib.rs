@@ -10,6 +10,7 @@ pub(crate) use spin::{Mutex, Once};
 pub mod display;
 mod gdt;
 pub mod interrupts;
+pub mod memory;
 pub mod serial;
 mod util;
 
