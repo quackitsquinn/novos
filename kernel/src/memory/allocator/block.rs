@@ -1,14 +1,14 @@
 use crate::memory::allocator::blocksize::BlockSize;
 
 use super::blocktype::BlockType;
-
-// lets do something funky rq... whats the biggest alignment we can have?
-
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Block {
     // The type of the block
     pub block_type: BlockType,
     // The start address of the block
     pub address: usize,
+    // If the block needs to be removed in the next block clean
+    pub needs_delete: bool,
 }
 
 impl Block {
@@ -16,6 +16,7 @@ impl Block {
         Self {
             block_type,
             address,
+            needs_delete: false,
         }
     }
 
@@ -45,7 +46,7 @@ impl Block {
         Some(new_block)
     }
 
-    pub fn merge(self, other: Block) -> Block {
+    pub fn merge(&mut self, other: &mut Block) -> Block {
         if other.address > self.address {
             return other.merge(self); // Ensure self is the block with the lower address
         }

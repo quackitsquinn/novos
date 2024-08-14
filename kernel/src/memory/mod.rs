@@ -114,4 +114,9 @@ fn init_heap() {
             .unwrap()
             .flush();
     }
+
+    sprintln!("Heap initialized at 0x{:x} - 0x{:x}", hstart, hend);
+    sprintln!("Initializing allocator");
+    unsafe { allocator::init(hstart.as_u64() as usize, hend.as_u64() as usize) };
+    sprintln!("Allocator initialized");
 }
