@@ -1,6 +1,9 @@
 #![no_std]
 #![no_main]
 #![feature(abi_x86_interrupt)]
+#![forbid(unsafe_op_in_unsafe_fn)]
+
+extern crate alloc;
 
 use core::arch::asm;
 
@@ -42,6 +45,8 @@ pub fn display_init() -> bool {
 pub fn init_kernel() {
     serial::init();
     println!("Initialized serial");
+    memory::init();
+    println!("Initialized paging");
     gdt::init_gdt();
     println!("Initialized GDT");
     interrupts::init();

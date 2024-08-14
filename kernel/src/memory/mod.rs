@@ -13,6 +13,9 @@ use x86_64::{
 };
 
 use crate::{sprint, sprintln, util::OnceMutex};
+
+pub mod allocator;
+
 // Evaluates to 0x4156_4F4E_0000
 pub const HEAP_MEM_OFFSET: u64 = (u32::from_ne_bytes(*b"NOVA") as u64) << 16;
 pub const HEAP_SIZE: u64 = 1024 * 512; // 512 KiB
