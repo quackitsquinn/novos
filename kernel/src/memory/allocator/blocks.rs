@@ -3,6 +3,8 @@ use core::{
     mem, ptr, slice,
 };
 
+use log::{debug, trace};
+
 use crate::sprintln;
 
 use super::{block::Block, blocksize::BlockSize, blocktype::BlockType};
@@ -43,7 +45,7 @@ impl Blocks {
             blocks,
             heap_start,
             heap_end,
-            unmap_start: 0,
+            unmap_start: heap_start,
         }
     }
 
@@ -65,6 +67,22 @@ impl Blocks {
         );
         self.unmap_start += size;
         block
+    }
+
+    unsafe fn find_block_by_ptr(&mut self, ptr: *mut u8) -> Option<&mut Block> {
+        let ptr = ptr as usize;
+        for block in &mut *self.blocks {
+            if ptr >= block.address && ptr < block.address + block.size() {
+                trace!(
+                    "Found ptr ({:#x}) in block {:#x} (off: {})",
+                    ptr,
+                    block.address,
+                    ptr - block.address
+                );
+                return Some(block);
+            }
+        }
+        None
     }
 
     pub unsafe fn allocate(&mut self, layout: Layout) -> *mut u8 {
@@ -102,26 +120,33 @@ impl Blocks {
     pub unsafe fn deallocate(&mut self, ptr: *mut u8, layout: Layout) {
         let align = layout.align();
         let ptr = ptr as usize - align;
-        for block in &mut *self.blocks {
-            if block.address == ptr {
-                block.deallocate();
+
+        if let Some(blk) = unsafe { self.find_block_by_ptr(ptr as *mut u8) } {
+            if blk.is_free() {
+                return;
             }
+            blk.deallocate();
+            self.dbg_print_blocks();
+            return;
         }
     }
 
     unsafe fn run_join(&mut self) {
         let mut last_free_block: Option<&mut Block> = None;
+        let mut joined = 0;
         for block in &mut *self.blocks {
             if !block.needs_delete {
                 if block.is_free() {
                     if let Some(lsblk) = last_free_block {
                         *block = block.merge(lsblk);
+                        joined += 1;
                         lsblk.needs_delete = true
                     }
                     last_free_block = Some(block)
                 }
             }
         }
+        debug!("Joined {} blocks", joined);
     }
 
     unsafe fn ptr_is_allocated(&self, ptr: *mut u8) -> bool {
@@ -139,6 +164,7 @@ impl Blocks {
         let mut len = self.blocks.len();
         let mut base = self.blocks.as_mut_ptr();
         let mut deleted = 0;
+        self.dbg_print_blocks();
         // step -> if block is marked as needs_delete -> move all elements before 1 up -> continue
         for (i, block) in self.blocks.iter_mut().enumerate() {
             if block.needs_delete {
@@ -151,6 +177,8 @@ impl Blocks {
                 deleted += 1;
             }
         }
+        self.dbg_print_blocks();
+        debug!("Deleted {} blocks", deleted);
         self.blocks =
             unsafe { slice::from_raw_parts_mut(self.blocks.as_mut_ptr().add(deleted), len) }
     }
@@ -167,6 +195,23 @@ impl Blocks {
             // TODO: handle this better. Should not panic.
             panic!("Out of memory");
         }
+    }
+
+    fn dbg_print_blocks(&self) {
+        let mx = self.blocks.last().unwrap().size() / size_of::<Block>();
+        trace!(
+            "blkcount {}/{} ({})",
+            self.blocks.len(),
+            mx,
+            self.blocks.len() as f64 / mx as f64
+        );
+
+        let unalloc_count = self.blocks.iter().filter(|b| b.is_free()).count();
+        trace!(
+            "unallocs: {} allocs: {}",
+            unalloc_count,
+            self.blocks.len() - unalloc_count
+        );
     }
 }
 

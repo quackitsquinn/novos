@@ -8,6 +8,7 @@ extern crate alloc;
 use core::arch::asm;
 
 use limine::request::StackSizeRequest;
+use log::info;
 pub(crate) use spin::{Mutex, Once};
 
 pub mod display;
@@ -44,22 +45,22 @@ pub fn display_init() -> bool {
 
 pub fn init_kernel() {
     serial::init();
-    println!("Initialized serial");
+    info!("Initialized serial");
     memory::init();
-    println!("Initialized paging");
+    info!("Initialized paging");
     gdt::init_gdt();
-    println!("Initialized GDT");
+    info!("Initialized GDT");
     interrupts::init();
-    println!("Initialized interrupts");
-    sprintln!("Checking if bootloader has provided stack size");
+    info!("Initialized interrupts");
+    info!("Checking if bootloader has provided stack size");
     // If the response is present, the bootloader has provided our requested stack size.
     if let Some(_) = STACK_REQUEST.get_response() {
-        sprintln!("Bootloader has provided stack size: 0x{:x}", STACK_SIZE);
+        info!("Bootloader has provided stack size: 0x{:x}", STACK_SIZE);
     } else {
-        sprintln!("Bootloader has not provided stack size");
+        info!("Bootloader has not provided stack size");
     }
-    sprintln!("Initializing display");
+    info!("Initializing display");
     display::init();
     DISPLAY_INITIALIZED.call_once(|| ());
-    sprintln!("Kernel initialized");
+    info!("Kernel initialized");
 }

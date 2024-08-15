@@ -4,6 +4,8 @@
 
 extern crate alloc;
 
+use core::hint::black_box;
+
 use kernel::{
     display::{self, color::Color, terminal},
     interrupts::hardware::timer,
@@ -24,7 +26,14 @@ pub extern "C" fn _start() -> ! {
     kernel::init_kernel();
     sprintln!("Initialized kernel");
     x86_64::instructions::interrupts::enable();
-    alloc::vec![0; 100];
     sprintln!("Enabled interrupts");
+    while true {
+        create_arr_check_free();
+    }
     kernel::hlt_loop();
+}
+
+fn create_arr_check_free() {
+    // Make sure this doesn't get optimized out
+    black_box(alloc::vec![0; 10]);
 }

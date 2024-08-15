@@ -19,6 +19,10 @@ pub fn init() {
         port.init();
         port
     });
+
+    log::set_logger(&LOGGER)
+        .map(|()| log::set_max_level(LOG_LEVEL.to_level_filter()))
+        .unwrap();
 }
 
 pub fn write_byte(byte: u8) {
@@ -75,3 +79,29 @@ macro_rules! sprintln {
     };
 
 }
+
+const LOG_LEVEL: log::Level = log::Level::Trace;
+struct SerialLog;
+
+impl log::Log for SerialLog {
+    fn enabled(&self, metadata: &log::Metadata) -> bool {
+        metadata.level() <= LOG_LEVEL
+    }
+
+    fn log(&self, record: &log::Record) {
+        if self.enabled(record.metadata()) {
+            sprintln!(
+                "[{}] ({}:{}) {}: {}",
+                record.level(),
+                record.file().unwrap_or("unknown"),
+                record.line().unwrap_or(0),
+                record.target(),
+                record.args()
+            );
+        }
+    }
+
+    fn flush(&self) {}
+}
+
+const LOGGER: SerialLog = SerialLog;
