@@ -1,6 +1,7 @@
 #![no_std]
 #![no_main]
 #![feature(abi_x86_interrupt)]
+#![reexport_test_harness_main = "test_main"]
 
 extern crate alloc;
 
@@ -24,6 +25,10 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
     kernel::init_kernel();
+
+    #[cfg(test)]
+    test_main();
+
     sprintln!("Initialized kernel");
     x86_64::instructions::interrupts::enable();
     sprintln!("Enabled interrupts");
@@ -35,5 +40,6 @@ pub extern "C" fn _start() -> ! {
 
 fn create_arr_check_free() {
     // Make sure this doesn't get optimized out
-    black_box(alloc::vec![0; 10]);
+    let t = alloc::vec![0; 10];
+    black_box(t);
 }

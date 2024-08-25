@@ -3,7 +3,7 @@ use core::{
     mem, ptr, slice,
 };
 
-use log::{debug, trace};
+use log::{debug, info, trace};
 
 use crate::sprintln;
 
@@ -15,9 +15,10 @@ pub struct Blocks {
     unmap_start: usize,           // The start of the unmapped memory.
     heap_start: usize,
     heap_end: usize,
+    map_unmap_balance: isize,
 }
 
-const INIT_BLOCK_SIZE: usize = 1024 * 10;
+const INIT_BLOCK_SIZE: usize = 1024;
 const SPLIT_THRESHOLD: f64 = 0.5;
 
 impl Blocks {
@@ -46,11 +47,12 @@ impl Blocks {
             heap_start,
             heap_end,
             unmap_start: heap_start,
+            map_unmap_balance: 0,
         }
     }
 
     pub unsafe fn push_block(&mut self, block: Block) {
-        self.check_block_space();
+        self.run_gc_if_needed();
         let off =
             (self.heap_end - (mem::size_of::<Block>() * (self.blocks.len() + 1))) as *mut Block;
         let off = align(off, true);
@@ -72,7 +74,7 @@ impl Blocks {
     unsafe fn find_block_by_ptr(&mut self, ptr: *mut u8) -> Option<&mut Block> {
         let ptr = ptr as usize;
         for block in &mut *self.blocks {
-            if ptr >= block.address && ptr < block.address + block.size() {
+            if ptr >= block.address && ptr <= block.address + block.size() {
                 trace!(
                     "Found ptr ({:#x}) in block {:#x} (off: {})",
                     ptr,
@@ -114,7 +116,12 @@ impl Blocks {
         }
 
         let addr = address as usize;
-        (addr + address.align_offset(align)) as *mut u8
+
+        self.map_unmap_balance += 1;
+
+        let ptr = (addr + address.align_offset(align)) as *mut u8;
+        trace!("Allocated block at {:#x}", ptr as usize);
+        ptr
     }
 
     pub unsafe fn deallocate(&mut self, ptr: *mut u8, layout: Layout) {
@@ -122,13 +129,27 @@ impl Blocks {
         let ptr = ptr as usize - align;
 
         if let Some(blk) = unsafe { self.find_block_by_ptr(ptr as *mut u8) } {
+            info!("Deallocating block {:?}", blk);
             if blk.is_free() {
                 return;
             }
             blk.deallocate();
+            info!("Deallocated block {:?}", blk);
+            self.map_unmap_balance -= 1;
             self.dbg_print_blocks();
             return;
         }
+        sprintln!(
+            "Block not found for deallocation \n BLOCKS: {:?}",
+            self.blocks
+        );
+
+        sprintln!(
+            "Is ptr in heap? {}",
+            ptr >= self.heap_start && ptr < self.heap_end
+        );
+
+        panic!("Block not found for deallocation");
     }
 
     unsafe fn run_join(&mut self) {
@@ -138,11 +159,14 @@ impl Blocks {
             if !block.needs_delete {
                 if block.is_free() {
                     if let Some(lsblk) = last_free_block {
+                        info!("Joining blocks {:?} and {:?}", lsblk, block);
                         *block = block.merge(lsblk);
                         joined += 1;
                         lsblk.needs_delete = true
                     }
                     last_free_block = Some(block)
+                } else {
+                    last_free_block = None;
                 }
             }
         }
@@ -183,12 +207,9 @@ impl Blocks {
             unsafe { slice::from_raw_parts_mut(self.blocks.as_mut_ptr().add(deleted), len) }
     }
 
-    fn check_block_space(&mut self) {
+    fn run_gc_if_needed(&mut self) {
         if self.blocks.len() * mem::size_of::<Block>() >= self.blocks.last().unwrap().size() {
-            unsafe {
-                self.run_join();
-                self.run_shrink();
-            };
+            self.run_gc();
         }
 
         if self.blocks.len() * mem::size_of::<Block>() >= self.blocks.last().unwrap().size() {
@@ -197,13 +218,27 @@ impl Blocks {
         }
     }
 
+    fn run_gc(&mut self) {
+        sprintln!("START-PRE-GC");
+        self.dbg_serial_send_csv();
+        sprintln!("END-PRE-GC");
+        unsafe {
+            self.run_join();
+            self.run_shrink();
+        }
+        sprintln!("START-POST-GC");
+        self.dbg_serial_send_csv();
+        sprintln!("END-POST-GC");
+    }
+
     fn dbg_print_blocks(&self) {
         let mx = self.blocks.last().unwrap().size() / size_of::<Block>();
         trace!(
-            "blkcount {}/{} ({})",
+            "blkcount {}/{} ({}) umapbal: {}",
             self.blocks.len(),
             mx,
-            self.blocks.len() as f64 / mx as f64
+            self.blocks.len() as f64 / mx as f64,
+            self.map_unmap_balance
         );
 
         let unalloc_count = self.blocks.iter().filter(|b| b.is_free()).count();
@@ -212,6 +247,19 @@ impl Blocks {
             unalloc_count,
             self.blocks.len() - unalloc_count
         );
+    }
+
+    fn dbg_serial_send_csv(&self) {
+        sprintln!("address,size,free,delete");
+        for block in &*self.blocks {
+            sprintln!(
+                "{},{},{},{}",
+                block.address,
+                block.size(),
+                block.is_free(),
+                block.needs_delete
+            );
+        }
     }
 }
 

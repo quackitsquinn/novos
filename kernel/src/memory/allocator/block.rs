@@ -1,7 +1,8 @@
 use crate::memory::allocator::blocksize::BlockSize;
 
 use super::blocktype::BlockType;
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+//INFO: We don't derive Copy to prevent accidental copies of the block
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Block {
     // The type of the block
     pub block_type: BlockType,

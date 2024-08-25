@@ -102,21 +102,22 @@ unsafe impl FrameAllocator<Size4KiB> for PageFrameAllocator {
 }
 
 fn init_heap() {
-    let hstart = VirtAddr::new(HEAP_MEM_OFFSET);
-    let hend = hstart + HEAP_SIZE - 1u64;
-    let hstart_page = Page::containing_address(hstart);
-    let hend_page = Page::containing_address(hend);
-    let hrange: PageRangeInclusive<Size4KiB> = Page::range_inclusive(hstart_page, hend_page);
+    let heap_start = VirtAddr::new(HEAP_MEM_OFFSET);
+    let heap_end = heap_start + HEAP_SIZE - 1u64;
+    let heap_start_page = Page::containing_address(heap_start);
+    let heap_end_page = Page::containing_address(heap_end);
+    let heap_range: PageRangeInclusive<Size4KiB> =
+        Page::range_inclusive(heap_start_page, heap_end_page);
 
     let mut pfa = FRAME_ALLOCATOR.get();
-    for page in hrange {
+    for page in heap_range {
         pfa.map_page(page, PageTableFlags::PRESENT | PageTableFlags::WRITABLE)
             .unwrap()
             .flush();
     }
 
-    sprintln!("Heap initialized at 0x{:x} - 0x{:x}", hstart, hend);
+    sprintln!("Heap initialized at 0x{:x} - 0x{:x}", heap_start, heap_end);
     sprintln!("Initializing allocator");
-    unsafe { allocator::init(hstart.as_u64() as usize, hend.as_u64() as usize) };
+    unsafe { allocator::init(heap_start.as_u64() as usize, heap_end.as_u64() as usize) };
     sprintln!("Allocator initialized");
 }
