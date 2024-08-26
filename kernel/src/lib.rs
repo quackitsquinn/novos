@@ -63,4 +63,34 @@ pub fn init_kernel() {
     display::init();
     DISPLAY_INITIALIZED.call_once(|| ());
     info!("Kernel initialized");
+
+    let _ = debug_release_check!(
+        debug {
+            sprintln!("Debug build");
+            3
+        },
+        release {
+            sprintln!("Release build");
+            33
+        }
+    );
+}
+
+#[macro_export]
+macro_rules! debug_release_check {
+    (debug $run_in_debug: tt, release $run_in_release: tt ) => {{
+        #[cfg(debug_assertions)]
+        $run_in_debug
+        #[cfg(not(debug_assertions))]
+        $run_in_release
+    }};
+}
+
+#[macro_export]
+macro_rules! assert_or_else {
+    ($assertion: expr, $else_block: block) => {
+        if !$assertion {
+            $else_block
+        }
+    };
 }

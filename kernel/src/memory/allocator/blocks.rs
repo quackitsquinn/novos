@@ -1,11 +1,14 @@
 use core::{
     alloc::{GlobalAlloc, Layout},
-    mem, ptr, slice,
+    error,
+    mem::{self, MaybeUninit},
+    ptr::{self, addr_eq, addr_of},
+    slice,
 };
 
 use log::{debug, error, info, trace};
 
-use crate::sprintln;
+use crate::{assert_or_else, debug_release_check, sprintln};
 
 use super::{block::Block, blocksize::BlockSize, blocktype::BlockType};
 
@@ -21,7 +24,7 @@ pub struct Blocks {
 unsafe impl Send for Blocks {}
 unsafe impl Sync for Blocks {}
 
-const INIT_BLOCK_SIZE: usize = 1024;
+const INIT_BLOCK_SIZE: usize = 1024 * 10; // 10KB
 const SPLIT_THRESHOLD: f64 = 0.5;
 
 impl Blocks {
@@ -125,17 +128,23 @@ impl Blocks {
 
         let ptr = (addr + address.align_offset(align)) as *mut u8;
         trace!("Allocated block at {:#x}", ptr as usize);
+        self.run_gc();
         ptr
     }
 
     pub unsafe fn deallocate(&mut self, ptr: *mut u8, layout: Layout) {
-        let align = layout.align();
-        let ptr = ptr as usize - align;
-
-        if let Some(blk) = unsafe { self.find_block_by_ptr(ptr as *mut u8) } {
+        if let Some(blk) = unsafe { self.find_block_by_ptr(ptr) } {
             info!("Deallocating block {:?}", blk);
             if blk.is_free() {
-                return;
+                // TODO: Should DEFINITELY not panic here. Tis is a temporary debug check.
+                debug_release_check! {
+                    debug {
+                        panic!("Block already deallocated");
+                    },
+                    release {
+                        error!("Block already deallocated");
+                    }
+                }
             }
             blk.deallocate();
             info!("Deallocated block {:?}", blk);
@@ -148,10 +157,10 @@ impl Blocks {
             self.blocks
         );
 
-        sprintln!(
-            "Is ptr in heap? {}",
-            ptr >= self.heap_start && ptr < self.heap_end
-        );
+        // sprintln!(
+        //     "Is ptr in heap? {}",
+        //     ptr >= self.heap_start && ptr < self.heap_end
+        // );
 
         error!("Block not found for deallocation");
     }
@@ -197,9 +206,26 @@ impl Blocks {
         // step -> if block is marked as needs_delete -> move all elements before 1 up -> continue
         for (i, block) in self.blocks.iter_mut().enumerate() {
             if block.needs_delete {
+                debug!("Deleting block {:?}", block);
+                if i == 0 {
+                    base = unsafe { base.add(1) };
+                    len -= 1;
+                    deleted += 1;
+                    continue;
+                }
                 // Copy base + i - 1 to i
                 unsafe {
-                    ptr::copy(base, base.add(1), i - 1);
+                    assert_or_else!(
+                        base.add(1) as usize <= self.heap_end
+                            && base.add(1) as usize + size_of::<Block>() * len <= self.heap_end,
+                        {
+                            error!("Unable to shrink block table! (Attempting to copy 0x{:X} blocks to {:p} would overrun the heap by 0x{:X})", len, base.add(1),(base.add(1) as usize + size_of::<Block>() * len) - self.heap_end);
+                            self.dbg_print_blocks();
+                            self.dbg_serial_send_csv();
+                            panic!("Unable to shrink block table!");
+                        }
+                    );
+                    ptr::copy(base, base.add(1), i);
                     base = base.add(1);
                 }
                 len -= 1;

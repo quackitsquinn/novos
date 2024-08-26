@@ -32,7 +32,7 @@ pub extern "C" fn _start() -> ! {
     sprintln!("Initialized kernel");
     x86_64::instructions::interrupts::enable();
     sprintln!("Enabled interrupts");
-    while true {
+    loop {
         create_arr_check_free();
     }
     kernel::hlt_loop();
@@ -40,6 +40,9 @@ pub extern "C" fn _start() -> ! {
 
 fn create_arr_check_free() {
     // Make sure this doesn't get optimized out
-    let t = alloc::vec![0; 10];
+    let mut t: alloc::vec::Vec<u8> = alloc::vec![0];
+    for i in 0..100 {
+        t.push(i);
+    }
     black_box(t);
 }
