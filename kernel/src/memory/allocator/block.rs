@@ -7,13 +7,13 @@ pub struct Block {
     // The type of the block
     pub block_type: BlockType,
     // The start address of the block
-    pub address: usize,
+    pub address: *mut u8,
     // If the block needs to be removed in the next block clean
     pub needs_delete: bool,
 }
 
 impl Block {
-    pub fn new(block_type: BlockType, address: usize) -> Self {
+    pub fn new(block_type: BlockType, address: *mut u8) -> Self {
         Self {
             block_type,
             address,
@@ -42,7 +42,7 @@ impl Block {
             return None;
         }
 
-        let new_block = Block::new(self.block_type, self.address + size);
+        let new_block = Block::new(self.block_type, unsafe { self.address.add(size) });
         self.block_type = self.block_type.deallocate();
         Some(new_block)
     }

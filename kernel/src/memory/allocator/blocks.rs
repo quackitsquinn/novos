@@ -3,7 +3,7 @@ use core::{
     mem, ptr, slice,
 };
 
-use log::{debug, info, trace};
+use log::{debug, error, info, trace};
 
 use crate::sprintln;
 
@@ -17,6 +17,9 @@ pub struct Blocks {
     heap_end: usize,
     map_unmap_balance: isize,
 }
+// TODO: Don't implement Send and Sync for Blocks. Implement it for LockedAllocator instead.
+unsafe impl Send for Blocks {}
+unsafe impl Sync for Blocks {}
 
 const INIT_BLOCK_SIZE: usize = 1024;
 const SPLIT_THRESHOLD: f64 = 0.5;
@@ -29,7 +32,7 @@ impl Blocks {
         // Set the first block to contain itself
         let block = Block::new(
             BlockType::Allocated(BlockSize::new_bytes(INIT_BLOCK_SIZE)),
-            block_heap_end,
+            block_heap_end as *mut u8,
         );
         sprintln!("Writing initblock to {:#x}", block_heap_end);
         unsafe {
@@ -65,7 +68,7 @@ impl Blocks {
     unsafe fn allocate_block(&mut self, size: usize) -> Block {
         let block = Block::new(
             BlockType::Allocated(BlockSize::new_bytes(size)),
-            self.unmap_start,
+            self.unmap_start as *mut u8,
         );
         self.unmap_start += size;
         block
@@ -74,12 +77,13 @@ impl Blocks {
     unsafe fn find_block_by_ptr(&mut self, ptr: *mut u8) -> Option<&mut Block> {
         let ptr = ptr as usize;
         for block in &mut *self.blocks {
-            if ptr >= block.address && ptr <= block.address + block.size() {
+            let addr = block.address as usize;
+            if ptr >= addr && ptr <= addr + block.size() {
                 trace!(
-                    "Found ptr ({:#x}) in block {:#x} (off: {})",
+                    "Found ptr ({:#x}) in block {:#p} (off: {})",
                     ptr,
                     block.address,
-                    ptr - block.address
+                    ptr - addr
                 );
                 return Some(block);
             }
@@ -149,7 +153,7 @@ impl Blocks {
             ptr >= self.heap_start && ptr < self.heap_end
         );
 
-        panic!("Block not found for deallocation");
+        error!("Block not found for deallocation");
     }
 
     unsafe fn run_join(&mut self) {
@@ -176,7 +180,8 @@ impl Blocks {
     unsafe fn ptr_is_allocated(&self, ptr: *mut u8) -> bool {
         let ptr = ptr as usize;
         for block in &*self.blocks {
-            if ptr >= block.address && ptr < block.address + block.size() {
+            let addr = block.address as usize;
+            if ptr >= addr && ptr < addr + block.size() {
                 return block.is_free();
             }
         }
@@ -253,7 +258,7 @@ impl Blocks {
         sprintln!("address,size,free,delete");
         for block in &*self.blocks {
             sprintln!(
-                "{},{},{},{}",
+                "{:p},{},{},{}",
                 block.address,
                 block.size(),
                 block.is_free(),
