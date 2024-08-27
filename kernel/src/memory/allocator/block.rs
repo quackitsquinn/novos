@@ -1,11 +1,10 @@
-use crate::memory::allocator::blocksize::BlockSize;
-
-use super::blocktype::BlockType;
 //INFO: We don't derive Copy to prevent accidental copies of the block
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Block {
-    // The type of the block
-    pub block_type: BlockType,
+    // The size of the block
+    pub size: usize,
+    //  Is the block free or allocated
+    pub is_free: bool,
     // The start address of the block
     pub address: *mut u8,
     // If the block needs to be removed in the next block clean
@@ -13,28 +12,29 @@ pub struct Block {
 }
 
 impl Block {
-    pub fn new(block_type: BlockType, address: *mut u8) -> Self {
+    pub fn new(size: usize, address: *mut u8, is_free: bool) -> Self {
         Self {
-            block_type,
+            size,
+            is_free: is_free,
             address,
             needs_delete: false,
         }
     }
 
     pub fn size(&self) -> usize {
-        self.block_type.size()
+        self.size
     }
 
     pub fn is_free(&self) -> bool {
-        self.block_type.is_free()
+        self.is_free
     }
 
     pub fn deallocate(&mut self) {
-        self.block_type = self.block_type.deallocate();
+        self.is_free = true;
     }
 
     pub fn allocate(&mut self) {
-        self.block_type = self.block_type.allocate();
+        self.is_free = false;
     }
 
     pub fn split(&mut self, size: usize) -> Option<Block> {
@@ -42,8 +42,8 @@ impl Block {
             return None;
         }
 
-        let new_block = Block::new(self.block_type, unsafe { self.address.add(size) });
-        self.block_type = self.block_type.deallocate();
+        let new_block = Block::new(self.size - size, unsafe { self.address.add(size) }, true);
+        self.size = size;
         Some(new_block)
     }
 
@@ -52,12 +52,9 @@ impl Block {
             return other.merge(self); // Ensure self is the block with the lower address
         }
         assert!(
-            self.block_type.is_free() && other.block_type.is_free(),
+            self.is_free() && other.is_free(),
             "Cannot merge allocated blocks"
         );
-        Block::new(
-            BlockType::Free(BlockSize::new_bytes(self.size() + other.size())),
-            self.address,
-        )
+        Block::new(self.size() + other.size(), self.address, true)
     }
 }

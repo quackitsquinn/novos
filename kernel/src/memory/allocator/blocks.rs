@@ -10,7 +10,7 @@ use log::{debug, error, info, trace};
 
 use crate::{assert_or_else, debug_release_check, sprintln};
 
-use super::{block::Block, blocksize::BlockSize, blocktype::BlockType};
+use super::block::Block;
 
 pub struct Blocks {
     // INFO: We don't use a Vec here because A. infinite recursion and B. The slice grows downwards rather than upwards.
@@ -33,10 +33,7 @@ impl Blocks {
         let block_heap_end = align(block_heap_end as *mut Block, true) as usize;
         sprintln!("Block heap end: {:#x}", block_heap_end);
         // Set the first block to contain itself
-        let block = Block::new(
-            BlockType::Allocated(BlockSize::new_bytes(INIT_BLOCK_SIZE)),
-            block_heap_end as *mut u8,
-        );
+        let block = Block::new(INIT_BLOCK_SIZE, block_heap_end as *mut u8, false);
         sprintln!("Writing initblock to {:#x}", block_heap_end);
         unsafe {
             let mut lastblock = (block_heap_end) as *mut Block;
@@ -69,10 +66,7 @@ impl Blocks {
     }
     // This will be relatively slow, but it should be called less and less as the heap grows.
     unsafe fn allocate_block(&mut self, size: usize) -> Block {
-        let block = Block::new(
-            BlockType::Allocated(BlockSize::new_bytes(size)),
-            self.unmap_start as *mut u8,
-        );
+        let block = Block::new(size, self.unmap_start as *mut u8, false);
         self.unmap_start += size;
         block
     }

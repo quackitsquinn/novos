@@ -5,8 +5,6 @@ use crate::util::OnceMutex;
 pub mod alloc;
 pub mod block;
 pub mod blocks;
-pub mod blocksize;
-pub mod blocktype;
 
 #[global_allocator]
 pub static ALLOCATOR: LockedAllocator = LockedAllocator::new();
