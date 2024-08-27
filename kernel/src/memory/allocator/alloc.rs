@@ -1,5 +1,5 @@
 // :(.. this doesn't seem to work.
-#![doc = include_str!("allocation.md")]
+#![doc = include_str!("allocator-design-new.md")]
 
 use core::alloc::GlobalAlloc;
 

@@ -1,5 +1,3 @@
-use core::mem;
-
 use bitflags::iter::Iter;
 use limine::{memory_map::EntryType, paging::Mode, response::MemoryMapResponse};
 use spin::{Mutex, Once};
