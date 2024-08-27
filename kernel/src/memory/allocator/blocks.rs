@@ -18,7 +18,7 @@ pub struct Blocks {
     unmap_start: usize,           // The start of the unmapped memory.
     heap_start: usize,
     heap_end: usize,
-    map_unmap_balance: isize,
+    allocation_balance: isize,
 }
 // TODO: Don't implement Send and Sync for Blocks. Implement it for LockedAllocator instead.
 unsafe impl Send for Blocks {}
@@ -34,15 +34,15 @@ impl Blocks {
         sprintln!("Block heap end: {:#x}", block_heap_end);
         // Set the first block to contain itself
         let block = Block::new(INIT_BLOCK_SIZE, block_heap_end as *mut u8, false);
-        sprintln!("Writing initblock to {:#x}", block_heap_end);
+        sprintln!("Writing block table block to {:#x}", block_heap_end);
         unsafe {
-            let mut lastblock = (block_heap_end) as *mut Block;
-            lastblock.write(block);
+            let block_table_block = (block_heap_end) as *mut Block;
+            block_table_block.write(block);
         };
-        sprintln!("Wrote initblock to {:#x}", block_heap_end);
-        let arrptr = block_heap_end as *mut Block;
-        sprintln!("Block array at {:#x}", arrptr as usize);
-        let blocks = unsafe { slice::from_raw_parts_mut(arrptr, 1) };
+        sprintln!("Wrote block table block to {:#x}", block_heap_end);
+        let blk_tbl_ptr = block_heap_end as *mut Block;
+        sprintln!("Block table at {:#x}", blk_tbl_ptr as usize);
+        let blocks = unsafe { slice::from_raw_parts_mut(blk_tbl_ptr, 1) };
         sprintln!("Blocks: {:?}", blocks);
 
         Self {
@@ -50,20 +50,20 @@ impl Blocks {
             heap_start,
             heap_end,
             unmap_start: heap_start,
-            map_unmap_balance: 0,
+            allocation_balance: 0,
         }
     }
 
     pub unsafe fn push_block(&mut self, block: Block) {
         self.run_gc_if_needed();
-        let off =
-            (self.heap_end - (mem::size_of::<Block>() * (self.blocks.len() + 1))) as *mut Block;
-        let off = align(off, true);
+        let off = unsafe { self.blocks.as_mut_ptr().sub(1) };
+        //let off = align(off, true); this align is probably not needed
         unsafe {
             off.write(block);
             self.blocks = slice::from_raw_parts_mut(off, self.blocks.len() + 1);
         }
     }
+
     // This will be relatively slow, but it should be called less and less as the heap grows.
     unsafe fn allocate_block(&mut self, size: usize) -> Block {
         let block = Block::new(size, self.unmap_start as *mut u8, false);
@@ -118,7 +118,7 @@ impl Blocks {
 
         let addr = address as usize;
 
-        self.map_unmap_balance += 1;
+        self.allocation_balance += 1;
 
         let ptr = (addr + address.align_offset(align)) as *mut u8;
         trace!("Allocated block at {:#x}", ptr as usize);
@@ -142,7 +142,7 @@ impl Blocks {
             }
             blk.deallocate();
             info!("Deallocated block {:?}", blk);
-            self.map_unmap_balance -= 1;
+            self.allocation_balance -= 1;
             self.dbg_print_blocks();
             return;
         }
@@ -150,13 +150,10 @@ impl Blocks {
             "Block not found for deallocation \n BLOCKS: {:?}",
             self.blocks
         );
-
-        // sprintln!(
-        //     "Is ptr in heap? {}",
-        //     ptr >= self.heap_start && ptr < self.heap_end
-        // );
-
-        error!("Block not found for deallocation");
+        error!(
+            "Block not found for deallocation (ptr: {:#x})",
+            ptr as usize
+        );
     }
 
     unsafe fn run_join(&mut self) {
@@ -196,12 +193,13 @@ impl Blocks {
         let mut len = self.blocks.len();
         let mut base = self.blocks.as_mut_ptr();
         let mut deleted = 0;
+        let mut would_copy_oob = false;
         self.dbg_print_blocks();
         // step -> if block is marked as needs_delete -> move all elements before 1 up -> continue
         for (i, block) in self.blocks.iter_mut().enumerate() {
             if block.needs_delete {
                 debug!("Deleting block {:?}", block);
-                if i == 0 {
+                if i == len - 1 {
                     base = unsafe { base.add(1) };
                     len -= 1;
                     deleted += 1;
@@ -209,22 +207,28 @@ impl Blocks {
                 }
                 // Copy base + i - 1 to i
                 unsafe {
-                    assert_or_else!(
-                        base.add(1) as usize <= self.heap_end
-                            && base.add(1) as usize + size_of::<Block>() * len <= self.heap_end,
-                        {
-                            error!("Unable to shrink block table! (Attempting to copy 0x{:X} blocks to {:p} would overrun the heap by 0x{:X})", len, base.add(1),(base.add(1) as usize + size_of::<Block>() * len) - self.heap_end);
-                            self.dbg_print_blocks();
-                            self.dbg_serial_send_csv();
-                            panic!("Unable to shrink block table!");
-                        }
-                    );
-                    ptr::copy(base, base.add(1), i);
+                    if base.add(1) as usize <= self.heap_end
+                        && base.add(1) as usize + size_of::<Block>() * len <= self.heap_end
+                    {
+                        would_copy_oob = true;
+                        break;
+                    } else {
+                        ptr::copy(base, base.add(1), i);
+                    }
                     base = base.add(1);
                 }
                 len -= 1;
                 deleted += 1;
             }
+        }
+
+        if would_copy_oob {
+            unsafe {
+                error!("Unable to shrink block table! (Attempting to copy 0x{:X} blocks to {:p} would overrun the heap by 0x{:X})", len, base.add(1),(base.add(1) as usize + size_of::<Block>() * len) - self.heap_end);
+            }
+            self.dbg_print_blocks();
+            self.dbg_serial_send_csv();
+            panic!("Unable to shrink block table!");
         }
         self.dbg_print_blocks();
         debug!("Deleted {} blocks", deleted);
@@ -263,7 +267,7 @@ impl Blocks {
             self.blocks.len(),
             mx,
             self.blocks.len() as f64 / mx as f64,
-            self.map_unmap_balance
+            self.allocation_balance
         );
 
         let unalloc_count = self.blocks.iter().filter(|b| b.is_free()).count();
