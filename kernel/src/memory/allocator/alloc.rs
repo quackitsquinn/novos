@@ -8,7 +8,7 @@ use crate::util::OnceMutex;
 use super::{block::Block, blocks::Blocks, LockedAllocator};
 
 pub struct RuntimeAllocator {
-    blocks: Blocks,
+    pub(super) blocks: Blocks,
 }
 
 impl RuntimeAllocator {
@@ -31,9 +31,9 @@ unsafe impl GlobalAlloc for LockedAllocator {
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: core::alloc::Layout) {
-        if layout.size() == 0 {
-            return;
-        }
+        // if layout.size() == 0 {
+        //     return;
+        // }
         let mut alloc = self.get();
         unsafe { alloc.blocks.deallocate(ptr, layout) };
     }

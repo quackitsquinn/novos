@@ -10,7 +10,7 @@ use core::hint::black_box;
 use kernel::{
     display::{self, color::Color, terminal},
     interrupts::hardware::timer,
-    println, sprintln, terminal,
+    memory, println, sprintln, terminal,
 };
 
 #[panic_handler]
@@ -36,13 +36,20 @@ pub extern "C" fn _start() -> ! {
         create_arr_check_free();
     }
     kernel::hlt_loop();
+    memory::allocator::output_blocks();
 }
+
+static mut COUNTER: u32 = 0;
 
 fn create_arr_check_free() {
     // Make sure this doesn't get optimized out
-    let mut t: alloc::vec::Vec<u8> = alloc::vec![0];
+    let mut t: alloc::vec::Vec<u32> = alloc::vec![0];
     for i in 0..100 {
-        t.push(i);
+        t.push(unsafe { COUNTER });
+        sprintln!("Pushed {}", unsafe { COUNTER });
+        unsafe {
+            COUNTER += 1;
+        }
     }
     black_box(t);
 }

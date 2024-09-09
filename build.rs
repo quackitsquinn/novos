@@ -31,11 +31,13 @@ macro_rules! copy_all {
 fn main() {
     let out_dir = std::env::var("OUT_DIR").expect("OUT_DIR not set");
     let kernel_dir = std::env::var("CARGO_BIN_FILE_KERNEL").expect("CARGO_BIN_FILE_KERNEL not set");
+    // Should re-clone limine if the env var is set
+    let invalidate_limine = std::env::var("INVALIDATE_LIMINE").is_ok();
 
     println!("OUT_DIR: {}", out_dir);
     println!("CARGO_BIN_FILE_KERNEL: {}", kernel_dir);
 
-    make_limine_bin();
+    make_limine_bin(invalidate_limine);
 
     make_iso(&out_dir, &kernel_dir);
 
@@ -43,16 +45,17 @@ fn main() {
 }
 
 /// Build limine binary
-fn make_limine_bin() {
-    if Path::new(&out_base!("limine/")).exists() {
+fn make_limine_bin(invalidate: bool) {
+    if Path::new(&out_base!("limine/")).exists() && !invalidate {
         return;
     } else {
+        rm_rf(&out_base!("limine/"));
         // Clone limine
         let output = std::process::Command::new("git")
             .args(&[
                 "clone",
                 "https://github.com/limine-bootloader/limine.git",
-                "--branch=v7.5.1-binary",
+                "--branch=v8.x-binary",
                 "--depth=1",
                 &out_base!("limine"),
             ])
@@ -77,7 +80,7 @@ fn make_iso(out_dir: &str, kernel_bin: &str) {
 
     copy_all!(
         out_base!("iso/boot/"),
-        "limine.cfg",
+        "limine.conf",
         &limine!("limine-bios.sys"),
         &limine!("limine-bios-cd.bin"),
         &limine!("limine-uefi-cd.bin")

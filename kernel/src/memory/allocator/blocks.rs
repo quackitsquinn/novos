@@ -1,21 +1,16 @@
-use core::{
-    alloc::{GlobalAlloc, Layout},
-    error,
-    mem::{self, MaybeUninit},
-    ptr::{self, addr_eq, addr_of},
-    slice,
-};
+use core::{alloc::Layout, mem, ptr, slice};
 
 use log::{debug, error, info, trace};
 
-use crate::{assert_or_else, debug_release_check, sprintln};
+use crate::{debug_release_check, sprintln};
 
 use super::block::Block;
 
+#[derive(Debug)]
 pub struct Blocks {
     // INFO: We don't use a Vec here because A. infinite recursion and B. The slice grows downwards rather than upwards.
-    blocks: &'static mut [Block], // TODO: maybe use MaybeUninits? Would half the size of the struct.
-    unmap_start: usize,           // The start of the unmapped memory.
+    blocks: &'static mut [Block],
+    unmap_start: usize, // The start of the unmapped memory.
     heap_start: usize,
     heap_end: usize,
     allocation_balance: isize,
@@ -26,6 +21,7 @@ unsafe impl Sync for Blocks {}
 
 const INIT_BLOCK_SIZE: usize = 1024 * 10; // 10KB
 const SPLIT_THRESHOLD: f64 = 0.5;
+const GC_THRESHOLD: f64 = 0.8;
 
 impl Blocks {
     pub unsafe fn init(heap_start: usize, heap_end: usize) -> Self {
@@ -55,9 +51,17 @@ impl Blocks {
     }
 
     pub unsafe fn push_block(&mut self, block: Block) {
-        self.run_gc_if_needed();
+        self.check_block_space();
+        // TODO: Use the actual allocator design here. This is a temporary solution because I got tired of fighting with pointers.
+        for blks in &mut *self.blocks {
+            if blks.is_reusable {
+                *blks = block;
+                return;
+            }
+        }
+        // If this is reached, we just need to push the block to the end of the slice.
         let off = unsafe { self.blocks.as_mut_ptr().sub(1) };
-        //let off = align(off, true); this align is probably not needed
+        // SAFETY: run_gc_if_needed ensures that there is enough space for the block.
         unsafe {
             off.write(block);
             self.blocks = slice::from_raw_parts_mut(off, self.blocks.len() + 1);
@@ -66,8 +70,10 @@ impl Blocks {
 
     // This will be relatively slow, but it should be called less and less as the heap grows.
     unsafe fn allocate_block(&mut self, size: usize) -> Block {
+        self.dbg_print_blocks();
         let block = Block::new(size, self.unmap_start as *mut u8, false);
         self.unmap_start += size;
+        self.dbg_print_blocks();
         block
     }
 
@@ -90,16 +96,16 @@ impl Blocks {
 
     pub unsafe fn allocate(&mut self, layout: Layout) -> *mut u8 {
         let size = layout.size();
-        let align = layout.align();
+        let alignment = layout.align();
         let mut split = None;
         let mut address = ptr::null_mut();
 
         for block in &mut *self.blocks {
-            if block.is_free() && block.size() + align >= size {
+            if block.is_free() && block.size() + alignment >= size {
                 block.allocate();
                 address = block.address as *mut u8;
-                if block.size() > size + align + (size as f64 * SPLIT_THRESHOLD) as usize {
-                    split = block.split(size + align);
+                if block.size() > size + alignment + (size as f64 * SPLIT_THRESHOLD) as usize {
+                    split = block.split(size + alignment);
                 }
             }
         }
@@ -107,7 +113,7 @@ impl Blocks {
         if address.is_null() {
             sprintln!("Allocating new block");
             // Allocate a new block
-            let block = unsafe { self.allocate_block(size + align) };
+            let block = unsafe { self.allocate_block(size + alignment) };
             address = block.address as *mut u8;
             unsafe { self.push_block(block) };
         }
@@ -116,18 +122,17 @@ impl Blocks {
             unsafe { self.push_block(block) };
         }
 
-        let addr = address as usize;
-
         self.allocation_balance += 1;
 
-        let ptr = (addr + address.align_offset(align)) as *mut u8;
+        let ptr = align_with_alignment(address, layout.align(), false);
         trace!("Allocated block at {:#x}", ptr as usize);
-        self.run_gc();
         ptr
     }
 
     pub unsafe fn deallocate(&mut self, ptr: *mut u8, layout: Layout) {
-        if let Some(blk) = unsafe { self.find_block_by_ptr(ptr) } {
+        if let Some(blk) =
+            unsafe { self.find_block_by_ptr(align_with_alignment(ptr, layout.align(), true)) }
+        {
             info!("Deallocating block {:?}", blk);
             if blk.is_free() {
                 // TODO: Should DEFINITELY not panic here. Tis is a temporary debug check.
@@ -137,6 +142,7 @@ impl Blocks {
                     },
                     release {
                         error!("Block already deallocated");
+                        return;
                     }
                 }
             }
@@ -160,13 +166,13 @@ impl Blocks {
         let mut last_free_block: Option<&mut Block> = None;
         let mut joined = 0;
         for block in &mut *self.blocks {
-            if !block.needs_delete {
+            if !block.is_reusable {
                 if block.is_free() {
                     if let Some(lsblk) = last_free_block {
                         info!("Joining blocks {:?} and {:?}", lsblk, block);
                         *block = block.merge(lsblk);
                         joined += 1;
-                        lsblk.needs_delete = true
+                        lsblk.is_reusable = true
                     }
                     last_free_block = Some(block)
                 } else {
@@ -188,56 +194,12 @@ impl Blocks {
         false
     }
 
-    unsafe fn run_shrink(&mut self) {
-        // TODO: better optimization for sequential deletion blocks
-        let mut len = self.blocks.len();
-        let mut base = self.blocks.as_mut_ptr();
-        let mut deleted = 0;
-        let mut would_copy_oob = false;
-        self.dbg_print_blocks();
-        // step -> if block is marked as needs_delete -> move all elements before 1 up -> continue
-        for (i, block) in self.blocks.iter_mut().enumerate() {
-            if block.needs_delete {
-                debug!("Deleting block {:?}", block);
-                if i == len - 1 {
-                    base = unsafe { base.add(1) };
-                    len -= 1;
-                    deleted += 1;
-                    continue;
-                }
-                // Copy base + i - 1 to i
-                unsafe {
-                    if base.add(1) as usize <= self.heap_end
-                        && base.add(1) as usize + size_of::<Block>() * len <= self.heap_end
-                    {
-                        would_copy_oob = true;
-                        break;
-                    } else {
-                        ptr::copy(base, base.add(1), i);
-                    }
-                    base = base.add(1);
-                }
-                len -= 1;
-                deleted += 1;
-            }
-        }
-
-        if would_copy_oob {
-            unsafe {
-                error!("Unable to shrink block table! (Attempting to copy 0x{:X} blocks to {:p} would overrun the heap by 0x{:X})", len, base.add(1),(base.add(1) as usize + size_of::<Block>() * len) - self.heap_end);
-            }
-            self.dbg_print_blocks();
-            self.dbg_serial_send_csv();
-            panic!("Unable to shrink block table!");
-        }
-        self.dbg_print_blocks();
-        debug!("Deleted {} blocks", deleted);
-        self.blocks =
-            unsafe { slice::from_raw_parts_mut(self.blocks.as_mut_ptr().add(deleted), len) }
-    }
-
-    fn run_gc_if_needed(&mut self) {
-        if self.blocks.len() * mem::size_of::<Block>() >= self.blocks.last().unwrap().size() {
+    fn check_block_space(&mut self) {
+        // run GC if the block table is more than GC_THRESHOLD full
+        if (self.blocks.len() * size_of::<Block>()) as f64
+            / self.blocks.last().unwrap().size() as f64
+            >= GC_THRESHOLD
+        {
             self.run_gc();
         }
 
@@ -253,7 +215,6 @@ impl Blocks {
         sprintln!("END-PRE-GC");
         unsafe {
             self.run_join();
-            self.run_shrink();
         }
         sprintln!("START-POST-GC");
         self.dbg_serial_send_csv();
@@ -279,29 +240,39 @@ impl Blocks {
     }
 
     fn dbg_serial_send_csv(&self) {
-        sprintln!("address,size,free,delete");
-        for block in &*self.blocks {
-            sprintln!(
-                "{:p},{},{},{}",
-                block.address,
-                block.size(),
-                block.is_free(),
-                block.needs_delete
-            );
-        }
+        #[cfg(debug_assertions)]
+        {
+            sprintln!("address,size,free,can_reuse");
+            for block in &*self.blocks {
+                sprintln!(
+                    "{:p},{},{},{}",
+                    block.address,
+                    block.size(),
+                    block.is_free(),
+                    block.is_reusable
+                );
+            }
+        };
     }
 }
 
+#[inline]
 fn align<T>(val: *mut T, downwards: bool) -> *mut T {
-    let align = mem::align_of::<T>();
+    align_with_alignment(val as *mut u8, mem::align_of::<T>(), downwards) as *mut T
+}
+
+fn align_with_alignment(val: *mut u8, alignment: usize, downwards: bool) -> *mut u8 {
     let val = val as usize;
-    let offset = val % align;
+    let offset = val % alignment;
     if offset == 0 {
-        return val as *mut T;
+        return val as *mut u8;
     }
-    if downwards {
-        (val - offset) as *mut T
+
+    let ptr = if downwards {
+        (val - offset) as *mut u8
     } else {
-        (val + (align - offset)) as *mut T
-    }
+        (val + (alignment - offset)) as *mut u8
+    };
+    assert!(ptr.is_aligned());
+    ptr
 }

@@ -7,8 +7,8 @@ pub struct Block {
     pub is_free: bool,
     // The start address of the block
     pub address: *mut u8,
-    // If the block needs to be removed in the next block clean
-    pub needs_delete: bool,
+    // Can the block be reused
+    pub is_reusable: bool,
 }
 
 impl Block {
@@ -17,7 +17,7 @@ impl Block {
             size,
             is_free: is_free,
             address,
-            needs_delete: false,
+            is_reusable: false,
         }
     }
 

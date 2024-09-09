@@ -91,10 +91,8 @@ impl log::Log for SerialLog {
     fn log(&self, record: &log::Record) {
         if self.enabled(record.metadata()) {
             sprintln!(
-                "[{}] ({}:{}) {}: {}",
+                "[{}] {}: {}",
                 record.level(),
-                record.file().unwrap_or("unknown"),
-                record.line().unwrap_or(0),
                 record.target(),
                 record.args()
             );
