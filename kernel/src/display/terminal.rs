@@ -164,7 +164,7 @@ impl Write for Terminal {
 #[doc(hidden)]
 pub fn _print(args: core::fmt::Arguments) {
     use core::fmt::Write;
-    crate::serial::_print(args);
+    crate::serial::interface::_print(args);
     if crate::display_init() {
         write!(*terminal!(), "{}", args).unwrap();
     }

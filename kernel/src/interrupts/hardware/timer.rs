@@ -1,3 +1,5 @@
+use core::time::Duration;
+
 use x86_64::structures::idt::InterruptStackFrame;
 
 use crate::println;
@@ -32,4 +34,14 @@ pub fn get_minutes() -> u64 {
 
 pub fn get_hours() -> u64 {
     get_minutes() / 60
+}
+
+pub fn sleep(time: Duration) {
+    let start = get_ticks();
+    let end = start
+        + (time.as_secs() * (TIMER_FREQUENCY as u64))
+        + (time.subsec_nanos() as u64 / 1_000_000);
+    while get_ticks() < end {
+        x86_64::instructions::interrupts::enable_and_hlt();
+    }
 }

@@ -7,7 +7,7 @@ use crate::{debug_release_check, sprintln};
 use super::block::Block;
 
 #[derive(Debug)]
-pub struct Blocks {
+pub struct BlockAllocator {
     // INFO: We don't use a Vec here because A. infinite recursion and B. The slice grows downwards rather than upwards.
     blocks: &'static mut [Block],
     unmap_start: usize, // The start of the unmapped memory.
@@ -16,14 +16,14 @@ pub struct Blocks {
     allocation_balance: isize,
 }
 // TODO: Don't implement Send and Sync for Blocks. Implement it for LockedAllocator instead.
-unsafe impl Send for Blocks {}
-unsafe impl Sync for Blocks {}
+unsafe impl Send for BlockAllocator {}
+unsafe impl Sync for BlockAllocator {}
 
 const INIT_BLOCK_SIZE: usize = 1024 * 10; // 10KB
 const SPLIT_THRESHOLD: f64 = 0.5;
 const GC_THRESHOLD: f64 = 0.8;
 
-impl Blocks {
+impl BlockAllocator {
     pub unsafe fn init(heap_start: usize, heap_end: usize) -> Self {
         let block_heap_end = heap_end - mem::size_of::<Block>();
         let block_heap_end = align(block_heap_end as *mut Block, true) as usize;
@@ -152,17 +152,13 @@ impl Blocks {
             self.dbg_print_blocks();
             return;
         }
-        sprintln!(
-            "Block not found for deallocation \n BLOCKS: {:?}",
-            self.blocks
-        );
         error!(
             "Block not found for deallocation (ptr: {:#x})",
             ptr as usize
         );
     }
 
-    unsafe fn run_join(&mut self) {
+    unsafe fn gc(&mut self) {
         let mut last_free_block: Option<&mut Block> = None;
         let mut joined = 0;
         for block in &mut *self.blocks {
@@ -214,7 +210,7 @@ impl Blocks {
         self.dbg_serial_send_csv();
         sprintln!("END-PRE-GC");
         unsafe {
-            self.run_join();
+            self.gc();
         }
         sprintln!("START-POST-GC");
         self.dbg_serial_send_csv();

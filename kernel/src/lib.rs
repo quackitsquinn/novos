@@ -46,12 +46,14 @@ pub fn display_init() -> bool {
 pub fn init_kernel() {
     serial::init();
     info!("Initialized serial");
-    memory::init();
-    info!("Initialized paging");
     gdt::init_gdt();
     info!("Initialized GDT");
     interrupts::init();
     info!("Initialized interrupts");
+    serial::init_debug_harness();
+    info!("Initialized debug harness");
+    memory::init();
+    info!("Initialized paging");
     info!("Checking if bootloader has provided stack size");
     // If the response is present, the bootloader has provided our requested stack size.
     if let Some(_) = STACK_REQUEST.get_response() {

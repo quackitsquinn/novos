@@ -2,6 +2,7 @@ use bitflags::iter::Iter;
 use limine::{memory_map::EntryType, paging::Mode, response::MemoryMapResponse};
 use spin::{Mutex, Once};
 use x86_64::{
+    instructions::bochs_breakpoint,
     registers::control::Cr3,
     structures::paging::{
         mapper::MapperFlush, page::PageRangeInclusive, FrameAllocator, Mapper, OffsetPageTable,
@@ -118,4 +119,7 @@ fn init_heap() {
     sprintln!("Initializing allocator");
     unsafe { allocator::init(heap_start.as_u64() as usize, heap_end.as_u64() as usize) };
     sprintln!("Allocator initialized");
+    unsafe {
+        bochs_breakpoint();
+    }
 }

@@ -5,17 +5,17 @@ use core::alloc::GlobalAlloc;
 
 use crate::util::OnceMutex;
 
-use super::{block::Block, blocks::Blocks, LockedAllocator};
+use super::{block::Block, blocks::BlockAllocator, LockedAllocator};
 
 pub struct RuntimeAllocator {
-    pub(super) blocks: Blocks,
+    pub(super) blocks: BlockAllocator,
 }
 
 impl RuntimeAllocator {
     pub unsafe fn new(heap_start: usize, heap_end: usize) -> Self {
         Self {
             // SAFETY: Validity of the heap is guaranteed by the caller
-            blocks: unsafe { Blocks::init(heap_start, heap_end) },
+            blocks: unsafe { BlockAllocator::init(heap_start, heap_end) },
         }
     }
 }

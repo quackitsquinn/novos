@@ -41,6 +41,8 @@ fn main() {
 
     make_iso(&out_dir, &kernel_dir);
 
+    copy_kernel_bin_dbg(&out_dir, &kernel_dir);
+
     make_hdd(&out_dir, &kernel_dir);
 }
 
@@ -85,8 +87,8 @@ fn make_iso(out_dir: &str, kernel_bin: &str) {
         &limine!("limine-bios-cd.bin"),
         &limine!("limine-uefi-cd.bin")
     );
-
     fs::copy(kernel_bin, out_base!("iso/boot/kernel.bin")).expect("Failed to copy kernel.bin");
+
     fs::create_dir_all(out_base!("iso/EFI/BOOT")).expect("Failed to create iso/EFI/BOOT directory");
 
     copy_all!(
@@ -121,6 +123,15 @@ fn make_iso(out_dir: &str, kernel_bin: &str) {
         println!("stdout: {}", String::from_utf8_lossy(&output.stdout));
     } else {
         println!("Failed to create iso: {:?}", output);
+    }
+}
+
+fn copy_kernel_bin_dbg(out_dir: &str, kernel_bin_dir: &str) {
+    // Check if we are in release mode
+    let release = std::env::var("PROFILE").unwrap() == "release";
+    // We only copy the binary if we are in debug mode because we need to copy the debug symbols
+    if !release {
+        fs::copy(kernel_bin_dir, out_base!("kernel.bin")).expect("Failed to copy kernel.bin");
     }
 }
 
