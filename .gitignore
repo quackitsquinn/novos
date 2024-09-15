@@ -3,3 +3,5 @@
 **/target
 ## Ignore boot folder
 /boot
+## Ignore logs
+**/*.log

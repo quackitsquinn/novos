@@ -1,7 +1,7 @@
 use core::fmt;
 
 ///! This is a module that wraps the uart_16550 crate for serial use.
-///! The point of this module is to allow rls to work with the uart_16550 crate.
+///! The point of this module is to allow rls to work with the uart_16550 crate on non-x86_64 targets.
 ///! Because of how the uart_16550 crate is implemented, rls can't see the functions in the crate directly, so we have to wrap them in this module.
 
 #[cfg(target_arch = "x86_64")]

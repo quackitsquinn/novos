@@ -6,6 +6,7 @@ use crate::{sprintln, util::OnceMutex};
 use raw::SerialPort;
 use x86_64::instructions::interrupts::without_interrupts;
 
+pub mod harness;
 pub mod interface;
 mod raw; // Things to interact with the serial port directly
 
@@ -39,4 +40,6 @@ pub fn init() {
     log::set_max_level(LOG_LEVEL.to_level_filter());
 }
 
-pub fn init_debug_harness() {}
+pub fn init_debug_harness() {
+    harness::init_debug_harness();
+}
