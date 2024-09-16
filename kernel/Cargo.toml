@@ -25,3 +25,6 @@ panic = "abort"
 
 [profile.dev]
 panic = "abort"
+# Include all debug info
+debug = true
+opt-level = 0

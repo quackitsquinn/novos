@@ -1,6 +1,6 @@
-use core::time::Duration;
+use core::{hint::spin_loop, time::Duration};
 
-use x86_64::structures::idt::InterruptStackFrame;
+use x86_64::{instructions::interrupts::without_interrupts, structures::idt::InterruptStackFrame};
 
 use crate::println;
 
@@ -22,11 +22,11 @@ pub(super) extern "x86-interrupt" fn timer_handler(_stack_frame: InterruptStackF
 }
 
 pub fn get_ticks() -> u64 {
-    unsafe { TICKS }
+    without_interrupts(|| unsafe { TICKS })
 }
 
 pub fn get_seconds() -> u64 {
-    unsafe { TICKS / (TIMER_FREQUENCY as u64) }
+    get_ticks() / (TIMER_FREQUENCY as u64)
 }
 
 pub fn get_minutes() -> u64 {
@@ -38,25 +38,23 @@ pub fn get_hours() -> u64 {
 }
 
 pub fn sleep(time: Duration) {
-    let start = get_ticks();
-    let end = start
-        + (time.as_secs() * (TIMER_FREQUENCY as u64))
-        + (time.subsec_nanos() as u64 / 1_000_000);
-    while get_ticks() < end {
-        x86_64::instructions::interrupts::enable_and_hlt();
+    let timer = Timer::new(time);
+    while !timer.is_done() {
+        spin_loop();
     }
 }
 
 pub struct Timer {
+    pub ticks: u64,
     pub end: u64,
 }
 
 impl Timer {
     pub fn new(duration: Duration) -> Self {
+        let ticks = (duration.as_secs_f32() * TIMER_FREQUENCY) as u64;
         Self {
-            end: get_ticks()
-                + (duration.as_secs() * (TIMER_FREQUENCY as u64))
-                + (duration.subsec_nanos() as u64 / 1_000_000),
+            ticks,
+            end: get_ticks() + ticks,
         }
     }
 

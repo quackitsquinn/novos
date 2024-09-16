@@ -7,6 +7,8 @@ pub fn main() {
         .arg("target/artifacts/novos.iso") // We don't use a bios specific iso because it supports both
         .arg("-serial")
         .arg("stdio")
+        .arg("-serial")
+        .arg("pty") // We don't use this, but it's here to prevent the default serial port from being used
         .arg("-m")
         .arg("1G");
 
