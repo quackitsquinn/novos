@@ -39,7 +39,9 @@ fn main() {
 
     make_limine_bin(invalidate_limine);
 
-    make_iso(&out_dir, &kernel_dir);
+    make_iso("novos.iso", &kernel_dir);
+
+    build_tests();
 
     copy_kernel_bin_dbg(&out_dir, &kernel_dir);
 
@@ -77,7 +79,8 @@ fn rm_rf(path: &str) {
     let _ = fs::remove_dir_all(path);
 }
 
-fn make_iso(out_dir: &str, kernel_bin: &str) {
+fn make_iso(out_name: &str, kernel_bin: &str) {
+    fs::remove_dir_all(out_base!("iso")).ok();
     fs::create_dir_all(out_base!("iso/boot")).expect("Failed to create iso/boot directory");
 
     copy_all!(
@@ -114,7 +117,7 @@ fn make_iso(out_dir: &str, kernel_bin: &str) {
         "--protective-msdos-label",
         &out_base!("iso"),
         "-o",
-        &out_base!("novos.iso"),
+        &out_base!(out_name),
     ]);
     println!("{:?}", format!("{:?}", iso).replace("\"", ""));
     let output = iso.output();
@@ -133,6 +136,29 @@ fn copy_kernel_bin_dbg(out_dir: &str, kernel_bin_dir: &str) {
     if !release {
         fs::copy(kernel_bin_dir, out_base!("kernel.bin")).expect("Failed to copy kernel.bin");
     }
+}
+
+fn build_tests() {
+    // HACK: Literally all of this. It currently appears that there is no good way to do this in cargo.
+    //
+    // Build kernel tests
+    let output = Command::new("cargo")
+        .current_dir("kernel")
+        .args(&["test", "--no-run"])
+        .env(
+            "CARGO_TARGET_DIR",
+            fs::canonicalize("target/tests").unwrap(),
+        )
+        .output()
+        .expect("Failed to build tests");
+    // The last line should contain the full path to the test binary.
+    // This whole thing is kinda gross, but as far as I can tell, there is no way to get the path to the built binary from cargo
+    let output_str = String::from_utf8_lossy(&output.stderr); // Cargo put most of it's output in stderr
+    println!("Output from cargo test --no-run: {}", output_str);
+    let output = output_str.lines().last().unwrap();
+    let bin = output.split("(").nth(1).unwrap().trim_end_matches(")");
+    println!("Test binary: {}", bin);
+    make_iso("kernel_tests.iso", bin);
 }
 
 fn make_hdd(out_dir: &str, kernel_bin_dir: &str) {}

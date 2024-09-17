@@ -2,6 +2,8 @@
 #![no_main]
 #![feature(abi_x86_interrupt)]
 #![forbid(unsafe_op_in_unsafe_fn)]
+#![feature(custom_test_frameworks)]
+#![test_runner(crate::testing::test_runner)]
 
 extern crate alloc;
 
@@ -16,6 +18,7 @@ mod gdt;
 pub mod interrupts;
 pub mod memory;
 pub mod serial;
+pub mod testing;
 mod util;
 
 /// Because we need a relatively big stack for the display, we need to request a bigger stack size

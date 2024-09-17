@@ -1,3 +1,4 @@
 fn main() {
-    println!("Hello, world!");
+    eprintln!("Run `cargo run --bin bios_boot` to boot!");
+    exit(-1);
 }

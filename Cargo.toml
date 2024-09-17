@@ -12,4 +12,3 @@ kernel = {path = "kernel", artifact = "bin", target = "x86_64-unknown-none"}
 [dependencies]
 lazy_static = "1.5.0"
 regex = "1.10.6"
-
