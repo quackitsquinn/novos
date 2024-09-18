@@ -1,17 +1,33 @@
-#[cfg(test)]
-pub fn test_runner(tests: &[&dyn Fn()]) {
-    use core::any::type_name_of_val;
+use crate::{hlt_loop, sprintln};
 
-    use crate::{init_kernel, sprint, sprintln};
+// This module is for the testing framework. (IF IT WORKS)
+// For some reason, I keep running into issues with getting this working.
+// Most currently, I can't get `cargo test --no-run` to output a binary with symbols.
+// It outputs a binary, but it doesn't have symbols (including no _start function), so limine can't boot it.
+// This is going on the backburner for now, but I will finish it eventually.
 
-    init_kernel();
+pub trait Testable {
+    fn run(&self);
+}
 
+impl<T> Testable for T
+where
+    T: Fn(),
+{
+    fn run(&self) {
+        sprintln!("Running test {}", core::any::type_name::<T>());
+        self();
+        sprintln!(".. [ok]");
+    }
+}
+
+//#[cfg(test)]
+pub fn test_runner(tests: &[&dyn Testable]) {
     sprintln!("Running {} tests", tests.len());
     for test in tests {
-        sprint!("Running test {} ...", type_name_of_val(test));
-        test();
-        sprintln!("[ok]");
+        test.run();
     }
+    hlt_loop();
 }
 
 #[cfg(test)]

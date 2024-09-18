@@ -159,6 +159,8 @@ fn build_tests() {
     let bin = output.split("(").nth(1).unwrap().trim_end_matches(")");
     println!("Test binary: {}", bin);
     make_iso("kernel_tests.iso", bin);
+    // Copy the test binary to the artifacts directory
+    fs::copy(bin, out_base!("kernel_tests.bin")).expect("Failed to copy kernel_tests");
 }
 
 fn make_hdd(out_dir: &str, kernel_bin_dir: &str) {}

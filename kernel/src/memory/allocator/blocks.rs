@@ -10,6 +10,7 @@ use super::block::Block;
 pub struct BlockAllocator {
     // INFO: We don't use a Vec here because A. infinite recursion and B. The slice grows downwards rather than upwards.
     blocks: &'static mut [Block],
+    table_block: &'static mut Block,
     unmap_start: usize, // The start of the unmapped memory.
     heap_start: usize,
     heap_end: usize,
@@ -43,6 +44,7 @@ impl BlockAllocator {
 
         Self {
             blocks,
+            table_block: unsafe { &mut *blk_tbl_ptr },
             heap_start,
             heap_end,
             unmap_start: heap_start,
@@ -191,15 +193,13 @@ impl BlockAllocator {
     }
 
     fn check_block_space(&mut self) {
+        let size = self.table_block.size();
         // run GC if the block table is more than GC_THRESHOLD full
-        if (self.blocks.len() * size_of::<Block>()) as f64
-            / self.blocks.last().unwrap().size() as f64
-            >= GC_THRESHOLD
-        {
+        if (self.blocks.len() * size_of::<Block>()) as f64 / size as f64 >= GC_THRESHOLD {
             self.run_gc();
         }
 
-        if self.blocks.len() * mem::size_of::<Block>() >= self.blocks.last().unwrap().size() {
+        if self.blocks.len() * mem::size_of::<Block>() >= size {
             // TODO: handle this better. Should not panic.
             panic!("Out of memory");
         }
@@ -218,7 +218,7 @@ impl BlockAllocator {
     }
 
     fn dbg_print_blocks(&self) {
-        let mx = self.blocks.last().unwrap().size() / size_of::<Block>();
+        let mx = self.table_block.size() / size_of::<Block>();
         trace!(
             "blkcount {}/{} ({}) umapbal: {}",
             self.blocks.len(),

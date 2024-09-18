@@ -23,11 +23,9 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
 }
 
 #[no_mangle]
+#[cfg(not(test))]
 pub extern "C" fn _start() -> ! {
     kernel::init_kernel();
-
-    #[cfg(test)]
-    test_main();
 
     sprintln!("Initialized kernel");
     x86_64::instructions::interrupts::enable();
@@ -37,6 +35,14 @@ pub extern "C" fn _start() -> ! {
     }
     kernel::hlt_loop();
     memory::allocator::output_blocks();
+}
+
+#[no_mangle]
+#[cfg(test)]
+pub extern "C" fn _start() -> ! {
+    kernel::init_kernel();
+    test_main();
+    kernel::hlt_loop();
 }
 
 static mut COUNTER: u32 = 0;
