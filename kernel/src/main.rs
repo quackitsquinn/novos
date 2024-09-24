@@ -25,6 +25,8 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
 #[no_mangle]
 #[cfg(not(test))]
 pub extern "C" fn _start() -> ! {
+    use kernel::memory::allocator;
+
     kernel::init_kernel();
 
     sprintln!("Initialized kernel");
@@ -32,6 +34,7 @@ pub extern "C" fn _start() -> ! {
     sprintln!("Enabled interrupts");
     loop {
         create_arr_check_free();
+        assert!(allocator::get_allocation_balance() == 0);
     }
     kernel::hlt_loop();
     memory::allocator::output_blocks();

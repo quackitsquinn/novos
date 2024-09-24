@@ -24,10 +24,11 @@ impl<'a, T> OnceMutex<T> {
     }
 
     pub fn get(&self) -> MutexGuard<T> {
-        if self.inner.get().unwrap().is_locked() {
-            panic!("Attempted to lock a locked mutex!")
+        let i = self.inner.get().unwrap();
+        if let Some(i) = i.try_lock() {
+            return i;
         }
-        self.inner.get().unwrap().lock()
+        panic!("Attempted to lock a locked mutex!");
     }
 
     pub fn is_locked(&self) -> bool {

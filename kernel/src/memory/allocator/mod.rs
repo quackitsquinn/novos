@@ -18,3 +18,7 @@ pub unsafe fn init(heap_start: usize, heap_end: usize) {
 pub fn output_blocks() {
     sprintln!("{:#?}", ALLOCATOR.get().blocks);
 }
+
+pub fn get_allocation_balance() -> isize {
+    ALLOCATOR.get().blocks.allocation_balance()
+}

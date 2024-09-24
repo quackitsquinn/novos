@@ -48,13 +48,30 @@ impl Block {
     }
 
     pub fn merge(&mut self, other: &mut Block) -> Block {
+        // Ensure the blocks are free and reusable
+        debug_assert_eq!(self.is_free, other.is_free);
+        //debug_assert!(self.is_reusable && other.is_reusable);
+
         if other.address > self.address {
             return other.merge(self); // Ensure self is the block with the lower address
         }
-        assert!(
-            self.is_free() && other.is_free(),
-            "Cannot merge allocated blocks"
-        );
-        Block::new(self.size() + other.size(), self.address, true)
+
+        debug_assert!(self.is_adjacent(other));
+
+        let new_size = self.size + other.size;
+
+        Block::new(new_size, self.address, true)
+    }
+
+    pub fn is_adjacent(&self, other: &Block) -> bool {
+        let self_end = self.address as usize + self.size;
+
+        self_end == other.address as usize
+            || self.address as usize == other.address as usize + other.size
+    }
+
+    pub fn set_reusable(&mut self, reusable: bool) {
+        debug_assert!(self.is_free);
+        self.is_reusable = reusable;
     }
 }

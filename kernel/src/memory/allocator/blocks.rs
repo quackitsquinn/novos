@@ -52,7 +52,7 @@ impl BlockAllocator {
         }
     }
 
-    pub unsafe fn push_block(&mut self, block: Block) {
+    unsafe fn push_block(&mut self, block: Block) {
         self.check_block_space();
         // TODO: Use the actual allocator design here. This is a temporary solution because I got tired of fighting with pointers.
         for blks in &mut *self.blocks {
@@ -106,7 +106,7 @@ impl BlockAllocator {
             if block.is_free() && block.size() + alignment >= size {
                 block.allocate();
                 address = block.address as *mut u8;
-                if block.size() > size + alignment + (size as f64 * SPLIT_THRESHOLD) as usize {
+                if block.size() > size + (size as f64 * SPLIT_THRESHOLD) as usize {
                     split = block.split(size + alignment);
                 }
             }
@@ -132,21 +132,22 @@ impl BlockAllocator {
     }
 
     pub unsafe fn deallocate(&mut self, ptr: *mut u8, layout: Layout) {
-        if let Some(blk) =
-            unsafe { self.find_block_by_ptr(align_with_alignment(ptr, layout.align(), true)) }
+        if let Some(blk) = // OLD: align_with_alignment(ptr, layout.align(), true))
+            unsafe { self.find_block_by_ptr(ptr) }
         {
             info!("Deallocating block {:?}", blk);
             if blk.is_free() {
                 // TODO: Should DEFINITELY not panic here. Tis is a temporary debug check.
                 debug_release_check! {
                     debug {
+                        self.dbg_serial_send_csv();
                         panic!("Block already deallocated");
                     },
                     release {
                         error!("Block already deallocated");
-                        return;
                     }
                 }
+                return;
             }
             blk.deallocate();
             info!("Deallocated block {:?}", blk);
@@ -154,28 +155,44 @@ impl BlockAllocator {
             self.dbg_print_blocks();
             return;
         }
-        error!(
-            "Block not found for deallocation (ptr: {:#x})",
-            ptr as usize
-        );
+        debug_release_check!(
+            debug {
+                panic!("Block not found");
+            },
+            release {
+                error!("Block not found");
+            }
+        )
     }
 
     unsafe fn gc(&mut self) {
         let mut last_free_block: Option<&mut Block> = None;
         let mut joined = 0;
         for block in &mut *self.blocks {
-            if !block.is_reusable {
-                if block.is_free() {
-                    if let Some(lsblk) = last_free_block {
-                        info!("Joining blocks {:?} and {:?}", lsblk, block);
-                        *block = block.merge(lsblk);
-                        joined += 1;
-                        lsblk.is_reusable = true
+            if block.is_free() {
+                if let Some(lsblk) = last_free_block {
+                    if !lsblk.is_adjacent(block) {
+                        last_free_block = None;
+                        continue;
                     }
-                    last_free_block = Some(block)
-                } else {
-                    last_free_block = None;
+                    info!("Joining blocks {:?} and {:?}", lsblk, block);
+                    info!(
+                        "Address: {:#x} Size: {}",
+                        lsblk.address as usize,
+                        lsblk.size()
+                    );
+                    info!(
+                        "Address: {:#x} Size: {}",
+                        block.address as usize,
+                        block.size()
+                    );
+                    *block = block.merge(lsblk);
+                    joined += 1;
+                    lsblk.set_reusable(true);
                 }
+                last_free_block = Some(block)
+            } else {
+                last_free_block = None;
             }
         }
         debug!("Joined {} blocks", joined);
@@ -249,6 +266,10 @@ impl BlockAllocator {
                 );
             }
         };
+    }
+
+    pub fn allocation_balance(&self) -> isize {
+        self.allocation_balance
     }
 }
 

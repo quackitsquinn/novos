@@ -21,6 +21,8 @@ pub mod serial;
 pub mod testing;
 mod util;
 
+const KERNEL_VERSION: &str = env!("CARGO_PKG_VERSION");
+
 /// Because we need a relatively big stack for the display, we need to request a bigger stack size
 /// from the bootloader.
 // TODO: For some ungodly reason, increasing this causes something to go wrong with the framebuffer??.
