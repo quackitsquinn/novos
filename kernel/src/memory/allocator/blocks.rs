@@ -22,6 +22,7 @@ unsafe impl Sync for BlockAllocator {}
 
 // Count of blocks that can be allocated in the inital block table.
 const INIT_BLOCK_SIZE: usize = 512;
+const BLOCK_SIZE_BYTES: usize = mem::size_of::<Block>() * INIT_BLOCK_SIZE;
 const SPLIT_THRESHOLD: f64 = 0.5;
 const GC_THRESHOLD: f64 = 0.8;
 
@@ -29,13 +30,12 @@ impl BlockAllocator {
     pub unsafe fn init(heap_start: usize, heap_end: usize) -> Self {
         let block_heap_end = heap_end - mem::size_of::<Block>();
         let block_heap_end = align(block_heap_end as *mut Block, true) as usize;
-        sprintln!("Block heap end: {:#x}", block_heap_end);
-        // Set the first block to contain itself
-        let block = Block::new(
-            INIT_BLOCK_SIZE * size_of::<Block>(),
-            block_heap_end as *mut u8,
-            false,
+        info!(
+            "Creating block table with size {} at {:#x}",
+            BLOCK_SIZE_BYTES, block_heap_end
         );
+        // Set the first block to contain itself
+        let block = Block::new(BLOCK_SIZE_BYTES, block_heap_end as *mut u8, false);
         let mut blocks =
             unsafe { DownwardsVec::new(block_heap_end as *mut Block, INIT_BLOCK_SIZE) };
 
@@ -136,8 +136,9 @@ impl BlockAllocator {
                 // TODO: Should DEFINITELY not panic here. Tis is a temporary debug check.
                 debug_release_check! {
                     debug {
+                        error!("Block already deallocated");
                         self.dbg_serial_send_csv();
-                        panic!("Block already deallocated");
+                        //panic!("Block already deallocated");
                     },
                     release {
                         error!("Block already deallocated");

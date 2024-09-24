@@ -66,6 +66,14 @@ impl<'a, T> DownwardsVec<'a, T> {
     pub fn as_mut_ptr(&mut self) -> *mut T {
         self.base
     }
+
+    pub unsafe fn set_cap(&mut self, cap: usize) {
+        assert!(
+            cap >= self.len,
+            "New capacity must be greater than or equal to the length"
+        );
+        self.capacity = cap;
+    }
 }
 
 impl<'a, T> core::ops::Deref for DownwardsVec<'a, T> {
