@@ -51,4 +51,5 @@ fn handle_stream(stream: Reader, name: &'static str, print: bool) {
             println!("{}", line);
         }
     }
+    unreachable!();
 }

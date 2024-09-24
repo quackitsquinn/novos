@@ -5,6 +5,7 @@ use crate::{sprint, sprintln, util::OnceMutex};
 pub mod alloc;
 pub mod block;
 pub mod blocks;
+mod downwards_vec;
 
 #[global_allocator]
 pub static ALLOCATOR: LockedAllocator = LockedAllocator::new();

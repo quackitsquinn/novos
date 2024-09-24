@@ -1,15 +1,15 @@
-use core::{alloc::Layout, mem, ptr, slice};
+use core::{alloc::Layout, cell::UnsafeCell, mem, ptr, slice};
 
 use log::{debug, error, info, trace};
 
 use crate::{debug_release_check, sprintln};
 
-use super::block::Block;
+use super::{block::Block, downwards_vec::DownwardsVec};
 
 #[derive(Debug)]
 pub struct BlockAllocator {
-    // INFO: We don't use a Vec here because A. infinite recursion and B. The slice grows downwards rather than upwards.
-    blocks: &'static mut [Block],
+    // The blocks are stored in a downwards-growing vector.
+    blocks: DownwardsVec<'static, Block>,
     table_block: &'static mut Block,
     unmap_start: usize, // The start of the unmapped memory.
     heap_start: usize,
@@ -20,7 +20,8 @@ pub struct BlockAllocator {
 unsafe impl Send for BlockAllocator {}
 unsafe impl Sync for BlockAllocator {}
 
-const INIT_BLOCK_SIZE: usize = 1024 * 10; // 10KB
+// Count of blocks that can be allocated in the inital block table.
+const INIT_BLOCK_SIZE: usize = 512;
 const SPLIT_THRESHOLD: f64 = 0.5;
 const GC_THRESHOLD: f64 = 0.8;
 
@@ -30,21 +31,21 @@ impl BlockAllocator {
         let block_heap_end = align(block_heap_end as *mut Block, true) as usize;
         sprintln!("Block heap end: {:#x}", block_heap_end);
         // Set the first block to contain itself
-        let block = Block::new(INIT_BLOCK_SIZE, block_heap_end as *mut u8, false);
-        sprintln!("Writing block table block to {:#x}", block_heap_end);
-        unsafe {
-            let block_table_block = (block_heap_end) as *mut Block;
-            block_table_block.write(block);
-        };
-        sprintln!("Wrote block table block to {:#x}", block_heap_end);
-        let blk_tbl_ptr = block_heap_end as *mut Block;
-        sprintln!("Block table at {:#x}", blk_tbl_ptr as usize);
-        let blocks = unsafe { slice::from_raw_parts_mut(blk_tbl_ptr, 1) };
-        sprintln!("Blocks: {:?}", blocks);
+        let block = Block::new(
+            INIT_BLOCK_SIZE * size_of::<Block>(),
+            block_heap_end as *mut u8,
+            false,
+        );
+        let mut blocks =
+            unsafe { DownwardsVec::new(block_heap_end as *mut Block, INIT_BLOCK_SIZE) };
+
+        blocks.push(block).expect("Failed to push block");
+
+        let table_block = unsafe { &mut *blocks.as_mut_ptr() };
 
         Self {
             blocks,
-            table_block: unsafe { &mut *blk_tbl_ptr },
+            table_block,
             heap_start,
             heap_end,
             unmap_start: heap_start,
@@ -61,13 +62,8 @@ impl BlockAllocator {
                 return;
             }
         }
-        // If this is reached, we just need to push the block to the end of the slice.
-        let off = unsafe { self.blocks.as_mut_ptr().sub(1) };
-        // SAFETY: run_gc_if_needed ensures that there is enough space for the block.
-        unsafe {
-            off.write(block);
-            self.blocks = slice::from_raw_parts_mut(off, self.blocks.len() + 1);
-        }
+
+        self.blocks.push(block).expect("Failed to push block");
     }
 
     // This will be relatively slow, but it should be called less and less as the heap grows.
