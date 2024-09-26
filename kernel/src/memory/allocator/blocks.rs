@@ -1,4 +1,10 @@
-use core::{alloc::Layout, cell::UnsafeCell, mem, ptr, slice};
+use core::{
+    alloc::Layout,
+    cell::UnsafeCell,
+    mem,
+    ptr::{self, NonNull},
+    slice,
+};
 
 use log::{debug, error, info, trace};
 
@@ -22,6 +28,7 @@ unsafe impl Sync for BlockAllocator {}
 
 // Count of blocks that can be allocated in the inital block table.
 const INIT_BLOCK_SIZE: usize = 512;
+const BLOCK_TABLE_BLOCK_SIZE: usize = 128;
 const BLOCK_SIZE_BYTES: usize = mem::size_of::<Block>() * INIT_BLOCK_SIZE;
 const SPLIT_THRESHOLD: f64 = 0.5;
 const GC_THRESHOLD: f64 = 0.8;
@@ -59,6 +66,7 @@ impl BlockAllocator {
         for blks in &mut *self.blocks {
             if blks.is_reusable {
                 *blks = block;
+
                 return;
             }
         }
@@ -79,7 +87,7 @@ impl BlockAllocator {
         let ptr = ptr as usize;
         for block in &mut *self.blocks {
             let addr = block.address as usize;
-            if ptr >= addr && ptr <= addr + block.size() {
+            if ptr >= addr && ptr < addr + block.size() {
                 trace!(
                     "Found ptr ({:#x}) in block {:#p} (off: {})",
                     ptr,
@@ -214,8 +222,7 @@ impl BlockAllocator {
         }
 
         if self.blocks.len() * mem::size_of::<Block>() >= size {
-            // TODO: handle this better. Should not panic.
-            panic!("Out of memory");
+            panic!("Out of block space"); // TODO: This should try to reserve more space.
         }
     }
 

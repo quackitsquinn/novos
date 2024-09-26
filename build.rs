@@ -68,10 +68,12 @@ fn make_limine_bin(invalidate: bool) {
         println!("status: {}", output.status);
     }
     // Compile limine
-    let output = std::process::Command::new("make")
+    std::process::Command::new("make")
         .arg("limine")
         .current_dir(out_base!("limine/"))
-        .output()
+        .spawn()
+        .expect("Failed to compile limine")
+        .wait()
         .expect("Failed to compile limine");
 }
 
