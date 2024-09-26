@@ -10,8 +10,10 @@ use core::hint::black_box;
 use kernel::{
     display::{self, color::Color, terminal},
     interrupts::hardware::timer,
-    memory, println, sprintln, terminal,
+    memory::{self, allocator::get_block_allocator},
+    println, sprintln, terminal,
 };
+use log::{error, log_enabled, trace};
 
 #[panic_handler]
 fn panic(_info: &core::panic::PanicInfo) -> ! {
@@ -53,12 +55,44 @@ static mut COUNTER: u32 = 0;
 fn create_arr_check_free() {
     // Make sure this doesn't get optimized out
     let mut t: alloc::vec::Vec<u32> = alloc::vec![0];
-    for i in 0..100 {
+    for i in 0..10 {
         t.push(unsafe { COUNTER });
         sprintln!("Pushed {}", unsafe { COUNTER });
         unsafe {
             COUNTER += 1;
         }
     }
-    black_box(t);
+    let blocks = get_block_allocator();
+    let bt = blocks.get_block_table();
+    bt.iter().enumerate().for_each(|(i, block)| {
+        if block == blocks.get_table_block() {
+            trace!("Table Block {:#X}: {:?}", i, block);
+        } else {
+            trace!("Block {:#X}: {:?}", i, block);
+        }
+    });
+
+    drop(bt);
+    drop(blocks);
+    drop(black_box(t));
+
+    let blocks = get_block_allocator();
+    let bt = blocks.get_block_table();
+
+    let mut failed = false;
+    // Assert that all blocks are marked as free. (This should be true because we free the vector)
+    bt.iter().enumerate().for_each(|(i, block)| {
+        if block.is_free {
+            trace!("Block {:#X}: {:?}", i, block);
+        } else if block == blocks.get_table_block() {
+            trace!("Table Block {:#X}: {:?}", i, block);
+        } else {
+            error!("Block {:#X}: {:?}", i, block);
+            failed = true;
+        }
+    });
+
+    if failed {
+        panic!("Failed to free all blocks");
+    }
 }

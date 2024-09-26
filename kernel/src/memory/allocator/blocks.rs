@@ -29,15 +29,15 @@ const GC_THRESHOLD: f64 = 0.8;
 impl BlockAllocator {
     pub unsafe fn init(heap_start: usize, heap_end: usize) -> Self {
         let block_heap_end = heap_end - mem::size_of::<Block>();
-        let block_heap_end = align(block_heap_end as *mut Block, true) as usize;
+        let block_table_base = align(block_heap_end as *mut Block, true) as usize;
         info!(
             "Creating block table with size {} at {:#x}",
-            BLOCK_SIZE_BYTES, block_heap_end
+            BLOCK_SIZE_BYTES, block_table_base
         );
         // Set the first block to contain itself
-        let block = Block::new(BLOCK_SIZE_BYTES, block_heap_end as *mut u8, false);
+        let block = Block::new(BLOCK_SIZE_BYTES, block_table_base as *mut u8, false);
         let mut blocks =
-            unsafe { DownwardsVec::new(block_heap_end as *mut Block, INIT_BLOCK_SIZE) };
+            unsafe { DownwardsVec::new(block_table_base as *mut Block, INIT_BLOCK_SIZE) };
 
         blocks.push(block).expect("Failed to push block");
 
@@ -267,6 +267,18 @@ impl BlockAllocator {
 
     pub fn allocation_balance(&self) -> isize {
         self.allocation_balance
+    }
+
+    pub fn get_block_table<'a>(&'a self) -> &'a DownwardsVec<'static, Block> {
+        &self.blocks
+    }
+    // Get the block table mutably. This is unsafe because it allows the block table to be modified.
+    pub unsafe fn get_block_table_mut<'a>(&'a mut self) -> &'a mut DownwardsVec<'static, Block> {
+        &mut self.blocks
+    }
+
+    pub fn table_block(&self) -> &Block {
+        self.table_block
     }
 }
 

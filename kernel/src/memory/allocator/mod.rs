@@ -1,4 +1,8 @@
 use alloc::RuntimeAllocator;
+use block::Block;
+use blocks::BlockAllocator;
+use downwards_vec::DownwardsVec;
+use spin::MutexGuard;
 
 use crate::{sprint, sprintln, util::OnceMutex};
 
@@ -22,4 +26,33 @@ pub fn output_blocks() {
 
 pub fn get_allocation_balance() -> isize {
     ALLOCATOR.get().blocks.allocation_balance()
+}
+
+pub struct BlockLock<'a> {
+    lock: MutexGuard<'a, RuntimeAllocator>,
+}
+
+impl<'a> BlockLock<'a> {
+    pub fn new(lock: MutexGuard<'a, RuntimeAllocator>) -> Self {
+        Self { lock }
+    }
+
+    pub fn get_block_table(&self) -> &DownwardsVec<Block> {
+        self.lock.blocks.get_block_table()
+    }
+    /// Get the block table as mutable.
+    ///
+    /// # Safety
+    /// The caller must ensure that the block table is not incorrectly modified.
+    pub unsafe fn get_block_table_mut(&mut self) -> &'a DownwardsVec<Block> {
+        unsafe { self.lock.blocks.get_block_table_mut() }
+    }
+
+    pub fn get_table_block(&self) -> &Block {
+        self.lock.blocks.table_block()
+    }
+}
+
+pub fn get_block_allocator() -> BlockLock<'static> {
+    BlockLock::new(ALLOCATOR.get())
 }
