@@ -10,10 +10,6 @@ fn main() {
         .arg("-m")
         .arg("1G");
 
-    if env::var("DEBUG").is_ok() {
-        println!("Running in debug mode");
-        command.arg("-S").arg("-s");
-    }
     let mut command = command.spawn().expect("qemu-system-x86_64 failed to start");
     command.wait().expect("qemu-system-x86_64 failed to run");
 }

@@ -40,6 +40,6 @@ fn panic(info: &core::panic::PanicInfo) -> ! {
 }
 
 #[test_case]
-fn test_test_runner() {
+fn trivial_test_case() {
     assert!(1 == 1);
 }

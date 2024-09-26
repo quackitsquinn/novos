@@ -141,9 +141,7 @@ fn copy_kernel_bin_dbg(out_dir: &str, kernel_bin_dir: &str) {
 }
 
 fn build_tests() {
-    // HACK: Literally all of this. It currently appears that there is no good way to do this in cargo.
-    //
-    // Build kernel tests
+    // TODO: Use cargo build --tests --message-format=json and parse the output to get the test binary
     let output = Command::new("cargo")
         .current_dir("kernel")
         .args(&["test", "--no-run"])

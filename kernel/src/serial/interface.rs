@@ -1,6 +1,6 @@
 use crate::util::OnceMutex;
 
-use super::raw::SerialPort;
+use uart_16550::SerialPort;
 
 const SERIAL_PORT_NUM: u16 = 0x3F8;
 static SERIAL_PORT: OnceMutex<SerialPort> = OnceMutex::new();
