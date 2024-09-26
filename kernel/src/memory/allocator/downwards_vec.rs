@@ -74,6 +74,10 @@ impl<'a, T> DownwardsVec<'a, T> {
         );
         self.capacity = cap;
     }
+
+    pub unsafe fn grow(&mut self, additional: usize) {
+        self.capacity += additional;
+    }
 }
 
 impl<'a, T> core::ops::Deref for DownwardsVec<'a, T> {

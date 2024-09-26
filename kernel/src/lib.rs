@@ -26,7 +26,7 @@ const KERNEL_VERSION: &str = env!("CARGO_PKG_VERSION");
 /// Because we need a relatively big stack for the display, we need to request a bigger stack size
 /// from the bootloader.
 // TODO: For some ungodly reason, increasing this causes something to go wrong with the framebuffer??.
-// I have some probably incorrect theories about why this is happening, but I'm not sure.
+// I have some probably incorrect theories about why this is happening.
 // My guess is that the large stack size goes into the framebuffer info struct, which then makes it corrupted.
 // I have not done enough research to confirm this, but it's my best guess.
 const STACK_SIZE: u64 = 0xFF000; // 0xCF8
