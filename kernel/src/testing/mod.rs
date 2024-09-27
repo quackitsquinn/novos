@@ -1,11 +1,5 @@
 use crate::{hlt_loop, sprintln};
 
-// This module is for the testing framework. (IF IT WORKS)
-// For some reason, I keep running into issues with getting this working.
-// Most currently, I can't get `cargo test --no-run` to output a binary with symbols.
-// It outputs a binary, but it doesn't have symbols (including no _start function), so limine can't boot it.
-// This is going on the backburner for now, but I will finish it eventually.
-
 pub trait Testable {
     fn run(&self);
 }
@@ -21,7 +15,7 @@ where
     }
 }
 
-//#[cfg(test)]
+#[cfg(test)]
 pub fn test_runner(tests: &[&dyn Testable]) {
     sprintln!("Running {} tests", tests.len());
     for test in tests {
