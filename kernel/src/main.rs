@@ -1,7 +1,6 @@
 #![no_std]
 #![no_main]
 #![feature(abi_x86_interrupt)]
-#![reexport_test_harness_main = "test_main"]
 
 extern crate alloc;
 
@@ -40,14 +39,6 @@ pub extern "C" fn _start() -> ! {
     }
     kernel::hlt_loop();
     memory::allocator::output_blocks();
-}
-
-#[no_mangle]
-#[cfg(test)]
-pub extern "C" fn _start() -> ! {
-    kernel::init_kernel();
-    test_main();
-    kernel::hlt_loop();
 }
 
 static mut COUNTER: u32 = 0;

@@ -1,11 +1,5 @@
 use crate::{hlt_loop, sprintln};
 
-// This module is for the testing framework. (IF IT WORKS)
-// For some reason, I keep running into issues with getting this working.
-// Most currently, I can't get `cargo test --no-run` to output a binary with symbols.
-// It outputs a binary, but it doesn't have symbols (including no _start function), so limine can't boot it.
-// This is going on the backburner for now, but I will finish it eventually.
-
 pub trait Testable {
     fn run(&self);
 }
@@ -39,7 +33,17 @@ fn panic(info: &core::panic::PanicInfo) -> ! {
     hlt_loop()
 }
 
+#[no_mangle]
+#[cfg(test)]
+pub extern "C" fn _start() -> ! {
+    use crate::init_kernel;
+
+    init_kernel();
+    crate::test_main();
+    hlt_loop()
+}
+
 #[test_case]
-fn test_test_runner() {
+fn trivial_test() {
     assert!(1 == 1);
 }
