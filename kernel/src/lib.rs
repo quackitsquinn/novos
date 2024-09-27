@@ -4,6 +4,7 @@
 #![forbid(unsafe_op_in_unsafe_fn)]
 #![feature(custom_test_frameworks)]
 #![test_runner(crate::testing::test_runner)]
+#![reexport_test_harness_main = "test_main"]
 
 use core::arch::asm;
 

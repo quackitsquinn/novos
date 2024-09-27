@@ -1,4 +1,4 @@
-use crate::{hlt_loop, sprintln};
+use crate::{hlt_loop, init_kernel, sprintln};
 
 pub trait Testable {
     fn run(&self);
@@ -36,4 +36,12 @@ fn panic(info: &core::panic::PanicInfo) -> ! {
 #[test_case]
 fn trivial_test_case() {
     assert!(1 == 1);
+}
+
+#[no_mangle]
+#[cfg(test)]
+pub extern "C" fn _start() -> ! {
+    init_kernel();
+    crate::test_main();
+    hlt_loop()
 }
