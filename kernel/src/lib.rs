@@ -9,18 +9,11 @@ use core::arch::asm;
 
 use limine::request::StackSizeRequest;
 use log::info;
-pub(crate) use spin::{Mutex, Once};
 
 pub mod serial;
 pub mod testing;
 mod util;
 
-/// Because we need a relatively big stack for the display, we need to request a bigger stack size
-/// from the bootloader.
-// TODO: For some ungodly reason, increasing this causes something to go wrong with the framebuffer??.
-// I have some probably incorrect theories about why this is happening.
-// My guess is that the large stack size goes into the framebuffer info struct, which then makes it corrupted.
-// I have not done enough research to confirm this, but it's my best guess.
 const STACK_SIZE: u64 = 0xFF000; // 0xCF8
 #[used]
 static STACK_REQUEST: StackSizeRequest = StackSizeRequest::new().with_size(STACK_SIZE);
