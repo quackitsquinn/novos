@@ -5,10 +5,12 @@ fn main() {
     command
         .arg("-cdrom")
         .arg("target/artifacts/kernel_tests.iso") // We don't use a bios specific iso because it supports both
-        .arg("-serial")
-        .arg("stdio")
+        // .arg("-serial")
+        // .arg("stdio")
         .arg("-m")
-        .arg("1G");
+        .arg("1G")
+        .arg("--nographic")
+        .args(&["-device", "isa-debug-exit,iobase=0xf4,iosize=0x04"]);
 
     if env::var("DEBUG").is_ok() {
         println!("Running in debug mode");

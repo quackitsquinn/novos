@@ -71,9 +71,12 @@ pub fn init_kernel() {
     } else {
         info!("Bootloader has not provided stack size");
     }
-    info!("Initializing display");
-    display::init();
-    DISPLAY_INITIALIZED.call_once(|| ());
+    #[cfg(not(test))] // Tests don't have a display
+    {
+        info!("Initializing display");
+        display::init();
+        DISPLAY_INITIALIZED.call_once(|| ());
+    }
     info!("Kernel initialized");
 
     let _ = debug_release_check!(

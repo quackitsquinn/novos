@@ -2,6 +2,8 @@ use core::{
     marker::PhantomData,
     ops::{Index, IndexMut},
 };
+
+use log::trace;
 /// A downwards-growing vector. Used for the block table in the allocator.
 pub struct DownwardsVec<'a, T> {
     base: *mut T,
@@ -124,5 +126,54 @@ where
 {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         self.slice.fmt(f)
+    }
+}
+
+mod test {
+    use core::{mem::MaybeUninit, pin::Pin, ptr::null_mut};
+
+    use log::info;
+
+    use crate::println;
+
+    use super::*;
+
+    fn new_in<'a, T, const CAP: usize>(here: &'a mut [MaybeUninit<T>; CAP]) -> DownwardsVec<'a, T> {
+        let base = unsafe { (here.as_mut_ptr() as *mut T).add(CAP - 1) };
+        unsafe { DownwardsVec::new(base, CAP) }
+    }
+
+    #[test_case]
+    fn test_push_one() {
+        let mut arr = [MaybeUninit::uninit(); 10];
+        let mut vec = new_in(&mut arr);
+        vec.push(1).unwrap();
+        assert_eq!(vec.len(), 1);
+        assert_eq!(vec[0], 1);
+    }
+
+    #[test_case]
+    fn test_push_fill() {
+        let mut arr = [MaybeUninit::uninit(); 10];
+        let mut vec = new_in(&mut arr);
+        for i in 0..10 {
+            vec.push(i).unwrap();
+        }
+        assert_eq!(vec.len(), 10);
+        for i in 0..10 {
+            assert_eq!(vec[i], 9 - i);
+        }
+    }
+
+    #[test_case]
+    fn test_push_over_cap() {
+        let mut arr = [MaybeUninit::uninit(); 10];
+        let mut vec = new_in(&mut arr);
+        for i in 0..10 {
+            vec.push(i).unwrap();
+        }
+        assert_eq!(vec.len(), 10);
+        assert!(vec.push(10).is_none());
+        assert_eq!(vec.len(), 10);
     }
 }

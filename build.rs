@@ -39,7 +39,7 @@ fn main() {
 
     make_limine_bin(invalidate_limine);
 
-    make_iso("novos.iso", &kernel_dir);
+    make_iso("novos.iso", &kernel_dir, "boot_cfg/main.conf");
 
     build_tests();
 
@@ -81,18 +81,18 @@ fn rm_rf(path: &str) {
     let _ = fs::remove_dir_all(path);
 }
 
-fn make_iso(out_name: &str, kernel_bin: &str) {
+fn make_iso(out_name: &str, kernel_bin: &str, config: &str) {
     fs::remove_dir_all(out_base!("iso")).ok();
     fs::create_dir_all(out_base!("iso/boot")).expect("Failed to create iso/boot directory");
 
     copy_all!(
         out_base!("iso/boot/"),
-        "limine.conf",
         &limine!("limine-bios.sys"),
         &limine!("limine-bios-cd.bin"),
         &limine!("limine-uefi-cd.bin")
     );
     fs::copy(kernel_bin, out_base!("iso/boot/kernel.bin")).expect("Failed to copy kernel.bin");
+    fs::copy(config, out_base!("iso/boot/limine.conf")).expect("Failed to copy limine.cfg");
 
     fs::create_dir_all(out_base!("iso/EFI/BOOT")).expect("Failed to create iso/EFI/BOOT directory");
 
@@ -160,7 +160,7 @@ fn build_tests() {
     let output = output_str.lines().last().unwrap();
     let bin = output.split("(").nth(1).unwrap().trim_end_matches(")");
     println!("Test binary: {}", bin);
-    make_iso("kernel_tests.iso", bin);
+    make_iso("kernel_tests.iso", bin, "boot_cfg/test.conf");
     // Copy the test binary to the artifacts directory
     fs::copy(bin, out_base!("kernel_tests.bin")).expect("Failed to copy kernel_tests");
 }

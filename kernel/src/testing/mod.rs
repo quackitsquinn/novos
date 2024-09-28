@@ -1,5 +1,7 @@
 use crate::{hlt_loop, sprintln};
 
+mod qemu_exit;
+
 pub trait Testable {
     fn run(&self);
 }
@@ -21,7 +23,7 @@ pub fn test_runner(tests: &[&dyn Testable]) {
     for test in tests {
         test.run();
     }
-    hlt_loop();
+    qemu_exit::exit(false);
 }
 
 #[cfg(test)]
@@ -30,7 +32,7 @@ fn panic(info: &core::panic::PanicInfo) -> ! {
     use crate::{hlt_loop, sprint, sprintln};
 
     sprintln!("{}", info);
-    hlt_loop()
+    qemu_exit::exit(true);
 }
 
 #[no_mangle]
@@ -40,7 +42,7 @@ pub extern "C" fn _start() -> ! {
 
     init_kernel();
     crate::test_main();
-    hlt_loop()
+    qemu_exit::exit(false);
 }
 
 #[test_case]
