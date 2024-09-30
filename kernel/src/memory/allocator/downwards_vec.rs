@@ -129,7 +129,8 @@ where
     }
 }
 
-mod test {
+#[cfg(test)]
+pub mod test {
     use core::{mem::MaybeUninit, pin::Pin, ptr::null_mut};
 
     use log::info;
@@ -137,13 +138,15 @@ mod test {
     use crate::println;
 
     use super::*;
-
-    fn new_in<'a, T, const CAP: usize>(here: &'a mut [MaybeUninit<T>; CAP]) -> DownwardsVec<'a, T> {
+    /// Create a new downwards-growing vector in the given array.
+    pub fn new_in<'a, T, const CAP: usize>(
+        here: &'a mut [MaybeUninit<T>; CAP],
+    ) -> DownwardsVec<'a, T> {
         let base = unsafe { (here.as_mut_ptr() as *mut T).add(CAP - 1) };
         unsafe { DownwardsVec::new(base, CAP) }
     }
 
-    #[test_case]
+    #[kproc::test("DownwardsVec push one" can_recover = true)]
     fn test_push_one() {
         let mut arr = [MaybeUninit::uninit(); 10];
         let mut vec = new_in(&mut arr);
@@ -152,7 +155,7 @@ mod test {
         assert_eq!(vec[0], 1);
     }
 
-    #[test_case]
+    #[kproc::test("DownwardsVec push fill" can_recover = true)]
     fn test_push_fill() {
         let mut arr = [MaybeUninit::uninit(); 10];
         let mut vec = new_in(&mut arr);
@@ -165,7 +168,7 @@ mod test {
         }
     }
 
-    #[test_case]
+    #[kproc::test("DownwardsVec push over cap" can_recover = true)]
     fn test_push_over_cap() {
         let mut arr = [MaybeUninit::uninit(); 10];
         let mut vec = new_in(&mut arr);

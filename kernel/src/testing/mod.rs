@@ -2,23 +2,8 @@ use crate::{hlt_loop, sprintln};
 
 mod qemu_exit;
 
-pub trait Testable {
-    fn run(&self);
-}
-
-impl<T> Testable for T
-where
-    T: Fn(),
-{
-    fn run(&self) {
-        sprintln!("Running test {}", core::any::type_name::<T>());
-        self();
-        sprintln!(".. [ok]");
-    }
-}
-
 //#[cfg(test)]
-pub fn test_runner(tests: &[&dyn Testable]) {
+pub fn test_runner(tests: &[&TestFunction]) {
     sprintln!("Running {} tests", tests.len());
     for test in tests {
         test.run();
@@ -45,7 +30,42 @@ pub extern "C" fn _start() -> ! {
     qemu_exit::exit(false);
 }
 
-#[test_case]
+#[kproc::test("Trivial test")]
 fn trivial_test() {
     assert!(1 == 1);
+}
+
+pub struct TestFunction {
+    /// The function to run.
+    pub function: fn(),
+    /// The name of the function.
+    pub function_name: &'static str,
+    /// The name of the test that will be displayed to the user
+    /// This should be a human readable name.
+    pub human_name: &'static str,
+    /// If this test fails/panics, should we continue running tests?
+    /// This should be false for tests that test the kernel's core functionality.
+    pub can_recover: bool,
+}
+
+impl Default for TestFunction {
+    fn default() -> Self {
+        Self::const_default()
+    }
+}
+
+impl TestFunction {
+    pub const fn const_default() -> Self {
+        Self {
+            function: || {},
+            function_name: "",
+            human_name: "",
+            can_recover: false,
+        }
+    }
+    pub fn run(&self) {
+        sprintln!("Running test: {} ({})", self.human_name, self.function_name);
+        (self.function)();
+        sprintln!("Test passed: {} ({})", self.human_name, self.function_name);
+    }
 }

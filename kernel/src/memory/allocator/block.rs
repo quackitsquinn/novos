@@ -36,7 +36,7 @@ impl Block {
     pub fn allocate(&mut self) {
         self.is_free = false;
     }
-
+    /// Split the block into two blocks, the first block will have the requested size and the second block will have the remaining size
     pub fn split(&mut self, size: usize) -> Option<Block> {
         if self.size() < size {
             return None;
@@ -52,7 +52,7 @@ impl Block {
         debug_assert_eq!(self.is_free, other.is_free);
         //debug_assert!(self.is_reusable && other.is_reusable);
 
-        if other.address > self.address {
+        if other.address < self.address {
             return other.merge(self); // Ensure self is the block with the lower address
         }
 
@@ -73,5 +73,51 @@ impl Block {
     pub fn set_reusable(&mut self, reusable: bool) {
         debug_assert!(self.is_free);
         self.is_reusable = reusable;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[kproc::test("Block split")]
+    fn test_block_split() {
+        let mut block = Block::new(1024, 0x1000 as *mut u8, true);
+        let new_block = block.split(512).unwrap();
+
+        assert_eq!(block.size(), 512);
+        assert_eq!(new_block.size(), 512);
+        assert_eq!(new_block.address, 0x1200 as *mut u8);
+        assert_eq!(
+            block.address as usize + block.size,
+            new_block.address as usize
+        );
+    }
+
+    #[kproc::test("Block merge")]
+    fn test_block_merge() {
+        let mut block1 = Block::new(512, 0x1000 as *mut u8, true);
+        let mut block2 = Block::new(512, 0x1200 as *mut u8, true);
+
+        let new_block = block1.merge(&mut block2);
+
+        assert_eq!(new_block.size(), 1024);
+        assert_eq!(new_block.address, block1.address);
+    }
+
+    #[kproc::test("Block is adjacent")]
+    fn test_block_is_adjacent() {
+        let block1 = Block::new(512, 0x1000 as *mut u8, true);
+        let block2 = Block::new(512, 0x1200 as *mut u8, true);
+
+        assert!(block1.is_adjacent(&block2));
+    }
+
+    #[kproc::test("Block is not adjacent")]
+    fn test_block_is_not_adjacent() {
+        let block1 = Block::new(512, 0x1000 as *mut u8, true);
+        let block2 = Block::new(512, 0x1600 as *mut u8, true);
+
+        assert!(!block1.is_adjacent(&block2));
     }
 }

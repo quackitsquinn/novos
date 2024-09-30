@@ -10,7 +10,10 @@ use log::{debug, error, info, trace};
 
 use crate::{debug_release_check, sprintln};
 
-use super::{block::Block, downwards_vec::DownwardsVec};
+use super::{
+    block::{self, Block},
+    downwards_vec::DownwardsVec,
+};
 
 #[derive(Debug)]
 pub struct BlockAllocator {
@@ -22,7 +25,7 @@ pub struct BlockAllocator {
     heap_end: usize,
     allocation_balance: isize,
 }
-// TODO: Don't implement Send and Sync for Blocks. Implement it for LockedAllocator instead.
+
 unsafe impl Send for BlockAllocator {}
 unsafe impl Sync for BlockAllocator {}
 
@@ -37,18 +40,28 @@ impl BlockAllocator {
     pub unsafe fn init(heap_start: usize, heap_end: usize) -> Self {
         let block_heap_end = heap_end - mem::size_of::<Block>();
         let block_table_base = align(block_heap_end as *mut Block, true) as usize;
-        info!(
-            "Creating block table with size {} at {:#x}",
-            BLOCK_SIZE_BYTES, block_table_base
-        );
-        // Set the first block to contain itself
-        let block = Block::new(BLOCK_SIZE_BYTES, block_table_base as *mut u8, false);
-        let mut blocks =
-            unsafe { DownwardsVec::new(block_table_base as *mut Block, INIT_BLOCK_SIZE) };
 
-        blocks.push(block).expect("Failed to push block");
+        let (table_block, blocks) =
+            unsafe { Self::init_table_at(block_table_base as *mut Block, BLOCK_SIZE_BYTES) };
 
-        let table_block = unsafe { &mut *blocks.as_mut_ptr() };
+        Self {
+            blocks,
+            table_block,
+            heap_start,
+            heap_end,
+            unmap_start: heap_start,
+            allocation_balance: 0,
+        }
+    }
+    /// Creates a new block allocator with the given heap start and end. Only configured for testing because I can't think of a real world use case for this.
+    #[cfg(test)]
+    pub(crate) unsafe fn init_at(
+        heap_start: usize,
+        heap_end: usize,
+        block_table_base: usize,
+    ) -> Self {
+        let (table_block, blocks) =
+            unsafe { Self::init_table_at(block_table_base as *mut Block, BLOCK_SIZE_BYTES) };
 
         Self {
             blocks,
@@ -60,8 +73,29 @@ impl BlockAllocator {
         }
     }
 
+    unsafe fn init_table_at(
+        ptr: *mut Block,
+        table_size: usize,
+    ) -> (&'static mut Block, DownwardsVec<'static, Block>) {
+        let block_table_base = unsafe { ptr.sub(table_size) };
+        let size_bytes = table_size * mem::size_of::<Block>();
+        info!(
+            "Creating block table with size {} at {:p}",
+            BLOCK_SIZE_BYTES, ptr
+        );
+        // Set the first block to contain itself
+        let block = Block::new(size_bytes, block_table_base as *mut u8, false);
+        let mut blocks = unsafe { DownwardsVec::new(ptr, INIT_BLOCK_SIZE) };
+
+        blocks.push(block).expect("Failed to push block");
+
+        let table_block = unsafe { &mut *blocks.as_mut_ptr() };
+        (table_block, blocks)
+    }
+
     unsafe fn push_block(&mut self, block: Block) {
         self.check_block_space();
+
         // TODO: Use the actual allocator design here. This is a temporary solution because I got tired of fighting with pointers.
         for blks in &mut *self.blocks {
             if blks.is_reusable {
@@ -308,4 +342,25 @@ fn align_with_alignment(val: *mut u8, alignment: usize, downwards: bool) -> *mut
     };
     assert!(ptr.is_aligned());
     ptr
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use kroc::test;
+    use mem::ManuallyDrop;
+
+    pub struct DebugAllocator<const SPACE: usize> {
+        pub inner: BlockAllocator,
+        inner_arr: [ManuallyDrop<Block>; BLOCK_CAP],
+    }
+
+    impl<const BLOCK_CAP: usize> DebugAllocator<BLOCK_CAP> {
+        pub fn new(heap_start: usize, heap_end: usize) -> Self {
+            let mut inner_arr =
+                [ManuallyDrop::new(Block::new(0, ptr::null_mut(), false)); BLOCK_CAP];
+            let inner = unsafe { BlockAllocator::init(heap_start, heap_end) };
+            Self { inner, inner_arr }
+        }
+    }
 }
