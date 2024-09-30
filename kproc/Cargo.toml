@@ -1,0 +1,13 @@
+[package]
+name = "kproc"
+version = "0.1.0"
+edition = "2021"
+description = "Some proc macros for novOS"
+
+[dependencies]
+proc-macro2 = "1.0.86"
+quote = "1.0.37"
+syn = {version = "2.0.79", features = ["full"]}
+
+[lib]
+proc-macro = true

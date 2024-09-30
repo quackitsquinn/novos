@@ -1,4 +1,0 @@
-{
-    "rust-analyzer.check.allTargets": false,
-    "rust-analyzer.check.targets": "x86_64-unknown-linux-gnu"
-}  
