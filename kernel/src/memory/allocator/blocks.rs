@@ -42,7 +42,7 @@ impl BlockAllocator {
         let block_table_base = align(block_heap_end as *mut Block, true) as usize;
 
         let (table_block, blocks) =
-            unsafe { Self::init_table_at(block_table_base as *mut Block, BLOCK_SIZE_BYTES) };
+            unsafe { Self::init_table_at(block_table_base as *mut Block, INIT_BLOCK_SIZE) };
 
         Self {
             blocks,
@@ -54,15 +54,19 @@ impl BlockAllocator {
         }
     }
     /// Creates a new block allocator with the given heap start and end. Only configured for testing because I can't think of a real world use case for this.
-    #[cfg(test)]
+    //#[cfg(test)]
     pub(crate) unsafe fn init_at(
         heap_start: usize,
         heap_end: usize,
-        block_table_base: usize,
+        block_table_base: *mut Block,
+        block_table_size: usize,
     ) -> Self {
         let (table_block, blocks) =
-            unsafe { Self::init_table_at(block_table_base as *mut Block, BLOCK_SIZE_BYTES) };
-
+            unsafe { Self::init_table_at(block_table_base as *mut Block, block_table_size) };
+        info!(
+            "Creating block allocator with heap start: {:#x} and heap end: {:#x}",
+            heap_start, heap_end
+        );
         Self {
             blocks,
             table_block,
@@ -87,7 +91,9 @@ impl BlockAllocator {
         let block = Block::new(size_bytes, block_table_base as *mut u8, false);
         let mut blocks = unsafe { DownwardsVec::new(ptr, INIT_BLOCK_SIZE) };
 
+        info!("Pushing table block");
         blocks.push(block).expect("Failed to push block");
+        info!("Pushed table block");
 
         let table_block = unsafe { &mut *blocks.as_mut_ptr() };
         (table_block, blocks)
@@ -344,23 +350,57 @@ fn align_with_alignment(val: *mut u8, alignment: usize, downwards: bool) -> *mut
     ptr
 }
 
-#[cfg(test)]
+//#[cfg(test)]
 mod tests {
-    use super::*;
-    use kroc::test;
-    use mem::ManuallyDrop;
+    use crate::stack_check;
 
+    use super::*;
+    use kproc::test;
+    use mem::{ManuallyDrop, MaybeUninit};
+
+    /// A test allocator that uses a fixed-size array for blocks.
+    /// ***WARNING: This is not a real allocator. DO NOT DEREF ANY POINTERS FROM THIS ALLOCATOR.***
     pub struct DebugAllocator<const SPACE: usize> {
         pub inner: BlockAllocator,
-        inner_arr: [ManuallyDrop<Block>; BLOCK_CAP],
+        inner_arr: [ManuallyDrop<Block>; SPACE],
     }
 
-    impl<const BLOCK_CAP: usize> DebugAllocator<BLOCK_CAP> {
+    impl<const SPACE: usize> DebugAllocator<SPACE> {
         pub fn new(heap_start: usize, heap_end: usize) -> Self {
-            let mut inner_arr =
-                [ManuallyDrop::new(Block::new(0, ptr::null_mut(), false)); BLOCK_CAP];
-            let inner = unsafe { BlockAllocator::init(heap_start, heap_end) };
-            Self { inner, inner_arr }
+            // This is safe because A. BlockAllocator expects uninitialized memory and B. ManuallyDrop is repr(transparent).
+            trace!(
+                "Creating DebugAllocator with heap start: {:#x} and heap end: {:#x}",
+                heap_start,
+                heap_end,
+            );
+            let mut inner_arr: [ManuallyDrop<Block>; SPACE] =
+                unsafe { MaybeUninit::uninit().assume_init() };
+            // This is OK because we don't reference the inner allocator until it's initialized.
+            #[allow(invalid_value)]
+            let mut this: DebugAllocator<SPACE> = unsafe { MaybeUninit::uninit().assume_init() };
+            this.inner_arr = inner_arr;
+            stack_check();
+            this.inner = unsafe {
+                BlockAllocator::init_at(
+                    heap_start,
+                    heap_end,
+                    this.inner_arr.as_mut_ptr() as *mut Block,
+                    SPACE,
+                )
+            };
+            trace!("Created DebugAllocator");
+            this
         }
+    }
+
+    #[test("DebugAllocator is valid", can_recover = true)]
+    fn test_debug_allocator() {
+        stack_check();
+        let mut allocator = DebugAllocator::<10>::new(0x1000, 0x2000);
+        assert_eq!(allocator.inner.get_block_table().len(), 1);
+        assert_eq!(
+            allocator.inner.get_block_table()[0].size(),
+            BLOCK_SIZE_BYTES
+        );
     }
 }

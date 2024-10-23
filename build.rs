@@ -141,18 +141,29 @@ fn copy_kernel_bin_dbg(out_dir: &str, kernel_bin_dir: &str) {
 }
 
 fn build_tests() {
-    // HACK: Literally all of this. It currently appears that there is no good way to do this in cargo.
+    // TODO: Refactor to use cargo build --tests and with json outputs
     //
     // Build kernel tests
-    let output = Command::new("cargo")
+    println!("Building kernel tests");
+    let output = Command::new(option_env!("CARGO").unwrap_or("cargo"))
         .current_dir("kernel")
         .args(&["test", "--no-run"])
         .env(
             "CARGO_TARGET_DIR",
-            fs::canonicalize("target/tests").unwrap(),
+            fs::canonicalize("target/tests").unwrap_or_else(|f| {
+                if f.kind() == std::io::ErrorKind::NotFound {
+                    fs::create_dir("target/tests").expect("Failed to create target/tests");
+                    return fs::canonicalize("target/tests").expect("Failed to get canonical path");
+                }
+                panic!("Failed to get canonical path for target/tests: {}", f)
+            }),
         )
         .output()
-        .expect("Failed to build tests");
+        .unwrap_or_else(|f| {
+            println!("cargo::warning=Failed to run cargo test --no-run: {}", f);
+            panic!("Failed to run cargo test --no-run: {}", f)
+        });
+
     // The last line should contain the full path to the test binary.
     // This whole thing is kinda gross, but as far as I can tell, there is no way to get the path to the built binary from cargo
     let output_str = String::from_utf8_lossy(&output.stderr); // Cargo put most of it's output in stderr

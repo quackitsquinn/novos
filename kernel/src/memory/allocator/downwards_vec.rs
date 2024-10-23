@@ -80,6 +80,23 @@ impl<'a, T> DownwardsVec<'a, T> {
     pub unsafe fn grow(&mut self, additional: usize) {
         self.capacity += additional;
     }
+    /// Clone the vector exactly. This will create a new vector with the same length, capacity, and elements.
+    /// # Safety
+    /// This is *incredibly* unsafe. The caller must ensure the following:
+    /// - The cloned vector is forgotten before the original vector is dropped.
+    /// - The cloned vector is not used after the original vector is dropped.
+    /// - There are no concurrent accesses to either the original or cloned vector.
+    ///
+    /// This function is primarily used for testing to create a test vector that can be cloned into a test allocator.
+    pub unsafe fn clone_exact(&self) -> Self {
+        Self {
+            base: self.base,
+            len: self.len,
+            capacity: self.capacity,
+            slice: unsafe { core::slice::from_raw_parts_mut(self.base, self.len) },
+            _marker: PhantomData,
+        }
+    }
 }
 
 impl<'a, T> core::ops::Deref for DownwardsVec<'a, T> {
@@ -146,7 +163,7 @@ pub mod test {
         unsafe { DownwardsVec::new(base, CAP) }
     }
 
-    #[kproc::test("DownwardsVec push one" can_recover = true)]
+    #[kproc::test("DownwardsVec push one", can_recover = true)]
     fn test_push_one() {
         let mut arr = [MaybeUninit::uninit(); 10];
         let mut vec = new_in(&mut arr);
@@ -155,7 +172,7 @@ pub mod test {
         assert_eq!(vec[0], 1);
     }
 
-    #[kproc::test("DownwardsVec push fill" can_recover = true)]
+    #[kproc::test("DownwardsVec push fill", can_recover = true)]
     fn test_push_fill() {
         let mut arr = [MaybeUninit::uninit(); 10];
         let mut vec = new_in(&mut arr);
@@ -168,7 +185,7 @@ pub mod test {
         }
     }
 
-    #[kproc::test("DownwardsVec push over cap" can_recover = true)]
+    #[kproc::test("DownwardsVec push over cap", can_recover = true)]
     fn test_push_over_cap() {
         let mut arr = [MaybeUninit::uninit(); 10];
         let mut vec = new_in(&mut arr);
@@ -178,5 +195,19 @@ pub mod test {
         assert_eq!(vec.len(), 10);
         assert!(vec.push(10).is_none());
         assert_eq!(vec.len(), 10);
+    }
+
+    #[kproc::test("DownwardsVec clone exact", can_recover = true)]
+    fn test_clone_exact() {
+        let mut arr = [MaybeUninit::uninit(); 10];
+        let mut vec = new_in(&mut arr);
+        for i in 0..10 {
+            vec.push(i).unwrap();
+        }
+        let mut clone = unsafe { vec.clone_exact() };
+        assert!(clone.slice == vec.slice);
+        assert!(clone.base == vec.base);
+        assert!(clone.len == vec.len);
+        assert!(clone.capacity == vec.capacity);
     }
 }

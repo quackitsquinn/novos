@@ -3,12 +3,13 @@
 #![feature(abi_x86_interrupt)]
 #![forbid(unsafe_op_in_unsafe_fn)]
 #![feature(custom_test_frameworks)]
+#![feature(maybe_uninit_uninit_array)]
 #![test_runner(crate::testing::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
 extern crate alloc;
 
-use core::arch::asm;
+use core::{arch::asm, ptr::addr_of};
 
 use limine::request::StackSizeRequest;
 use log::info;
@@ -34,6 +35,31 @@ const STACK_SIZE: u64 = 0xFF000; // 0xCF8
 #[used]
 static STACK_REQUEST: StackSizeRequest = StackSizeRequest::new().with_size(STACK_SIZE);
 
+static STACK_BASE: Once<usize> = Once::new();
+
+pub fn stack_ptr() -> usize {
+    // We could also just do addr_of!(local_var), but this is more fun.
+    let stack_ptr: usize;
+    unsafe {
+        asm!("mov {}, rsp", out(reg) stack_ptr);
+    }
+    stack_ptr
+}
+/// Check function to see how much stack space is used. Mainly used as a concrete way to check if a bug is occurring due to a stack overflow.
+pub fn stack_check() -> usize {
+    let base = *unsafe { STACK_BASE.get_unchecked() };
+    let size = *unsafe { STACK_BASE.get_unchecked() } - stack_ptr();
+    info!(
+        "Stack size: 0x{:x} ({} percent) (sb: 0x{:x}, sp: 0x{:x})",
+        size,
+        size as f64 / STACK_SIZE as f64 * 100.0,
+        base,
+        stack_ptr()
+    );
+    size
+}
+
+// sb: 0xffff80003f74beb0,sp:0xffff80003f74c770
 /// Halts the CPU indefinitely.
 pub fn hlt_loop() -> ! {
     // SAFETY: We only call cli and hlt, which are safe to call.
@@ -54,6 +80,11 @@ pub fn display_init() -> bool {
 }
 
 pub fn init_kernel() {
+    // NOTE: This is a hack to get the stack base address. 
+    // This is used because limine does not provide the stack base address.
+    let mut _dummy = 0;
+    _dummy = &raw const _dummy as usize;
+    STACK_BASE.call_once(|| _dummy);
     serial::init();
     info!("Initialized serial");
     gdt::init_gdt();

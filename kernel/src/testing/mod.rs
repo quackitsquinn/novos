@@ -34,7 +34,7 @@ pub extern "C" fn _start() -> ! {
 fn trivial_test() {
     assert!(1 == 1);
 }
-
+// TODO: Recovery implementation and prioritize recoverable tests over unrecoverable tests
 pub struct TestFunction {
     /// The function to run.
     pub function: fn(),
