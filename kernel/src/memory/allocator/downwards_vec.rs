@@ -77,6 +77,15 @@ impl<'a, T> DownwardsVec<'a, T> {
         self.capacity = cap;
     }
 
+    pub unsafe fn set_len(&mut self, len: usize) {
+        assert!(
+            len <= self.capacity,
+            "New length must be less than or equal to the capacity"
+        );
+        self.len = len;
+        self.slice = unsafe { core::slice::from_raw_parts_mut(self.base, self.len) };
+    }
+
     pub unsafe fn grow(&mut self, additional: usize) {
         self.capacity += additional;
     }

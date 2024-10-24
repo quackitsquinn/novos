@@ -76,27 +76,48 @@ impl BlockAllocator {
             allocation_balance: 0,
         }
     }
+    /// Creates a new block allocator with the given heap start, end, and block table.
+    ///
+    /// # Safety
+    /// heap_start and heap_end must be valid memory addresses, and if not, any pointer returned
+    /// by this allocator will be invalid and is undefined behavior to dereference.
+    pub(crate) unsafe fn init_with_vec(
+        heap_start: usize,
+        heap_end: usize,
+        mut blocks: DownwardsVec<'static, Block>,
+    ) -> Self {
+        let table_block = unsafe { Self::init_table_vec(&mut blocks) };
+        Self {
+            blocks,
+            table_block,
+            heap_start,
+            heap_end,
+            unmap_start: heap_start,
+            allocation_balance: 0,
+        }
+    }
 
     unsafe fn init_table_at(
         ptr: *mut Block,
         table_size: usize,
     ) -> (&'static mut Block, DownwardsVec<'static, Block>) {
-        let block_table_base = unsafe { ptr.sub(table_size) };
-        let size_bytes = table_size * mem::size_of::<Block>();
-        info!(
-            "Creating block table with size {} at {:p}",
-            BLOCK_SIZE_BYTES, ptr
+        unsafe {
+            let mut blocks = DownwardsVec::new(ptr, table_size);
+            let table_block = Self::init_table_vec(&mut blocks);
+            (table_block, blocks)
+        }
+    }
+
+    unsafe fn init_table_vec(vec: &mut DownwardsVec<'static, Block>) -> &'static mut Block {
+        let block = Block::new(
+            vec.capacity() * mem::size_of::<Block>(),
+            vec.as_ptr() as *mut u8,
+            false,
         );
-        // Set the first block to contain itself
-        let block = Block::new(size_bytes, block_table_base as *mut u8, false);
-        let mut blocks = unsafe { DownwardsVec::new(ptr, INIT_BLOCK_SIZE) };
-
-        info!("Pushing table block");
-        blocks.push(block).expect("Failed to push block");
-        info!("Pushed table block");
-
-        let table_block = unsafe { &mut *blocks.as_mut_ptr() };
-        (table_block, blocks)
+        unsafe {
+            vec.push_unchecked(block);
+            &mut *vec.as_mut_ptr()
+        }
     }
 
     unsafe fn push_block(&mut self, block: Block) {
@@ -352,6 +373,8 @@ fn align_with_alignment(val: *mut u8, alignment: usize, downwards: bool) -> *mut
 
 //#[cfg(test)]
 mod tests {
+    use core::hint::black_box;
+
     use crate::stack_check;
 
     use super::*;
@@ -362,6 +385,7 @@ mod tests {
     /// ***WARNING: This is not a real allocator. DO NOT DEREF ANY POINTERS FROM THIS ALLOCATOR.***
     pub struct DebugAllocator<const SPACE: usize> {
         pub inner: BlockAllocator,
+        vec: DownwardsVec<'static, Block>,
         inner_arr: [ManuallyDrop<Block>; SPACE],
     }
 
@@ -375,21 +399,24 @@ mod tests {
             );
             let mut inner_arr: [ManuallyDrop<Block>; SPACE] =
                 unsafe { MaybeUninit::uninit().assume_init() };
-            // This is OK because we don't reference the inner allocator until it's initialized.
-            #[allow(invalid_value)]
-            let mut this: DebugAllocator<SPACE> = unsafe { MaybeUninit::uninit().assume_init() };
-            this.inner_arr = inner_arr;
-            stack_check();
-            this.inner = unsafe {
-                BlockAllocator::init_at(
-                    heap_start,
-                    heap_end,
-                    this.inner_arr.as_mut_ptr() as *mut Block,
-                    SPACE,
-                )
-            };
-            trace!("Created DebugAllocator");
-            this
+            let mut vec = unsafe { DownwardsVec::new(inner_arr.as_mut_ptr() as *mut Block, SPACE) };
+            let inner =
+                unsafe { BlockAllocator::init_with_vec(heap_start, heap_end, vec.clone_exact()) };
+
+            Self {
+                inner,
+                vec,
+                inner_arr,
+            }
+        }
+    }
+
+    impl<const SPACE: usize> Drop for DebugAllocator<SPACE> {
+        fn drop(&mut self) {
+            // We are unable to drop vec, but we can override it with an empty vec.
+            unsafe {
+                self.vec.set_len(0);
+            }
         }
     }
 
@@ -400,7 +427,7 @@ mod tests {
         assert_eq!(allocator.inner.get_block_table().len(), 1);
         assert_eq!(
             allocator.inner.get_block_table()[0].size(),
-            BLOCK_SIZE_BYTES
+            10 * mem::size_of::<Block>()
         );
     }
 }
