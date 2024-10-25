@@ -430,4 +430,17 @@ mod tests {
             10 * mem::size_of::<Block>()
         );
     }
+
+    #[test("BlockAllocator allocation", can_recover = true)]
+    fn test_block_allocator_allocate() {
+        let mut allocator = DebugAllocator::<10>::new(0x1000, 0x2000);
+        let layout = Layout::from_size_align(10, 1).unwrap();
+        let ptr = unsafe { allocator.inner.allocate(layout) };
+        assert!(!ptr.is_null());
+        assert_eq!(allocator.inner.allocation_balance(), 1);
+        let block = unsafe { allocator.inner.find_block_by_ptr(ptr).unwrap() };
+        assert!(!block.is_free());
+        assert_eq!(block.size(), 10);
+        info!("{:#?}", allocator.vec);
+    }
 }

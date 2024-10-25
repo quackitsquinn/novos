@@ -219,4 +219,18 @@ pub mod test {
         assert!(clone.len == vec.len);
         assert!(clone.capacity == vec.capacity);
     }
+
+    #[kproc::test("DownwardsVec iter")]
+    fn test_iter() {
+        let mut arr = [MaybeUninit::uninit(); 10];
+        let mut vec = new_in(&mut arr);
+        for i in 0..10 {
+            vec.push(i).unwrap();
+        }
+        let mut iter = vec.iter();
+        for i in 0..10 {
+            assert_eq!(iter.next(), Some(&(9 - i)));
+        }
+        assert_eq!(iter.next(), None);
+    }
 }

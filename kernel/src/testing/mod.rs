@@ -1,11 +1,27 @@
-use crate::{hlt_loop, sprintln};
+use core::mem;
+
+use spin::Mutex;
+
+use crate::{hlt_loop, sprintln, util::OnceMutex};
 
 mod qemu_exit;
 
+static TESTS: OnceMutex<&[&TestFunction]> = OnceMutex::new();
+static CURRENT: Mutex<usize> = Mutex::new(0);
+static NEXT: Mutex<Option<usize>> = Mutex::new(None);
+
 //#[cfg(test)]
 pub fn test_runner(tests: &[&TestFunction]) {
+    TESTS.init(unsafe { mem::transmute(tests) });
     sprintln!("Running {} tests", tests.len());
-    for test in tests {
+    let len = tests.len();
+    for (i, test) in tests.iter().enumerate() {
+        *CURRENT.lock() = i;
+        if i + 1 < len {
+            *NEXT.lock() = Some(i + 1);
+        } else {
+            *NEXT.lock() = None;
+        }
         test.run();
     }
     qemu_exit::exit(false);
