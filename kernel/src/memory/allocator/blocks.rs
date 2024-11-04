@@ -1,6 +1,7 @@
 use core::{
     alloc::Layout,
     cell::UnsafeCell,
+    fmt::Debug,
     mem,
     ptr::{self, NonNull},
     slice,
@@ -15,7 +16,6 @@ use super::{
     downwards_vec::DownwardsVec,
 };
 
-#[derive(Debug)]
 pub struct BlockAllocator {
     // The blocks are stored in a downwards-growing vector.
     blocks: DownwardsVec<'static, Block>,
@@ -144,8 +144,26 @@ impl BlockAllocator {
         self.dbg_print_blocks();
         block
     }
+    /// Returns the block that `ptr` is allocated in.
+    /// The returned block is not guaranteed to be allocated, so it is up to the caller to check if the block is allocated.
+    pub fn find_block_by_ptr(&self, ptr: *mut u8) -> Option<&Block> {
+        let ptr = ptr as usize;
+        for block in &*self.blocks {
+            let addr = block.address as usize;
+            if ptr >= addr && ptr < addr + block.size() {
+                trace!(
+                    "Found ptr ({:#x}) in block {:#p} (off: {})",
+                    ptr,
+                    block.address,
+                    ptr - addr
+                );
+                return Some(block);
+            }
+        }
+        None
+    }
 
-    unsafe fn find_block_by_ptr(&mut self, ptr: *mut u8) -> Option<&mut Block> {
+    unsafe fn find_block_by_ptr_mut(&mut self, ptr: *mut u8) -> Option<&mut Block> {
         let ptr = ptr as usize;
         for block in &mut *self.blocks {
             let addr = block.address as usize;
@@ -161,7 +179,7 @@ impl BlockAllocator {
         }
         None
     }
-
+    #[must_use = "Returned pointer must be deallocated with deallocate"]
     pub unsafe fn allocate(&mut self, layout: Layout) -> *mut u8 {
         let size = layout.size();
         // If the alignment is 1, we don't need to align it.
@@ -208,9 +226,9 @@ impl BlockAllocator {
         ptr
     }
 
-    pub unsafe fn deallocate(&mut self, ptr: *mut u8, layout: Layout) {
+    pub unsafe fn deallocate(&mut self, ptr: *mut u8, layout: Layout) -> Option<()> {
         if let Some(blk) = // OLD: align_with_alignment(ptr, layout.align(), true))
-            unsafe { self.find_block_by_ptr(ptr) }
+            unsafe { self.find_block_by_ptr_mut(ptr) }
         {
             info!("Deallocating block {:?}", blk);
             if blk.is_free() {
@@ -225,13 +243,13 @@ impl BlockAllocator {
                         error!("Block already deallocated");
                     }
                 }
-                return;
+                return None;
             }
             blk.deallocate();
             info!("Deallocated block {:?}", blk);
             self.allocation_balance -= 1;
             self.dbg_print_blocks();
-            return;
+            return Some(());
         }
         debug_release_select!(
             debug {
@@ -240,7 +258,10 @@ impl BlockAllocator {
             release {
                 error!("Block not found");
             }
-        )
+        );
+
+        #[allow(unreachable_code)]
+        return None;
     }
 
     unsafe fn gc(&mut self) {
@@ -276,12 +297,13 @@ impl BlockAllocator {
         debug!("Joined {} blocks", joined);
     }
 
-    unsafe fn ptr_is_allocated(&self, ptr: *mut u8) -> bool {
+    /// Check if a pointer is allocated by the block allocator.
+    pub fn ptr_is_allocated(&self, ptr: *mut u8) -> bool {
         let ptr = ptr as usize;
         for block in &*self.blocks {
             let addr = block.address as usize;
             if ptr >= addr && ptr < addr + block.size() {
-                return block.is_free();
+                return !block.is_free();
             }
         }
         false
@@ -360,11 +382,27 @@ impl BlockAllocator {
     pub fn table_block(&self) -> &Block {
         self.table_block
     }
-
+    /// Clear the block allocator. This function is ***INCREDIBLY UNSAFE*** and should only be used for testing.
+    ///
+    /// # Safety
+    ///
+    /// This function is so unsafe because it in essence calls mem::forget on anything allocated in the block allocator. This means that any pointers returned by the block allocator are now invalid and dereferencing them is undefined behavior.
+    /// This function should only be used for testing purposes, and even then, it should be used with caution.
+    #[cfg(test)]
     pub unsafe fn clear(&mut self) {
-        unsafe { self.blocks.set_len(0) };
-        self.unmap_start = self.heap_start;
-        self.allocation_balance = 0;
+        *self = unsafe { Self::init(self.heap_start, self.heap_end) };
+    }
+}
+
+impl Debug for BlockAllocator {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("BlockAllocator")
+            .field("blocks", &self.blocks)
+            .field("table_block", &self.table_block)
+            .field("heap_start", &(self.heap_start as *const u8))
+            .field("heap_end", &(self.heap_end as *const u8))
+            .field("allocation_balance", &self.allocation_balance)
+            .finish()
     }
 }
 
@@ -389,80 +427,116 @@ fn align_with_alignment(val: *mut u8, alignment: usize, downwards: bool) -> *mut
     ptr
 }
 
-//#[cfg(test)]
 mod tests {
     use core::hint::black_box;
 
-    use crate::stack_check;
+    use crate::{memory::allocator::ALLOCATOR, stack_check};
 
     use super::*;
-    use kproc::test;
     use mem::{ManuallyDrop, MaybeUninit};
 
-    /// A test allocator that uses a fixed-size array for blocks.
-    /// ***WARNING: This is not a real allocator. DO NOT DEREF ANY POINTERS FROM THIS ALLOCATOR.***
-    pub struct DebugAllocator<const SPACE: usize> {
-        pub inner: BlockAllocator,
-        vec: DownwardsVec<'static, Block>,
-        inner_arr: [ManuallyDrop<Block>; SPACE],
-    }
-
-    impl<const SPACE: usize> DebugAllocator<SPACE> {
-        pub fn new(heap_start: usize, heap_end: usize) -> Self {
-            // This is safe because A. BlockAllocator expects uninitialized memory and B. ManuallyDrop is repr(transparent).
-            trace!(
-                "Creating DebugAllocator with heap start: {:#x} and heap end: {:#x}",
-                heap_start,
-                heap_end,
-            );
-            let mut inner_arr: [ManuallyDrop<Block>; SPACE] =
-                unsafe { MaybeUninit::uninit().assume_init() };
-            let vec = unsafe { DownwardsVec::new(inner_arr.as_mut_ptr() as *mut Block, SPACE) };
-            let inner =
-                unsafe { BlockAllocator::init_with_vec(heap_start, heap_end, vec.clone_exact()) };
-
-            let s = Self {
-                inner,
-                vec,
-                inner_arr,
-            };
-
-            s
-        }
-    }
-
-    impl<const SPACE: usize> Drop for DebugAllocator<SPACE> {
-        fn drop(&mut self) {
-            // We are unable to drop vec, but we can override it with an empty vec.
+    macro_rules! clear {
+        () => {
+            #[cfg(test)]
             unsafe {
-                self.vec.set_len(0);
+                drop(ALLOCATOR.get().blocks.clear())
             }
-        }
+        };
     }
 
-    #[test("DebugAllocator is valid", can_recover = true)]
-    fn test_debug_allocator() {
-        stack_check();
-        let mut allocator = DebugAllocator::<10>::new(0x1000, 0x2000);
-        assert_eq!(allocator.inner.get_block_table().len(), 1);
-        assert_eq!(
-            allocator.inner.get_block_table()[0].size(),
-            10 * mem::size_of::<Block>()
-        );
-    }
+    // TODO: Have an allocator created explicitly for testing. This current implementation would make it unstable to have any &'static heap allocated structures.
 
-    #[test("BlockAllocator allocation", can_recover = true)]
-    fn test_block_allocator_allocate() {
-        let mut allocator = DebugAllocator::<10>::new(0x1000, 0x2000);
-        let layout = Layout::from_size_align(10, 1).unwrap();
-        let ptr = unsafe { allocator.inner.allocate(layout) };
-        info!("{:#?}", allocator.vec);
-        info!("{:#?}", allocator.inner.get_block_table());
+    #[kproc::test("Allocation", can_recover = true, bench_count = Some(100))]
+    fn test_allocation() {
+        clear!();
+
+        let layout = Layout::from_size_align(512, 1).unwrap();
+
+        let allocator = &mut ALLOCATOR.get().blocks;
+
+        let ptr = unsafe { allocator.allocate(layout) };
+
+        trace!("Allocated pointer: {:p}", ptr);
+        trace!("Block table: {:#?}", allocator);
         assert!(!ptr.is_null());
-        assert_eq!(allocator.inner.allocation_balance(), 1);
-        let block = unsafe { allocator.inner.find_block_by_ptr(ptr).unwrap() };
-        assert!(!block.is_free());
-        assert_eq!(block.size(), 10);
-        info!("{:#?}", allocator.vec);
+        assert_eq!(allocator.allocation_balance, 1);
+        // Check if whole range is allocated
+        for i in 0..512 {
+            assert!(
+                allocator.ptr_is_allocated(unsafe { ptr.add(i) }),
+                "Failed at {}",
+                i
+            );
+        }
+
+        let block = allocator
+            .find_block_by_ptr(ptr)
+            .expect("Allocated pointer not found");
+        // Check if the block data is correct
+        assert!(!block.is_free);
+        assert!(!block.is_reusable);
+        assert_eq!(block.size, layout.size());
+        assert_eq!(block.address, ptr);
+
+        unsafe { allocator.deallocate(ptr, layout) }.expect("Block failed to free");
+        assert_eq!(allocator.allocation_balance, 0);
+        assert!(!allocator.ptr_is_allocated(ptr));
+
+        let block = allocator
+            .find_block_by_ptr(ptr)
+            .expect("Block pointer not found");
+
+        assert_eq!(block.size, layout.size());
+        assert!(block.is_free);
+    }
+
+    #[kproc::test("Block Join", can_recover = true)]
+    fn test_block_join() {
+        clear!();
+
+        let layout = Layout::from_size_align(512, 1).unwrap();
+
+        let allocator = &mut ALLOCATOR.get().blocks;
+
+        let ptrs = [
+            unsafe { allocator.allocate(layout) },
+            unsafe { allocator.allocate(layout) },
+            unsafe { allocator.allocate(layout) },
+            unsafe { allocator.allocate(layout) },
+        ];
+
+        for ptr in &ptrs {
+            for i in 0..512 {
+                assert!(
+                    allocator.ptr_is_allocated(unsafe { ptr.add(i) }),
+                    "Failed at {:p}/{}",
+                    ptr,
+                    i
+                );
+            }
+
+            let block = allocator
+                .find_block_by_ptr(*ptr)
+                .expect("Allocated pointer not found");
+
+            assert!(!block.is_free);
+            assert!(!block.is_reusable);
+            assert_eq!(block.size, layout.size());
+            assert_eq!(block.address, *ptr);
+        }
+
+        for ptr in &ptrs {
+            unsafe { allocator.deallocate(*ptr, layout) }.expect("Block failed to free");
+        }
+
+        // Manually run GC
+        unsafe { allocator.gc() };
+
+        let block = allocator
+            .find_block_by_ptr(ptrs[0])
+            .expect("Block pointer not found");
+
+        assert_eq!(block.size, layout.size() * 4);
+        assert!(block.is_free);
     }
 }

@@ -76,6 +76,7 @@ pub fn derive_test(input: ItemFn, attributes: TokenStream) -> TokenStream {
         #[test_case]
         #[doc(hidden)]
         #[allow(non_snake_case)]
+        #[allow(non_upper_case_globals)]
         static #marker_name: crate::testing::TestFunction = crate::testing::TestFunction {
             function: #fn_name,
             function_name: stringify!(#fn_name),
@@ -83,6 +84,7 @@ pub fn derive_test(input: ItemFn, attributes: TokenStream) -> TokenStream {
             #(#struct_format,)*
             ..crate::testing::TestFunction::const_default()
         };
+        #[allow(unused)]
         #input
     };
     // Write the expanded code to a file for debugging. We ignore the error because it's not important.
