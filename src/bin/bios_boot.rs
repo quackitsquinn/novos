@@ -45,7 +45,8 @@ pub fn main() {
             buf_wr.flush().expect("Failed to flush");
         }
         FILE_WRITERS.lock().unwrap().clear();
-    });
+    })
+    .expect("Failed to set ctrlc handler");
     command.wait().expect("qemu-system-x86_64 failed to run");
 }
 
