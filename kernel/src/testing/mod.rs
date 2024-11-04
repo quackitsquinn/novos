@@ -62,7 +62,7 @@ pub struct TestFunction {
     /// If this test fails/panics, should we continue running tests?
     /// This should be false for tests that test the kernel's core functionality.
     pub can_recover: bool,
-    // The number of times this test should be run.
+    /// The number of times this test should be run.
     pub bench_count: Option<usize>,
 }
 
