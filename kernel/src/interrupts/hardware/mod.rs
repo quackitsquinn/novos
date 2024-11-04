@@ -1,9 +1,8 @@
-use core::arch::asm;
 
 use pic8259::ChainedPics;
 use spin::Mutex;
 
-use crate::{println, sprintln};
+use crate::sprintln;
 
 pub mod timer;
 

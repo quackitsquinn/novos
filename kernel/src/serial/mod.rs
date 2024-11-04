@@ -2,9 +2,7 @@
 //!
 //! This module is based off of the uart_16550 crate, which is a driver for the 16550 UART chip.
 
-use crate::{sprintln, util::OnceMutex};
-use raw::SerialPort;
-use x86_64::instructions::interrupts::without_interrupts;
+use crate::sprintln;
 
 pub mod harness;
 pub mod interface;

@@ -1,6 +1,5 @@
 use framebuffer::Framebuffer;
 use limine::request::FramebufferRequest;
-use spin::{Mutex, Once};
 
 mod character;
 pub mod color;

@@ -1,11 +1,10 @@
 use core::fmt::Write;
 
 use arrayvec::ArrayVec;
-use spin::{Mutex, Once};
 
-use crate::{display::terminal, framebuffer, sprintln, terminal};
+use crate::{framebuffer, terminal};
 
-use super::{color::Color, framebuffer, screen_char::ScreenChar};
+use super::{color::Color, screen_char::ScreenChar};
 
 const MAX_HEIGHT: usize = 32;
 const MAX_WIDTH: usize = MAX_HEIGHT * 2;

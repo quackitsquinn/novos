@@ -4,15 +4,11 @@
 
 extern crate alloc;
 
-use core::hint::black_box;
 
 use kernel::{
-    display::{self, color::Color, terminal},
-    interrupts::hardware::timer,
-    memory::{self, allocator::get_block_allocator},
-    println, sprintln, terminal,
+    memory::{self},
+    println, sprintln,
 };
-use log::{error, log_enabled, trace};
 
 #[panic_handler]
 fn panic(_info: &core::panic::PanicInfo) -> ! {

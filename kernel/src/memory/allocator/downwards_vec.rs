@@ -3,7 +3,6 @@ use core::{
     ops::{Index, IndexMut},
 };
 
-use log::trace;
 /// A downwards-growing vector. Used for the block table in the allocator.
 pub struct DownwardsVec<'a, T> {
     base: *mut T,
@@ -157,11 +156,11 @@ where
 
 #[cfg(test)]
 pub mod test {
-    use core::{mem::MaybeUninit, pin::Pin, ptr::null_mut};
+    use core::mem::MaybeUninit;
 
-    use log::info;
+    
 
-    use crate::println;
+    
 
     use super::*;
     /// Create a new downwards-growing vector in the given array.

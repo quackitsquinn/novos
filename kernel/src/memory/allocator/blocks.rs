@@ -1,20 +1,15 @@
 use core::{
     alloc::Layout,
-    cell::UnsafeCell,
     fmt::Debug,
     mem,
-    ptr::{self, NonNull},
-    slice,
+    ptr::{self},
 };
 
 use log::{debug, error, info, trace};
 
 use crate::{debug_release_select, sprintln};
 
-use super::{
-    block::{self, Block},
-    downwards_vec::DownwardsVec,
-};
+use super::{block::Block, downwards_vec::DownwardsVec};
 
 pub struct BlockAllocator {
     // The blocks are stored in a downwards-growing vector.
@@ -428,12 +423,10 @@ fn align_with_alignment(val: *mut u8, alignment: usize, downwards: bool) -> *mut
 }
 
 mod tests {
-    use core::hint::black_box;
 
-    use crate::{memory::allocator::ALLOCATOR, stack_check};
+    use crate::memory::allocator::ALLOCATOR;
 
     use super::*;
-    use mem::{ManuallyDrop, MaybeUninit};
 
     macro_rules! clear {
         () => {

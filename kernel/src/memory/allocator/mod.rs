@@ -1,10 +1,9 @@
 use alloc::RuntimeAllocator;
 use block::Block;
-use blocks::BlockAllocator;
 use downwards_vec::DownwardsVec;
 use spin::MutexGuard;
 
-use crate::{sprint, sprintln, util::OnceMutex};
+use crate::{sprintln, util::OnceMutex};
 
 pub mod alloc;
 pub mod block;

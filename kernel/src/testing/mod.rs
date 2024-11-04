@@ -2,7 +2,7 @@ use core::mem;
 
 use spin::Mutex;
 
-use crate::{hlt_loop, sprintln, util::OnceMutex};
+use crate::{sprintln, util::OnceMutex};
 
 mod qemu_exit;
 
@@ -30,7 +30,7 @@ pub fn test_runner(tests: &[&TestFunction]) {
 #[cfg(test)]
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {
-    use crate::{hlt_loop, sprint, sprintln};
+    use crate::sprintln;
 
     sprintln!("{}", info);
     qemu_exit::exit(true);

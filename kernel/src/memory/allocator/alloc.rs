@@ -3,9 +3,8 @@
 
 use core::alloc::GlobalAlloc;
 
-use crate::util::OnceMutex;
 
-use super::{block::Block, blocks::BlockAllocator, LockedAllocator};
+use super::{blocks::BlockAllocator, LockedAllocator};
 
 pub struct RuntimeAllocator {
     pub(super) blocks: BlockAllocator,

@@ -1,8 +1,6 @@
-use bitflags::iter::Iter;
 use limine::{memory_map::EntryType, paging::Mode, response::MemoryMapResponse};
-use spin::{Mutex, Once};
+use spin::Once;
 use x86_64::{
-    instructions::bochs_breakpoint,
     registers::control::Cr3,
     structures::paging::{
         mapper::MapperFlush, page::PageRangeInclusive, FrameAllocator, Mapper, OffsetPageTable,
@@ -11,7 +9,7 @@ use x86_64::{
     PhysAddr, VirtAddr,
 };
 
-use crate::{sprint, sprintln, util::OnceMutex};
+use crate::{sprintln, util::OnceMutex};
 
 pub mod allocator;
 

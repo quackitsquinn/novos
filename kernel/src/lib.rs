@@ -9,11 +9,11 @@
 
 extern crate alloc;
 
-use core::{arch::asm, ptr::addr_of};
+use core::arch::asm;
 
 use limine::request::StackSizeRequest;
 use log::info;
-pub(crate) use spin::{Mutex, Once};
+pub(crate) use spin::Once;
 
 pub mod display;
 mod gdt;
