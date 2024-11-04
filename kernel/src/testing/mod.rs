@@ -62,6 +62,8 @@ pub struct TestFunction {
     /// If this test fails/panics, should we continue running tests?
     /// This should be false for tests that test the kernel's core functionality.
     pub can_recover: bool,
+    // The number of times this test should be run.
+    pub bench_count: Option<usize>,
 }
 
 impl Default for TestFunction {
@@ -77,11 +79,18 @@ impl TestFunction {
             function_name: "",
             human_name: "",
             can_recover: false,
+            bench_count: None,
         }
     }
     pub fn run(&self) {
         sprintln!("Running test: {} ({})", self.human_name, self.function_name);
-        (self.function)();
+        if let Some(count) = self.bench_count {
+            for _ in 0..count {
+                (self.function)();
+            }
+        } else {
+            (self.function)();
+        }
         sprintln!("Test passed: {} ({})", self.human_name, self.function_name);
     }
 }
