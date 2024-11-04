@@ -8,7 +8,7 @@ use core::{
 
 use log::{debug, error, info, trace};
 
-use crate::{debug_release_check, sprintln};
+use crate::{debug_release_select, sprintln};
 
 use super::{
     block::{self, Block},
@@ -126,12 +126,13 @@ impl BlockAllocator {
         // TODO: Use the actual allocator design here. This is a temporary solution because I got tired of fighting with pointers.
         for blks in &mut *self.blocks {
             if blks.is_reusable {
+                trace!("Reusing block {:?}", blks);
                 *blks = block;
-
                 return;
             }
         }
 
+        trace!("Pushing block {:?}", block);
         self.blocks.push(block).expect("Failed to push block");
     }
 
@@ -163,22 +164,33 @@ impl BlockAllocator {
 
     pub unsafe fn allocate(&mut self, layout: Layout) -> *mut u8 {
         let size = layout.size();
-        let alignment = layout.align();
+        // If the alignment is 1, we don't need to align it.
+        let alignment = if layout.align() == 1 {
+            0
+        } else {
+            layout.align()
+        };
         let mut split = None;
         let mut address = ptr::null_mut();
 
         for block in &mut *self.blocks {
             if block.is_free() && block.size() + alignment >= size {
+                trace!("Found free block with correct size {:?}", block);
                 block.allocate();
                 address = block.address as *mut u8;
                 if block.size() > size + (size as f64 * SPLIT_THRESHOLD) as usize {
+                    trace!(
+                        "Splitting block at {:?} at offset {}",
+                        block,
+                        size + alignment
+                    );
                     split = block.split(size + alignment);
                 }
             }
         }
 
         if address.is_null() {
-            sprintln!("Allocating new block");
+            trace!("No free block found; allocating new block");
             // Allocate a new block
             let block = unsafe { self.allocate_block(size + alignment) };
             address = block.address as *mut u8;
@@ -192,7 +204,7 @@ impl BlockAllocator {
         self.allocation_balance += 1;
 
         let ptr = align_with_alignment(address, layout.align(), false);
-        trace!("Allocated block at {:#x}", ptr as usize);
+        trace!("Returning pointer {:p}", ptr);
         ptr
     }
 
@@ -203,7 +215,7 @@ impl BlockAllocator {
             info!("Deallocating block {:?}", blk);
             if blk.is_free() {
                 // TODO: Should DEFINITELY not panic here. Tis is a temporary debug check.
-                debug_release_check! {
+                debug_release_select! {
                     debug {
                         error!("Block already deallocated");
                         self.dbg_serial_send_csv();
@@ -221,7 +233,7 @@ impl BlockAllocator {
             self.dbg_print_blocks();
             return;
         }
-        debug_release_check!(
+        debug_release_select!(
             debug {
                 panic!("Block not found");
             },
@@ -348,6 +360,12 @@ impl BlockAllocator {
     pub fn table_block(&self) -> &Block {
         self.table_block
     }
+
+    pub unsafe fn clear(&mut self) {
+        unsafe { self.blocks.set_len(0) };
+        self.unmap_start = self.heap_start;
+        self.allocation_balance = 0;
+    }
 }
 
 #[inline]
@@ -399,15 +417,17 @@ mod tests {
             );
             let mut inner_arr: [ManuallyDrop<Block>; SPACE] =
                 unsafe { MaybeUninit::uninit().assume_init() };
-            let mut vec = unsafe { DownwardsVec::new(inner_arr.as_mut_ptr() as *mut Block, SPACE) };
+            let vec = unsafe { DownwardsVec::new(inner_arr.as_mut_ptr() as *mut Block, SPACE) };
             let inner =
                 unsafe { BlockAllocator::init_with_vec(heap_start, heap_end, vec.clone_exact()) };
 
-            Self {
+            let s = Self {
                 inner,
                 vec,
                 inner_arr,
-            }
+            };
+
+            s
         }
     }
 
@@ -436,6 +456,8 @@ mod tests {
         let mut allocator = DebugAllocator::<10>::new(0x1000, 0x2000);
         let layout = Layout::from_size_align(10, 1).unwrap();
         let ptr = unsafe { allocator.inner.allocate(layout) };
+        info!("{:#?}", allocator.vec);
+        info!("{:#?}", allocator.inner.get_block_table());
         assert!(!ptr.is_null());
         assert_eq!(allocator.inner.allocation_balance(), 1);
         let block = unsafe { allocator.inner.find_block_by_ptr(ptr).unwrap() };

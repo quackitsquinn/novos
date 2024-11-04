@@ -80,7 +80,7 @@ pub fn display_init() -> bool {
 }
 
 pub fn init_kernel() {
-    // NOTE: This is a hack to get the stack base address. 
+    // NOTE: This is a hack to get the stack base address.
     // This is used because limine does not provide the stack base address.
     let mut _dummy = 0;
     _dummy = &raw const _dummy as usize;
@@ -110,7 +110,7 @@ pub fn init_kernel() {
     }
     info!("Kernel initialized");
 
-    let _ = debug_release_check!(
+    let _ = debug_release_select!(
         debug {
             sprintln!("Debug build");
             3
@@ -123,7 +123,7 @@ pub fn init_kernel() {
 }
 
 #[macro_export]
-macro_rules! debug_release_check {
+macro_rules! debug_release_select {
     (debug $run_in_debug: tt, release $run_in_release: tt ) => {{
         #[cfg(debug_assertions)]
         $run_in_debug
