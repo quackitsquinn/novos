@@ -3,11 +3,10 @@
 
 use core::alloc::GlobalAlloc;
 
-
 use super::{blocks::BlockAllocator, LockedAllocator};
 
 pub struct RuntimeAllocator {
-    pub(super) blocks: BlockAllocator,
+    pub(crate) blocks: BlockAllocator,
 }
 
 impl RuntimeAllocator {

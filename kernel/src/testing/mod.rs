@@ -1,8 +1,9 @@
 use core::mem;
 
+use log::info;
 use spin::Mutex;
 
-use crate::{sprintln, util::OnceMutex};
+use crate::{serial, sprintln, util::OnceMutex};
 
 mod qemu_exit;
 
@@ -84,10 +85,24 @@ impl TestFunction {
     }
     pub fn run(&self) {
         sprintln!("Running test: {} ({})", self.human_name, self.function_name);
+        #[allow(unused_unsafe)]
+        unsafe {
+            #[cfg(test)]
+            crate::memory::allocator::TEST_ALLOCATOR
+                .get()
+                .blocks
+                .clear();
+        }
+        let log_level = serial::LOG_LEVEL;
         if let Some(count) = self.bench_count {
-            for _ in 0..count {
+            (self.function)();
+            info!("Reducing log level to error for benchmarking");
+            log::set_max_level(log::LevelFilter::Error);
+            for _ in 0..count - 1 {
                 (self.function)();
             }
+            log::set_max_level(log_level.to_level_filter());
+            info!("Restored log level to {}", log_level);
         } else {
             (self.function)();
         }

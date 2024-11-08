@@ -1,4 +1,5 @@
 use limine::{memory_map::EntryType, paging::Mode, response::MemoryMapResponse};
+use log::info;
 use spin::Once;
 use x86_64::{
     registers::control::Cr3,
@@ -16,6 +17,9 @@ pub mod allocator;
 // Evaluates to 0x4156_4F4E_0000
 pub const HEAP_MEM_OFFSET: u64 = (u32::from_ne_bytes(*b"NOVA") as u64) << 16;
 pub const HEAP_SIZE: u64 = 1024 * 512; // 512 KiB
+
+pub const TEST_HEAP_MEM_OFFSET: u64 = (u32::from_ne_bytes(*b"TEST") as u64) << 16;
+pub const TEST_HEAP_SIZE: u64 = HEAP_SIZE; // 512 KiB
 
 #[used]
 static PAGE_TABLE_REQUEST: limine::request::PagingModeRequest =
@@ -99,8 +103,25 @@ unsafe impl FrameAllocator<Size4KiB> for PageFrameAllocator {
 }
 
 fn init_heap() {
-    let heap_start = VirtAddr::new(HEAP_MEM_OFFSET);
-    let heap_end = heap_start + HEAP_SIZE - 1u64;
+    configure_heap_allocator("Kernel", allocator::init, HEAP_MEM_OFFSET, HEAP_SIZE);
+    configure_heap_allocator(
+        "Kernel Test",
+        allocator::init_test,
+        TEST_HEAP_MEM_OFFSET,
+        TEST_HEAP_SIZE,
+    );
+}
+
+/// Configure a heap allocator with the given name, allocator function, and heap size.
+/// alloc_fn should be a function that takes two usize arguments: the start and end of the heap (in that order).
+fn configure_heap_allocator(
+    alloc_name: &str,
+    alloc_fn: unsafe fn(usize, usize),
+    heap_offset: u64,
+    heap_size: u64,
+) {
+    let heap_start = VirtAddr::new(heap_offset);
+    let heap_end = heap_start + heap_size - 1u64;
     let heap_start_page = Page::containing_address(heap_start);
     let heap_end_page = Page::containing_address(heap_end);
     let heap_range: PageRangeInclusive<Size4KiB> =
@@ -113,8 +134,11 @@ fn init_heap() {
             .flush();
     }
 
-    sprintln!("Heap initialized at 0x{:x} - 0x{:x}", heap_start, heap_end);
-    sprintln!("Initializing allocator");
-    unsafe { allocator::init(heap_start.as_u64() as usize, heap_end.as_u64() as usize) };
-    sprintln!("Allocator initialized");
+    info!(
+        "{} Heap initialized at 0x{:x} - 0x{:x}",
+        alloc_name, heap_start, heap_end
+    );
+    info!("Initializing {} allocator", alloc_name);
+    unsafe { alloc_fn(heap_start.as_u64() as usize, heap_end.as_u64() as usize) };
+    info!("{} allocator initialized", alloc_name);
 }

@@ -8,7 +8,7 @@ pub mod harness;
 pub mod interface;
 mod raw; // Things to interact with the serial port directly
 
-const LOG_LEVEL: log::Level = log::Level::Trace;
+pub const LOG_LEVEL: log::Level = log::Level::Trace;
 struct SerialLog;
 
 impl log::Log for SerialLog {

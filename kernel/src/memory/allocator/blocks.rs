@@ -424,7 +424,7 @@ fn align_with_alignment(val: *mut u8, alignment: usize, downwards: bool) -> *mut
 
 mod tests {
 
-    use crate::memory::allocator::ALLOCATOR;
+    use crate::memory::allocator::TEST_ALLOCATOR;
 
     use super::*;
 
@@ -432,7 +432,7 @@ mod tests {
         () => {
             #[cfg(test)]
             unsafe {
-                drop(ALLOCATOR.get().blocks.clear())
+                drop(TEST_ALLOCATOR.get().blocks.clear())
             }
         };
     }
@@ -441,11 +441,9 @@ mod tests {
 
     #[kproc::test("Allocation", can_recover = true, bench_count = Some(100))]
     fn test_allocation() {
-        clear!();
-
         let layout = Layout::from_size_align(512, 1).unwrap();
 
-        let allocator = &mut ALLOCATOR.get().blocks;
+        let allocator = &mut TEST_ALLOCATOR.get().blocks;
 
         let ptr = unsafe { allocator.allocate(layout) };
 
@@ -485,11 +483,9 @@ mod tests {
 
     #[kproc::test("Block Join", can_recover = true)]
     fn test_block_join() {
-        clear!();
-
         let layout = Layout::from_size_align(512, 1).unwrap();
 
-        let allocator = &mut ALLOCATOR.get().blocks;
+        let allocator = &mut TEST_ALLOCATOR.get().blocks;
 
         let ptrs = [
             unsafe { allocator.allocate(layout) },
@@ -531,5 +527,24 @@ mod tests {
 
         assert_eq!(block.size, layout.size() * 4);
         assert!(block.is_free);
+    }
+
+    #[kproc::test("Block Reuse", can_recover = true)]
+    fn test_block_reuse() {
+        let layout = Layout::from_size_align(512, 1).unwrap();
+
+        let allocator = &mut TEST_ALLOCATOR.get().blocks;
+
+        let ptr = unsafe { allocator.allocate(layout) };
+
+        unsafe {
+            allocator
+                .deallocate(ptr, layout)
+                .expect("Block failed to free");
+        }
+
+        let new_ptr = unsafe { allocator.allocate(layout) };
+
+        assert_eq!(ptr, new_ptr);
     }
 }

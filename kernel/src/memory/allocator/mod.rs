@@ -13,10 +13,17 @@ mod downwards_vec;
 #[global_allocator]
 pub static ALLOCATOR: LockedAllocator = LockedAllocator::new();
 
+/// An allocator purely for testing. This allocator is reset after every test, so it is unsafe to store any static variables in this allocator.
+pub static TEST_ALLOCATOR: LockedAllocator = LockedAllocator::new();
+
 pub type LockedAllocator = OnceMutex<RuntimeAllocator>;
 
 pub unsafe fn init(heap_start: usize, heap_end: usize) {
     ALLOCATOR.init(unsafe { RuntimeAllocator::new(heap_start, heap_end) });
+}
+
+pub unsafe fn init_test(heap_start: usize, heap_end: usize) {
+    TEST_ALLOCATOR.init(unsafe { RuntimeAllocator::new(heap_start, heap_end) });
 }
 
 pub fn output_blocks() {
