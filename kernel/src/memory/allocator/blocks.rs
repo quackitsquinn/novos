@@ -145,7 +145,7 @@ impl BlockAllocator {
         let ptr = ptr as usize;
         for block in &*self.blocks {
             let addr = block.address as usize;
-            if ptr >= addr && ptr < addr + block.size() {
+            if ptr >= addr && ptr < addr + block.size() && !block.is_reusable {
                 trace!(
                     "Found ptr ({:#x}) in block {:#p} (off: {})",
                     ptr,
@@ -437,22 +437,10 @@ mod tests {
         };
     }
 
-    // TODO: Have an allocator created explicitly for testing. This current implementation would make it unstable to have any &'static heap allocated structures.
-
-    #[kproc::test("Allocation", can_recover = true, bench_count = Some(100))]
-    fn test_allocation() {
-        let layout = Layout::from_size_align(512, 1).unwrap();
-
-        let allocator = &mut TEST_ALLOCATOR.get().blocks;
-
-        let ptr = unsafe { allocator.allocate(layout) };
-
-        trace!("Allocated pointer: {:p}", ptr);
-        trace!("Block table: {:#?}", allocator);
+    fn alloc_check(ptr: *mut u8, layout: Layout, allocator: &mut BlockAllocator) {
         assert!(!ptr.is_null());
-        assert_eq!(allocator.allocation_balance, 1);
         // Check if whole range is allocated
-        for i in 0..512 {
+        for i in 0..layout.size() {
             assert!(
                 allocator.ptr_is_allocated(unsafe { ptr.add(i) }),
                 "Failed at {}",
@@ -464,10 +452,21 @@ mod tests {
             .find_block_by_ptr(ptr)
             .expect("Allocated pointer not found");
         // Check if the block data is correct
-        assert!(!block.is_free);
+        assert!(!block.is_free());
         assert!(!block.is_reusable);
-        assert_eq!(block.size, layout.size());
+        assert_eq!(block.size(), layout.size());
         assert_eq!(block.address, ptr);
+    }
+
+    #[kproc::test("Allocation", can_recover = true, bench_count = Some(100))]
+    fn test_allocation() {
+        let layout = Layout::from_size_align(512, 1).unwrap();
+
+        let allocator = &mut TEST_ALLOCATOR.get().blocks;
+
+        let ptr = unsafe { allocator.allocate(layout) };
+
+        alloc_check(ptr, layout, allocator);
 
         unsafe { allocator.deallocate(ptr, layout) }.expect("Block failed to free");
         assert_eq!(allocator.allocation_balance, 0);
@@ -495,23 +494,7 @@ mod tests {
         ];
 
         for ptr in &ptrs {
-            for i in 0..512 {
-                assert!(
-                    allocator.ptr_is_allocated(unsafe { ptr.add(i) }),
-                    "Failed at {:p}/{}",
-                    ptr,
-                    i
-                );
-            }
-
-            let block = allocator
-                .find_block_by_ptr(*ptr)
-                .expect("Allocated pointer not found");
-
-            assert!(!block.is_free);
-            assert!(!block.is_reusable);
-            assert_eq!(block.size, layout.size());
-            assert_eq!(block.address, *ptr);
+            alloc_check(*ptr, layout, allocator);
         }
 
         for ptr in &ptrs {
@@ -546,5 +529,47 @@ mod tests {
         let new_ptr = unsafe { allocator.allocate(layout) };
 
         assert_eq!(ptr, new_ptr);
+    }
+
+    #[kproc::test("Block Reuse w/ splitting block")]
+    fn test_block_reuse_split() {
+        let layout = Layout::from_size_align(512, 1).unwrap();
+
+        let allocator = &mut TEST_ALLOCATOR.get().blocks;
+
+        let ptrs = [
+            unsafe { allocator.allocate(layout) },
+            unsafe { allocator.allocate(layout) },
+            unsafe { allocator.allocate(layout) },
+            unsafe { allocator.allocate(layout) },
+        ];
+
+        unsafe {
+            allocator
+                .deallocate(ptrs[1], layout)
+                .expect("Block failed to free");
+            allocator
+                .deallocate(ptrs[2], layout)
+                .expect("Block failed to free");
+        };
+
+        unsafe { allocator.gc() };
+
+        alloc_check(ptrs[0], layout, allocator);
+        alloc_check(ptrs[3], layout, allocator);
+
+        let dealloc_block_1 = allocator
+            .find_block_by_ptr(ptrs[1])
+            .expect("Unable to find ptr block");
+        let dealloc_block_2 = allocator
+            .find_block_by_ptr(ptrs[2])
+            .expect("Unable to find ptr block");
+
+        assert!(
+            dealloc_block_1 == dealloc_block_2,
+            "{:#?} != {:#?}",
+            dealloc_block_1,
+            dealloc_block_2
+        )
     }
 }
