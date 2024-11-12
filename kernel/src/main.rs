@@ -4,7 +4,6 @@
 
 extern crate alloc;
 
-
 use kernel::{
     memory::{self},
     println, sprintln,
@@ -19,7 +18,7 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
     kernel::hlt_loop();
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[cfg(not(test))]
 pub extern "C" fn _start() -> ! {
     use kernel::memory::allocator;
@@ -29,13 +28,5 @@ pub extern "C" fn _start() -> ! {
     sprintln!("Initialized kernel");
     x86_64::instructions::interrupts::enable();
     sprintln!("Enabled interrupts");
-    fn fnn() {
-        fnn();
-    }
-    loop {
-        fnn();
-        assert!(allocator::get_allocation_balance() == 0);
-    }
     kernel::hlt_loop();
-    memory::allocator::output_blocks();
 }

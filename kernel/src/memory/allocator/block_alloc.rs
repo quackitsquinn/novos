@@ -186,6 +186,10 @@ impl BlockAllocator {
         let mut split = None;
         let mut address = ptr::null_mut();
 
+        if size == 0 {
+            return ptr::null_mut();
+        }
+
         for block in &mut *self.blocks {
             if block.is_free() && block.size() + alignment >= size {
                 trace!("Found free block with correct size {:?}", block);
@@ -377,6 +381,11 @@ impl BlockAllocator {
     pub fn table_block(&self) -> &Block {
         self.table_block
     }
+    /// Gets the count of allocated blocks.
+    /// Will always be >= 1 because the table block is always allocated.
+    pub fn allocated_count(&self) -> usize {
+        self.blocks.iter().filter(|b| !b.is_free()).count()
+    }
     /// Clear the block allocator. This function is ***INCREDIBLY UNSAFE*** and should only be used for testing.
     ///
     /// # Safety
@@ -424,7 +433,9 @@ fn align_with_alignment(val: *mut u8, alignment: usize, downwards: bool) -> *mut
 
 mod tests {
 
-    use crate::memory::allocator::TEST_ALLOCATOR;
+    use alloc::{boxed::Box, vec::Vec};
+
+    use crate::memory::allocator::{LockedAllocator, TEST_ALLOCATOR};
 
     use super::*;
 
@@ -437,25 +448,26 @@ mod tests {
         };
     }
 
-    fn alloc_check(ptr: *mut u8, layout: Layout, allocator: &mut BlockAllocator) {
+    fn alloc_check<T>(ptr: *mut T, layout: Layout, allocator: &mut BlockAllocator) {
         assert!(!ptr.is_null());
         // Check if whole range is allocated
         for i in 0..layout.size() {
             assert!(
-                allocator.ptr_is_allocated(unsafe { ptr.add(i) }),
+                allocator.ptr_is_allocated(unsafe { ptr.cast::<u8>().add(i).cast() }),
                 "Failed at {}",
                 i
             );
         }
 
         let block = allocator
-            .find_block_by_ptr(ptr)
+            .find_block_by_ptr(ptr.cast())
             .expect("Allocated pointer not found");
         // Check if the block data is correct
         assert!(!block.is_free());
         assert!(!block.is_reusable);
-        assert_eq!(block.size(), layout.size());
-        assert_eq!(block.address, ptr);
+        assert!(block.size() >= layout.size());
+        assert_eq!(block.address, ptr.cast());
+        assert!(ptr.is_aligned())
     }
 
     #[kproc::test("Allocation", can_recover = true, bench_count = Some(100))]
@@ -571,5 +583,84 @@ mod tests {
             dealloc_block_1,
             dealloc_block_2
         )
+    }
+
+    #[kproc::test("Block Split")]
+    fn test_block_split() {
+        let layout = Layout::from_size_align(512, 1).unwrap();
+
+        let allocator = &mut TEST_ALLOCATOR.get().blocks;
+
+        let ptr = unsafe { allocator.allocate(layout) };
+
+        alloc_check(ptr, layout, allocator);
+
+        unsafe {
+            allocator
+                .deallocate(ptr, layout)
+                .expect("Block failed to free");
+        }
+
+        let new_layout = Layout::from_size_align(128, 1).unwrap();
+
+        let new_ptr = unsafe { allocator.allocate(new_layout) };
+
+        alloc_check(new_ptr, new_layout, allocator);
+
+        let new_block = allocator
+            .find_block_by_ptr(unsafe { new_ptr.add(128) })
+            .ok_or_else(|| {
+                allocator.dbg_serial_send_csv();
+                panic!("Block not found!")
+            })
+            .unwrap();
+
+        assert_eq!(new_block.size, layout.size() - new_layout.size());
+    }
+
+    #[kproc::test("Allocation with correct alignment")]
+    fn test_alignment() {
+        for i in 1..=12 {
+            let layout = Layout::from_size_align(1, 1 << i).unwrap();
+
+            let allocator = &mut TEST_ALLOCATOR.get().blocks;
+
+            let ptr = unsafe { allocator.allocate(layout) };
+
+            alloc_check(ptr, layout, allocator);
+            assert!(ptr.is_aligned_to(1 << i));
+
+            unsafe {
+                allocator
+                    .deallocate(ptr, layout)
+                    .expect("Block failed to free");
+            }
+        }
+    }
+
+    #[kproc::test("Attempt to allocate ZST")]
+    fn test_zst() {
+        let layout = Layout::from_size_align(0, 1).unwrap();
+
+        let allocator = &mut TEST_ALLOCATOR.get().blocks;
+
+        let ptr = unsafe { allocator.allocate(layout) };
+
+        assert!(ptr.is_null());
+    }
+
+    #[kproc::test("Box allocation", bench_count = Some(200))]
+    fn test_box() {
+        let value = 32u32;
+
+        let bx = Box::new_in(value, &TEST_ALLOCATOR);
+        let ptr = Box::into_raw(bx);
+
+        let alloc = &mut TEST_ALLOCATOR.get().blocks;
+
+        assert_eq!(alloc.allocation_balance, 1);
+        assert_eq!(unsafe { *ptr }, value);
+        alloc_check(ptr, Layout::from_size_align(4, 1).unwrap(), alloc);
+        drop(unsafe { Box::from_raw_in(ptr, &TEST_ALLOCATOR) });
     }
 }

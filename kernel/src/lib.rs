@@ -4,6 +4,8 @@
 #![forbid(unsafe_op_in_unsafe_fn)]
 #![feature(custom_test_frameworks)]
 #![feature(maybe_uninit_uninit_array)]
+#![feature(allocator_api)]
+#![feature(pointer_is_aligned_to)]
 #![test_runner(crate::testing::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 

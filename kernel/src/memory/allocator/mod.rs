@@ -1,14 +1,73 @@
-use alloc::RuntimeAllocator;
+#![doc = include_str!("allocator-design-new.md")]
+
+use core::{
+    alloc::{AllocError, Allocator, GlobalAlloc},
+    ptr::NonNull,
+};
+
 use block::Block;
+use block_alloc::BlockAllocator;
 use downwards_vec::DownwardsVec;
 use spin::MutexGuard;
 
 use crate::{sprintln, util::OnceMutex};
 
-pub mod alloc;
 pub mod block;
-pub mod blocks;
+pub mod block_alloc;
 mod downwards_vec;
+
+pub struct RuntimeAllocator {
+    pub(crate) blocks: BlockAllocator,
+}
+
+impl RuntimeAllocator {
+    pub unsafe fn new(heap_start: usize, heap_end: usize) -> Self {
+        Self {
+            // SAFETY: Validity of the heap is guaranteed by the caller
+            blocks: unsafe { BlockAllocator::init(heap_start, heap_end) },
+        }
+    }
+}
+
+unsafe impl GlobalAlloc for LockedAllocator {
+    unsafe fn alloc(&self, layout: core::alloc::Layout) -> *mut u8 {
+        if layout.size() == 0 {
+            // TODO: Figure out if this is the correct behavior for zero-sized allocations
+            return core::ptr::null_mut();
+        }
+        let mut alloc = self.get();
+        unsafe { alloc.blocks.allocate(layout) }
+    }
+
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: core::alloc::Layout) {
+        // if layout.size() == 0 {
+        //     return;
+        // }
+        let mut alloc = self.get();
+        unsafe { alloc.blocks.deallocate(ptr, layout) };
+    }
+}
+
+unsafe impl Allocator for LockedAllocator {
+    fn allocate(&self, layout: core::alloc::Layout) -> Result<NonNull<[u8]>, AllocError> {
+        if layout.size() == 0 {
+            return Ok(NonNull::slice_from_raw_parts(NonNull::dangling(), 0));
+        }
+        let ptr = unsafe { self.get().blocks.allocate(layout) };
+        if ptr.is_null() {
+            Err(AllocError)
+        } else {
+            Ok(NonNull::slice_from_raw_parts(
+                NonNull::new(ptr).ok_or(AllocError)?,
+                layout.size(),
+            ))
+        }
+    }
+
+    unsafe fn deallocate(&self, ptr: core::ptr::NonNull<u8>, layout: core::alloc::Layout) {
+        unsafe { self.get().blocks.deallocate(ptr.as_ptr(), layout) };
+    }
+}
 
 #[global_allocator]
 pub static ALLOCATOR: LockedAllocator = LockedAllocator::new();
@@ -24,41 +83,4 @@ pub unsafe fn init(heap_start: usize, heap_end: usize) {
 
 pub unsafe fn init_test(heap_start: usize, heap_end: usize) {
     TEST_ALLOCATOR.init(unsafe { RuntimeAllocator::new(heap_start, heap_end) });
-}
-
-pub fn output_blocks() {
-    sprintln!("{:#?}", ALLOCATOR.get().blocks);
-}
-
-pub fn get_allocation_balance() -> isize {
-    ALLOCATOR.get().blocks.allocation_balance()
-}
-
-pub struct BlockLock<'a> {
-    lock: MutexGuard<'a, RuntimeAllocator>,
-}
-
-impl<'a> BlockLock<'a> {
-    pub fn new(lock: MutexGuard<'a, RuntimeAllocator>) -> Self {
-        Self { lock }
-    }
-
-    pub fn get_block_table(&self) -> &DownwardsVec<Block> {
-        self.lock.blocks.get_block_table()
-    }
-    /// Get the block table as mutable.
-    ///
-    /// # Safety
-    /// The caller must ensure that the block table is not incorrectly modified.
-    pub unsafe fn get_block_table_mut(&mut self) -> &'a DownwardsVec<Block> {
-        unsafe { self.lock.blocks.get_block_table_mut() }
-    }
-
-    pub fn get_table_block(&self) -> &Block {
-        self.lock.blocks.table_block()
-    }
-}
-
-pub fn get_block_allocator() -> BlockLock<'static> {
-    BlockLock::new(ALLOCATOR.get())
 }

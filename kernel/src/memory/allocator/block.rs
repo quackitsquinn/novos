@@ -36,7 +36,7 @@ impl Block {
     pub fn allocate(&mut self) {
         self.is_free = false;
     }
-    /// Split the block into two blocks, the first block will have the requested size and the second block will have the remaining size
+    /// Split the block into two blocks. This block will have the size of `size` and the new block will have the remaining size.
     pub fn split(&mut self, size: usize) -> Option<Block> {
         if self.size() < size {
             return None;
@@ -88,6 +88,29 @@ mod tests {
         assert_eq!(block.size(), 512);
         assert_eq!(new_block.size(), 512);
         assert_eq!(new_block.address, 0x1200 as *mut u8);
+        assert_eq!(
+            block.address as usize + block.size,
+            new_block.address as usize
+        );
+    }
+
+    #[kproc::test("Block split too large")]
+    fn test_block_split_too_large() {
+        let mut block = Block::new(1024, 0x1000 as *mut u8, true);
+        let new_block = block.split(2048);
+
+        assert!(new_block.is_none());
+        assert_eq!(block.size(), 1024);
+    }
+
+    #[kproc::test("Block split not even")]
+    fn test_block_split_not_even() {
+        let mut block = Block::new(1024, 0x1000 as *mut u8, true);
+        let new_block = block.split(513).unwrap();
+
+        assert_eq!(block.size(), 513);
+        assert_eq!(new_block.size(), 511);
+        assert_eq!(new_block.address, 0x1201 as *mut u8);
         assert_eq!(
             block.address as usize + block.size,
             new_block.address as usize

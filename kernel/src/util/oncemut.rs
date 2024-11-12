@@ -34,4 +34,8 @@ impl<'a, T> OnceMutex<T> {
     pub fn is_locked(&self) -> bool {
         self.mutex().is_locked()
     }
+
+    pub unsafe fn force_unlock(&self) {
+        unsafe { self.mutex().force_unlock() }
+    }
 }
