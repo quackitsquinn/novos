@@ -133,6 +133,9 @@ impl BlockAllocator {
 
     // This will be relatively slow, but it should be called less and less as the heap grows.
     unsafe fn allocate_block(&mut self, size: usize) -> Block {
+        if self.unmap_start + size >= self.heap_end {
+            panic!("Out of memory");
+        }
         self.dbg_print_blocks();
         let block = Block::new(size, self.unmap_start as *mut u8, false);
         self.unmap_start += size;
@@ -266,6 +269,8 @@ impl BlockAllocator {
     unsafe fn gc(&mut self) {
         let mut last_free_block: Option<&mut Block> = None;
         let mut joined = 0;
+        // Sort the blocks by address
+        self.blocks.sort_by(|a, b| a.address.cmp(&b.address));
         for block in &mut *self.blocks {
             if block.is_free() {
                 if let Some(lsblk) = last_free_block {
@@ -316,20 +321,21 @@ impl BlockAllocator {
         }
 
         if self.blocks.len() * mem::size_of::<Block>() >= size {
+            self.dbg_serial_send_csv();
             panic!("Out of block space"); // TODO: This should try to reserve more space.
         }
     }
 
     fn run_gc(&mut self) {
-        sprintln!("START-PRE-GC");
-        self.dbg_serial_send_csv();
-        sprintln!("END-PRE-GC");
+        // sprintln!("START-PRE-GC");
+        // self.dbg_serial_send_csv();
+        // sprintln!("END-PRE-GC");
         unsafe {
             self.gc();
         }
-        sprintln!("START-POST-GC");
-        self.dbg_serial_send_csv();
-        sprintln!("END-POST-GC");
+        // sprintln!("START-POST-GC");
+        // self.dbg_serial_send_csv();
+        // sprintln!("END-POST-GC");
     }
 
     fn dbg_print_blocks(&self) {
@@ -656,11 +662,39 @@ mod tests {
         let bx = Box::new_in(value, &TEST_ALLOCATOR);
         let ptr = Box::into_raw(bx);
 
-        let alloc = &mut TEST_ALLOCATOR.get().blocks;
+        let mut alloc = TEST_ALLOCATOR.get();
+        let blocks = &mut alloc.blocks;
 
-        assert_eq!(alloc.allocation_balance, 1);
+        assert_eq!(blocks.allocation_balance, 1);
         assert_eq!(unsafe { *ptr }, value);
-        alloc_check(ptr, Layout::from_size_align(4, 1).unwrap(), alloc);
+        alloc_check(ptr, Layout::from_size_align(4, 1).unwrap(), blocks);
+        drop(alloc);
         drop(unsafe { Box::from_raw_in(ptr, &TEST_ALLOCATOR) });
+    }
+
+    #[kproc::test("Vec allocation")]
+    fn test_vec() {
+        for i in 0..200 {
+            let mut vec = Vec::new_in(&TEST_ALLOCATOR);
+            let layout = Layout::array::<u8>(100).expect("Failed to create layout");
+
+            for i in 0..100 {
+                vec.push(i);
+            }
+
+            let ptr = vec.as_ptr().cast_mut();
+
+            let mut alloc = TEST_ALLOCATOR.get();
+            let blocks = &mut alloc.blocks;
+
+            assert_eq!(blocks.allocation_balance, 1);
+            assert_eq!(unsafe { *ptr }, 0);
+            alloc_check(ptr, layout, blocks);
+            drop(alloc);
+            drop(vec);
+            let mut alloc = &mut TEST_ALLOCATOR.get().blocks;
+            assert!(!alloc.ptr_is_allocated(ptr));
+            assert_eq!(alloc.allocation_balance, 0);
+        }
     }
 }

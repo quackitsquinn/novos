@@ -76,6 +76,12 @@ impl Block {
     }
 }
 
+impl PartialOrd for Block {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        self.address.partial_cmp(&other.address)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
