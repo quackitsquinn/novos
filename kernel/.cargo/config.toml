@@ -1,5 +1,7 @@
 [build]
 target = "x86_64-unknown-none"
+# Force the inclusion of frame pointers and always include the debug information
+rustflags = ["-C", "force_frame_pointers=y", "-C", "debuginfo=2"]
 
 [unstable]
 build-std = ["core", "compiler_builtins"]
