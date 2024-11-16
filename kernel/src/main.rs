@@ -2,9 +2,10 @@
 #![no_main]
 #![feature(abi_x86_interrupt)]
 
-use core::{arch::asm, hint::black_box};
+use core::{arch::asm, hint::black_box, ptr};
 
 use kernel::sprintln;
+use limine::request::{KernelAddressRequest, KernelFileRequest};
 use log::{error, log_enabled, trace};
 
 #[panic_handler]
@@ -23,20 +24,23 @@ pub extern "C" fn _start() -> ! {
     recurse(10);
     kernel::hlt_loop();
 }
-/// Recurses `n` times, then panics. Current use case is to test the stack trace printing.
-fn recurse(n: u32) {
+/// Recurses `n` times, then prints the stack trace. This is used to test the stack trace printing.
+#[inline(never)]
+extern "C" fn recurse(n: u32) {
     if n == 0 {
-        panic!("done");
+        sprintln!("Printing stack trace");
+        print_trace();
+        sprintln!(".. Finished printing stack trace");
+        return;
     }
     recurse(n - 1);
-    black_box(n);
 }
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct StackFrame {
     pub rbp: *const StackFrame,
-    pub rip: usize,
+    pub rip: *const (),
 }
 
 pub fn print_trace() {
@@ -44,10 +48,9 @@ pub fn print_trace() {
     unsafe {
         asm!("mov {}, rbp", out(reg) rbp);
     }
-
     while !rbp.is_null() {
-        let frame = unsafe { *rbp };
-        sprintln!("{:x}", frame.rip);
+        let frame = unsafe { ptr::read_unaligned(rbp) };
+        sprintln!("{:#?}", frame);
         rbp = frame.rbp;
     }
 }
