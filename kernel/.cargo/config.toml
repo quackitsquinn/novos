@@ -1,5 +1,6 @@
 [build]
 target = "x86_64-unknown-none"
+rustflags = ["-Cforce-frame-pointers=true", "-Cdebuginfo=2"]
 
 [unstable]
 build-std = ["core", "compiler_builtins", "alloc"]

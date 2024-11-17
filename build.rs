@@ -40,6 +40,8 @@ fn main() {
     make_limine_bin(invalidate_limine);
 
     make_iso("novos.iso", &kernel_dir, "boot_cfg/main.conf");
+    // debug disables KASLR which breaks lldb's ability to find the symbols
+    make_iso("novos_debug.iso", &kernel_dir, "boot_cfg/debug.conf");
 
     build_tests();
 
@@ -171,7 +173,7 @@ fn build_tests() {
     let output = output_str.lines().last().unwrap();
     let bin = output.split("(").nth(1).unwrap().trim_end_matches(")");
     println!("Test binary: {}", bin);
-    make_iso("kernel_tests.iso", bin, "boot_cfg/test.conf");
+    make_iso("kernel_tests.iso", bin, "boot_cfg/debug.conf");
     // Copy the test binary to the artifacts directory
     fs::copy(bin, out_base!("kernel_tests.bin")).expect("Failed to copy kernel_tests");
 }

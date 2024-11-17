@@ -10,12 +10,8 @@ use kernel::{
 };
 
 #[panic_handler]
-fn panic(_info: &core::panic::PanicInfo) -> ! {
-    sprintln!("uh oh, the code {}", _info);
-    if kernel::display_init() {
-        println!("uh oh, the code {}", _info);
-    }
-    kernel::hlt_loop();
+fn panic(pi: &core::panic::PanicInfo) -> ! {
+    kernel::panic::panic_extended_info(pi);
 }
 
 #[unsafe(no_mangle)]
@@ -25,8 +21,5 @@ pub extern "C" fn _start() -> ! {
 
     kernel::init_kernel();
 
-    sprintln!("Initialized kernel");
-    x86_64::instructions::interrupts::enable();
-    sprintln!("Enabled interrupts");
-    kernel::hlt_loop();
+    kernel::hlt_loop()
 }

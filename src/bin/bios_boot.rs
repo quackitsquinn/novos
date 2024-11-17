@@ -10,10 +10,20 @@ use std::{
 };
 
 pub fn main() {
+    let debug_mode = env::var("DEBUG").is_ok();
     let mut command = Command::new("qemu-system-x86_64");
+
+    let iso = if debug_mode {
+        "novos_debug.iso"
+    } else {
+        "novos.iso"
+    };
+
+    let iso_path = format!("target/artifacts/{}", iso);
+
     command
         .arg("-cdrom")
-        .arg("target/artifacts/novos.iso") // We don't use a bios specific iso because it supports both
+        .arg(&iso_path) // We don't use a bios specific iso because it supports both
         .arg("-serial")
         .arg("stdio")
         .arg("-serial")
@@ -24,7 +34,7 @@ pub fn main() {
     command.stdout(Stdio::piped());
     command.stderr(Stdio::piped());
 
-    if env::var("DEBUG").is_ok() {
+    if debug_mode {
         println!("Running in debug mode");
         command.arg("-S").arg("-s");
     }

@@ -20,6 +20,7 @@ uart_16550 = "0.3.1"
 # for some reason, x86_64 bops uart_16550 into working. I don't know why.
 x86_64 = "0.15.1"
 kproc = { path = "../kproc" }
+backtrace = { version = "0.3.74", default-features = false }
 
 [profile.release]
 panic = "abort"
@@ -29,3 +30,4 @@ panic = "abort"
 # Include all debug info
 debug = true
 opt-level = 0
+
