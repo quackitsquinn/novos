@@ -43,11 +43,7 @@ fn main() {
     // debug disables KASLR which breaks lldb's ability to find the symbols
     make_iso("novos_debug.iso", &kernel_dir, "boot_cfg/debug.conf");
 
-    build_tests();
-
     copy_kernel_bin_dbg(&out_dir, &kernel_dir);
-
-    make_hdd(&out_dir, &kernel_dir);
 }
 
 /// Build limine binary
@@ -141,41 +137,3 @@ fn copy_kernel_bin_dbg(out_dir: &str, kernel_bin_dir: &str) {
         fs::copy(kernel_bin_dir, out_base!("kernel.bin")).expect("Failed to copy kernel.bin");
     }
 }
-
-fn build_tests() {
-    // TODO: Refactor to use cargo build --tests and with json outputs
-    //
-    // Build kernel tests
-    println!("Building kernel tests");
-    let output = Command::new(option_env!("CARGO").unwrap_or("cargo"))
-        .current_dir("kernel")
-        .args(&["test", "--no-run"])
-        .env(
-            "CARGO_TARGET_DIR",
-            fs::canonicalize("target/tests").unwrap_or_else(|f| {
-                if f.kind() == std::io::ErrorKind::NotFound {
-                    fs::create_dir("target/tests").expect("Failed to create target/tests");
-                    return fs::canonicalize("target/tests").expect("Failed to get canonical path");
-                }
-                panic!("Failed to get canonical path for target/tests: {}", f)
-            }),
-        )
-        .output()
-        .unwrap_or_else(|f| {
-            println!("cargo::warning=Failed to run cargo test --no-run: {}", f);
-            panic!("Failed to run cargo test --no-run: {}", f)
-        });
-
-    // The last line should contain the full path to the test binary.
-    // This whole thing is kinda gross, but as far as I can tell, there is no way to get the path to the built binary from cargo
-    let output_str = String::from_utf8_lossy(&output.stderr); // Cargo put most of it's output in stderr
-    println!("Output from cargo test --no-run: {}", output_str);
-    let output = output_str.lines().last().unwrap();
-    let bin = output.split("(").nth(1).unwrap().trim_end_matches(")");
-    println!("Test binary: {}", bin);
-    make_iso("kernel_tests.iso", bin, "boot_cfg/debug.conf");
-    // Copy the test binary to the artifacts directory
-    fs::copy(bin, out_base!("kernel_tests.bin")).expect("Failed to copy kernel_tests");
-}
-
-fn make_hdd(out_dir: &str, kernel_bin_dir: &str) {}

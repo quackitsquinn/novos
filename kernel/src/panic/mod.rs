@@ -38,24 +38,48 @@ mod stacktrace {
     use core::{arch::asm, ffi::c_void, mem};
 
     use crate::sprintln;
-    #[repr(C)]
-    #[derive(Debug, Copy, Clone)]
-    pub struct StackFrame {
-        pub rbp: *const StackFrame,
-        pub rip: usize,
+
+    pub struct StackTrace {
+        pub fp: usize,
+        pub pc_ptr: *const usize,
+    }
+
+    impl StackTrace {
+        #[inline(always)]
+        pub unsafe fn start() -> Option<Self> {
+            let mut fp: usize;
+            unsafe { core::arch::asm!("mov {}, rbp", out(reg) fp) };
+            let pc_ptr = fp.checked_add(mem::size_of::<usize>())?;
+            Some(Self {
+                fp,
+                pc_ptr: pc_ptr as *const usize,
+            })
+        }
+
+        pub unsafe fn next(self) -> Option<Self> {
+            let fp = unsafe { *(self.fp as *const usize) };
+            let pc_ptr = fp.checked_add(mem::size_of::<usize>())?;
+            Some(Self {
+                fp: fp,
+                pc_ptr: pc_ptr as *const usize,
+            })
+        }
     }
 
     pub fn print_trace(depth: usize) {
-        let mut rbp: *const StackFrame;
-        unsafe {
-            asm!("mov {}, rbp", out(reg) rbp);
+        let mut trace = unsafe { StackTrace::start() };
+        for _ in 0..depth {
+            if let Some(t) = trace {
+                print_trace_entry(&t);
+                trace = unsafe { t.next() };
+            } else {
+                break;
+            }
         }
-        let mut i = 0;
-        while !rbp.is_null() && i < depth {
-            let frame = unsafe { *rbp };
-            sprintln!("{:x}", frame.rip);
-            rbp = frame.rbp;
-            i += 1;
-        }
+    }
+    #[inline(always)]
+    fn print_trace_entry(trace: &StackTrace) {
+        let pc = unsafe { *trace.pc_ptr };
+        sprintln!("{:x}", pc);
     }
 }

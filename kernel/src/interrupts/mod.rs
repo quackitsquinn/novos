@@ -6,9 +6,7 @@ use x86_64::{
     },
 };
 
-pub mod hardware;
-
-use crate::println;
+use crate::sprintln;
 
 static IDT: Once<InterruptDescriptorTable> = Once::new();
 // no clue if i will use these (or even how) but they are here
@@ -24,25 +22,24 @@ pub fn set_custom_handler(index: u8, handler: HandlerFunc) {
 
 // General handler
 fn general_handler(stack_frame: InterruptStackFrame, index: u8, error_code: Option<u64>) {
-    println!("Interrupt: {} ({})", index, BASIC_HANDLERS[index as usize]);
-    println!("Error code: {:?}", error_code);
-    println!("{:?}", stack_frame);
+    sprintln!("Interrupt: {} ({})", index, BASIC_HANDLERS[index as usize]);
+    sprintln!("Error code: {:?}", error_code);
+    sprintln!("{:?}", stack_frame);
 }
 
 extern "x86-interrupt" fn page_fault_handler(
     stack_frame: InterruptStackFrame,
     error_code: PageFaultErrorCode,
 ) {
-    println!("Page fault");
-    println!("Error code: {:?}", error_code);
-    println!("{:?}", stack_frame);
+    sprintln!("Page fault");
+    sprintln!("Error code: {:?}", error_code);
+    sprintln!("{:?}", stack_frame);
     crate::hlt_loop();
 }
 
 pub fn init() {
     // Initialize hardware interrupts
-    println!("Defining hardware interrupts");
-    hardware::define_hardware();
+    sprintln!("Defining hardware interrupts");
     IDT.call_once(|| {
         let mut idt = InterruptDescriptorTable::new();
         set_general_handler!(&mut idt, general_handler);
@@ -56,14 +53,13 @@ pub fn init() {
         {
             idt[i as u8 + 32].set_handler_fn(handler);
         }
-        // println!("{:?}", idt.breakpoint);
-        //       println!("{:?}", idt);
+        // sprintln!("{:?}", idt.breakpoint);
+        //       sprintln!("{:?}", idt);
         idt
     });
     // Load the IDT now that it is & 'static
     IDT.get().unwrap().load();
-    println!("Initializing hardware interrupts");
-    hardware::init();
+    sprintln!("Initializing hardware interrupts");
 }
 
 const BASIC_HANDLERS: [&'static str; 32] = [

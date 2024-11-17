@@ -4,9 +4,7 @@
 
 use crate::sprintln;
 
-pub mod harness;
 pub mod interface;
-mod raw; // Things to interact with the serial port directly
 
 pub const LOG_LEVEL: log::Level = log::Level::Trace;
 struct SerialLog;
@@ -36,8 +34,4 @@ pub fn init() {
     interface::init();
     log::set_logger(&LOGGER).unwrap();
     log::set_max_level(LOG_LEVEL.to_level_filter());
-}
-
-pub fn init_debug_harness() {
-    harness::init_debug_harness();
 }
