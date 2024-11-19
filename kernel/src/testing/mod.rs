@@ -7,34 +7,20 @@ use crate::{serial, sprintln, util::OnceMutex};
 
 mod qemu_exit;
 
-static TESTS: OnceMutex<&[&TestFunction]> = OnceMutex::new();
-static CURRENT: Mutex<usize> = Mutex::new(0);
-static NEXT: Mutex<Option<usize>> = Mutex::new(None);
-
 //#[cfg(test)]
 pub fn test_runner(tests: &[&TestFunction]) {
-    TESTS.init(unsafe { mem::transmute(tests) });
     sprintln!("Running {} tests", tests.len());
     let len = tests.len();
-    for (i, test) in tests.iter().enumerate() {
-        *CURRENT.lock() = i;
-        if i + 1 < len {
-            *NEXT.lock() = Some(i + 1);
-        } else {
-            *NEXT.lock() = None;
-        }
+    tests.iter().for_each(|test| {
         test.run();
-    }
+    });
     qemu_exit::exit(false);
 }
 
 #[cfg(test)]
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {
-    use crate::sprintln;
-
-    sprintln!("{}", info);
-    qemu_exit::exit(true);
+    crate::panic::panic(info);
 }
 
 #[no_mangle]

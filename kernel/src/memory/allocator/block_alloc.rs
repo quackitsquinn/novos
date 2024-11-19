@@ -24,10 +24,8 @@ pub struct BlockAllocator {
 unsafe impl Send for BlockAllocator {}
 unsafe impl Sync for BlockAllocator {}
 
-// Count of blocks that can be allocated in the inital block table.
+// Count of blocks that can be allocated in the initial block table.
 const INIT_BLOCK_SIZE: usize = 512;
-const BLOCK_TABLE_BLOCK_SIZE: usize = 128;
-const BLOCK_SIZE_BYTES: usize = mem::size_of::<Block>() * INIT_BLOCK_SIZE;
 const SPLIT_THRESHOLD: f64 = 0.5;
 const GC_THRESHOLD: f64 = 0.8;
 
@@ -39,49 +37,6 @@ impl BlockAllocator {
         let (table_block, blocks) =
             unsafe { Self::init_table_at(block_table_base as *mut Block, INIT_BLOCK_SIZE) };
 
-        Self {
-            blocks,
-            table_block,
-            heap_start,
-            heap_end,
-            unmap_start: heap_start,
-            allocation_balance: 0,
-        }
-    }
-    /// Creates a new block allocator with the given heap start and end. Only configured for testing because I can't think of a real world use case for this.
-    //#[cfg(test)]
-    pub(crate) unsafe fn init_at(
-        heap_start: usize,
-        heap_end: usize,
-        block_table_base: *mut Block,
-        block_table_size: usize,
-    ) -> Self {
-        let (table_block, blocks) =
-            unsafe { Self::init_table_at(block_table_base as *mut Block, block_table_size) };
-        info!(
-            "Creating block allocator with heap start: {:#x} and heap end: {:#x}",
-            heap_start, heap_end
-        );
-        Self {
-            blocks,
-            table_block,
-            heap_start,
-            heap_end,
-            unmap_start: heap_start,
-            allocation_balance: 0,
-        }
-    }
-    /// Creates a new block allocator with the given heap start, end, and block table.
-    ///
-    /// # Safety
-    /// heap_start and heap_end must be valid memory addresses, and if not, any pointer returned
-    /// by this allocator will be invalid and is undefined behavior to dereference.
-    pub(crate) unsafe fn init_with_vec(
-        heap_start: usize,
-        heap_end: usize,
-        mut blocks: DownwardsVec<'static, Block>,
-    ) -> Self {
-        let table_block = unsafe { Self::init_table_vec(&mut blocks) };
         Self {
             blocks,
             table_block,
@@ -228,7 +183,7 @@ impl BlockAllocator {
         ptr
     }
 
-    pub unsafe fn deallocate(&mut self, ptr: *mut u8, layout: Layout) -> Option<()> {
+    pub unsafe fn deallocate(&mut self, ptr: *mut u8, _: Layout) -> Option<()> {
         if let Some(blk) = // OLD: align_with_alignment(ptr, layout.align(), true))
             unsafe { self.find_block_by_ptr_mut(ptr) }
         {

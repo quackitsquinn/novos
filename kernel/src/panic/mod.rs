@@ -12,17 +12,13 @@ pub fn panic_basic(pi: &PanicInfo) {
 }
 
 /// A more traditional panic handler that includes more information.
-pub fn panic_extended_info(pi: &PanicInfo) -> ! {
+pub fn panic_extended_info(pi: &PanicInfo) {
     error!("PANIC at ");
     write_location(pi);
     sprintln!();
     error!("{}", pi.message());
     sprintln!("Backtrace:");
     stacktrace::print_trace();
-    sprintln!("Done; attempting QEMU exit");
-    testing::try_shutdown_qemu(true);
-    sprintln!("Failed to exit QEMU; halting");
-    hlt_loop();
 }
 
 fn write_location(pi: &PanicInfo) {
@@ -42,9 +38,11 @@ pub fn panic(pi: &PanicInfo) -> ! {
         hlt_loop();
     }
     PANIC_CHECK.call_once(|| ());
-    //panic_basic(pi);
     panic_extended_info(pi);
-    loop {}
+    sprintln!("Done; attempting QEMU exit");
+    testing::try_shutdown_qemu(true);
+    sprintln!("Failed to exit QEMU; halting");
+    hlt_loop();
 }
 
 pub fn init() {
