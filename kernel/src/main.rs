@@ -11,7 +11,7 @@ use kernel::{
 
 #[panic_handler]
 fn panic(pi: &core::panic::PanicInfo) -> ! {
-    kernel::panic::panic_extended_info(pi);
+    kernel::panic::panic(pi);
 }
 
 #[unsafe(no_mangle)]

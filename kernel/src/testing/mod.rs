@@ -47,6 +47,10 @@ pub extern "C" fn _start() -> ! {
     qemu_exit::exit(false);
 }
 
+pub fn try_shutdown_qemu(non_zero: bool) {
+    qemu_exit::exit(non_zero);
+}
+
 #[kproc::test("Trivial test")]
 fn trivial_test() {
     assert!(1 == 1);

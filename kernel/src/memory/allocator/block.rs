@@ -13,6 +13,7 @@ pub struct Block {
 
 impl Block {
     pub fn new(size: usize, address: *mut u8, is_free: bool) -> Self {
+        panic!("TEST");
         Self {
             size,
             is_free: is_free,

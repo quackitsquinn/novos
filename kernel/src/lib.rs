@@ -90,6 +90,8 @@ pub fn init_kernel() {
     STACK_BASE.call_once(|| _dummy);
     serial::init();
     info!("Initialized serial");
+    panic::init();
+    info!("Initialized panic");
     gdt::init_gdt();
     info!("Initialized GDT");
     interrupts::init();

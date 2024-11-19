@@ -24,7 +24,10 @@ impl<'a, T> OnceMutex<T> {
     }
 
     pub fn get(&self) -> MutexGuard<T> {
-        let i = self.inner.get().unwrap();
+        let i = self
+            .inner
+            .get()
+            .expect("Attempted to get an uninitialized OnceMutex!");
         if let Some(i) = i.try_lock() {
             return i;
         }
