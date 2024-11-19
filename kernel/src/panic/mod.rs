@@ -52,11 +52,11 @@ pub fn init() {
 }
 
 mod stacktrace {
-    use core::{arch::asm, ffi::c_void, mem, slice, str};
+    use core::{arch::asm, slice};
 
     use goblin::elf64::sym;
     use limine::request::{KernelAddressRequest, KernelFileRequest};
-    use log::{error, info, trace};
+    use log::info;
     use rustc_demangle::demangle;
 
     use crate::{sprint, sprintln};

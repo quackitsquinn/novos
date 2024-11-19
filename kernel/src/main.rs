@@ -4,10 +4,6 @@
 
 extern crate alloc;
 
-use kernel::{
-    memory::{self},
-    println, sprintln,
-};
 
 #[panic_handler]
 fn panic(pi: &core::panic::PanicInfo) -> ! {
@@ -17,7 +13,7 @@ fn panic(pi: &core::panic::PanicInfo) -> ! {
 #[unsafe(no_mangle)]
 #[cfg(not(test))]
 pub extern "C" fn _start() -> ! {
-    use kernel::memory::allocator;
+    
 
     kernel::init_kernel();
 

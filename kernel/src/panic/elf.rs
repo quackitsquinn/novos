@@ -1,13 +1,10 @@
-use core::{error::Error, ffi::CStr, mem::transmute, ops, str};
+use core::{ffi::CStr, mem::transmute, str};
 
 use goblin::{
     elf::section_header::SHT_SYMTAB,
-    elf64::{header, program_header, section_header, sym},
+    elf64::{header, section_header, sym},
 };
-use log::trace;
-use spin::Once;
 
-use crate::sprint;
 
 /// An ELF executable
 pub struct Elf<'a> {

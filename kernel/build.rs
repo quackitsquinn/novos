@@ -14,7 +14,7 @@ fn generate_characters() {
         let end = c_arr.rfind('}').unwrap();
         let mut contents = c_arr[start + 1..end].to_string();
         contents = contents.replace("{", "[").replace("}", "]");
-        let mut char_count = contents.matches("[").count();
+        let char_count = contents.matches("[").count();
         format!(
             "pub const {}: [[u8;8]; {}] = [",
             arr_name,

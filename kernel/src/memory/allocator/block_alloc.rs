@@ -441,7 +441,7 @@ mod tests {
 
     use alloc::{boxed::Box, vec::Vec};
 
-    use crate::memory::allocator::{LockedAllocator, TEST_ALLOCATOR};
+    use crate::memory::allocator::TEST_ALLOCATOR;
 
     use super::*;
 

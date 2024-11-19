@@ -3,7 +3,6 @@ use std::{
     fs::{File, OpenOptions},
     io::{BufRead, BufReader, Read, Write},
     process::{Command, Stdio},
-    str::Lines,
     thread,
 };
 

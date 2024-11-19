@@ -1,11 +1,9 @@
 use std::{
     env,
-    fs::{File, OpenOptions},
+    fs::File,
     io::{stdout, BufRead, BufReader, BufWriter, Read, Write},
-    mem::MaybeUninit,
     process::{Child, Command, Stdio},
-    str::Lines,
-    sync::{Arc, Mutex},
+    sync::Mutex,
     thread,
 };
 
@@ -76,8 +74,8 @@ type Reader = Box<dyn Read>;
 static FILE_WRITERS: Mutex<Vec<BufWriter<File>>> = Mutex::new(Vec::new());
 
 fn handle_stream(stream: Reader, name: &'static str, print: bool) {
-    let mut br = BufReader::new(stream);
-    let mut bw =
+    let br = BufReader::new(stream);
+    let bw =
         BufWriter::new(File::create(format!("{}.log", name)).expect("Failed to create log file"));
 
     let mut buf_wrs = FILE_WRITERS.lock().unwrap();

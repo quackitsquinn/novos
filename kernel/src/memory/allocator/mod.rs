@@ -5,12 +5,9 @@ use core::{
     ptr::NonNull,
 };
 
-use block::Block;
 use block_alloc::BlockAllocator;
-use downwards_vec::DownwardsVec;
-use spin::MutexGuard;
 
-use crate::{sprintln, util::OnceMutex};
+use crate::util::OnceMutex;
 
 pub mod block;
 pub mod block_alloc;
