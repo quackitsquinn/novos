@@ -26,10 +26,6 @@ pub fn main() {
     command
         .arg("-cdrom")
         .arg(&iso_path) // We don't use a bios specific iso because it supports both
-        .arg("-serial")
-        .arg("stdio")
-        .arg("-serial")
-        .arg("pty") // We don't use this, but it's here to prevent the default serial port from being used
         .arg("-m")
         .arg("1G");
 
@@ -42,7 +38,16 @@ pub fn main() {
     }
 
     if no_display {
-        command.arg("-nographic");
+        command
+            .arg("-nographic")
+            .arg("-device")
+            .arg("isa-debug-exit,iobase=0xf4,iosize=0x04");
+    } else {
+        command
+            .arg("-serial")
+            .arg("stdio")
+            .arg("-serial")
+            .arg("pty"); // We don't use this, but it's here to prevent the default serial port from being used
     }
 
     let mut command = command.spawn().expect("qemu-system-x86_64 failed to start");
