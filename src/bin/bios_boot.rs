@@ -11,9 +11,11 @@ use std::{
 
 pub fn main() {
     let debug_mode = env::var("DEBUG").is_ok();
+    let no_display = env::var("NO_DISPLAY").is_ok();
     let mut command = Command::new("qemu-system-x86_64");
 
-    let iso = if debug_mode {
+    /// Use the debug iso if no_display is enabled to remove the KASLR selection prompt (KASLR is disabled in the debug iso)
+    let iso = if debug_mode || no_display {
         "novos_debug.iso"
     } else {
         "novos.iso"
@@ -37,6 +39,10 @@ pub fn main() {
     if debug_mode {
         println!("Running in debug mode");
         command.arg("-S").arg("-s");
+    }
+
+    if no_display {
+        command.arg("-nographic");
     }
 
     let mut command = command.spawn().expect("qemu-system-x86_64 failed to start");
