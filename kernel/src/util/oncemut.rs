@@ -41,4 +41,11 @@ impl<'a, T> OnceMutex<T> {
     pub unsafe fn force_unlock(&self) {
         unsafe { self.mutex().force_unlock() }
     }
+
+    pub unsafe fn force_get(&self) -> MutexGuard<T> {
+        unsafe {
+            self.force_unlock();
+        }
+        self.get()
+    }
 }

@@ -357,6 +357,18 @@ impl BlockAllocator {
     pub unsafe fn clear(&mut self) {
         *self = unsafe { Self::init(self.heap_start, self.heap_end) };
     }
+    /// Prints a debug representation of the block allocator.
+    pub fn print_state(&self) {
+        sprintln!("Start: {:#x}, End: {:#x}", self.heap_start, self.heap_end);
+        sprintln!(
+            "Allocated: {:#x}, Deallocated: {:#x}, Balance: {}, Unmapped start: {:#x} ({}% allocated)",
+            self.allocated_count(),
+            self.blocks.len() - self.allocated_count(),
+            self.allocation_balance,
+            self.unmap_start,
+            (self.unmap_start - self.heap_start) / (self.heap_end - self.heap_start)
+        );
+    }
 }
 
 impl Debug for BlockAllocator {

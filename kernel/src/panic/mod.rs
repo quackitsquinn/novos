@@ -3,7 +3,7 @@ use core::panic::PanicInfo;
 use log::error;
 use spin::Once;
 
-use crate::{hlt_loop, sprint, sprintln, testing};
+use crate::{hlt_loop, memory::allocator, sprint, sprintln, testing};
 
 mod elf;
 
@@ -13,12 +13,28 @@ pub fn panic_basic(pi: &PanicInfo) {
 
 /// A more traditional panic handler that includes more information.
 pub fn panic_extended_info(pi: &PanicInfo) {
-    error!("PANIC at ");
+    sprintln!("=== KERNEL PANIC ===");
+    sprint!("Panic at ");
     write_location(pi);
     sprintln!();
-    error!("{}", pi.message());
-    sprintln!("Backtrace:");
+    sprintln!("{}", pi.message());
+    sprintln!("=== HEAP STATE ===");
+    sprintln!("Main heap:");
+    // Safety: We are in a panic, so the allocator should be completely halted
+    unsafe { allocator::ALLOCATOR.force_get().blocks.print_state() };
+    if cfg!(test) {
+        sprintln!("Test heap:");
+        // Safety: Same as above
+        unsafe {
+            crate::memory::allocator::TEST_ALLOCATOR
+                .force_get()
+                .blocks
+                .print_state()
+        };
+    }
+    sprintln!("=== STACK TRACE ===");
     stacktrace::print_trace();
+    sprintln!("=== END OF PANIC ===");
 }
 
 fn write_location(pi: &PanicInfo) {
