@@ -1,9 +1,7 @@
-use core::mem;
 
 use log::info;
-use spin::Mutex;
 
-use crate::{serial, sprintln, util::OnceMutex};
+use crate::{serial, sprintln};
 
 mod qemu_exit;
 

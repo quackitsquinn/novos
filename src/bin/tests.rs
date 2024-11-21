@@ -1,4 +1,3 @@
-use std::{env, process::Command};
 
 use novos::Config;
 

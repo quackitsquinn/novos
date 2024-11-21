@@ -1,9 +1,8 @@
 use std::{
     env,
     fs::File,
-    io::{stdout, BufRead, BufWriter, Read, Write},
+    io::{stdout, BufRead, Read, Write},
     process::Stdio,
-    sync::{Arc, Mutex},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -46,7 +45,7 @@ impl Config {
             .expect("qemu-system-x86_64 failed to start");
 
         let mut stdout = status.stdout.expect("Failed to get stdout");
-        let mut stderr = status.stderr.expect("Failed to get stderr");
+        let stderr = status.stderr.expect("Failed to get stderr");
 
         let pty = find_pty(&mut stdout);
 
