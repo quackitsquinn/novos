@@ -21,16 +21,17 @@ pub fn panic_extended_info(pi: &PanicInfo) {
     sprintln!("=== HEAP STATE ===");
     sprintln!("Main heap:");
     // Safety: We are in a panic, so the allocator should be completely halted
-    unsafe { allocator::ALLOCATOR.force_get().blocks.print_state() };
+    let alloc = unsafe { allocator::ALLOCATOR.force_get() };
+    alloc.blocks.print_state();
+    sprintln!("Sending heap state to serial");
+    alloc.blocks.send_blocks_aux("heap.raw");
     if cfg!(test) {
         sprintln!("Test heap:");
         // Safety: Same as above
-        unsafe {
-            crate::memory::allocator::TEST_ALLOCATOR
-                .force_get()
-                .blocks
-                .print_state()
-        };
+        let alloc = unsafe { crate::memory::allocator::TEST_ALLOCATOR.force_get() };
+        alloc.blocks.print_state();
+        sprintln!("Sending test heap state to serial");
+        alloc.blocks.send_blocks_aux("test_heap.raw");
     }
     sprintln!("=== STACK TRACE ===");
     stacktrace::print_trace();

@@ -4,7 +4,7 @@
 
 use crate::sprintln;
 
-pub mod harness;
+pub mod aux;
 pub mod interface;
 mod raw; // Things to interact with the serial port directly
 
@@ -39,5 +39,5 @@ pub fn init() {
 }
 
 pub fn init_debug_harness() {
-    harness::init_debug_harness();
+    aux::init_aux_serial();
 }

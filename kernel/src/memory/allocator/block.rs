@@ -1,5 +1,6 @@
 //INFO: We don't derive Copy to prevent accidental copies of the block
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[repr(C)] // Prevent field reordering
 pub struct Block {
     // The size of the block
     pub size: usize,
