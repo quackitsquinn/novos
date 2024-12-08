@@ -1,9 +1,12 @@
 use std::{
     env,
     fs::File,
-    io::{stdout, BufRead, Read, Write},
+    io::{stdout, BufRead, BufWriter, Read, Write},
+    path::{Path, PathBuf},
     process::Stdio,
 };
+
+mod port_reader;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Config {
@@ -13,44 +16,60 @@ pub struct Config {
     pub memory: String,
     pub serial: Vec<String>,
     pub dev_exit: bool,
-    /// Different than wait_for_debugger, as it will actually connect to the kernel debug harness. Unimplemented.
-    pub debug: bool,
+    pub extra_args: Vec<String>,
 }
 
 impl Config {
-    pub fn run(&self) {
-        let mut args = vec!["-cdrom", &self.iso];
-        if self.wait_for_debugger {
-            args.push("-s");
-            args.push("-S");
+    pub fn run(&mut self) {
+        let mut args = vec!["-cdrom".to_string(), self.iso.to_string()];
+        self.add_debug_flags(&mut args);
+        self.add_memory(&mut args);
+        self.add_serial_ports(&mut args);
+        self.add_extra_args(&mut args);
+
+        if env::var("VERBOSE").is_ok() {
+            println!("Running qemu with args: {:?}", args);
         }
-        if !self.graphics {
-            args.push("-nographic");
-        }
-        args.push("-m");
-        args.push(&self.memory);
-        for serial in &self.serial {
-            args.push("-serial");
-            args.push(serial);
-        }
-        if self.dev_exit {
-            args.push("-device");
-            args.push("isa-debug-exit,iobase=0xf4,iosize=0x04");
-        }
-        let status = std::process::Command::new("qemu-system-x86_64")
+
+        let mut qemu = std::process::Command::new("qemu-system-x86_64")
             .args(&args)
             .stderr(Stdio::piped())
             .stdout(Stdio::piped())
             .spawn()
             .expect("qemu-system-x86_64 failed to start");
 
-        let mut stdout = status.stdout.expect("Failed to get stdout");
-        let stderr = status.stderr.expect("Failed to get stderr");
+        let mut stdout = qemu.stdout.take().expect("Failed to get stdout");
+        let stderr = qemu.stderr.take().expect("Failed to get stderr");
 
-        let pty = find_pty(&mut stdout);
+        let pty: Option<(PathBuf, String)> = find_pty(&mut stdout);
 
-        spawn_out_handler(Box::new(stdout), "stdout", true);
-        spawn_out_handler(Box::new(stderr), "stderr", true);
+        if let Some((pty, name)) = pty {
+            if name == "serial0" {
+                println!("Found serial0 pty: {:?}", pty);
+                spawn_out_handler(
+                    Box::new(File::open(pty).expect("Failed to open serial0 pty")),
+                    "osout",
+                    true,
+                );
+            } else {
+                eprintln!("Found unknown pty: {:?}", pty);
+            }
+        }
+
+        let pty: Option<(PathBuf, String)> = find_pty(&mut stdout);
+
+        if let Some((pty, name)) = pty {
+            if name == "serial1" {
+                println!("Found serial1 pty: {:?}", pty);
+                port_reader::run(&pty);
+            }
+        } else {
+            eprintln!("Failed to find pty (found {:?})", pty);
+        }
+
+        spawn_out_handler(Box::new(stdout), "stdout", false);
+        spawn_out_handler(Box::new(stderr), "stderr", false);
+        qemu.wait().expect("Failed to wait for qemu");
     }
 
     pub fn empty() -> Config {
@@ -61,8 +80,41 @@ impl Config {
             memory: "".to_string(),
             serial: Vec::new(),
             dev_exit: false,
-            debug: false,
+            extra_args: Vec::new(),
         }
+    }
+
+    fn add_debug_flags(&mut self, args: &mut Vec<String>) {
+        if self.wait_for_debugger {
+            args.push("-s".to_string());
+            args.push("-S".to_string());
+        }
+        if self.dev_exit {
+            args.push("-device".to_string());
+            args.push("isa-debug-exit,iobase=0xf4,iosize=0x04".to_string());
+        }
+        if !self.graphics {
+            args.push("-nographic".to_string());
+            args.push("-monitor".to_string());
+            args.push("pty".to_string());
+        }
+    }
+
+    fn add_memory(&mut self, args: &mut Vec<String>) {
+        args.push("-m".to_string());
+        args.push(self.memory.clone());
+    }
+
+    fn add_serial_ports(&mut self, args: &mut Vec<String>) {
+        for serial in &self.serial {
+            args.push("-serial".to_string());
+            args.push(serial.clone());
+        }
+    }
+
+    fn add_extra_args(&mut self, args: &mut Vec<String>) {
+        let extra_args = env::var("QEMU_ARGS").unwrap_or("".to_string());
+        args.extend(extra_args.split_whitespace().map(|s| s.to_string()));
     }
 }
 
@@ -84,11 +136,21 @@ impl Default for Config {
         cfg.dev_exit = no_display || debug_mode;
         cfg.graphics = !no_display;
         cfg.wait_for_debugger = debug_mode;
+        if !no_display {
+            // This breaks stuff if we don't have a display
+            cfg.serial.push("stdio".to_string());
+        }
+        cfg.serial.push("pty".to_string());
         cfg
     }
 }
 
-fn spawn_out_handler(out: Box<dyn Read>, name: &str, print: bool) {
+fn spawn_out_handler(out: Box<dyn Read + Send>, name: &str, print: bool) {
+    let name = name.to_string();
+    std::thread::spawn(move || spawn_out_handler_inner(out, name, print));
+}
+
+fn spawn_out_handler_inner(out: Box<dyn Read>, name: String, print: bool) {
     let mut br = std::io::BufReader::new(out);
     let mut f = File::create(format!("{}.log", name)).expect("Failed to create log file");
     // We would use a buffer writer, but having to flush it would be painful and probably won't increase performance in any meaningful way
@@ -109,22 +171,36 @@ fn spawn_out_handler(out: Box<dyn Read>, name: &str, print: bool) {
         buf.clear();
     }
 }
-
-fn find_pty(reader: &mut dyn Read) -> Option<String> {
-    let mut br = std::io::BufReader::new(reader);
+/// Finds the pty path in the qemu output. In the format of (path, name)
+fn find_pty(reader: &mut dyn Read) -> Option<(PathBuf, String)> {
+    let mut br = std::io::BufReader::new(&mut *reader);
     let mut buf = String::new();
     let line = br.read_line(&mut buf);
     if line.is_err() {
+        println!("Failed to read line: {:?}", line.err());
         return None;
     }
     let line = line.unwrap();
     if line == 0 {
+        println!("No data read");
         return None;
     }
     let line = buf.trim();
-    if line.starts_with("Opening debug harness on pty: ") {
-        return Some(line.split(": ").last().unwrap().to_string());
+    println!("Read line: {}", line);
+    if line.starts_with("char device redirected to ") {
+        let path = line
+            .trim_start_matches("char device redirected to ")
+            .split_whitespace()
+            .next()?;
+        if line.contains("monitor") {
+            println!("Found monitor pty: {}", path);
+            return find_pty(reader);
+        }
+        // char device redirected to /dev/ttys005 (label serial0)
+        // serial0)
+        // serial0
+        let name = line.split_whitespace().last()?.trim_end_matches(')');
+        return Some((PathBuf::from(path), name.to_string()));
     }
     None
 }
-fn run_harness(ptr: &str) {}
