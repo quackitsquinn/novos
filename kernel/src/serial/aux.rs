@@ -31,24 +31,9 @@ pub enum AuxError {
     FileNameTooLong,
 }
 
-macro_rules! write_bytes {
-    ($port:expr, $bytes:expr) => {
-        sprint!("Sending bytes: ");
-        without_interrupts(|| {
-        // Im curious.. what if this is ran with interrupts disabled? Would that fix it being inconsistent?
-        for byte in $bytes {
-            sprint!("{:x}", *byte);
-            $port.send_raw(*byte);
-        }
-            sprintln!();
-        });
-    };
-}
-
 const WRITE_FILE_COMMAND: u8 = 0x01;
 
 pub fn send_data(filename: &str, data: &[u8]) -> Result<(), AuxError> {
-    let mut port = AUX_PORT.get();
     let data_len = (data.len() as u64).to_le_bytes();
     let name_len: u8 = filename
         .len()
@@ -61,14 +46,22 @@ pub fn send_data(filename: &str, data: &[u8]) -> Result<(), AuxError> {
         data_len
     );
 
-    port.send_raw(WRITE_FILE_COMMAND);
-    port.send_raw(name_len);
-    write_bytes!(port, filename.as_bytes());
+    send(&[WRITE_FILE_COMMAND, name_len]);
+    send(filename.as_bytes());
     sprintln!("Sent filename: {}.. Sending data length", filename);
-    write_bytes!(port, &data_len);
+    send(&data_len);
     sprintln!("Sent data length: {}", data.len());
-    write_bytes!(port, data);
+    send(data);
     sprintln!("Sent file: {}", filename);
 
     Ok(())
+}
+
+fn send(data: &[u8]) {
+    without_interrupts(|| {
+        let mut port = AUX_PORT.get();
+        for byte in data {
+            write!(port, "{:2x}", byte).unwrap();
+        }
+    });
 }

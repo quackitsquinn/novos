@@ -1,4 +1,4 @@
-use core::fmt;
+use core::{fmt, panic};
 
 ///! This is a module that wraps the uart_16550 crate for serial use.
 ///! The point of this module is to allow rls to work with the uart_16550 crate on non-x86_64 targets.
@@ -17,7 +17,7 @@ struct NoOpSerialPort(u16);
 impl NoOpSerialPort {
     /// Base port.
     fn port_base(&self) -> u16 {
-        self.0
+        panic!("Serial port not available");
     }
 
     /// Data port.
@@ -68,53 +68,45 @@ impl NoOpSerialPort {
     /// really points to a serial port device and that the caller has the necessary rights
     /// to perform the I/O operation.
     pub const unsafe fn new(base: u16) -> Self {
-        Self(base)
+        panic!("Serial port not available");
     }
 
     /// Initializes the serial port.
     ///
     /// The default configuration of [38400/8-N-1](https://en.wikipedia.org/wiki/8-N-1) is used.
-    pub fn init(&mut self) {}
+    pub fn init(&mut self) {
+        panic!("Serial port not available");
+    }
 
     /// Sends a byte on the serial port.
     pub fn send(&mut self, data: u8) {
-        match data {
-            8 | 0x7F => {
-                self.send_raw(8);
-                self.send_raw(b' ');
-                self.send_raw(8);
-            }
-            data => {
-                self.send_raw(data);
-            }
-        }
+        panic!("Serial port not available");
     }
 
     /// Sends a raw byte on the serial port, intended for binary data.
-    pub fn send_raw(&mut self, data: u8) {}
+    pub fn send_raw(&mut self, data: u8) {
+        panic!("Serial port not available");
+    }
 
     /// Tries to send a raw byte on the serial port, intended for binary data.
     pub fn try_send_raw(&mut self, data: u8) -> Result<(), WouldBlockError> {
-        Ok(())
+        panic!("Serial port not available");
     }
 
     /// Receives a byte on the serial port.
     pub fn receive(&mut self) -> u8 {
-        0
+        panic!("Serial port not available");
     }
 
     /// Tries to receive a byte on the serial port.
     pub fn try_receive(&mut self) -> Result<u8, WouldBlockError> {
-        Ok(0)
+        panic!("Serial port not available");
     }
 }
 
 impl fmt::Write for NoOpSerialPort {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        for byte in s.bytes() {
-            self.send(byte);
-        }
-        Ok(())
+        panic!("Serial port not available");
     }
 }
 
@@ -125,6 +117,6 @@ pub struct WouldBlockError;
 
 impl fmt::Display for WouldBlockError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("serial device not ready")
+        panic!("Serial port not available");
     }
 }

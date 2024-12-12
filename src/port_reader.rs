@@ -29,6 +29,7 @@ pub fn run(pty: &Path) {
 }
 
 fn run_inner(ptr: &mut File) {
+    return;
     println!("Initialized port reader");
     let mut buf = [0u8; 8];
     let mut out = File::create("output.txt").expect("Failed to create output file");
