@@ -20,6 +20,7 @@ uart_16550 = "0.3.1"
 # for some reason, x86_64 bops uart_16550 into working. I don't know why.
 x86_64 = "0.15.1"
 kproc = { path = "../kproc" }
+kserial = { path = "../kserial", features = ["client"] }
 backtrace = { version = "0.3.74", default-features = false }
 goblin = { version = "0.9.2", default-features = false, features = ["elf64", "elf32"] }
 thiserror = { version = "2.0.3", default-features = false }

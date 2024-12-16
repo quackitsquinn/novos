@@ -24,14 +24,14 @@ pub fn panic_extended_info(pi: &PanicInfo) {
     let alloc = unsafe { allocator::ALLOCATOR.force_get() };
     alloc.blocks.print_state();
     sprintln!("Sending heap state to serial");
-    alloc.blocks.send_blocks_aux("heap.raw");
+    alloc.blocks.export_block_binary("heap.raw");
     if cfg!(test) {
         sprintln!("Test heap:");
         // Safety: Same as above
         let alloc = unsafe { crate::memory::allocator::TEST_ALLOCATOR.force_get() };
         alloc.blocks.print_state();
         sprintln!("Sending test heap state to serial");
-        alloc.blocks.send_blocks_aux("test_heap.raw");
+        alloc.blocks.export_block_binary("test_heap.raw");
     }
     sprintln!("=== STACK TRACE ===");
     stacktrace::print_trace();

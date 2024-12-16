@@ -6,7 +6,7 @@ use std::{
     process::Stdio,
 };
 
-mod port_reader;
+mod packet_handler;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Config {
@@ -61,7 +61,7 @@ impl Config {
         if let Some((pty, name)) = pty {
             if name == "serial1" {
                 println!("Found serial1 pty: {:?}", pty);
-                port_reader::run(&pty);
+                compile_error!("REFACTOR");
             }
         } else {
             eprintln!("Failed to find pty (found {:?})", pty);

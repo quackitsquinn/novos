@@ -7,7 +7,7 @@ use core::{
 
 use log::{debug, error, info, trace};
 
-use crate::{debug_release_select, serial::aux, sprintln};
+use crate::{debug_release_select, sprintln};
 
 use super::{block::Block, downwards_vec::DownwardsVec};
 
@@ -327,7 +327,7 @@ impl BlockAllocator {
         };
     }
 
-    pub fn send_blocks_aux(&self, filename: &str) {
+    pub fn export_block_binary(&self, filename: &str) {
         // Unfortunately, we can't depend on the allocator (because if this is being called, the allocator is locked), so the only reliable way to send the blocks is to send them as the binary representation of the blocks.
         let mem_slice = &*self.blocks;
         let mem_slice_as_bytes = unsafe {
@@ -336,8 +336,8 @@ impl BlockAllocator {
                 mem_slice.len() * mem::size_of::<Block>(),
             )
         };
-        // Send the blocks
-        aux::send_data(filename, mem_slice_as_bytes).expect("Failed to send blocks");
+        // TODO: Send the blocks
+        // (filename, mem_slice_as_bytes).expect("Failed to send blocks");
     }
 
     pub fn allocation_balance(&self) -> isize {

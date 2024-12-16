@@ -4,7 +4,6 @@
 
 use crate::sprintln;
 
-pub mod aux;
 pub mod interface;
 mod raw; // Things to interact with the serial port directly
 
@@ -34,7 +33,6 @@ const LOGGER: SerialLog = SerialLog;
 
 pub fn init() {
     interface::init();
-    aux::init_aux_serial();
     log::set_logger(&LOGGER).unwrap();
     log::set_max_level(LOG_LEVEL.to_level_filter());
 }
