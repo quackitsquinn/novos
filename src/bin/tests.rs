@@ -8,6 +8,5 @@ fn main() {
     cfg.graphics = false;
     cfg.serial.clear();
     cfg.serial.push("pty".to_string());
-    cfg.serial.push("pty".to_string());
     cfg.run();
 }

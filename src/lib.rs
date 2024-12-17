@@ -46,25 +46,10 @@ impl Config {
         if let Some((pty, name)) = pty {
             if name == "serial0" {
                 println!("Found serial0 pty: {:?}", pty);
-                spawn_out_handler(
-                    Box::new(File::open(pty).expect("Failed to open serial0 pty")),
-                    "osout",
-                    true,
-                );
+                packet_handler::run(&pty);
             } else {
                 eprintln!("Found unknown pty: {:?}", pty);
             }
-        }
-
-        let pty: Option<(PathBuf, String)> = find_pty(&mut stdout);
-
-        if let Some((pty, name)) = pty {
-            if name == "serial1" {
-                println!("Found serial1 pty: {:?}", pty);
-                compile_error!("REFACTOR");
-            }
-        } else {
-            eprintln!("Failed to find pty (found {:?})", pty);
         }
 
         spawn_out_handler(Box::new(stdout), "stdout", false);

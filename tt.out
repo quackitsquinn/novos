@@ -1,0 +1,5 @@
+Read line: char device redirected to /dev/ttys009 (label compat_monitor0)
+Found monitor pty: /dev/ttys009
+Read line: char device redirected to /dev/ttys018 (label serial0)
+Found serial0 pty: "/dev/ttys018"
+[SerialPortInfo { port_name: "/dev/cu.wlan-debug", port_type: PciPort }, SerialPortInfo { port_name: "/dev/tty.wlan-debug", port_type: PciPort }, SerialPortInfo { port_name: "/dev/cu.debug-console", port_type: PciPort }, SerialPortInfo { port_name: "/dev/tty.debug-console", port_type: PciPort }, SerialPortInfo { port_name: "/dev/cu.Bluetooth-Incoming-Port", port_type: PciPort }, SerialPortInfo { port_name: "/dev/tty.Bluetooth-Incoming-Port", port_type: PciPort }]

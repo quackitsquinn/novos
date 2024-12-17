@@ -1,12 +1,13 @@
 use core::{fmt::Write, time::Duration};
 
-use crate::{interrupts::hardware::timer::Timer, serial::raw::SerialPort, util::OnceMutex};
+use kserial::{client, common::Command};
+use log::info;
 
-use super::commands::Command;
+use crate::{interrupts::hardware::timer::Timer, serial::raw::SerialPort, util::OnceMutex};
 
 const SERIAL_PORT_NUM: u16 = 0x3F8;
 static SERIAL_PORT: OnceMutex<Serial> = OnceMutex::new();
-const PACKET_SUPPORT_WAIT_TIME: Duration = Duration::from_millis(10);
+const PACKET_SUPPORT_WAIT_TIME: Duration = Duration::from_millis(100);
 
 pub struct Serial {
     port: SerialPort,
@@ -22,7 +23,6 @@ pub struct Serial {
     ///
     /// This will only be enabled after interrupts are enabled, as the kernel waits for a few cycles to ensure that the other end is ready.
     packet_support: bool,
-    pub(super) in_command: bool,
 }
 
 impl Serial {
@@ -36,14 +36,19 @@ impl Serial {
         Serial {
             port,
             packet_support: false,
-            in_command: false,
         }
     }
 
     pub fn check_packet_support(&mut self) {
         let timer = Timer::new(PACKET_SUPPORT_WAIT_TIME);
         let mut has_read = false;
+        // Write a 0xFF byte to the other end to indicate that we have started polling for packet support.
+        unsafe {
+            self.send_raw(0xFF);
+        }
+
         while !timer.is_done() && !has_read {
+            writeln!(self, "Checking for packet support...").unwrap();
             if let Ok(byte) = self.port.try_receive() {
                 // Similar to TCP/IP's SYN-ACK handshake, we send a 0xFF byte to the other end to indicate that we are ready for packet mode.
                 if byte == 0xFF {
@@ -51,6 +56,7 @@ impl Serial {
                         self.send_raw(0xFF);
                     }
                     self.packet_support = true;
+                    client::init(&SERIAL_PORT);
                     has_read = true;
                 }
             }
@@ -67,10 +73,6 @@ impl Serial {
         }
     }
 
-    pub fn run_command(&mut self, command: Command) {
-        command.handle(self);
-    }
-
     pub fn has_packet_support(&self) -> bool {
         self.packet_support
     }
@@ -83,29 +85,14 @@ impl Serial {
 impl Write for Serial {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
         if self.packet_support {
-            if !self.in_command {
-                Command::WriteString(s).handle(self);
-            } else {
-                // If we are in a command, a command is handling the information, so we can just send the raw bytes.
-                for byte in s.bytes() {
-                    assert!(
-                        byte != 0,
-                        "Strings sent over the serial port cannot contain null terminators."
-                    );
-                    self.port.send(byte);
+            panic!("Do not call this function! Use the Command enum instead.");
+        } else {
+            for byte in s.bytes() {
+                unsafe {
+                    self.send_raw(byte);
                 }
             }
-        } else {
-            // If packet support is not enabled, just send the raw bytes.
-            assert!(
-                !s.contains(0xff as char),
-                "Strings sent over the serial port cannot contain the byte 0xFF."
-            );
-            for byte in s.bytes() {
-                self.port.send(byte);
-            }
         }
-
         Ok(())
     }
 }

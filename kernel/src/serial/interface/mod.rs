@@ -1,7 +1,6 @@
 use core::{fmt::Write, time::Duration};
 
-use commands::Command;
-use kserial::client::SerialAdapter;
+use kserial::{client::SerialAdapter, common::Command};
 use serial::Serial;
 use spin::Once;
 
@@ -9,7 +8,6 @@ use crate::{interrupts::hardware::timer::Timer, util::OnceMutex};
 
 use super::raw::SerialPort;
 
-pub mod commands;
 pub mod serial;
 
 static SERIAL_PORT: OnceMutex<Serial> = OnceMutex::new();
@@ -62,16 +60,11 @@ pub fn init() {
     SERIAL_PORT.init(unsafe { Serial::new(0x3F8) });
 }
 
-pub fn init_packet_support() {
-    let mut serial = SERIAL_PORT.get();
-    serial.check_packet_support();
-}
-
 #[doc(hidden)]
 pub fn _print(args: core::fmt::Arguments) {
     let mut serial = SERIAL_PORT.get();
     if serial.has_packet_support() {
-        serial.run_command(Command::WriteArguments(&args));
+        Command::WriteArguments(&args).send();
     } else {
         serial.write_fmt(args).unwrap();
     }
@@ -96,4 +89,17 @@ macro_rules! sprintln {
         $crate::sprint!(concat!($fmt, "\n"), $($arg)*)
     };
 
+}
+
+pub fn init_packet_support() {
+    sprintln!("Checking for packet support...");
+    let mut serial = SERIAL_PORT.get();
+    serial.check_packet_support();
+    let support = serial.has_packet_support();
+    drop(serial);
+    if support {
+        sprintln!("Packet support enabled");
+    } else {
+        sprintln!("Packet support not enabled");
+    }
 }

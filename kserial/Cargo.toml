@@ -11,4 +11,10 @@ spin = "0.9.8"
 default = []
 std = []
 client = []
-server = ["std"]
+server = ["std", "dep:serialport"]
+
+
+# Add serialport if its client
+[dependencies.serialport]
+version = "4.6.1"
+optional = true
