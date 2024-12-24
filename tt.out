@@ -1,5 +1,16 @@
-Read line: char device redirected to /dev/ttys009 (label compat_monitor0)
-Found monitor pty: /dev/ttys009
-Read line: char device redirected to /dev/ttys018 (label serial0)
-Found serial0 pty: "/dev/ttys018"
-[SerialPortInfo { port_name: "/dev/cu.wlan-debug", port_type: PciPort }, SerialPortInfo { port_name: "/dev/tty.wlan-debug", port_type: PciPort }, SerialPortInfo { port_name: "/dev/cu.debug-console", port_type: PciPort }, SerialPortInfo { port_name: "/dev/tty.debug-console", port_type: PciPort }, SerialPortInfo { port_name: "/dev/cu.Bluetooth-Incoming-Port", port_type: PciPort }, SerialPortInfo { port_name: "/dev/tty.Bluetooth-Incoming-Port", port_type: PciPort }]
+Running qemu with args: ["-cdrom", "target/artifacts/kernel_tests.iso", "-device", "isa-debug-exit,iobase=0xf4,iosize=0x04", "-nographic", "-monitor", "pty", "-chardev", "socket,path=target/serial0.sock,server,id=output", "-m", "1G", "-serial", "chardev:output"]
+c[?7l[2J[0mSeaBIOS (version rel-1.16.3-0-ga6ed6b701f0a-prebuilt.qemu.org)
+
+
+iPXE (http://ipxe.org) 00:03.0 CA00 PCI2.10 PnP PMM+3EFD0FC0+3EF30FC0 CA00
+Press Ctrl-B to configure iPXE (PCI 00:03.0)...                                                                               
+
+
+Booting from Hard Disk...
+Boot failed: could not read the boot disk
+
+Booting from Floppy...
+Boot failed: could not read the boot disk
+
+Booting from DVD/CD...
+c[?7l[2Jc

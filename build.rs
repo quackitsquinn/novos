@@ -34,6 +34,10 @@ fn main() {
     // Should re-clone limine if the env var is set
     let invalidate_limine = std::env::var("INVALIDATE_LIMINE").is_ok();
 
+    if invalidate_limine {
+        println!("cargo:warning=Invalidating limine");
+    }
+
     println!("OUT_DIR: {}", out_dir);
     println!("CARGO_BIN_FILE_KERNEL: {}", kernel_dir);
 

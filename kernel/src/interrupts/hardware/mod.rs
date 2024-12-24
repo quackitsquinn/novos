@@ -1,4 +1,3 @@
-
 use pic8259::ChainedPics;
 use spin::Mutex;
 

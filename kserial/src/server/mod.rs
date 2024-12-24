@@ -1,13 +1,9 @@
-use core::time::Duration;
 use std::{
-    fs::{File, OpenOptions},
-    io::{self, Read, Seek, SeekFrom, Write},
+    io::{self, Read, Write},
     os::unix::net::UnixStream,
     path::Path,
     thread,
 };
-
-use serialport::{SerialPort, SerialPortBuilder, TTYPort};
 
 const BUF_SIZE: usize = 16;
 
@@ -18,7 +14,20 @@ pub struct Server {
 impl Server {
     /// Creates a new server with the given path. The path should be a path to a Unix socket.
     pub fn new(path: &Path) -> Result<Self, io::Error> {
-        todo!();
+        for i in 0..10 {
+            let tty = match UnixStream::connect(path) {
+                Ok(tty) => tty,
+                Err(e) => {
+                    if i == 9 {
+                        return Err(e);
+                    }
+                    thread::sleep(std::time::Duration::from_secs(1));
+                    continue;
+                }
+            };
+            return Ok(Self { tty });
+        }
+        unreachable!()
     }
 
     pub fn run(&mut self) -> Result<(), io::Error> {
@@ -27,16 +36,9 @@ impl Server {
         println!("Got 0xFF byte, switching to packet mode");
         // dude idfk spam 0xFF bytes. The qemu serial port is weird, and like, incredibly unreliable.
         // I have tried so many things to do this properly, including using a second port to read commands but LITERALLY NOTHING WORKS
+        thread::sleep(std::time::Duration::from_secs(1));
+        self.tty.write_all(&[0xFF])?;
 
-        for _ in 0..10 {
-            if let Ok(n) = self.tty.write(&[0xFF]) {
-                if n != 1 {
-                    println!("Failed to write 0xFF byte");
-                }
-            }
-            //thread::sleep(Duration::from_millis(10));
-        }
-        self.tty.flush()?;
         let mut buf = [0; BUF_SIZE];
         loop {
             self.tty.read_exact(&mut buf)?;
@@ -55,7 +57,9 @@ where
         tty.read_exact(&mut buf)?;
         let text = String::from_utf8_lossy(&buf);
         print!("{}", text);
-        if buf.contains(&0xFF) {}
+        if buf.contains(&0xFF) {
+            break;
+        }
     }
 
     Ok(())

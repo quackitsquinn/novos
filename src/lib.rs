@@ -1,9 +1,9 @@
 use std::{
     env,
     fs::File,
-    io::{stdout, BufRead, BufWriter, Read, Write},
-    path::{Path, PathBuf},
-    process::Stdio,
+    io::{stdout, BufRead, Read, Write},
+    path::PathBuf,
+    process::{Command, Stdio},
 };
 
 mod packet_handler;
@@ -23,6 +23,10 @@ impl Config {
     pub fn run(&mut self) {
         let mut args = vec!["-cdrom".to_string(), self.iso.to_string()];
         self.add_debug_flags(&mut args);
+        self.create_unix_chardev(
+            &mut args,
+            PathBuf::from("target/serial0.sock").to_str().unwrap(),
+        );
         self.add_memory(&mut args);
         self.add_serial_ports(&mut args);
         self.add_extra_args(&mut args);
@@ -31,7 +35,7 @@ impl Config {
             println!("Running qemu with args: {:?}", args);
         }
 
-        let mut qemu = std::process::Command::new("qemu-system-x86_64")
+        let mut qemu = Command::new("qemu-system-x86_64")
             .args(&args)
             .stderr(Stdio::piped())
             .stdout(Stdio::piped())
@@ -41,16 +45,7 @@ impl Config {
         let mut stdout = qemu.stdout.take().expect("Failed to get stdout");
         let stderr = qemu.stderr.take().expect("Failed to get stderr");
 
-        let pty: Option<(PathBuf, String)> = find_pty(&mut stdout);
-
-        if let Some((pty, name)) = pty {
-            if name == "serial0" {
-                println!("Found serial0 pty: {:?}", pty);
-                packet_handler::run(&pty);
-            } else {
-                eprintln!("Found unknown pty: {:?}", pty);
-            }
-        }
+        packet_handler::run(&PathBuf::from("target/serial0.sock"));
 
         spawn_out_handler(Box::new(stdout), "stdout", false);
         spawn_out_handler(Box::new(stderr), "stderr", false);
@@ -100,6 +95,11 @@ impl Config {
     fn add_extra_args(&mut self, args: &mut Vec<String>) {
         let extra_args = env::var("QEMU_ARGS").unwrap_or("".to_string());
         args.extend(extra_args.split_whitespace().map(|s| s.to_string()));
+    }
+
+    fn create_unix_chardev(&mut self, args: &mut Vec<String>, path: &str) {
+        args.push("-chardev".to_string());
+        args.push(format!("socket,path={},server,id=output", path));
     }
 }
 

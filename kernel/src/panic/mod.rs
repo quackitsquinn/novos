@@ -3,7 +3,7 @@ use core::panic::PanicInfo;
 use log::error;
 use spin::Once;
 
-use crate::{hlt_loop, memory::allocator, sprint, sprintln, testing};
+use crate::{hlt_loop, memory::allocator, serial, sprint, sprintln, testing};
 
 mod elf;
 
@@ -13,6 +13,10 @@ pub fn panic_basic(pi: &PanicInfo) {
 
 /// A more traditional panic handler that includes more information.
 pub fn panic_extended_info(pi: &PanicInfo) {
+    // Disable packet handling
+    serial::interface::SERIAL_PORT
+        .get()
+        .disable_packet_support();
     sprintln!("=== KERNEL PANIC ===");
     sprint!("Panic at ");
     write_location(pi);

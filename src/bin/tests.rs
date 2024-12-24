@@ -7,6 +7,7 @@ fn main() {
     cfg.dev_exit = true;
     cfg.graphics = false;
     cfg.serial.clear();
-    cfg.serial.push("pty".to_string());
+    cfg.serial.push("chardev:output".to_string());
+    //cfg.wait_for_debugger = true;
     cfg.run();
 }

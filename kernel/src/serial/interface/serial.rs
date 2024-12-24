@@ -7,7 +7,7 @@ use crate::{interrupts::hardware::timer::Timer, serial::raw::SerialPort, util::O
 
 const SERIAL_PORT_NUM: u16 = 0x3F8;
 static SERIAL_PORT: OnceMutex<Serial> = OnceMutex::new();
-const PACKET_SUPPORT_WAIT_TIME: Duration = Duration::from_millis(100);
+const PACKET_SUPPORT_WAIT_TIME: Duration = Duration::from_millis(1000);
 
 pub struct Serial {
     port: SerialPort,
@@ -39,28 +39,15 @@ impl Serial {
         }
     }
 
-    pub fn check_packet_support(&mut self) {
-        let timer = Timer::new(PACKET_SUPPORT_WAIT_TIME);
-        let mut has_read = false;
-        // Write a 0xFF byte to the other end to indicate that we have started polling for packet support.
-        unsafe {
-            self.send_raw(0xFF);
-        }
+    pub fn enable_packet_support(&mut self) {
+        // writeln!(self, "Enabling packet support").unwrap();
+        self.packet_support = true;
+        //client::init(&SERIAL_PORT);
+    }
 
-        while !timer.is_done() && !has_read {
-            writeln!(self, "Checking for packet support...").unwrap();
-            if let Ok(byte) = self.port.try_receive() {
-                // Similar to TCP/IP's SYN-ACK handshake, we send a 0xFF byte to the other end to indicate that we are ready for packet mode.
-                if byte == 0xFF {
-                    unsafe {
-                        self.send_raw(0xFF);
-                    }
-                    self.packet_support = true;
-                    client::init(&SERIAL_PORT);
-                    has_read = true;
-                }
-            }
-        }
+    pub fn disable_packet_support(&mut self) {
+        // writeln!(self, "Disabling packet support").unwrap();
+        self.packet_support = false;
     }
 
     pub unsafe fn send_raw(&mut self, data: u8) {
@@ -84,7 +71,8 @@ impl Serial {
 
 impl Write for Serial {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
-        if self.packet_support {
+        if false {
+            //self.packet_support {
             panic!("Do not call this function! Use the Command enum instead.");
         } else {
             for byte in s.bytes() {

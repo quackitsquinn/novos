@@ -10,7 +10,7 @@ use super::raw::SerialPort;
 
 pub mod serial;
 
-static SERIAL_PORT: OnceMutex<Serial> = OnceMutex::new();
+pub static SERIAL_PORT: OnceMutex<Serial> = OnceMutex::new();
 
 impl SerialAdapter for OnceMutex<Serial> {
     fn send(&self, data: u8) -> Result<(), kserial::client::WouldBlockError> {
@@ -58,12 +58,16 @@ impl SerialAdapter for OnceMutex<Serial> {
 
 pub fn init() {
     SERIAL_PORT.init(unsafe { Serial::new(0x3F8) });
+    let mut serial = SERIAL_PORT.get();
+    kserial::client::init(&SERIAL_PORT);
+    serial.enable_packet_support();
 }
 
 #[doc(hidden)]
 pub fn _print(args: core::fmt::Arguments) {
     let mut serial = SERIAL_PORT.get();
     if serial.has_packet_support() {
+        //writeln!(serial, "AUIFNHAWERIOUGHAWEJIOGJAEHLUIGNAWOI").unwrap();
         Command::WriteArguments(&args).send();
     } else {
         serial.write_fmt(args).unwrap();
@@ -89,17 +93,4 @@ macro_rules! sprintln {
         $crate::sprint!(concat!($fmt, "\n"), $($arg)*)
     };
 
-}
-
-pub fn init_packet_support() {
-    sprintln!("Checking for packet support...");
-    let mut serial = SERIAL_PORT.get();
-    serial.check_packet_support();
-    let support = serial.has_packet_support();
-    drop(serial);
-    if support {
-        sprintln!("Packet support enabled");
-    } else {
-        sprintln!("Packet support not enabled");
-    }
 }

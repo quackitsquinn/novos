@@ -96,7 +96,6 @@ pub fn init_kernel() {
     info!("Initialized GDT");
     interrupts::init();
     info!("Initialized interrupts");
-    serial::interface::init_packet_support();
     memory::init();
     info!("Initialized paging");
     info!("Checking if bootloader has provided stack size");
