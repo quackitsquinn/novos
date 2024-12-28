@@ -5,6 +5,7 @@ use core::{
     ptr::{self},
 };
 
+use kserial::common::Command;
 use log::{debug, error, info, trace};
 
 use crate::{debug_release_select, sprintln};
@@ -337,7 +338,7 @@ impl BlockAllocator {
             )
         };
         // TODO: Send the blocks
-        // (filename, mem_slice_as_bytes).expect("Failed to send blocks");
+        Command::SendFile(filename, mem_slice_as_bytes).send();
     }
 
     pub fn allocation_balance(&self) -> isize {

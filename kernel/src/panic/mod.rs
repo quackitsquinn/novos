@@ -1,22 +1,37 @@
-use core::panic::PanicInfo;
+use core::{fmt::Write, panic::PanicInfo};
 
 use log::error;
 use spin::Once;
 
-use crate::{hlt_loop, memory::allocator, serial, sprint, sprintln, testing};
+use crate::{
+    hlt_loop,
+    memory::allocator,
+    serial::{self, raw::SerialPort},
+    sprint, sprintln, testing,
+};
 
 mod elf;
 
 pub fn panic_basic(pi: &PanicInfo) {
-    error!("PANIC {}", pi);
+    // Write the raw panic message to the serial port. This is just a debug tool because somewhere in my serial implementation its just.. exploding.
+    let mut panic_writer = unsafe { SerialPort::new(serial::SERIAL_PORT_NUM) };
+    if !serial::interface::PORT_HAS_INIT.is_completed() {
+        // If the code crashed before the serial port was initialized, we need to initialize it now.
+        panic_writer.init();
+    }
+    let _ = panic_writer.write_str("Panic: ");
+    let _ = if let Some(location) = pi.location() {
+        panic_writer.write_fmt(format_args!("{}:{}", location.file(), location.line()))
+    } else {
+        panic_writer.write_str("Unknown location")
+    };
+    let _ = panic_writer.write_str("\n");
+    let _ = panic_writer.write_fmt(format_args!("{}", pi.message()));
+    let _ = panic_writer.write_str("\n");
 }
 
 /// A more traditional panic handler that includes more information.
 pub fn panic_extended_info(pi: &PanicInfo) {
-    // Disable packet handling
-    serial::interface::SERIAL_PORT
-        .get()
-        .disable_packet_support();
     sprintln!("=== KERNEL PANIC ===");
     sprint!("Panic at ");
     write_location(pi);
@@ -54,7 +69,7 @@ static PANIC_CHECK: Once<()> = Once::new();
 
 pub fn panic(pi: &PanicInfo) -> ! {
     if PANIC_CHECK.is_completed() {
-        sprintln!("Double panic!");
+        //sprintln!("Double panic!");
         panic_basic(pi);
         hlt_loop();
     }

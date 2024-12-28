@@ -11,16 +11,19 @@ pub enum Command<'a> {
     WriteArguments(&'a Arguments<'a>),
     /// Send a file over the serial port. (filename, contents)
     SendFile(&'a str, &'a [u8]),
+    /// Disable packet support. YOU CAN NOT RE-ENABLE PACKET SUPPORT AT THIS POINT.
+    DisablePacketSupport,
 }
 
 impl Command<'_> {
     /// Get the command id.
     pub fn id(&self) -> u8 {
-        // Because the fields all contain different types, we can't cast the enum to an integer. Instead, we use a match statement to get the id.
+        // TODO: If more commands are added, refactor this all into a proc macro.
         match self {
-            Command::WriteString(_) => Command::WriteString as u8,
-            Command::WriteArguments(_) => Command::WriteArguments as u8,
-            Command::SendFile(_, _) => Command::SendFile as u8,
+            Command::WriteString(_) => 0,
+            Command::WriteArguments(_) => 1,
+            Command::SendFile(_, _) => 2,
+            Command::DisablePacketSupport => 3,
         }
     }
 }

@@ -26,11 +26,12 @@ impl Command<'_> {
         let adapter = SERIAL_ADAPTER
             .get()
             .expect("Serial adapter not initialized");
-        adapter.send_blocking(self.id());
+        adapter.send(self.id());
         match *self {
             Command::WriteString(s) => write_string(*adapter, s),
             Command::WriteArguments(args) => write_arguments(*adapter, args),
             Command::SendFile(filename, contents) => send_file(*adapter, filename, contents),
+            Command::DisablePacketSupport => {}
         }
     }
 }
@@ -40,8 +41,8 @@ where
     T: SerialAdapter + ?Sized,
 {
     string_precondition!(s);
-    a.send_slice_blocking(s.as_bytes());
-    a.send_blocking(0);
+    a.send_slice(s.as_bytes());
+    a.send(0);
 }
 
 fn write_arguments<T>(a: &T, args: &core::fmt::Arguments)
@@ -49,16 +50,18 @@ where
     T: SerialAdapter + ?Sized,
 {
     write_wrapper(a, args);
+    a.send(0);
 }
 
 fn send_file<T>(a: &T, filename: &str, contents: &[u8])
 where
     T: SerialAdapter + ?Sized,
 {
-    let len = filename.len() as u32;
-    a.send_slice_blocking(filename.as_bytes());
-    a.send_blocking(0);
+    a.send_slice(filename.as_bytes());
+    a.send(0);
 
-    let len = len.to_le_bytes();
-    a.send_slice_blocking(&len);
+    let len = (contents.len() as u32).to_le_bytes();
+    a.send_slice(&len);
+
+    a.send_slice(contents);
 }

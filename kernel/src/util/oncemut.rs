@@ -28,6 +28,7 @@ impl<'a, T> OnceMutex<T> {
             .inner
             .get()
             .expect("Attempted to get an uninitialized OnceMutex!");
+        // TODO: Do some fancy stack trace stuff here and save the last lock location. Would be greatly useful for debugging.
         if let Some(i) = i.try_lock() {
             return i;
         }

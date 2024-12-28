@@ -2,12 +2,9 @@ use core::{fmt::Write, time::Duration};
 
 use kserial::{client, common::Command};
 use log::info;
+use spin::Once;
 
 use crate::{interrupts::hardware::timer::Timer, serial::raw::SerialPort, util::OnceMutex};
-
-const SERIAL_PORT_NUM: u16 = 0x3F8;
-static SERIAL_PORT: OnceMutex<Serial> = OnceMutex::new();
-const PACKET_SUPPORT_WAIT_TIME: Duration = Duration::from_millis(1000);
 
 pub struct Serial {
     port: SerialPort,
@@ -42,7 +39,6 @@ impl Serial {
     pub fn enable_packet_support(&mut self) {
         // writeln!(self, "Enabling packet support").unwrap();
         self.packet_support = true;
-        //client::init(&SERIAL_PORT);
     }
 
     pub fn disable_packet_support(&mut self) {

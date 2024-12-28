@@ -5,9 +5,10 @@
 use crate::sprintln;
 
 pub mod interface;
-mod raw; // Things to interact with the serial port directly
+pub mod raw; // Things to interact with the serial port directly
 
 pub const LOG_LEVEL: log::Level = log::Level::Trace;
+pub const SERIAL_PORT_NUM: u16 = 0x3F8;
 struct SerialLog;
 
 impl log::Log for SerialLog {
