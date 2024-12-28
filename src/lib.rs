@@ -99,7 +99,7 @@ impl Config {
 
     fn create_unix_chardev(&mut self, args: &mut Vec<String>, path: &str) {
         args.push("-chardev".to_string());
-        args.push(format!("socket,path={},server,id=output", path));
+        args.push(format!("socket,path={},server=off,id=output", path));
     }
 }
 

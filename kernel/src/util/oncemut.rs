@@ -2,13 +2,19 @@ use core::panic;
 
 use spin::{Mutex, MutexGuard, Once};
 
+use crate::panic::stacktrace::{fmt_symbol, get_caller_rip};
+
 pub struct OnceMutex<T> {
     pub inner: Once<Mutex<T>>,
+    caller: Mutex<Option<*const ()>>,
 }
 
 impl<'a, T> OnceMutex<T> {
     pub const fn new() -> Self {
-        Self { inner: Once::new() }
+        Self {
+            inner: Once::new(),
+            caller: Mutex::new(None),
+        }
     }
 
     pub fn init(&self, value: T) {
@@ -30,9 +36,15 @@ impl<'a, T> OnceMutex<T> {
             .expect("Attempted to get an uninitialized OnceMutex!");
         // TODO: Do some fancy stack trace stuff here and save the last lock location. Would be greatly useful for debugging.
         if let Some(i) = i.try_lock() {
+            self.caller.lock().replace(get_caller_rip());
             return i;
         }
-        panic!("Attempted to lock a locked mutex!");
+        let caller = self.caller.lock();
+        if let Some(caller) = *caller {
+            panic!("Mutex already locked by: {}", fmt_symbol(caller));
+        } else {
+            panic!("Mutex already locked by unknown location");
+        }
     }
 
     pub fn is_locked(&self) -> bool {
@@ -50,3 +62,7 @@ impl<'a, T> OnceMutex<T> {
         self.get()
     }
 }
+
+unsafe impl<T> Sync for OnceMutex<T> {}
+
+unsafe impl<T> Send for OnceMutex<T> {}

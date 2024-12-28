@@ -8,8 +8,6 @@ pub struct Block {
     pub is_free: bool,
     // The start address of the block
     pub address: *mut u8,
-    // Can the block be reused
-    pub is_reusable: bool,
 }
 
 impl Block {
@@ -18,7 +16,6 @@ impl Block {
             size,
             is_free: is_free,
             address,
-            is_reusable: false,
         }
     }
 
@@ -69,11 +66,6 @@ impl Block {
 
         self_end == other.address as usize
             || self.address as usize == other.address as usize + other.size
-    }
-
-    pub fn set_reusable(&mut self, reusable: bool) {
-        debug_assert!(self.is_free);
-        self.is_reusable = reusable;
     }
 }
 

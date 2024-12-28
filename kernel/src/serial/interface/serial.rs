@@ -30,6 +30,10 @@ impl Serial {
     pub unsafe fn new(port: u16) -> Self {
         let mut port = unsafe { SerialPort::new(port) };
         port.init();
+        for i in 0..10 {
+            // Send 10 FF bytes to make sure that and garbage data is cleared out.
+            port.send_raw(0xFF);
+        }
         Serial {
             port,
             packet_support: false,
@@ -67,9 +71,8 @@ impl Serial {
 
 impl Write for Serial {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
-        if false {
-            //self.packet_support {
-            panic!("Do not call this function! Use the Command enum instead.");
+        if self.packet_support {
+            panic!("Do not use write_str with packet support enabled");
         } else {
             for byte in s.bytes() {
                 unsafe {

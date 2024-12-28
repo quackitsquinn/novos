@@ -24,7 +24,7 @@ pub mod memory;
 pub mod panic;
 pub mod serial;
 pub mod testing;
-mod util;
+pub mod util;
 
 const KERNEL_VERSION: &str = env!("CARGO_PKG_VERSION");
 

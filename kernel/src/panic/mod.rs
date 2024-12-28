@@ -11,6 +11,7 @@ use crate::{
 };
 
 mod elf;
+pub mod stacktrace;
 
 pub fn panic_basic(pi: &PanicInfo) {
     // Write the raw panic message to the serial port. This is just a debug tool because somewhere in my serial implementation its just.. exploding.
@@ -83,89 +84,4 @@ pub fn panic(pi: &PanicInfo) -> ! {
 
 pub fn init() {
     stacktrace::init();
-}
-
-mod stacktrace {
-    use core::{arch::asm, slice};
-
-    use goblin::elf64::sym;
-    use limine::request::{KernelAddressRequest, KernelFileRequest};
-    use log::info;
-    use rustc_demangle::demangle;
-
-    use crate::{sprint, sprintln};
-
-    use super::elf::Elf;
-    #[repr(C)]
-    #[derive(Debug, Copy, Clone)]
-    pub struct StackFrame {
-        pub rbp: *const StackFrame,
-        pub rip: *const (),
-    }
-
-    pub fn print_trace() {
-        let mut rbp: *const StackFrame;
-        unsafe {
-            asm!("mov {}, rbp", out(reg) rbp);
-        }
-        while !rbp.is_null() {
-            let frame = unsafe { *rbp };
-            sprint!("{:p}:{:p} = ", frame.rbp, frame.rip);
-            unsafe { symbol_trace(frame.rip) };
-            sprintln!();
-            rbp = frame.rbp;
-        }
-    }
-    static KERNEL_ADDR: KernelAddressRequest = KernelAddressRequest::new();
-    static KERNEL_FILE: KernelFileRequest = KernelFileRequest::new();
-
-    pub unsafe fn symbol_trace(addr: *const ()) {
-        // TODO: This should be put in an init function, along with a Once of the kernel ELF
-        let kernel_ptr = KERNEL_FILE
-            .get_response()
-            .expect("Failed to get kernel file")
-            .file()
-            .addr();
-        let kernel_size = KERNEL_FILE
-            .get_response()
-            .expect("Failed to get kernel file")
-            .file()
-            .size();
-        let kernel_slice = unsafe { slice::from_raw_parts(kernel_ptr, kernel_size as usize) };
-
-        let elf = Elf::new(kernel_slice).expect("Failed to get kernel ELF");
-        let strings = elf.strings().expect("Failed to get kernel strings");
-        let mut symbols = elf.symbols().expect("Failed to get kernel symbols");
-
-        let sym = symbols.find(|sym| {
-            let sym_addr = sym.st_value as *const ();
-            sym_addr <= addr
-                && addr < (sym.st_value as usize + sym.st_size as usize) as *mut ()
-                && sym::st_type(sym.st_info) == sym::STT_FUNC
-        });
-
-        if sym.is_none() {
-            sprint!("UNKNOWN (Unable to find symbol!) ");
-            return;
-        }
-
-        let sym = sym.unwrap();
-
-        let name = unsafe { strings.get_str(sym.st_name as usize) };
-
-        if let Err(err) = name {
-            sprint!("UNKNOWN (name error: {:?})", err);
-            return;
-        }
-
-        let name = name.unwrap();
-
-        let demangled = demangle(name);
-
-        sprint!("{}", demangled);
-    }
-
-    pub fn init() {
-        info!("Initialized stacktrace");
-    }
 }
