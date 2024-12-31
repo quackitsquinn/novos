@@ -12,6 +12,7 @@ use crate::util::OnceMutex;
 pub mod block;
 pub mod block_alloc;
 mod locked_vec;
+mod log;
 
 pub struct RuntimeAllocator {
     pub(crate) blocks: BlockAllocator,

@@ -5,3 +5,7 @@
 /boot
 ## Ignore logs
 **/*.log
+## Ignore output folder
+**/output
+## Output any binary files
+*.bin

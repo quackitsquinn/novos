@@ -8,7 +8,7 @@ use std::{
 
 pub struct Server {
     listener: UnixListener,
-    tty: UnixStream,
+    unix_term_stream: OpaqueCopyRead<UnixStream, File>,
 }
 
 impl Server {
@@ -29,22 +29,27 @@ impl Server {
                 }
             };
 
-            let (tty, _) = listener.accept()?;
+            let (stream, addr) = listener.accept()?;
+            println!("Connected to {:?}", addr);
 
             return Ok(Server {
                 listener: listener,
-                tty,
+                unix_term_stream: OpaqueCopyRead {
+                    dump: File::create("output/tty")?,
+                    inner: stream,
+                },
             });
         }
-        unreachable!()
+        unreachable!();
     }
 
     pub fn run(&mut self) -> Result<(), io::Error> {
+        println!("Server started");
         // First off, we read all bytes from the tty until we encounter a 0xFF byte. This is the handshake byte, so once we read it, we switch to packet mode.
-        read_until_ten_ff(&mut self.tty)?;
+        read_until_ten_ff(&mut self.unix_term_stream)?;
         let mut buf = [0; 1];
         loop {
-            if let Err(e) = self.tty.read_exact(&mut buf) {
+            if let Err(e) = self.unix_term_stream.read_exact(&mut buf) {
                 if e.kind() == io::ErrorKind::UnexpectedEof {
                     break;
                 }
@@ -52,8 +57,8 @@ impl Server {
             }
             match buf[0] {
                 // Both commands are just null-terminated strings, so we can handle them the same way.
-                0x00 | 0x01 => handle_write_string_command(&mut self.tty)?,
-                0x02 => handle_send_file_command(&mut self.tty)?,
+                0x00 | 0x01 => handle_write_string_command(&mut self.unix_term_stream)?,
+                0x02 => handle_send_file_command(&mut self.unix_term_stream)?,
                 0xFF => break,
                 _ => panic!("Invalid command byte"),
             }
@@ -127,4 +132,29 @@ fn read_nul_terminated_str(read: &mut dyn Read) -> io::Result<String> {
         string.push(buf[0] as char);
     }
     Ok(string)
+}
+
+/// A wrapper around a Read that copies all data read from it to another Write.
+struct OpaqueCopyRead<T, D>
+where
+    T: Read,
+    D: Write,
+{
+    dump: D,
+    inner: T,
+}
+
+impl<T, D> Read for OpaqueCopyRead<T, D>
+where
+    T: Read,
+    D: Write,
+{
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        let res = self.inner.read(buf)?;
+        if res == 0 {
+            return Ok(0);
+        }
+        self.dump.write_all(&buf[..res])?;
+        Ok(res)
+    }
 }

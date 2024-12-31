@@ -7,9 +7,12 @@ use core::{
 };
 
 use kserial::common::Command;
-use log::{debug, error, info, trace};
 
-use crate::{debug_release_select, sprintln};
+use crate::{
+    debug_release_select,
+    memory::allocator::log::{alloc_debug, alloc_error, alloc_info, alloc_trace},
+    sprintln,
+};
 
 use super::{block::Block, locked_vec::LockedVec};
 
@@ -86,7 +89,7 @@ impl BlockAllocator {
     unsafe fn push_block(&mut self, block: Block) {
         self.check_block_space();
 
-        trace!("Pushing block {:?}", block);
+        alloc_trace!("Pushing block {:?}", block);
         self.blocks.push(block).expect("Failed to push block");
     }
 
@@ -97,7 +100,7 @@ impl BlockAllocator {
         for block in &*self.blocks {
             let addr = block.address as usize;
             if ptr >= addr && ptr < addr + block.size() {
-                trace!(
+                alloc_trace!(
                     "Found ptr ({:#x}) in block {:#p} (off: {})",
                     ptr,
                     block.address,
@@ -114,7 +117,7 @@ impl BlockAllocator {
         for block in &mut *self.blocks {
             let addr = block.address as usize;
             if ptr >= addr && ptr < addr + block.size() {
-                trace!(
+                alloc_trace!(
                     "Found ptr ({:#x}) in block {:#p} (off: {})",
                     ptr,
                     block.address,
@@ -148,11 +151,11 @@ impl BlockAllocator {
                 panic!("Something has gone horribly wrong");
             }
             if block.is_free() && block.size() + alignment >= size {
-                trace!("Found free block with correct size {:?}", block);
+                alloc_trace!("Found free block with correct size {:?}", block);
                 block.allocate();
                 address = block.address as *mut u8;
                 if block.size() > size + SPLIT_BYTE_INCREASE + alignment {
-                    trace!(
+                    alloc_trace!(
                         "Splitting block at {:?} at offset {}",
                         block,
                         size + alignment
@@ -165,7 +168,7 @@ impl BlockAllocator {
 
         // Because the whole heap is mapped, not finding a block either means that the heap became full or something went horribly wrong.
         if address.is_null() {
-            error!("Failed to allocate block");
+            alloc_error!("Failed to allocate block");
             return ptr::null_mut();
         }
 
@@ -178,25 +181,25 @@ impl BlockAllocator {
         // TODO: It might be a good idea to check if aligning the pointer goes out of bounds.
         let (ptr, _) = unsafe { align_ptr(address, layout.align()) };
 
-        trace!("Returning pointer {:p}", ptr);
+        alloc_trace!("Returning pointer {:p}", ptr);
         ptr
     }
 
     pub unsafe fn deallocate(&mut self, ptr: *mut u8, _: Layout) -> Option<()> {
         if let Some(blk) = unsafe { self.find_block_by_ptr_mut(ptr) } {
-            info!("Deallocating block {:?}", blk);
+            alloc_info!("Deallocating block {:?}", blk);
             if blk.is_free() {
                 // TODO: Should DEFINITELY not panic here. Tis is a temporary debug check.
-                error!("Block already deallocated");
+                alloc_error!("Block already deallocated");
                 return None;
             }
             blk.deallocate();
-            info!("Deallocated block {:?}", blk);
+            alloc_info!("Deallocated block {:?}", blk);
             self.allocation_balance -= 1;
             self.dbg_print_blocks();
             return Some(());
         }
-        error!("Failed to find block for deallocation");
+        alloc_error!("Failed to find block for deallocation");
 
         #[allow(unreachable_code)]
         return None;
@@ -234,7 +237,7 @@ impl BlockAllocator {
             last_free = None;
             i = 0;
         }
-        debug!("Merged {} blocks", merge_total);
+        alloc_debug!("Merged {} blocks", merge_total);
     }
 
     /// Check if a pointer is allocated by the block allocator.
@@ -264,7 +267,7 @@ impl BlockAllocator {
 
     fn dbg_print_blocks(&self) {
         let mx = self.table_block.size() / size_of::<Block>();
-        trace!(
+        alloc_trace!(
             "blkcount {}/{} ({}) umapbal: {}",
             self.blocks.len(),
             mx,
@@ -273,7 +276,7 @@ impl BlockAllocator {
         );
 
         let unalloc_count = self.blocks.iter().filter(|b| b.is_free()).count();
-        trace!(
+        alloc_trace!(
             "unallocs: {} allocs: {}",
             unalloc_count,
             self.blocks.len() - unalloc_count
