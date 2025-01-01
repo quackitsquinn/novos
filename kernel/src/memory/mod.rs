@@ -1,5 +1,5 @@
 use limine::{memory_map::EntryType, paging::Mode, response::MemoryMapResponse};
-use log::info;
+use log::{info, trace};
 use spin::Once;
 use x86_64::{
     registers::control::Cr3,
@@ -141,4 +141,10 @@ fn configure_heap_allocator(
     info!("Initializing {} allocator", alloc_name);
     unsafe { alloc_fn(heap_start.as_u64() as usize, heap_end.as_u64() as usize) };
     info!("{} allocator initialized", alloc_name);
+}
+
+pub unsafe fn phys_to_virt(phys: PhysAddr) -> VirtAddr {
+    let offset = MEMORY_OFFSET.get().expect("Memory offset not set");
+    trace!("Adding {:x} to {:x}", offset, phys.as_u64());
+    VirtAddr::new(phys.as_u64() + MEMORY_OFFSET.get().expect("Memory offset not set"))
 }

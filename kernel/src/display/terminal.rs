@@ -1,16 +1,15 @@
 use core::fmt::Write;
 
-use arrayvec::ArrayVec;
+use alloc::{vec, vec::Vec};
+use log::info;
 
 use crate::{framebuffer, terminal};
 
 use super::{color::Color, screen_char::ScreenChar};
 
-const MAX_HEIGHT: usize = 32;
-const MAX_WIDTH: usize = MAX_HEIGHT * 2;
 pub struct Terminal {
     // x, y -> row, column
-    chars: ArrayVec<ArrayVec<ScreenChar, MAX_HEIGHT>, MAX_WIDTH>,
+    chars: Vec<Vec<ScreenChar>>,
     position: (u32, u32),
     char_size: (u32, u32),
     size: (usize, usize),
@@ -21,7 +20,7 @@ impl Terminal {
     pub fn new() -> Self {
         //   sprintln!("Getting fb size");
         let size = framebuffer!().size();
-        let char_size = ((size.0 / 8) as u32, (size.1 / 8) as u32);
+        let char_size = ((size.0 / 8) as u32 - 1, (size.1 / 8) as u32 - 1);
         let mut s = Self {
             chars: Self::make_vec(char_size),
             position: (0, 0),
@@ -35,15 +34,15 @@ impl Terminal {
         s
     }
 
-    fn make_vec(dim: (u32, u32)) -> ArrayVec<ArrayVec<ScreenChar, MAX_HEIGHT>, MAX_WIDTH> {
-        let mut vec: ArrayVec<ArrayVec<ScreenChar, MAX_HEIGHT>, MAX_WIDTH> = ArrayVec::new();
-        unsafe { vec.set_len(vec.capacity()) };
-        for i in 0..vec.capacity() {
-            let mut v = ArrayVec::new();
-            unsafe { v.set_len(v.capacity()) };
-            // We don't need to initialize the array because the initial state is already zeroed
-            vec[i] = v;
+    fn make_vec(dim: (u32, u32)) -> Vec<Vec<ScreenChar>> {
+        let mut vec: Vec<Vec<ScreenChar>> = Vec::with_capacity(dim.0 as usize);
+
+        for _ in 0..dim.0 {
+            let mut row = Vec::with_capacity(dim.1 as usize);
+            row.fill(ScreenChar::new(' ', Color::new(0, 0, 0)));
+            vec.push(row);
         }
+
         vec
     }
     /// Set the scale of the terminal.
@@ -52,8 +51,8 @@ impl Terminal {
         let old = self.char_size;
 
         self.set_char_size((
-            (self.size.1 / scale as usize * 8) as u32,
-            (self.size.0 / scale as usize * 8) as u32,
+            (self.size.1 / scale as usize * 8) as u32 - 1,
+            (self.size.0 / scale as usize * 8) as u32 - 1,
         ));
 
         unsafe {
@@ -66,7 +65,6 @@ impl Terminal {
     }
 
     fn set_char_size(&mut self, size: (u32, u32)) {
-        let size = (size.0.min(MAX_WIDTH as u32), size.1.min(MAX_HEIGHT as u32));
         self.char_size = size;
     }
 
@@ -76,7 +74,10 @@ impl Terminal {
 
     pub fn shift_up(&mut self) {
         self.chars.remove(0);
-        self.chars.push(ArrayVec::new());
+        self.chars.push(vec![
+            ScreenChar::new(' ', Color::new(0, 0, 0));
+            self.char_size.1 as usize
+        ]);
         self.draw_all();
     }
 
@@ -94,7 +95,6 @@ impl Terminal {
             self.position.1 += 4;
             return;
         }
-
         self.chars[self.position.0 as usize][self.position.1 as usize] = ScreenChar::new(c, color);
         self.draw_char(self.position.0, self.position.1);
         self.update_cursor();
@@ -116,6 +116,7 @@ impl Terminal {
     }
 
     fn newline(&mut self) {
+        info!("Newline");
         if self.position.1 + 1 >= self.char_size.1 {
             self.shift_up();
         } else {
