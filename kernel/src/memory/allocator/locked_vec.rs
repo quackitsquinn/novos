@@ -20,6 +20,7 @@ impl<T> LockedVec<T> {
     /// - The base pointer is valid for reads and writes for `capacity` elements.
     /// - The base pointer is not used for any other purpose while the vector is alive.
     pub unsafe fn new(base: *mut T, capacity: usize) -> Self {
+        assert!(base.is_aligned(), "base pointer must be aligned");
         Self {
             base,
             len: 0,
@@ -155,7 +156,7 @@ mod tests {
     use kproc::test;
 
     // This is kinda gross, but it's easy.
-    static mut ARENA: [u8; 0x1000] = [0; 0x1000];
+    static mut ARENA: [u32; 0x100] = [0; 0x100];
 
     #[test("LockedVec push")]
     fn test_push() {
