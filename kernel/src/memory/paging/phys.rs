@@ -60,7 +60,7 @@ impl PhysicalMap {
             return Err(err.unwrap());
         }
         let phys = self.phys;
-        Ok(unsafe { PhysicalMapLock::new(self, VirtAddr::new(phys.as_u64())) })
+        Ok(unsafe { PhysicalMapLock::new(self, VirtAddr::new(phys.as_u64()), pages) })
     }
 }
 
@@ -68,17 +68,28 @@ impl PhysicalMap {
 pub struct PhysicalMapLock {
     map: PhysicalMap,
     virt: VirtAddr,
+    page_count: usize,
 }
 
 impl PhysicalMapLock {
     /// Create a new physical map lock for the given physical map. The physical map is mapped to the given virtual address.
-    unsafe fn new(map: PhysicalMap, virt: VirtAddr) -> Self {
-        Self { map, virt }
+    unsafe fn new(map: PhysicalMap, virt: VirtAddr, page_count: usize) -> Self {
+        Self {
+            map,
+            virt,
+            page_count,
+        }
     }
 
     /// Get the virtual address of the start of the mapping.
     pub fn virt(&self) -> VirtAddr {
         self.virt
+    }
+
+    pub fn contains(&self, addr: PhysAddr) -> bool {
+        let start = self.map.phys - (self.map.phys.as_u64() % 4096);
+        let end = start + self.page_count as u64 * 4096;
+        addr >= start && addr < end
     }
 }
 
