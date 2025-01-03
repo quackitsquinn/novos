@@ -25,9 +25,12 @@ pub const HEAP_SIZE: u64 = 1024 * 512; // 512 KiB
 pub const TEST_HEAP_MEM_OFFSET: u64 = (u32::from_ne_bytes(*b"TEST") as u64) << 16;
 pub const TEST_HEAP_SIZE: u64 = HEAP_SIZE; // 512 KiB
 
+pub const MISC_MEM_OFFSET: u64 = (u32::from_ne_bytes(*b"MISC") as u64) << 16;
+
 pub fn init() {
     paging::init();
     init_heap();
+    paging::phys::init();
 }
 
 fn init_heap() {

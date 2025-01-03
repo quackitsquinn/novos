@@ -4,6 +4,7 @@ use core::fmt::Arguments;
 /// Each command has a corresponding handler defined in this module.
 /// Modules do *not* send the command id, only the data.
 #[repr(u8)]
+#[must_use = "Commands must be sent to the serial port to have any effect."]
 pub enum Command<'a> {
     /// Write a string to the serial port.
     WriteString(&'a str) = 0,

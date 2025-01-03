@@ -1,3 +1,4 @@
+use log::error;
 use spin::{Mutex, Once};
 use x86_64::{
     set_general_handler,
@@ -24,19 +25,19 @@ pub fn set_custom_handler(index: u8, handler: HandlerFunc) {
 
 // General handler
 fn general_handler(stack_frame: InterruptStackFrame, index: u8, error_code: Option<u64>) {
-    println!("Interrupt: {} ({})", index, BASIC_HANDLERS[index as usize]);
-    println!("Error code: {:?}", error_code);
-    println!("{:?}", stack_frame);
+    error!("Interrupt: {} ({})", index, BASIC_HANDLERS[index as usize]);
+    error!("Error code: {:?}", error_code);
+    error!("{:?}", stack_frame);
 }
 
 extern "x86-interrupt" fn page_fault_handler(
     stack_frame: InterruptStackFrame,
     error_code: PageFaultErrorCode,
 ) {
-    println!("Page fault");
-    println!("Error code: {:?}", error_code);
-    println!("{:?}", stack_frame);
-    crate::hlt_loop();
+    error!("Page fault");
+    error!("Error code: {:?}", error_code);
+    error!("{:?}", stack_frame);
+    panic!("Page fault");
 }
 
 pub fn init() {
