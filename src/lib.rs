@@ -42,7 +42,7 @@ impl Config {
             .spawn()
             .expect("qemu-system-x86_64 failed to start");
 
-        let mut stdout = qemu.stdout.take().expect("Failed to get stdout");
+        let stdout = qemu.stdout.take().expect("Failed to get stdout");
         let stderr = qemu.stderr.take().expect("Failed to get stderr");
 
         packet_handler::run(&PathBuf::from("target/serial0.sock"));
@@ -150,37 +150,4 @@ fn spawn_out_handler_inner(out: Box<dyn Read>, name: String, print: bool) {
         f.write_all(&buf).expect("Failed to write to file");
         buf.clear();
     }
-}
-/// Finds the pty path in the qemu output. In the format of (path, name)
-fn find_pty(reader: &mut dyn Read) -> Option<(PathBuf, String)> {
-    let mut br = std::io::BufReader::new(&mut *reader);
-    let mut buf = String::new();
-    let line = br.read_line(&mut buf);
-    if line.is_err() {
-        println!("Failed to read line: {:?}", line.err());
-        return None;
-    }
-    let line = line.unwrap();
-    if line == 0 {
-        println!("No data read");
-        return None;
-    }
-    let line = buf.trim();
-    println!("Read line: {}", line);
-    if line.starts_with("char device redirected to ") {
-        let path = line
-            .trim_start_matches("char device redirected to ")
-            .split_whitespace()
-            .next()?;
-        if line.contains("monitor") {
-            println!("Found monitor pty: {}", path);
-            return find_pty(reader);
-        }
-        // char device redirected to /dev/ttys005 (label serial0)
-        // serial0)
-        // serial0
-        let name = line.split_whitespace().last()?.trim_end_matches(')');
-        return Some((PathBuf::from(path), name.to_string()));
-    }
-    None
 }

@@ -12,7 +12,7 @@ use novos::Config;
 fn main() {
     let args = std::env::args().collect::<Vec<String>>();
 
-    let mut test_args = args[1..].to_vec();
+    let test_args = args[1..].to_vec();
 
     let kernel_path = build_tests(test_args);
 
@@ -79,7 +79,7 @@ fn build_tests(test_args: Vec<String>) -> PathBuf {
 }
 
 fn make_test_iso(kernel_path: PathBuf) {
-    let mut cfg = KConfig::new(
+    let cfg = KConfig::new(
         "target/artifacts".parse().unwrap(),
         kernel_path,
         "boot_cfg/test.conf".parse().unwrap(),

@@ -1,10 +1,4 @@
-use std::{
-    fs::{File, OpenOptions},
-    io::{Read, Write},
-    os::unix::net::UnixStream,
-    path::PathBuf,
-    thread,
-};
+use std::path::PathBuf;
 
 use kserial::server::Server;
 
