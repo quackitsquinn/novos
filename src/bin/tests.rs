@@ -17,8 +17,10 @@ fn main() {
     let kernel_path = build_tests(test_args);
 
     println!("Built tests at {:?}", kernel_path);
-    println!("Creating iso");
-    make_test_iso(kernel_path);
+    if kernel_path.1 {
+        println!("Creating iso");
+        make_test_iso(kernel_path.0);
+    }
     println!("Running tests");
 
     let mut cfg = Config::default();
@@ -32,7 +34,8 @@ fn main() {
 }
 
 /// Builds the test kernel and returns the path to the kernel binary
-fn build_tests(test_args: Vec<String>) -> PathBuf {
+/// Returns the path to the kernel binary, and if it was freshly built
+fn build_tests(test_args: Vec<String>) -> (PathBuf, bool) {
     let cmd = std::process::Command::new("cargo")
         .args(&[
             "build",
@@ -70,7 +73,8 @@ fn build_tests(test_args: Vec<String>) -> PathBuf {
         if json["reason"] == "build-finished" {
             if json["success"] == true {
                 let path = last_artifact["executable"].as_str().unwrap();
-                return PathBuf::from(path);
+                let fresh = last_artifact["fresh"].as_bool().unwrap();
+                return (PathBuf::from(path), fresh);
             }
         }
     }

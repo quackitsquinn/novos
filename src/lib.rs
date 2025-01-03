@@ -6,6 +6,8 @@ use std::{
     process::{Command, Stdio},
 };
 
+use ovmf_prebuilt::Source;
+
 mod packet_handler;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -16,6 +18,8 @@ pub struct Config {
     pub memory: String,
     pub serial: Vec<String>,
     pub dev_exit: bool,
+    /// Path to the UEFI code and variables images
+    pub uefi_img: Option<(PathBuf, PathBuf)>,
     pub extra_args: Vec<String>,
 }
 
@@ -30,6 +34,7 @@ impl Config {
         self.add_memory(&mut args);
         self.add_serial_ports(&mut args);
         self.add_extra_args(&mut args);
+        self.uefi(&mut args);
 
         if env::var("VERBOSE").is_ok() {
             println!("Running qemu with args: {:?}", args);
@@ -61,6 +66,7 @@ impl Config {
             serial: Vec::new(),
             dev_exit: false,
             extra_args: Vec::new(),
+            uefi_img: None,
         }
     }
 
@@ -101,6 +107,21 @@ impl Config {
         args.push("-chardev".to_string());
         args.push(format!("socket,path={},server=off,id=output", path));
     }
+
+    fn uefi(&mut self, args: &mut Vec<String>) {
+        if let Some(uefi_img) = &self.uefi_img {
+            args.push("-drive".to_string());
+            args.push(format!(
+                "file={},format=raw,if=pflash",
+                uefi_img.0.display()
+            ));
+            args.push("-drive".to_string());
+            args.push(format!(
+                "file={},format=raw,if=pflash",
+                uefi_img.1.display()
+            ));
+        }
+    }
 }
 
 impl Default for Config {
@@ -110,12 +131,21 @@ impl Default for Config {
         let no_display = env::var("NO_DISPLAY").is_ok();
         let kernel_mem = env::var("KERNEL_MEM").unwrap_or("1G".to_string());
         let iso_path = env::var("ISO").unwrap_or("boot_images/novaos.iso".to_string());
+        let mut uefi_img = None;
+        if env::var("USE_UEFI").is_ok() {
+            let pre = ovmf_prebuilt::Prebuilt::fetch(Source::LATEST, "target/uefi").unwrap();
+            uefi_img = Some((
+                pre.get_file(ovmf_prebuilt::Arch::X64, ovmf_prebuilt::FileType::Code),
+                pre.get_file(ovmf_prebuilt::Arch::X64, ovmf_prebuilt::FileType::Vars),
+            ));
+        }
         let mut cfg = Config::empty();
         cfg.iso = iso_path;
         cfg.memory = kernel_mem;
         cfg.dev_exit = no_display || debug_mode;
         cfg.graphics = !no_display;
         cfg.wait_for_debugger = debug_mode;
+        cfg.uefi_img = uefi_img;
         if !no_display {
             // This breaks stuff if we don't have a display
             cfg.serial.push("stdio".to_string());
