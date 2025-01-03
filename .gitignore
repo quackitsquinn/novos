@@ -9,3 +9,5 @@
 **/output
 ## Output any binary files
 *.bin
+## Ignore kernel images
+boot_images/
