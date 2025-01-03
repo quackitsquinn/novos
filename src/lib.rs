@@ -109,12 +109,7 @@ impl Default for Config {
         let debug_mode = env::var("DEBUG").is_ok();
         let no_display = env::var("NO_DISPLAY").is_ok();
         let kernel_mem = env::var("KERNEL_MEM").unwrap_or("1G".to_string());
-        let iso = if debug_mode || no_display {
-            "novos_debug.iso"
-        } else {
-            "novos.iso"
-        };
-        let iso_path = format!("target/artifacts/{}", iso);
+        let iso_path = env::var("ISO").unwrap_or("boot_images/novaos.iso".to_string());
         let mut cfg = Config::empty();
         cfg.iso = iso_path;
         cfg.memory = kernel_mem;

@@ -130,6 +130,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "jzon"
+version = "0.12.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "17ab85f84ca42c5ec520e6f3c9966ba1fd62909ce260f8837e248857d2560509"
+
+[[package]]
+name = "kbuild"
+version = "0.1.0"
+
+[[package]]
 name = "kernel"
 version = "0.1.0"
 dependencies = [
@@ -279,6 +289,8 @@ version = "0.1.0"
 dependencies = [
  "backtrace",
  "ctrlc",
+ "jzon",
+ "kbuild",
  "kernel",
  "kserial",
  "lazy_static",

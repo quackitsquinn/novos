@@ -25,6 +25,7 @@ rustc-demangle = { version = "0.1.24", default-features = false }
 
 [profile.release]
 panic = "abort"
+debug = true
 
 [profile.dev]
 panic = "abort"

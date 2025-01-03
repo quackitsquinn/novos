@@ -4,3 +4,7 @@ bindeps = true
 [build]
 # Include frame pointers for better backtraces. This is here and not target.x86_64-unknown-none because that doesn't apply to tests
 rustflags = ["-Cforce-frame-pointers=true", "-Cdebuginfo=2"]
+
+
+[alias]
+"ktest" = "run --bin tests --"

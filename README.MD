@@ -22,6 +22,8 @@ cargo run --bin bios_boot
 
 All debugging is done through environment variables. The following environment variables are supported:
 
+TODO: There's a few more (look in kbuild/src/config.rs for most of the new ones) so update this list
+
 - `ALLOC_DEBUG`: If set, will print out information about memory allocations and deallocations.
 - `DEBUG`: If set, QEMU will wait for a debugger to attach on port 1234.
 - `QEMU_FLAGS`: Additional flags to pass to QEMU.
