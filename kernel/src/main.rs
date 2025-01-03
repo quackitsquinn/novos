@@ -18,6 +18,7 @@ pub extern "C" fn _start() -> ! {
 
     println!("Hello, world!");
     println!("Welcome to NovOS!");
+    println!("This is a very long line. This will test that the framebuffer SHOULD NOT, I repeat SHOULD NOT crash. blah blah blah blah blah blah blah");
 
     kernel::hlt_loop()
 }

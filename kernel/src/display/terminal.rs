@@ -3,7 +3,7 @@ use core::fmt::Write;
 use alloc::{vec, vec::Vec};
 use log::info;
 
-use crate::{framebuffer, terminal};
+use crate::{framebuffer, sprintln, terminal};
 
 use super::{color::Color, screen_char::ScreenChar};
 
@@ -51,9 +51,11 @@ impl Terminal {
         let old = self.char_size;
 
         self.set_char_size((
-            (self.size.1 / scale as usize * 8) as u32 - 1,
-            (self.size.0 / scale as usize * 8) as u32 - 1,
+            (self.size.0 / (8 * scale as usize)) as u32 - 1,
+            (self.size.1 / (8 * scale as usize)) as u32 - 1,
         ));
+
+        sprintln!("Old: {:?}, New: {:?}", old, self.char_size);
 
         unsafe {
             self.chars.set_len(self.char_size.0 as usize);
@@ -73,11 +75,10 @@ impl Terminal {
     }
 
     pub fn shift_up(&mut self) {
-        self.chars.remove(0);
-        self.chars.push(vec![
-            ScreenChar::new(' ', Color::new(0, 0, 0));
-            self.char_size.1 as usize
-        ]);
+        for mut line in &mut self.chars {
+            line.remove(0);
+            line.push(ScreenChar::new(' ', Color::new(0, 0, 0)));
+        }
         self.draw_all();
     }
 
@@ -94,6 +95,10 @@ impl Terminal {
         if c == '\t' {
             self.position.1 += 4;
             return;
+        }
+
+        if self.position.0 >= self.char_size.0 {
+            self.newline();
         }
         self.chars[self.position.0 as usize][self.position.1 as usize] = ScreenChar::new(c, color);
         self.draw_char(self.position.0, self.position.1);
@@ -145,7 +150,7 @@ impl Terminal {
         );
     }
 
-    fn draw_all(&self) {
+    fn draw_all(&mut self) {
         for (i, row) in self.chars.iter().enumerate() {
             for (j, _) in row.iter().enumerate() {
                 self.draw_char(i as u32, j as u32);
