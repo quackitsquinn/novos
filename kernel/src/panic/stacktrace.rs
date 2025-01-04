@@ -6,7 +6,7 @@ use log::info;
 use rustc_demangle::demangle;
 use spin::Once;
 
-use crate::{sprint, sprintln};
+use crate::{print, println, sprint, sprintln};
 
 use super::elf::Elf;
 #[repr(C)]
@@ -23,9 +23,9 @@ pub fn print_trace() {
     }
     while !rbp.is_null() {
         let frame = unsafe { *rbp };
-        sprint!("{:p}:{:p} = ", frame.rbp, frame.rip);
+        print!("{:p}:{:p} = ", frame.rbp, frame.rip);
         unsafe { symbol_trace(frame.rip) };
-        sprintln!();
+        println!();
         rbp = frame.rbp;
     }
 }
@@ -35,7 +35,7 @@ static KERNEL_FILE_REQUEST: KernelFileRequest = KernelFileRequest::new();
 static KERNEL_FILE: Once<&[u8]> = Once::new();
 
 pub unsafe fn symbol_trace(addr: *const ()) {
-    sprint!("{}", fmt_symbol(addr));
+    print!("{}", fmt_symbol(addr));
 }
 
 unsafe fn sym_trace_inner(addr: *const (), writer: &mut dyn Write) {

@@ -44,8 +44,12 @@ pub fn panic_extended_info(pi: &PanicInfo) {
     // Safety: We are in a panic, so the allocator should be completely halted
     let alloc = unsafe { allocator::ALLOCATOR.force_get() };
     alloc.blocks.print_state();
+    // Drop the allocator so that it isn't locked when we print to the screen
+    drop(alloc);
     println!("Sending heap state to serial");
+    let alloc = unsafe { allocator::ALLOCATOR.force_get() };
     alloc.blocks.export_block_binary("heap.raw");
+    drop(alloc);
     if cfg!(test) {
         println!("Test heap:");
         // Safety: Same as above

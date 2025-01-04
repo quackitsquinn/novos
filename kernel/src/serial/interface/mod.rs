@@ -17,18 +17,12 @@ pub static PORT_HAS_INIT: Once<()> = Once::new();
 impl SerialAdapter for OnceMutex<Serial> {
     // HACK: All the .force_unlock() calls are to unlock the port, which is weird. I don't know why it's locked in the first place, but this fixed the previous issue.
     fn send(&self, data: u8) {
-        unsafe {
-            self.force_unlock();
-            let mut s = self.get();
+        let mut s = self.get();
 
-            s.get_inner().send_raw(data);
-        }
+        unsafe { s.get_inner().send_raw(data) };
     }
 
     fn send_slice(&self, data: &[u8]) {
-        unsafe {
-            self.force_unlock();
-        }
         let mut s = self.get();
         let serial = unsafe { s.get_inner() };
         for byte in data {
@@ -37,17 +31,11 @@ impl SerialAdapter for OnceMutex<Serial> {
     }
 
     fn read(&self) -> u8 {
-        unsafe {
-            self.force_unlock();
-        }
         let mut s = self.get();
         unsafe { s.get_inner().receive() }
     }
 
     fn read_slice(&self, data: &mut [u8]) -> usize {
-        unsafe {
-            self.force_unlock();
-        }
         let mut s = self.get();
         let serial = unsafe { s.get_inner() };
         let mut i = 0;
@@ -72,6 +60,7 @@ pub fn init() {
 pub fn _print(args: core::fmt::Arguments) {
     let mut serial = SERIAL_PORT.get();
     if serial.has_packet_support() {
+        drop(serial);
         //writeln!(serial, "AUIFNHAWERIOUGHAWEJIOGJAEHLUIGNAWOI").unwrap();
         Command::WriteArguments(&args).send();
     } else {
