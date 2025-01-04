@@ -30,7 +30,7 @@ impl Terminal {
         };
         // sprintln!("Setting scale");
         // Default to 2x scale because 90% of the time 8px is too small
-        s.set_scale(2);
+        s.set_scale(1);
         s
     }
 
@@ -75,11 +75,12 @@ impl Terminal {
     }
 
     pub fn shift_up(&mut self) {
+        let mut last = self.chars.clone();
         for mut line in &mut self.chars {
             line.remove(0);
             line.push(ScreenChar::new(' ', Color::new(0, 0, 0)));
         }
-        self.draw_all();
+        self.blit_update(last);
     }
 
     pub fn push_char(&mut self, c: char, color: Color) {
@@ -121,7 +122,6 @@ impl Terminal {
     }
 
     fn newline(&mut self) {
-        info!("Newline");
         if self.position.1 + 1 >= self.char_size.1 {
             self.shift_up();
         } else {
@@ -154,6 +154,16 @@ impl Terminal {
         for (i, row) in self.chars.iter().enumerate() {
             for (j, _) in row.iter().enumerate() {
                 self.draw_char(i as u32, j as u32);
+            }
+        }
+    }
+
+    fn blit_update(&mut self, last: Vec<Vec<ScreenChar>>) {
+        for (i, row) in self.chars.iter().enumerate() {
+            for (j, _) in row.iter().enumerate() {
+                if self.chars[i][j] != last[i][j] {
+                    self.draw_char(i as u32, j as u32);
+                }
             }
         }
     }

@@ -2,7 +2,7 @@
 //!
 //! This module is based off of the uart_16550 crate, which is a driver for the 16550 UART chip.
 
-use crate::sprintln;
+use crate::{display::TERMINAL, println, sprintln};
 
 pub mod interface;
 pub mod raw; // Things to interact with the serial port directly
@@ -18,6 +18,15 @@ impl log::Log for SerialLog {
 
     fn log(&self, record: &log::Record) {
         if self.enabled(record.metadata()) {
+            if TERMINAL.is_initialized() && !TERMINAL.is_locked() {
+                println!(
+                    "[{}] {}: {}",
+                    record.level(),
+                    record.target(),
+                    record.args()
+                );
+                return;
+            }
             sprintln!(
                 "[{}] {}: {}",
                 record.level(),

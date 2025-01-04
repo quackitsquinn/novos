@@ -60,7 +60,7 @@ impl Server {
                 0x00 | 0x01 => handle_write_string_command(&mut self.unix_term_stream)?,
                 0x02 => handle_send_file_command(&mut self.unix_term_stream)?,
                 0xFF => break,
-                _ => panic!("Invalid command byte"),
+                _ => eprintln!("Invalid byte: {}", buf[0]),
             }
         }
         Ok(())

@@ -51,6 +51,10 @@ impl<'a, T> OnceMutex<T> {
         self.mutex().is_locked()
     }
 
+    pub fn is_initialized(&self) -> bool {
+        self.inner.is_completed()
+    }
+
     pub unsafe fn force_unlock(&self) {
         unsafe { self.mutex().force_unlock() }
     }
@@ -59,7 +63,10 @@ impl<'a, T> OnceMutex<T> {
         unsafe {
             self.force_unlock();
         }
-        self.get()
+        let t = self.get();
+        // Set the caller to the correct value
+        self.caller.lock().replace(get_caller_rip());
+        t
     }
 }
 
