@@ -17,6 +17,7 @@ use limine::request::StackSizeRequest;
 use log::info;
 pub(crate) use spin::Once;
 
+pub mod acpi;
 pub mod display;
 mod gdt;
 pub mod interrupts;
@@ -111,6 +112,8 @@ pub fn init_kernel() {
         display::init();
         DISPLAY_INITIALIZED.call_once(|| ());
     }
+
+    acpi::init();
     info!("Kernel initialized");
 
     let _ = debug_release_select!(
