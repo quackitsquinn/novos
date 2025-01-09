@@ -34,12 +34,16 @@ impl PhysicalMap {
         let mut mapper = OFFSET_PAGE_TABLE.get();
         let mut frame_allocator = FRAME_ALLOCATOR.get();
 
-        if PHYSICAL_MAPS
+        todo!("This whole module needs to be reimplemented with the virtual memory allocator");
+
+        if let Some((res, page)) = PHYSICAL_MAPS
             .get()
             .iter()
-            .any(|(map, _)| map.phys == self.phys)
+            .find(|(map, _)| map.contains(self.phys, 0))
         {
-            return Err(PhysMapError::AlreadyMapped);
+            if res.contains(self.phys, self.size as u64) {
+                /* return PhysicalMapResult::new(*res, *page, 0); */
+            }
         }
         // First, we need to find how many pages we need to map. It will 90% just be one page, but we need to be sure.
         // If size is > 4096 we know we need to map at least 2 pages.
@@ -81,7 +85,17 @@ impl PhysicalMap {
                 Err(e) => err = Some(e),
             });
 
-        Ok(unsafe { PhysicalMapResult::new(self, virt.expect("no map") + page_offset, pages) })
+        info!(
+            "Mapped physical memory {:?} to {:?} with {} pages",
+            self.phys, virt, pages
+        );
+        Ok(unsafe { PhysicalMapResult::new(self, pages, virt.expect("no map").as_u64() as usize) })
+    }
+
+    fn contains(&self, addr: PhysAddr, size: u64) -> bool {
+        let start = self.phys;
+        let end = start + self.size as u64;
+        addr >= start && addr < end && addr + size <= end
     }
 }
 
@@ -90,15 +104,18 @@ pub struct PhysicalMapResult {
     map: PhysicalMap,
     virt: VirtAddr,
     page_count: usize,
+    page_base: *const (),
 }
 
 impl PhysicalMapResult {
     /// Create a new physical map lock for the given physical map. The physical map is mapped to the given virtual address.
-    unsafe fn new(map: PhysicalMap, virt: VirtAddr, page_count: usize) -> Self {
+    unsafe fn new(map: PhysicalMap, page_count: usize, page_base: usize) -> Self {
+        let virt = VirtAddr::new((map.phys.as_u64() % 4096) + page_base as u64);
         let n = Self {
             map,
             virt,
             page_count,
+            page_base: page_base as *const (),
         };
         PHYSICAL_MAPS
             .get()
@@ -111,10 +128,30 @@ impl PhysicalMapResult {
         self.virt
     }
 
-    pub fn contains(&self, addr: PhysAddr) -> bool {
+    pub fn contains(&self, addr: PhysAddr, size: u64) -> bool {
         let start = self.map.phys - (self.map.phys.as_u64() % 4096);
         let end = start + self.page_count as u64 * 4096;
-        addr >= start && addr < end
+        addr >= start && addr < end && addr + size <= end
+    }
+
+    pub fn unmap(self) -> PhysicalMap {
+        let mut mapper = OFFSET_PAGE_TABLE.get();
+        let mut phys_maps = PHYSICAL_MAPS.get();
+
+        let index = phys_maps
+            .iter()
+            .position(|(map, _)| map.phys == self.map.phys)
+            .expect("Could not find physical map");
+
+        phys_maps.remove(index);
+
+        for i in 0..self.page_count {
+            let page: Page<Size4KiB> = Page::containing_address(self.virt + i as u64 * 4096);
+
+            let res = mapper.unmap(page).expect("Could not unmap physical memory");
+            res.1.flush();
+        }
+        self.map
     }
 }
 

@@ -30,6 +30,7 @@ pub const MISC_MEM_OFFSET: u64 = (u32::from_ne_bytes(*b"MISC") as u64) << 16;
 pub fn init() {
     paging::init();
     init_heap();
+    paging::virt::init();
     paging::phys::init();
 }
 

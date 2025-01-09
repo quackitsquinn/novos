@@ -9,7 +9,7 @@ use x86_64::{
     structures::paging::{
         mapper::{MapToError, MapperFlush},
         FrameAllocator, Mapper, OffsetPageTable, Page, PageTable, PageTableFlags, PhysFrame,
-        Size4KiB,
+        Size4KiB, Translate,
     },
     PhysAddr, VirtAddr,
 };
@@ -17,6 +17,7 @@ use x86_64::{
 use crate::{sprintln, util::OnceMutex};
 
 pub mod phys;
+pub mod virt;
 
 #[used]
 static PAGE_TABLE_REQUEST: limine::request::PagingModeRequest =
@@ -105,4 +106,5 @@ pub(super) fn init() {
     FRAME_ALLOCATOR.init(PageFrameAllocator::new(
         MEMORY_MAP_REQUEST.get_response().unwrap(),
     ));
+    info!("Loading virt map");
 }
