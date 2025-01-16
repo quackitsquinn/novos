@@ -1,4 +1,5 @@
 use std::{
+    env,
     io::{self, BufRead},
     path::PathBuf,
     process::Stdio,
@@ -17,7 +18,7 @@ fn main() {
     let kernel_path = build_tests(test_args);
 
     println!("Built tests at {:?}", kernel_path);
-    if kernel_path.1 {
+    if kernel_path.1 || env::var("REBUILD").is_ok() {
         println!("Creating iso");
         make_test_iso(kernel_path.0);
     }
