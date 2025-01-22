@@ -1,4 +1,3 @@
-use core::error;
 
 use limine::{memory_map::EntryType, paging::Mode, response::MemoryMapResponse};
 use log::{error, info};
@@ -8,12 +7,12 @@ use x86_64::{
     structures::paging::{
         mapper::{MapToError, MapperFlush},
         FrameAllocator, Mapper, OffsetPageTable, Page, PageTable, PageTableFlags, PhysFrame,
-        Size4KiB, Translate,
+        Size4KiB,
     },
     PhysAddr, VirtAddr,
 };
 
-use crate::{sprintln, util::OnceMutex};
+use crate::util::OnceMutex;
 
 pub mod virt;
 

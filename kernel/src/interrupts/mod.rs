@@ -11,7 +11,7 @@ use x86_64::{
 
 pub mod hardware;
 
-use crate::{declare_module, println, util::KernelModule};
+use crate::declare_module;
 
 static IDT: Once<InterruptDescriptorTable> = Once::new();
 // no clue if i will use these (or even how) but they are here

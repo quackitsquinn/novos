@@ -1,12 +1,11 @@
 use core::{arch::asm, fmt::Write, slice};
 
 use goblin::elf64::sym;
-use limine::request::{KernelAddressRequest, KernelFileRequest};
-use log::info;
+use limine::request::KernelFileRequest;
 use rustc_demangle::demangle;
 use spin::Once;
 
-use crate::{print, println, sprint, sprintln};
+use crate::{print, println};
 
 use super::elf::Elf;
 #[repr(C)]

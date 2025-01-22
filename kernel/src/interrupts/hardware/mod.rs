@@ -3,7 +3,7 @@ use core::convert::Infallible;
 use pic8259::ChainedPics;
 use spin::Mutex;
 
-use crate::{declare_module, sprintln, util::KernelModule};
+use crate::declare_module;
 
 pub mod timer;
 

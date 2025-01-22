@@ -1,21 +1,15 @@
 use core::convert::Infallible;
 
-use crate::{declare_module, memory::paging::OFFSET_PAGE_TABLE, util::OnceMutex};
+use crate::{declare_module, util::OnceMutex};
 
 pub mod range;
 pub mod virt_alloc;
 
 use alloc::vec;
-use log::info;
 pub use range::VirtualAddressRange;
 use virt_alloc::VirtualAddressMapper;
-use x86_64::{
-    registers::control::Cr3,
-    structures::paging::{page, PageTable, PageTableFlags},
-    VirtAddr,
-};
+use x86_64::VirtAddr;
 
-use super::MEMORY_OFFSET;
 
 pub static VIRT_MAPPER: OnceMutex<VirtualAddressMapper> = OnceMutex::new();
 //

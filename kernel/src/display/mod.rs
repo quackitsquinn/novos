@@ -11,7 +11,7 @@ pub mod terminal;
 
 pub use character::get_char;
 
-use crate::{declare_module, sprintln, util::OnceMutex};
+use crate::{declare_module, util::OnceMutex};
 
 pub static LIMINE_FRAMEBUFFERS: FramebufferRequest = FramebufferRequest::new();
 

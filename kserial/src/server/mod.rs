@@ -7,6 +7,7 @@ use std::{
 };
 
 pub struct Server {
+    #[allow(dead_code)]
     listener: UnixListener,
     unix_term_stream: OpaqueCopyRead<UnixStream, File>,
 }
@@ -14,8 +15,8 @@ pub struct Server {
 impl Server {
     /// Creates a new server with the given path. The path should be a path to a Unix socket.
     pub fn new(path: &Path) -> Result<Self, io::Error> {
-        fs::remove_file(path);
-        fs::create_dir("output");
+        let _ = fs::remove_file(path);
+        let _ = fs::create_dir("output");
         for i in 0..10 {
             let listener = match UnixListener::bind(path) {
                 Ok(tty) => tty,
@@ -68,8 +69,7 @@ impl Server {
 }
 
 fn handle_write_string_command(read: &mut dyn Read) -> io::Result<()> {
-    let mut buf = [0; 1];
-    let mut string = read_nul_terminated_str(read)?;
+    let string = read_nul_terminated_str(read)?;
     print!("{}", string);
     flush();
     Ok(())
@@ -77,8 +77,7 @@ fn handle_write_string_command(read: &mut dyn Read) -> io::Result<()> {
 
 fn handle_send_file_command(read: &mut dyn Read) -> io::Result<()> {
     println!("Handling send file command");
-    let mut buf = [0; 1];
-    let mut filename = read_nul_terminated_str(read)?;
+    let filename = read_nul_terminated_str(read)?;
 
     let mut file = std::fs::OpenOptions::new()
         .write(true)

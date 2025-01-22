@@ -1,8 +1,4 @@
-use std::{
-    fs,
-    path::{Path, PathBuf},
-    process::Command,
-};
+use std::{fs, path::PathBuf};
 
 use kbuild::config::Config;
 

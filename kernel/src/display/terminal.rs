@@ -1,9 +1,9 @@
 use core::fmt::Write;
 
-use alloc::{vec, vec::Vec};
-use log::{debug, info};
+use alloc::vec::Vec;
+use log::debug;
 
-use crate::{framebuffer, sprintln, terminal};
+use crate::{framebuffer, terminal};
 
 use super::{color::Color, screen_char::ScreenChar};
 
@@ -75,8 +75,8 @@ impl Terminal {
     }
 
     pub fn shift_up(&mut self) {
-        let mut last = self.chars.clone();
-        for mut line in &mut self.chars {
+        let last = self.chars.clone();
+        for line in &mut self.chars {
             line.remove(0);
             line.push(ScreenChar::new(' ', Color::new(0, 0, 0)));
         }

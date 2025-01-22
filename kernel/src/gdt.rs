@@ -1,4 +1,4 @@
-use core::{convert::Infallible, ptr::addr_of};
+use core::convert::Infallible;
 
 use lazy_static::lazy_static;
 use x86_64::{

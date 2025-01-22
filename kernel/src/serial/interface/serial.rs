@@ -1,10 +1,7 @@
-use core::{fmt::Write, time::Duration};
+use core::fmt::Write;
 
-use kserial::{client, common::Command};
-use log::info;
-use spin::Once;
 
-use crate::{interrupts::hardware::timer::Timer, serial::raw::SerialPort, util::OnceMutex};
+use crate::serial::raw::SerialPort;
 
 pub struct Serial {
     port: SerialPort,

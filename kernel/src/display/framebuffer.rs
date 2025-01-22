@@ -1,7 +1,6 @@
 use limine::framebuffer::Framebuffer as LimineFramebuffer;
 use log::info;
 
-use crate::sprintln;
 
 use super::color::Color;
 /// A representation of a framebuffer.

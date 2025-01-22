@@ -1,6 +1,5 @@
 use core::{convert::Infallible, fmt::Write, panic::PanicInfo};
 
-use log::error;
 use spin::Once;
 
 use crate::{
@@ -9,7 +8,6 @@ use crate::{
     print, println,
     serial::{self, raw::SerialPort},
     testing,
-    util::KernelModule,
 };
 
 mod elf;

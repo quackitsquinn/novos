@@ -1,21 +1,16 @@
 use core::convert::Infallible;
 
-use alloc::format;
-use kserial::common::Command;
-use limine::{memory_map::EntryType, paging::Mode, response::MemoryMapResponse};
 use log::{info, trace};
-use paging::{FRAME_ALLOCATOR, MEMORY_OFFSET, OFFSET_PAGE_TABLE};
-use spin::Once;
+use paging::{FRAME_ALLOCATOR, MEMORY_OFFSET};
 use x86_64::{
-    registers::control::Cr3,
     structures::paging::{
-        mapper::MapperFlush, page::PageRangeInclusive, FrameAllocator, Mapper, OffsetPageTable,
-        Page, PageTable, PageTableFlags, PhysFrame, Size4KiB,
+        page::PageRangeInclusive,
+        Page, PageTableFlags, Size4KiB,
     },
     PhysAddr, VirtAddr,
 };
 
-use crate::{declare_module, sprintln, util::OnceMutex};
+use crate::declare_module;
 
 pub mod allocator;
 pub mod paging;
