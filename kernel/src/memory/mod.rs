@@ -1,3 +1,5 @@
+use core::convert::Infallible;
+
 use alloc::format;
 use kserial::common::Command;
 use limine::{memory_map::EntryType, paging::Mode, response::MemoryMapResponse};
@@ -13,7 +15,7 @@ use x86_64::{
     PhysAddr, VirtAddr,
 };
 
-use crate::{sprintln, util::OnceMutex};
+use crate::{declare_module, sprintln, util::OnceMutex};
 
 pub mod allocator;
 pub mod paging;
@@ -27,11 +29,14 @@ pub const TEST_HEAP_SIZE: u64 = HEAP_SIZE; // 512 KiB
 
 pub const MISC_MEM_OFFSET: u64 = (u32::from_ne_bytes(*b"MISC") as u64) << 16;
 
-pub fn init() {
+declare_module!("memory", init);
+
+fn init() -> Result<(), Infallible> {
+    // TODO: Update to KernelModule
     paging::init();
     init_heap();
-    paging::virt::init();
-    paging::phys::init();
+    paging::virt::MODULE.init();
+    Ok(())
 }
 
 fn init_heap() {

@@ -2,7 +2,6 @@ use core::error;
 
 use limine::{memory_map::EntryType, paging::Mode, response::MemoryMapResponse};
 use log::{error, info};
-use phys::PhysicalMap;
 use spin::Once;
 use x86_64::{
     registers::control::Cr3,
@@ -16,7 +15,6 @@ use x86_64::{
 
 use crate::{sprintln, util::OnceMutex};
 
-pub mod phys;
 pub mod virt;
 
 #[used]
@@ -78,11 +76,6 @@ impl PageFrameAllocator {
     ) -> Result<MapperFlush<Size4KiB>, MapToError<Size4KiB>> {
         let mut pgtbl = OFFSET_PAGE_TABLE.get();
         unsafe { pgtbl.identity_map(frame, flags, &mut *self) }
-    }
-    // probably need to implement unmap_page and unmap_phys
-    pub fn unmap_phys(&mut self, phys: PhysicalMap) -> Result<(), &'static str> {
-        let mut pgtbl = OFFSET_PAGE_TABLE.get();
-        todo!()
     }
 }
 

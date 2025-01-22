@@ -1,4 +1,5 @@
 use limine::framebuffer::Framebuffer as LimineFramebuffer;
+use log::info;
 
 use crate::sprintln;
 
@@ -24,7 +25,7 @@ impl Framebuffer {
             panic!("Framebuffers with less than 3 bytes per pixel are not supported.");
         }
 
-        sprintln!(
+        info!(
             "Framebuffer: {}x{} {}bpp ({})",
             fb.width(),
             fb.height(),

@@ -1,7 +1,7 @@
 use core::fmt::Write;
 
 use alloc::{vec, vec::Vec};
-use log::info;
+use log::{debug, info};
 
 use crate::{framebuffer, sprintln, terminal};
 
@@ -55,7 +55,7 @@ impl Terminal {
             (self.size.1 / (8 * scale as usize)) as u32 - 1,
         ));
 
-        sprintln!("Old: {:?}, New: {:?}", old, self.char_size);
+        debug!("Old: {:?}, New: {:?}", old, self.char_size);
 
         unsafe {
             self.chars.set_len(self.char_size.0 as usize);
@@ -176,11 +176,13 @@ impl Write for Terminal {
     }
 }
 
+// TODO: This whole section should be refactored
+
 #[doc(hidden)]
 pub fn _print(args: core::fmt::Arguments) {
     use core::fmt::Write;
     crate::serial::interface::_print(args);
-    if crate::display_init() {
+    if super::is_initialized() {
         write!(*terminal!(), "{}", args).unwrap();
     }
 }

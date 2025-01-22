@@ -1,3 +1,5 @@
+use core::convert::Infallible;
+
 use framebuffer::Framebuffer;
 use limine::request::FramebufferRequest;
 
@@ -9,15 +11,16 @@ pub mod terminal;
 
 pub use character::get_char;
 
-use crate::{sprintln, util::OnceMutex};
+use crate::{declare_module, sprintln, util::OnceMutex};
 
 pub static LIMINE_FRAMEBUFFERS: FramebufferRequest = FramebufferRequest::new();
 
 pub static FRAMEBUFFER: OnceMutex<Framebuffer> = OnceMutex::new();
 pub static TERMINAL: OnceMutex<terminal::Terminal> = OnceMutex::new();
 
-pub fn init() {
-    sprintln!("Creating framebuffer");
+declare_module!("display", init);
+
+fn init() -> Result<(), Infallible> {
     FRAMEBUFFER.init(Framebuffer::new(
         &LIMINE_FRAMEBUFFERS
             .get_response()
@@ -26,9 +29,8 @@ pub fn init() {
             .next()
             .unwrap(),
     ));
-    sprintln!("Framebuffer initialized.. Creating terminal");
     TERMINAL.init(terminal::Terminal::new());
-    sprintln!("Terminal initialized");
+    Ok(())
 }
 
 // Gets the global terminal instance.

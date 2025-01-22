@@ -1,14 +1,15 @@
-use core::{fmt::Write, panic::PanicInfo};
+use core::{convert::Infallible, fmt::Write, panic::PanicInfo};
 
 use log::error;
 use spin::Once;
 
 use crate::{
-    hlt_loop,
+    declare_module, hlt_loop,
     memory::allocator,
     print, println,
     serial::{self, raw::SerialPort},
     testing,
+    util::KernelModule,
 };
 
 mod elf;
@@ -87,6 +88,9 @@ pub fn panic(pi: &PanicInfo) -> ! {
     hlt_loop();
 }
 
-pub fn init() {
+declare_module!("panic", init);
+
+fn init() -> Result<(), Infallible> {
     stacktrace::init();
+    Ok(())
 }

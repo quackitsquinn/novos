@@ -1,7 +1,9 @@
+use core::convert::Infallible;
+
 use pic8259::ChainedPics;
 use spin::Mutex;
 
-use crate::sprintln;
+use crate::{declare_module, sprintln, util::KernelModule};
 
 pub mod timer;
 
@@ -36,13 +38,15 @@ pub(super) fn define_hardware() {
     super::set_custom_handler(InterruptIndex::Timer as u8, timer::timer_handler);
 }
 
-pub fn init() {
+declare_module!("hardware_interrupts", init);
+
+fn init() -> Result<(), Infallible> {
     unsafe {
         let mut p = PICS.lock();
         // Unmask interrupts (afaik it's lsb first? idk)
         p.write_masks(0b11111110, 0b11111111);
         p.initialize();
     }
-    sprintln!("Initialized hardware interrupts.. enabling interrupts");
     x86_64::instructions::interrupts::enable();
+    Ok(())
 }
