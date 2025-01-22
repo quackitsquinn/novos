@@ -16,8 +16,12 @@ impl VirtualAddressRange {
     }
     /// Create a new virtual address range with the given start and size, ensuring that the address is page aligned.
     pub fn new_aligned(start: VirtAddr, size: u64) -> Self {
-        assert!(start.as_u64() % 4096 == 0, "Address must be page aligned");
-        assert!(size % 4096 == 0, "Size must be page aligned");
+        assert!(
+            start.as_u64() % 4096 == 0,
+            "{:?} is not page aligned",
+            start
+        );
+        assert!(size % 4096 == 0, "{:#x} is not size aligned", size);
         Self { start, size }
     }
     /// Create a new virtual address range with the given start and size, ensuring that the address is page aligned and the size is a multiple of the page size.

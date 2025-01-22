@@ -95,6 +95,7 @@ unsafe impl FrameAllocator<Size4KiB> for PageFrameAllocator {
 
 pub(super) fn init() {
     // init order will probably be serial -> paging -> everything else
+    // TODO: refactor this module into a phys module and update this init function
     info!("Initializing paging");
     let off = MEMORY_OFFSET_REQUEST.get_response().unwrap().offset();
     MEMORY_OFFSET.call_once(|| off);
@@ -106,5 +107,4 @@ pub(super) fn init() {
     FRAME_ALLOCATOR.init(PageFrameAllocator::new(
         MEMORY_MAP_REQUEST.get_response().unwrap(),
     ));
-    info!("Loading virt map");
 }

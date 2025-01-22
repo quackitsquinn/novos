@@ -5,11 +5,16 @@ use super::range::VirtualAddressRange;
 
 const MAX_VIRT_ADDR: u64 = 0x0000_7FFF_FFFF_FFFF;
 /// The threshold for when to defragment the virtual address space.
-const DEFRAG_THRESHOLD: usize = 0x1000;
+const DEFRAG_THRESHOLD: usize = 1 << 24;
 
-pub(super) struct VirtualAddressMapper {
+pub struct VirtualAddressMapper {
     unused_ranges: Vec<VirtualAddressRange>,
 }
+
+// This isn't really a speed focused implementation, because it's not really needed.
+// Virtual memory isn't going to be needed constantly, and it'll really only be used for the following:
+// - Mapping ACPI tables
+// - Creating process page tables
 
 impl VirtualAddressMapper {
     pub unsafe fn from_used_ranges(ranges: Vec<VirtualAddressRange>) -> Self {
