@@ -1,4 +1,7 @@
-use x86_64::VirtAddr;
+use x86_64::{
+    structures::paging::{page::PageRangeInclusive, Page, Size4KiB},
+    VirtAddr,
+};
 
 /// A range of virtual addresses.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -63,5 +66,11 @@ impl VirtualAddressRange {
     /// Returns the new end of the range.
     pub fn extend(&mut self, size: u64) {
         self.size += size;
+    }
+    /// Returns the range as a page range.
+    pub fn as_page_range(&self) -> PageRangeInclusive<Size4KiB> {
+        let start = Page::containing_address(self.start);
+        let end = Page::containing_address(self.end() - 1u64);
+        Page::range_inclusive(start, end)
     }
 }

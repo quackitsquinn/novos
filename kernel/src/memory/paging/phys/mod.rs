@@ -5,6 +5,7 @@ use mapper::PageFrameAllocator;
 use crate::{declare_module, util::OnceMutex};
 
 pub mod mapper;
+pub mod phys_mem;
 
 pub static MEMORY_MAP_REQUEST: limine::request::MemoryMapRequest =
     limine::request::MemoryMapRequest::new();
