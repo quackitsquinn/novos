@@ -519,9 +519,8 @@ dependencies = [
 
 [[package]]
 name = "limine"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e067e3f6157e2a8514f98334ffa3bcf668bb25de7dc910ded7f84b2c662ca1eb"
+version = "0.3.1"
+source = "git+https://github.com/quackitsquinn/limine-rs-copy-derive.git?branch=master#864d1af9a23659b55ca693971dbcdd505680916b"
 dependencies = [
  "bitflags 2.5.0",
 ]

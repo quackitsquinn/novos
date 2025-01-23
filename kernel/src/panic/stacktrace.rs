@@ -1,7 +1,7 @@
 use core::{arch::asm, fmt::Write, slice};
 
 use goblin::elf64::sym;
-use limine::request::KernelFileRequest;
+use limine::request::ExecutableFileRequest;
 use rustc_demangle::demangle;
 use spin::Once;
 
@@ -29,7 +29,7 @@ pub fn print_trace() {
     }
 }
 
-static KERNEL_FILE_REQUEST: KernelFileRequest = KernelFileRequest::new();
+static KERNEL_FILE_REQUEST: ExecutableFileRequest = ExecutableFileRequest::new();
 
 static KERNEL_FILE: Once<&[u8]> = Once::new();
 

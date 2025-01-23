@@ -1,4 +1,7 @@
-use core::error::Error;
+use core::{
+    error::Error,
+    fmt::{Debug, Display},
+};
 
 use log::info;
 use spin::Once;
@@ -6,7 +9,7 @@ use spin::Once;
 /// A kernel module that can be initialized once. If the initialization fails, the kernel will panic.
 pub struct KernelModule<T>
 where
-    T: Error,
+    T: Debug + Display,
 {
     /// The name of the module.s
     pub name: &'static str,
@@ -18,7 +21,7 @@ where
 
 impl<T> KernelModule<T>
 where
-    T: Error,
+    T: Debug + Display,
 {
     /// Create a new kernel module.
     pub const fn new(name: &'static str, init: fn() -> Result<(), T>) -> Self {
@@ -50,7 +53,7 @@ where
 
 #[macro_export]
 macro_rules! declare_module {
-    ($name: expr, $func: ident, $error_type: path) => {
+    ($name: expr, $func: ident, $error_type: ty) => {
         pub static MODULE: $crate::util::KernelModule<$error_type> =
             $crate::util::KernelModule::new($name, $func);
 

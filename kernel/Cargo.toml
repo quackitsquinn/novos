@@ -11,7 +11,8 @@ bench = false
 [dependencies]
 bitflags = "2.5.0"
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
-limine = "0.3.0"
+# TODO: When Clone and Copy is implemented for Entry, replace.
+limine = {git = "https://github.com/quackitsquinn/limine-rs-copy-derive.git", branch = "master"}
 log = "0.4.22"
 pic8259 = "0.11.0"
 spin = "0.9.8"
