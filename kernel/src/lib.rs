@@ -13,6 +13,7 @@ extern crate alloc;
 
 use core::arch::asm;
 
+use limine::BaseRevision;
 use log::info;
 
 pub mod display;
@@ -26,6 +27,8 @@ pub mod util;
 
 const KERNEL_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const STACK_SIZE: u64 = 1 << 16; // Limine defaults to 16KiB
+
+static BASE_REVISION: BaseRevision = BaseRevision::with_revision(3);
 
 /// Halts the CPU indefinitely.
 pub fn hlt_loop() -> ! {

@@ -11,8 +11,8 @@ bench = false
 [dependencies]
 bitflags = "2.5.0"
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
-# TODO: When Clone and Copy is implemented for Entry, replace.
-limine = {git = "https://github.com/quackitsquinn/limine-rs-copy-derive.git", branch = "master"}
+# TODO: When this is released, use the version from crates.io
+limine = {git = "https://github.com/jasondyoungberg/limine-rs.git", branch = "master", commit = "e7c2359"}
 log = "0.4.22"
 pic8259 = "0.11.0"
 spin = "0.9.8"

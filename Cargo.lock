@@ -520,7 +520,7 @@ dependencies = [
 [[package]]
 name = "limine"
 version = "0.3.1"
-source = "git+https://github.com/quackitsquinn/limine-rs-copy-derive.git?branch=master#864d1af9a23659b55ca693971dbcdd505680916b"
+source = "git+https://github.com/jasondyoungberg/limine-rs.git?branch=master#e7c2359682fa3a663036e4b5f44b5395376760ab"
 dependencies = [
  "bitflags 2.5.0",
 ]
