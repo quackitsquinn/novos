@@ -61,12 +61,17 @@ pub fn map_address(
     size: u64,
     flags: PageTableFlags,
 ) -> Result<PhysicalMemoryMap, MapError> {
-    if size % 4096 != 0 {
-        return Err(MapError::SizeNotMultipleOfPageSize);
-    }
     let aligned_addr = addr.align_down(4096u64);
     let inner_page_offset = addr.as_u64() - aligned_addr.as_u64();
+
+    let aligned_size = if size % 4096 != 0 {
+        size + 4096 - (size % 4096)
+    } else {
+        size
+    };
+
     let addr = aligned_addr;
+    let size = aligned_size;
 
     // It's page aligned, so we can map it directly
     let mut vmapper = VIRT_MAPPER.get();
@@ -124,8 +129,6 @@ pub fn remap_address(
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum MapError {
-    #[error("Size not multiple of page size")]
-    SizeNotMultipleOfPageSize,
     #[error("Unable to allocate virtual memory")]
     UnableToAllocateVirtualMemory,
     #[error("Mapping error")]
