@@ -79,7 +79,7 @@ impl PartialOrd for Block {
 mod tests {
     use super::*;
 
-    #[kproc::test("Block split")]
+    #[kproc::test("Block split", can_recover = true)]
     fn test_block_split() {
         let mut block = Block::new(1024, 0x1000 as *mut u8, true);
         let new_block = block.split(512).unwrap();
@@ -93,16 +93,16 @@ mod tests {
         );
     }
 
-    #[kproc::test("Block split too large")]
+    #[kproc::test("Block split too large", can_recover = true)]
     fn test_block_split_too_large() {
         let mut block = Block::new(1024, 0x1000 as *mut u8, true);
         let new_block = block.split(2048);
 
-        assert!(new_block.is_none());
+        assert!(!new_block.is_none());
         assert_eq!(block.size(), 1024);
     }
 
-    #[kproc::test("Block split not even")]
+    #[kproc::test("Block split not even", can_recover = true)]
     fn test_block_split_not_even() {
         let mut block = Block::new(1024, 0x1000 as *mut u8, true);
         let new_block = block.split(513).unwrap();
@@ -116,7 +116,7 @@ mod tests {
         );
     }
 
-    #[kproc::test("Block merge")]
+    #[kproc::test("Block merge", can_recover = true)]
     fn test_block_merge() {
         let mut block1 = Block::new(512, 0x1000 as *mut u8, true);
         let mut block2 = Block::new(512, 0x1200 as *mut u8, true);
@@ -127,7 +127,7 @@ mod tests {
         assert_eq!(new_block.address, block1.address);
     }
 
-    #[kproc::test("Block is adjacent")]
+    #[kproc::test("Block is adjacent", can_recover = true)]
     fn test_block_is_adjacent() {
         let block1 = Block::new(512, 0x1000 as *mut u8, true);
         let block2 = Block::new(512, 0x1200 as *mut u8, true);
@@ -135,7 +135,7 @@ mod tests {
         assert!(block1.is_adjacent(&block2));
     }
 
-    #[kproc::test("Block is not adjacent")]
+    #[kproc::test("Block is not adjacent", can_recover = true)]
     fn test_block_is_not_adjacent() {
         let block1 = Block::new(512, 0x1000 as *mut u8, true);
         let block2 = Block::new(512, 0x1600 as *mut u8, true);

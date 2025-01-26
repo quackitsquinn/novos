@@ -34,3 +34,7 @@ panic = "abort"
 debug = true
 opt-level = 0
 
+[profile.test]
+panic = "abort"
+debug = true
+opt-level = 0
