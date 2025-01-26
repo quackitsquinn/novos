@@ -1,9 +1,9 @@
 use core::fmt::Write;
 
-use alloc::{vec, vec::Vec};
-use log::info;
+use alloc::vec::Vec;
+use log::debug;
 
-use crate::{framebuffer, sprintln, terminal};
+use crate::{framebuffer, terminal};
 
 use super::{color::Color, screen_char::ScreenChar};
 
@@ -55,7 +55,7 @@ impl Terminal {
             (self.size.1 / (8 * scale as usize)) as u32 - 1,
         ));
 
-        sprintln!("Old: {:?}, New: {:?}", old, self.char_size);
+        debug!("Old: {:?}, New: {:?}", old, self.char_size);
 
         unsafe {
             self.chars.set_len(self.char_size.0 as usize);
@@ -75,8 +75,8 @@ impl Terminal {
     }
 
     pub fn shift_up(&mut self) {
-        let mut last = self.chars.clone();
-        for mut line in &mut self.chars {
+        let last = self.chars.clone();
+        for line in &mut self.chars {
             line.remove(0);
             line.push(ScreenChar::new(' ', Color::new(0, 0, 0)));
         }
@@ -176,11 +176,13 @@ impl Write for Terminal {
     }
 }
 
+// TODO: This whole section should be refactored
+
 #[doc(hidden)]
 pub fn _print(args: core::fmt::Arguments) {
     use core::fmt::Write;
     crate::serial::interface::_print(args);
-    if crate::display_init() {
+    if super::is_initialized() {
         write!(*terminal!(), "{}", args).unwrap();
     }
 }

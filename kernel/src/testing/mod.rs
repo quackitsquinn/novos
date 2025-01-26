@@ -1,23 +1,87 @@
+use core::{mem::transmute, sync::atomic::AtomicBool};
 
+use alloc::vec::Vec;
 use log::info;
+use spin::{Mutex, Once, RwLock};
 
-use crate::{serial, sprintln};
+use crate::{serial, sprintln, util::OnceMutex};
 
 mod qemu_exit;
+pub mod test_fn;
+pub use test_fn::TestFunction;
+
+static TESTS: RwLock<&'static [&'static TestFunction]> = RwLock::new(&[]);
+static CURRENT: Mutex<usize> = Mutex::new(0);
+static IN_TEST_FRAMEWORK: Mutex<bool> = Mutex::new(true);
 
 //#[cfg(test)]
-pub fn test_runner(tests: &[&TestFunction]) {
-    sprintln!("Running {} tests", tests.len());
-    let len = tests.len();
-    tests.iter().for_each(|test| {
+pub fn test_runner(tests: &[&TestFunction]) /*-> ! */
+{
+    // SAFETY: transmute converts &'a [&'a TestFunction] to &'static [&'static TestFunction]
+    // This is safe because after this function never returns, the reference will never be used again as `qemu_exit::exit` halts the CPU if it cannot exit.
+    *TESTS.try_write().expect("unable to write") = unsafe { transmute(tests) };
+    tests.iter().enumerate().for_each(|(i, test)| {
+        *CURRENT.lock() = i;
+        sprintln!("Running test: {} (i {})", test.human_name, i);
         test.run();
     });
-    qemu_exit::exit(false);
+    qemu_exit::exit(false)
 }
 
 #[cfg(test)]
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {
+    use core::{panic::PanicInfo, sync::atomic::Ordering};
+
+    use crate::interrupts::UNHANDLED_INTERRUPT;
+
+    // First, check if we are here because of an unhandled interrupt
+    if UNHANDLED_INTERRUPT.is_completed() {
+        // We are in an unhandled interrupt, we cannot recover
+        crate::panic::panic(info)
+    }
+
+    // Then, check if the panic is a internal panic. If it is, panic with kernel handler.
+    if let Some(r) = IN_TEST_FRAMEWORK.try_lock() {
+        // Something has gone wrong, defer to kernel panic handler
+        if *r {
+            crate::panic::panic(info)
+        }
+    } else {
+        // We failed to lock the mutex, meaning we are already somewhere in the test framework
+        crate::panic::panic(info)
+    }
+
+    // If we got here, we are in a test panic, but because it is kernel code running, we set test framework to true.
+    *IN_TEST_FRAMEWORK.lock() = true;
+    // SAFETY: We are in a panic handler, no tests should be running so we can force unlock the mutex
+    unsafe {
+        TESTS.force_write_unlock();
+    }
+
+    let current = *CURRENT.lock();
+    let tests = TESTS.try_read().expect("Failed to get tests");
+    let test = tests[current];
+    // If the test should panic, we should pass it. Otherwise, we should fail it.
+    if test.should_panic {
+        test.passed();
+    } else {
+        test.failed();
+    }
+
+    // Attempt recovery if possible
+    if test.can_recover || test.should_panic {
+        if current + 1 < tests.len() {
+            let run_tests = tests[current + 1..]
+                .iter()
+                .map(|t| *t)
+                .collect::<Vec<&TestFunction>>();
+            drop(tests);
+            test_runner(&run_tests);
+        } else {
+            qemu_exit::exit(false);
+        }
+    }
     crate::panic::panic(info);
 }
 
@@ -28,7 +92,7 @@ pub extern "C" fn _start() -> ! {
 
     init_kernel();
     crate::test_main();
-    qemu_exit::exit(false);
+    qemu_exit::exit(true)
 }
 
 pub fn try_shutdown_qemu(non_zero: bool) {
@@ -39,61 +103,8 @@ pub fn try_shutdown_qemu(non_zero: bool) {
 fn trivial_test() {
     assert!(1 == 1);
 }
-// TODO: Recovery implementation and prioritize recoverable tests over unrecoverable tests
-pub struct TestFunction {
-    /// The function to run.
-    pub function: fn(),
-    /// The name of the function.
-    pub function_name: &'static str,
-    /// The name of the test that will be displayed to the user
-    /// This should be a human readable name.
-    pub human_name: &'static str,
-    /// If this test fails/panics, should we continue running tests?
-    /// This should be false for tests that test the kernel's core functionality.
-    pub can_recover: bool,
-    /// The number of times this test should be run.
-    pub bench_count: Option<usize>,
-}
 
-impl Default for TestFunction {
-    fn default() -> Self {
-        Self::const_default()
-    }
-}
-
-impl TestFunction {
-    pub const fn const_default() -> Self {
-        Self {
-            function: || {},
-            function_name: "",
-            human_name: "",
-            can_recover: false,
-            bench_count: None,
-        }
-    }
-    pub fn run(&self) {
-        sprintln!("Running test: {} ({})", self.human_name, self.function_name);
-        #[allow(unused_unsafe)]
-        unsafe {
-            #[cfg(test)]
-            crate::memory::allocator::TEST_ALLOCATOR
-                .get()
-                .blocks
-                .clear();
-        }
-        let log_level = serial::LOG_LEVEL;
-        if let Some(count) = self.bench_count {
-            (self.function)();
-            info!("Reducing log level to error for benchmarking");
-            log::set_max_level(log::LevelFilter::Error);
-            for _ in 0..count - 1 {
-                (self.function)();
-            }
-            log::set_max_level(log_level.to_level_filter());
-            info!("Restored log level to {}", log_level);
-        } else {
-            (self.function)();
-        }
-        sprintln!("Test passed: {} ({})", self.human_name, self.function_name);
-    }
+#[kproc::test("Panic test", should_panic = true)]
+fn failing_test() {
+    assert!(1 == 2);
 }

@@ -1,4 +1,5 @@
 use std::{
+    env,
     io::{self, BufRead},
     path::PathBuf,
     process::Stdio,
@@ -17,7 +18,7 @@ fn main() {
     let kernel_path = build_tests(test_args);
 
     println!("Built tests at {:?}", kernel_path);
-    if kernel_path.1 {
+    if kernel_path.1 || env::var("REBUILD").is_ok() {
         println!("Creating iso");
         make_test_iso(kernel_path.0);
     }
@@ -74,7 +75,8 @@ fn build_tests(test_args: Vec<String>) -> (PathBuf, bool) {
             if json["success"] == true {
                 let path = last_artifact["executable"].as_str().unwrap();
                 let fresh = last_artifact["fresh"].as_bool().unwrap();
-                return (PathBuf::from(path), fresh);
+                // TODO: For some reason, fresh is always false. This is a temporary fix.
+                return (PathBuf::from(path), true);
             }
         }
     }

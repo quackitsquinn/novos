@@ -1,4 +1,4 @@
-use core::ptr::addr_of;
+use core::convert::Infallible;
 
 use lazy_static::lazy_static;
 use x86_64::{
@@ -10,6 +10,8 @@ use x86_64::{
     },
     VirtAddr,
 };
+
+use crate::util::KernelModule;
 
 pub const IST_FAULT_INDEX: u16 = 0;
 
@@ -42,7 +44,9 @@ lazy_static! {
     };
 }
 
-pub fn init_gdt() {
+pub static MODULE: KernelModule<Infallible> = KernelModule::new("gdt", init);
+
+fn init() -> Result<(), Infallible> {
     GDT.0.load();
 
     unsafe {
@@ -52,6 +56,7 @@ pub fn init_gdt() {
         ES::set_reg(GDT.1.data_selector);
         load_tss(GDT.1.tss_selector);
     }
+    Ok(())
 }
 
 struct Selectors {

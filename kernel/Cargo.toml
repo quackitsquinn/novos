@@ -11,7 +11,8 @@ bench = false
 [dependencies]
 bitflags = "2.5.0"
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
-limine = "0.3.0"
+# TODO: When this is released, use the version from crates.io
+limine = {git = "https://github.com/jasondyoungberg/limine-rs.git", branch = "master", commit = "e7c2359"}
 log = "0.4.22"
 pic8259 = "0.11.0"
 spin = "0.9.8"
@@ -33,3 +34,7 @@ panic = "abort"
 debug = true
 opt-level = 0
 
+[profile.test]
+panic = "abort"
+debug = true
+opt-level = 0

@@ -1,6 +1,5 @@
 use core::{
     alloc::Layout,
-    error,
     fmt::Debug,
     mem, panic,
     ptr::{self},
@@ -9,7 +8,6 @@ use core::{
 use kserial::common::Command;
 
 use crate::{
-    debug_release_select,
     memory::allocator::log::{alloc_debug, alloc_error, alloc_info, alloc_trace},
     sprintln,
 };

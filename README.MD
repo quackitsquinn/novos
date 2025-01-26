@@ -53,6 +53,8 @@ All debugging is done through environment variables. The following environment v
 - `NO_DISPLAY`: Disables the graphical display in QEMU.
 - `KERNEL_MEM`: Sets the amount of memory to allocate for the kernel in QEMU.
 - `ISO`: Override the iso file to boot from.
+- `NO_EXIT`: Prevents QEMU from exiting after the kernel exits.
+- `REBUILD`: Forces a rebuild of the *test* binary. This will have no effect on the kernel itself, as the kernel is not build at runtime.
 
 ### Build-time options
 

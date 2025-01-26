@@ -2,7 +2,9 @@
 //!
 //! This module is based off of the uart_16550 crate, which is a driver for the 16550 UART chip.
 
-use crate::{display::TERMINAL, println, sprintln};
+use core::convert::Infallible;
+
+use crate::{declare_module, display::TERMINAL, println, sprintln};
 
 pub mod interface;
 pub mod raw; // Things to interact with the serial port directly
@@ -41,8 +43,11 @@ impl log::Log for SerialLog {
 
 const LOGGER: SerialLog = SerialLog;
 
-pub fn init() {
+declare_module!("serial", init);
+
+fn init() -> Result<(), Infallible> {
     interface::init();
     log::set_logger(&LOGGER).unwrap();
     log::set_max_level(LOG_LEVEL.to_level_filter());
+    Ok(())
 }

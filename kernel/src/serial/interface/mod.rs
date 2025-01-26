@@ -1,12 +1,11 @@
-use core::{fmt::Write, time::Duration};
+use core::fmt::Write;
 
 use kserial::{client::SerialAdapter, common::Command};
 use serial::Serial;
 use spin::Once;
 
-use crate::{interrupts::hardware::timer::Timer, util::OnceMutex};
+use crate::util::OnceMutex;
 
-use super::raw::SerialPort;
 
 pub mod serial;
 

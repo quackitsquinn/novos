@@ -1,12 +1,11 @@
 use core::{arch::asm, fmt::Write, slice};
 
 use goblin::elf64::sym;
-use limine::request::{KernelAddressRequest, KernelFileRequest};
-use log::info;
+use limine::request::ExecutableFileRequest;
 use rustc_demangle::demangle;
 use spin::Once;
 
-use crate::{print, println, sprint, sprintln};
+use crate::{print, println};
 
 use super::elf::Elf;
 #[repr(C)]
@@ -30,7 +29,7 @@ pub fn print_trace() {
     }
 }
 
-static KERNEL_FILE_REQUEST: KernelFileRequest = KernelFileRequest::new();
+static KERNEL_FILE_REQUEST: ExecutableFileRequest = ExecutableFileRequest::new();
 
 static KERNEL_FILE: Once<&[u8]> = Once::new();
 

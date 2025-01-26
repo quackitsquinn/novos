@@ -1,20 +1,14 @@
-use core::error;
+use core::convert::Infallible;
 
-use limine::{memory_map::EntryType, paging::Mode, response::MemoryMapResponse};
-use log::{error, info};
-use phys::PhysicalMap;
+use limine::paging::Mode;
 use spin::Once;
 use x86_64::{
     registers::control::Cr3,
-    structures::paging::{
-        mapper::{MapToError, MapperFlush},
-        FrameAllocator, Mapper, OffsetPageTable, Page, PageTable, PageTableFlags, PhysFrame,
-        Size4KiB, Translate,
-    },
-    PhysAddr, VirtAddr,
+    structures::paging::{OffsetPageTable, PageTable},
+    VirtAddr,
 };
 
-use crate::{sprintln, util::OnceMutex};
+use crate::{declare_module, util::OnceMutex};
 
 pub mod phys;
 pub mod virt;
@@ -30,81 +24,17 @@ static MEMORY_OFFSET_REQUEST: limine::request::HhdmRequest = limine::request::Hh
 static MEMORY_MAP_REQUEST: limine::request::MemoryMapRequest =
     limine::request::MemoryMapRequest::new();
 
-pub(super) static FRAME_ALLOCATOR: OnceMutex<PageFrameAllocator> = OnceMutex::new();
-
 pub static MEMORY_OFFSET: Once<u64> = Once::new();
 pub(super) static OFFSET_PAGE_TABLE: OnceMutex<OffsetPageTable> = OnceMutex::new();
 
-pub(super) struct PageFrameAllocator {
-    mmap: &'static MemoryMapResponse,
-    off: usize,
-    // TODO: when we have a heap, use a Box<Iterator<Item = PhysFrame>> to cache the usable frames
-}
+declare_module!("paging", init);
 
-impl PageFrameAllocator {
-    pub fn new(mmap: &'static MemoryMapResponse) -> Self {
-        Self { mmap, off: 0 }
-    }
-
-    pub fn usable_frames(&mut self) -> impl Iterator<Item = PhysFrame> {
-        self.mmap
-            .entries()
-            .iter()
-            .filter(|e| e.entry_type == EntryType::USABLE)
-            .map(|e| (e.base..e.base + e.length))
-            .flat_map(|r| r.step_by(4096))
-            .map(|addr| PhysFrame::containing_address(PhysAddr::new(addr)))
-    }
-
-    pub fn map_page(
-        &mut self,
-        page: Page<Size4KiB>,
-        flags: PageTableFlags,
-    ) -> Result<MapperFlush<Size4KiB>, &'static str> {
-        let mut pgtbl = OFFSET_PAGE_TABLE.get();
-        let frame = self.allocate_frame().ok_or("Out of frames")?;
-        Ok(
-            unsafe { pgtbl.map_to(page, frame, flags, &mut *self) }.map_err(|e| {
-                error!("Error mapping page: {:?}", e);
-                "Error mapping page"
-            })?,
-        )
-    }
-
-    pub unsafe fn identity_map(
-        &mut self,
-        frame: PhysFrame,
-        flags: PageTableFlags,
-    ) -> Result<MapperFlush<Size4KiB>, MapToError<Size4KiB>> {
-        let mut pgtbl = OFFSET_PAGE_TABLE.get();
-        unsafe { pgtbl.identity_map(frame, flags, &mut *self) }
-    }
-    // probably need to implement unmap_page and unmap_phys
-    pub fn unmap_phys(&mut self, phys: PhysicalMap) -> Result<(), &'static str> {
-        let mut pgtbl = OFFSET_PAGE_TABLE.get();
-        todo!()
-    }
-}
-
-unsafe impl FrameAllocator<Size4KiB> for PageFrameAllocator {
-    fn allocate_frame(&mut self) -> Option<PhysFrame> {
-        self.off += 1;
-        self.usable_frames().nth(self.off - 1)
-    }
-}
-
-pub(super) fn init() {
-    // init order will probably be serial -> paging -> everything else
-    info!("Initializing paging");
+fn init() -> Result<(), Infallible> {
     let off = MEMORY_OFFSET_REQUEST.get_response().unwrap().offset();
     MEMORY_OFFSET.call_once(|| off);
-    info!("Set memory offset to 0x{:x}", off);
     let cr3 = Cr3::read();
-    info!("Current CR3: {:?}", cr3);
-    let pgtbl = unsafe { &mut *((cr3.0.start_address().as_u64() + off) as *mut PageTable) };
-    OFFSET_PAGE_TABLE.init(unsafe { OffsetPageTable::new(pgtbl, VirtAddr::new(off)) });
-    FRAME_ALLOCATOR.init(PageFrameAllocator::new(
-        MEMORY_MAP_REQUEST.get_response().unwrap(),
-    ));
-    info!("Loading virt map");
+    let page_table = unsafe { &mut *((cr3.0.start_address().as_u64() + off) as *mut PageTable) };
+    OFFSET_PAGE_TABLE.init(unsafe { OffsetPageTable::new(page_table, VirtAddr::new(off)) });
+    phys::MODULE.init();
+    Ok(())
 }

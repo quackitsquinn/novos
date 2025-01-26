@@ -1,4 +1,6 @@
-use log::error;
+use core::convert::Infallible;
+
+use log::{error, info};
 use spin::{Mutex, Once};
 use x86_64::{
     set_general_handler,
@@ -9,7 +11,7 @@ use x86_64::{
 
 pub mod hardware;
 
-use crate::println;
+use crate::declare_module;
 
 static IDT: Once<InterruptDescriptorTable> = Once::new();
 // no clue if i will use these (or even how) but they are here
@@ -23,26 +25,32 @@ pub fn set_custom_handler(index: u8, handler: HandlerFunc) {
     handlers[index as usize - 32] = Some(handler);
 }
 
+pub static UNHANDLED_INTERRUPT: Once<()> = Once::new();
 // General handler
 fn general_handler(stack_frame: InterruptStackFrame, index: u8, error_code: Option<u64>) {
+    UNHANDLED_INTERRUPT.call_once(|| ());
     error!("Interrupt: {} ({})", index, BASIC_HANDLERS[index as usize]);
     error!("Error code: {:?}", error_code);
     error!("{:?}", stack_frame);
+    panic!("Unhandled interrupt");
 }
 
 extern "x86-interrupt" fn page_fault_handler(
     stack_frame: InterruptStackFrame,
     error_code: PageFaultErrorCode,
 ) {
+    UNHANDLED_INTERRUPT.call_once(|| ());
     error!("Page fault");
     error!("Error code: {:?}", error_code);
     error!("{:?}", stack_frame);
     panic!("Page fault");
 }
 
-pub fn init() {
+declare_module!("interrupts", init);
+
+fn init() -> Result<(), Infallible> {
     // Initialize hardware interrupts
-    println!("Defining hardware interrupts");
+    info!("Defining hardware interrupts");
     hardware::define_hardware();
     IDT.call_once(|| {
         let mut idt = InterruptDescriptorTable::new();
@@ -63,8 +71,8 @@ pub fn init() {
     });
     // Load the IDT now that it is & 'static
     IDT.get().unwrap().load();
-    println!("Initializing hardware interrupts");
-    hardware::init();
+    hardware::MODULE.init();
+    Ok(())
 }
 
 const BASIC_HANDLERS: [&'static str; 32] = [

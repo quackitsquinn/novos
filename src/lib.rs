@@ -37,7 +37,7 @@ impl Config {
         self.uefi(&mut args);
 
         if env::var("VERBOSE").is_ok() {
-            println!("Running qemu with args: {:?}", args);
+            println!("QEMU Invocation: qemu-system-x86_64 {}", args.join(" "));
         }
 
         let mut qemu = Command::new("qemu-system-x86_64")
@@ -55,6 +55,7 @@ impl Config {
         spawn_out_handler(Box::new(stdout), "stdout", false);
         spawn_out_handler(Box::new(stderr), "stderr", false);
         qemu.wait().expect("Failed to wait for qemu");
+        println!("QEMU exited");
     }
 
     pub fn empty() -> Config {
@@ -75,7 +76,7 @@ impl Config {
             args.push("-s".to_string());
             args.push("-S".to_string());
         }
-        if self.dev_exit {
+        if self.dev_exit && env::var("NO_EXIT").is_err() {
             args.push("-device".to_string());
             args.push("isa-debug-exit,iobase=0xf4,iosize=0x04".to_string());
         }

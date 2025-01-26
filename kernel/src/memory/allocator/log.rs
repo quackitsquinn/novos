@@ -40,4 +40,4 @@ macro_rules! alloc_error {
     };
 }
 
-pub(super) use {alloc_debug, alloc_error, alloc_info, alloc_trace, alloc_warn};
+pub(super) use {alloc_debug, alloc_error, alloc_info, alloc_trace};
