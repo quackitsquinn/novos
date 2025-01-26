@@ -1,5 +1,11 @@
 use alloc::{str, string::String};
+use limine::request::RsdpRequest;
 use log::info;
+use x86_64::PhysAddr;
+
+use crate::acpi::phys_table::PhysicalTable;
+
+use super::ACPIInitError;
 
 #[repr(packed, C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -58,4 +64,16 @@ impl RootSystemDescriptionPointer {
             (self.xsdt_address as *const (), true)
         }
     }
+}
+
+static RSDP_REQUEST: RsdpRequest = RsdpRequest::new();
+
+pub(super) fn find_rsdp() -> Result<(), ACPIInitError> {
+    let rsdp = RSDP_REQUEST
+        .get_response()
+        .ok_or(ACPIInitError::RSDPNotPresent)?;
+    // rsdp is a PHYSICAL address
+    let table = unsafe { RootSystemDescriptionPointer::new(rsdp.address() as *const ()) };
+    info!("RSDP found! {:?}", table);
+    todo!()
 }

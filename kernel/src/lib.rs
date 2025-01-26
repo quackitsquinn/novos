@@ -46,6 +46,7 @@ pub fn init_kernel() {
     gdt::MODULE.init();
     interrupts::MODULE.init();
     memory::MODULE.init();
+    acpi::MODULE.init();
 
     #[cfg(not(test))] // Tests don't have a display
     display::MODULE.init();
