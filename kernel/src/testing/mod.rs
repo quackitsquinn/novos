@@ -33,6 +33,15 @@ pub fn test_runner(tests: &[&TestFunction]) /*-> ! */
 fn panic(info: &core::panic::PanicInfo) -> ! {
     use core::{panic::PanicInfo, sync::atomic::Ordering};
 
+    use crate::interrupts::UNHANDLED_INTERRUPT;
+
+    // First, check if we are here because of an unhandled interrupt
+    if UNHANDLED_INTERRUPT.is_completed() {
+        // We are in an unhandled interrupt, we cannot recover
+        crate::panic::panic(info)
+    }
+
+    // Then, check if the panic is a internal panic. If it is, panic with kernel handler.
     if let Some(r) = IN_TEST_FRAMEWORK.try_lock() {
         // Something has gone wrong, defer to kernel panic handler
         if *r {
@@ -43,6 +52,7 @@ fn panic(info: &core::panic::PanicInfo) -> ! {
         crate::panic::panic(info)
     }
 
+    // If we got here, we are in a test panic, but because it is kernel code running, we set test framework to true.
     *IN_TEST_FRAMEWORK.lock() = true;
     // SAFETY: We are in a panic handler, no tests should be running so we can force unlock the mutex
     unsafe {
@@ -52,6 +62,7 @@ fn panic(info: &core::panic::PanicInfo) -> ! {
     let current = *CURRENT.lock();
     let tests = TESTS.try_read().expect("Failed to get tests");
     let test = tests[current];
+    // If the test should panic, we should pass it. Otherwise, we should fail it.
     if test.should_panic {
         test.passed();
     } else {

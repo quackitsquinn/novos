@@ -25,17 +25,21 @@ pub fn set_custom_handler(index: u8, handler: HandlerFunc) {
     handlers[index as usize - 32] = Some(handler);
 }
 
+pub static UNHANDLED_INTERRUPT: Once<()> = Once::new();
 // General handler
 fn general_handler(stack_frame: InterruptStackFrame, index: u8, error_code: Option<u64>) {
+    UNHANDLED_INTERRUPT.call_once(|| ());
     error!("Interrupt: {} ({})", index, BASIC_HANDLERS[index as usize]);
     error!("Error code: {:?}", error_code);
     error!("{:?}", stack_frame);
+    panic!("Unhandled interrupt");
 }
 
 extern "x86-interrupt" fn page_fault_handler(
     stack_frame: InterruptStackFrame,
     error_code: PageFaultErrorCode,
 ) {
+    UNHANDLED_INTERRUPT.call_once(|| ());
     error!("Page fault");
     error!("Error code: {:?}", error_code);
     error!("{:?}", stack_frame);
