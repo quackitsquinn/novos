@@ -21,6 +21,7 @@ mod gdt;
 pub mod interrupts;
 pub mod memory;
 pub mod panic;
+pub mod pci;
 pub mod serial;
 pub mod testing;
 pub mod util;
@@ -49,6 +50,7 @@ pub fn init_kernel() {
     #[cfg(not(test))] // Tests don't have a display
     display::MODULE.init();
 
+    pci::MODULE.init();
     info!("Kernel initialized");
 }
 
