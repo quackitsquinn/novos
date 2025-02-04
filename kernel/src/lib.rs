@@ -6,6 +6,7 @@
 #![feature(maybe_uninit_uninit_array)]
 #![feature(allocator_api)]
 #![feature(pointer_is_aligned_to)]
+#![feature(naked_functions)]
 #![test_runner(crate::testing::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
@@ -13,9 +14,11 @@ extern crate alloc;
 
 use core::arch::asm;
 
+use interrupts::{set_custom_handler, CUSTOM_HANDLERS};
 use limine::BaseRevision;
 use log::info;
 
+pub mod ctx;
 pub mod display;
 mod gdt;
 pub mod interrupts;
@@ -43,6 +46,7 @@ pub fn hlt_loop() -> ! {
 pub fn init_kernel() {
     serial::MODULE.init();
     panic::MODULE.init();
+    // set_custom_handler(32, test_handler);
     gdt::MODULE.init();
     interrupts::MODULE.init();
     memory::MODULE.init();

@@ -13,6 +13,15 @@ impl Vendor {
     pub const fn new(id: u16, name: &'static str, devices: &'static [Device]) -> Self {
         Self { id, name, devices }
     }
+
+    pub fn get_device(&self, device_id: u16) -> Option<&'static Device> {
+        for device in self.devices {
+            if device.id == device_id {
+                return Some(device);
+            }
+        }
+        None
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Copy)]
@@ -45,15 +54,10 @@ impl SubDevice {
     }
 }
 
-pub fn get_device(vendor_id: u16, device_id: u16) -> Option<&'static Device> {
+pub fn get_vendor(vendor_id: u16) -> Option<&'static Vendor> {
     for vendor in VENDORS {
         if vendor.id == vendor_id {
-            for device in vendor.devices {
-                if device.id == device_id {
-                    return Some(device);
-                }
-            }
-            return None;
+            return Some(vendor);
         }
     }
     None

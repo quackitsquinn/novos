@@ -11,11 +11,12 @@ use x86_64::{
 
 pub mod hardware;
 
-use crate::declare_module;
+use crate::{ctx::ctx_test_raw, declare_module};
 
 static IDT: Once<InterruptDescriptorTable> = Once::new();
 // no clue if i will use these (or even how) but they are here
-static CUSTOM_HANDLERS: Mutex<[Option<HandlerFunc>; 256 - 32]> = Mutex::new([None; 256 - 32]);
+pub(crate) static CUSTOM_HANDLERS: Mutex<[Option<HandlerFunc>; 256 - 32]> =
+    Mutex::new([None; 256 - 32]);
 
 pub fn set_custom_handler(index: u8, handler: HandlerFunc) {
     if index < 32 {
@@ -65,6 +66,7 @@ fn init() -> Result<(), Infallible> {
         {
             idt[i as u8 + 32].set_handler_fn(handler);
         }
+        idt[0xa0].set_handler_fn(ctx_test_raw);
         // println!("{:?}", idt.breakpoint);
         //       println!("{:?}", idt);
         idt

@@ -12,9 +12,17 @@ fn panic(pi: &core::panic::PanicInfo) -> ! {
 #[unsafe(no_mangle)]
 #[cfg(not(test))]
 pub extern "C" fn _start() -> ! {
+    use core::arch::asm;
+
     use kernel::println;
 
     kernel::init_kernel();
+
+    unsafe {
+        asm! {
+            "int 0xA0"
+        };
+    }
 
     println!("Hello, world!");
     println!("Welcome to NovOS!");
