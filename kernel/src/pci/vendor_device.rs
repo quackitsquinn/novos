@@ -1,5 +1,3 @@
-use kproc::pci_ids;
-
 // Ok. It's scheming time.
 // My plan is a (hopefullY) small proc macro that will generate the PCI device structs for us using pci.ids as the source.
 #[derive(Debug, Clone, PartialEq, Eq, Copy)]
@@ -55,12 +53,8 @@ impl SubDevice {
 }
 
 pub fn get_vendor(vendor_id: u16) -> Option<&'static Vendor> {
-    for vendor in VENDORS {
-        if vendor.id == vendor_id {
-            return Some(vendor);
-        }
-    }
+    // TODO: REFACTOR.
+    // The proc-macro approach made cargo shiver in fear, and shot up compilation times.
+    // Working on an in-progress binary format for the PCI database, with a library to generate it in std environments, and a parser for no_std.
     None
 }
-
-pci_ids!();
