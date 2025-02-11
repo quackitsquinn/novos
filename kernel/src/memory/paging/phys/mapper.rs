@@ -71,6 +71,20 @@ impl PageFrameAllocator {
         }
     }
 
+    pub fn map_to(
+        &mut self,
+        page: Page<Size4KiB>,
+        frame: PhysFrame<Size4KiB>,
+        flags: x86_64::structures::paging::PageTableFlags,
+    ) -> Result<(), MapToError<Size4KiB>> {
+        let mut mapper = memory::paging::OFFSET_PAGE_TABLE.get();
+        unsafe {
+            mapper
+                .map_to(page, frame, flags, &mut *self)
+                .map(|flush| flush.flush())
+        }
+    }
+
     pub fn map_range(
         &mut self,
         page_range: PageRangeInclusive<Size4KiB>,
