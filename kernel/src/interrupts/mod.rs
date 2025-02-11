@@ -1,4 +1,4 @@
-use core::convert::Infallible;
+use core::{convert::Infallible, error, mem};
 
 use log::{error, info};
 use spin::{Mutex, Once};
@@ -11,7 +11,11 @@ use x86_64::{
 
 pub mod hardware;
 
-use crate::{ctx::ctx_test_raw, declare_module};
+use crate::{
+    ctx::{ctx_test_raw, PageFaultInterruptContext},
+    declare_module, interrupt_wrapper,
+    panic::stacktrace::{self, StackFrame},
+};
 
 static IDT: Once<InterruptDescriptorTable> = Once::new();
 // no clue if i will use these (or even how) but they are here
@@ -36,16 +40,17 @@ fn general_handler(stack_frame: InterruptStackFrame, index: u8, error_code: Opti
     panic!("Unhandled interrupt");
 }
 
-extern "x86-interrupt" fn page_fault_handler(
-    stack_frame: InterruptStackFrame,
-    error_code: PageFaultErrorCode,
-) {
+extern "C" fn page_fault_handler(page_fault_ctx: *mut PageFaultInterruptContext) -> ! {
     UNHANDLED_INTERRUPT.call_once(|| ());
-    error!("Page fault");
-    error!("Error code: {:?}", error_code);
-    error!("{:?}", stack_frame);
-    panic!("Page fault");
+    let ctx = unsafe { &mut *page_fault_ctx };
+    error!("Page fault: {}", ctx.context);
+    error!("Error code: {:?}", ctx.error_code);
+    error!("STACK TRACE:");
+    stacktrace::print_trace_raw(ctx.context.rbp as *const StackFrame);
+    loop {}
 }
+
+interrupt_wrapper!(page_fault_handler, raw_page_fault_handler);
 
 declare_module!("interrupts", init);
 
@@ -56,7 +61,9 @@ fn init() -> Result<(), Infallible> {
     IDT.call_once(|| {
         let mut idt = InterruptDescriptorTable::new();
         set_general_handler!(&mut idt, general_handler);
-        idt.page_fault.set_handler_fn(page_fault_handler);
+        idt.page_fault.set_handler_fn(unsafe {
+            mem::transmute(raw_page_fault_handler as extern "x86-interrupt" fn(InterruptStackFrame))
+        });
         for (i, handler) in CUSTOM_HANDLERS
             .lock()
             .iter()

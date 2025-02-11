@@ -5,7 +5,7 @@ use limine::request::ExecutableFileRequest;
 use rustc_demangle::demangle;
 use spin::Once;
 
-use crate::{print, println};
+use crate::{ctx::Context, print, println};
 
 use super::elf::Elf;
 #[repr(C)]
@@ -20,6 +20,11 @@ pub fn print_trace() {
     unsafe {
         asm!("mov {}, rbp", out(reg) rbp);
     }
+    print_trace_raw(rbp);
+}
+
+pub fn print_trace_raw(rbp: *const StackFrame) {
+    let mut rbp = rbp;
     while !rbp.is_null() {
         let frame = unsafe { *rbp };
         print!("{:p}:{:p} = ", frame.rbp, frame.rip);
