@@ -1,4 +1,4 @@
-use alloc::vec::Vec;
+use alloc::{vec, vec::Vec};
 use x86_64::VirtAddr;
 
 use super::range::VirtualAddressRange;
@@ -17,6 +17,15 @@ pub struct VirtualAddressMapper {
 // - Creating process page tables
 
 impl VirtualAddressMapper {
+    pub unsafe fn new(start: VirtAddr, end: VirtAddr) -> Self {
+        Self {
+            unused_ranges: vec![VirtualAddressRange::new(
+                start,
+                end.as_u64() - start.as_u64(),
+            )],
+        }
+    }
+    #[deprecated]
     pub unsafe fn from_used_ranges(ranges: Vec<VirtualAddressRange>) -> Self {
         let mut unused = Vec::new();
         let mut last = VirtAddr::new(0);
@@ -40,7 +49,7 @@ impl VirtualAddressMapper {
             unused_ranges: unused,
         }
     }
-
+    #[deprecated]
     pub unsafe fn from_unused_ranges(ranges: Vec<VirtualAddressRange>) -> Self {
         Self {
             unused_ranges: ranges,

@@ -18,11 +18,6 @@ pub extern "C" fn _start() -> ! {
 
     kernel::init_kernel();
 
-    unsafe {
-        asm! {
-            "int 0xA0"
-        };
-    }
 
     println!("Hello, world!");
     println!("Welcome to NovOS!");

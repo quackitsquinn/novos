@@ -73,4 +73,12 @@ impl VirtualAddressRange {
         let end = Page::containing_address(self.end() - 1u64);
         Page::range_inclusive(start, end)
     }
+    /// Returns the range as a page.
+    pub fn as_page(&self) -> Page<Size4KiB> {
+        Page::containing_address(self.start)
+    }
+    /// Returns the range as a pointer.
+    pub fn as_ptr<T>(&self) -> *mut T {
+        self.start.as_mut_ptr()
+    }
 }
