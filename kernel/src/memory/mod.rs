@@ -10,6 +10,7 @@ use crate::declare_module;
 
 pub mod allocator;
 pub mod paging;
+pub mod stack;
 
 // Evaluates to 0x4156_4F4E_0000
 pub const HEAP_MEM_OFFSET: VirtAddr = VirtAddr::new((u32::from_ne_bytes(*b"NOVA") as u64) << 16);
@@ -58,7 +59,7 @@ fn configure_heap_allocator(
             PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
         )
     }
-        .expect("Unable to map heap");
+    .expect("Unable to map heap");
 
     info!(
         "{} Heap initialized at 0x{:x} - 0x{:x}",
