@@ -52,12 +52,12 @@ fn configure_heap_allocator(
     let heap_range: PageRangeInclusive<Size4KiB> =
         Page::range_inclusive(heap_start_page, heap_end_page);
 
-    paging::phys::FRAME_ALLOCATOR
-        .get()
-        .map_range(
+    unsafe {
+        paging::phys::FRAME_ALLOCATOR.get().map_range(
             heap_range,
             PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
         )
+    }
         .expect("Unable to map heap");
 
     info!(

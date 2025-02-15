@@ -24,26 +24,6 @@ pub extern "C" fn _start() -> ! {
     use x86_64::structures::paging::FrameAllocator;
 
     kernel::init_kernel();
-    #[no_mangle]
-    fn i0() {
-        #[no_mangle]
-        fn i1() {
-            #[no_mangle]
-            fn i2() {
-                #[no_mangle]
-                fn i3() {
-                    unsafe {
-                        asm!("int 14");
-                    }
-                    panic!("Page fault not thrown");
-                }
-                i3()
-            }
-            i2()
-        }
-        i1()
-    }
-    i0();
 
     println!("Hello, world!");
     println!("Welcome to NovOS!");
