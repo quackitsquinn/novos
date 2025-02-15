@@ -140,7 +140,7 @@ impl PageFrameAllocator {
         Ok(())
     }
 
-    pub fn unmap_page(&mut self, page: Page<Size4KiB>) -> Result<(), MapError> {
+    pub unsafe fn unmap_page(&mut self, page: Page<Size4KiB>) -> Result<(), MapError> {
         let mut mapper = memory::paging::OFFSET_PAGE_TABLE.get();
         unsafe { self.unmap_page_pagetable(page, &mut *mapper) }
     }
@@ -158,7 +158,7 @@ impl PageFrameAllocator {
         Ok(())
     }
 
-    pub fn unmap_range(
+    pub unsafe fn unmap_range(
         &mut self,
         page_range: PageRangeInclusive<Size4KiB>,
     ) -> Result<(), MapError> {

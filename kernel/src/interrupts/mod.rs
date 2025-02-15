@@ -72,9 +72,8 @@ fn init() -> Result<(), Infallible> {
             .map(|(i, h)| (i, h.unwrap()))
         {
             idt[i as u8 + 32].set_handler_fn(handler);
+            info!("Custom handler for interrupt {}: {:?}", i + 32, handler);
         }
-        // println!("{:?}", idt.breakpoint);
-        //       println!("{:?}", idt);
         idt
     });
     // Load the IDT now that it is & 'static
