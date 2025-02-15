@@ -12,7 +12,7 @@ use x86_64::{
 pub mod hardware;
 
 use crate::{
-    ctx::{ctx_test_raw, PageFaultInterruptContext},
+    ctx::PageFaultInterruptContext,
     declare_module, interrupt_wrapper,
     panic::stacktrace::{self, StackFrame},
 };
@@ -73,7 +73,6 @@ fn init() -> Result<(), Infallible> {
         {
             idt[i as u8 + 32].set_handler_fn(handler);
         }
-        idt[0xa0].set_handler_fn(ctx_test_raw);
         // println!("{:?}", idt.breakpoint);
         //       println!("{:?}", idt);
         idt

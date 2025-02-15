@@ -2,10 +2,8 @@ use core::{arch::naked_asm, fmt::Display, mem::offset_of};
 
 use x86_64::structures::idt::{InterruptStackFrame, InterruptStackFrameValue, PageFaultErrorCode};
 
-use crate::ctx::ctx_test;
-
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Context {
     pub r15: u64,
     pub r14: u64,
@@ -74,25 +72,6 @@ impl Display for Context {
         )?;
 
         Ok(())
-    }
-}
-
-#[repr(C)]
-#[derive(Debug)]
-pub struct InterruptContext {
-    pub context: Context,
-    pub int_frame: InterruptStackFrame,
-}
-
-impl InterruptContext {
-    pub const fn zero() -> InterruptContext {
-        unsafe { core::mem::zeroed() }
-    }
-    // TODO: The const here is a bit of a lie due to InterruptStackFrame not having a const constructor.
-    pub const fn zero_with_frame(frame: InterruptStackFrame) -> InterruptContext {
-        let mut ctx = Self::zero();
-        ctx.int_frame = frame;
-        ctx
     }
 }
 
@@ -171,5 +150,3 @@ macro_rules! interrupt_wrapper {
         }
     };
 }
-
-interrupt_wrapper!(ctx_test, ctx_test_raw);
