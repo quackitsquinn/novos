@@ -15,6 +15,7 @@ use crate::{
     ctx::PageFaultInterruptContext,
     declare_module, interrupt_wrapper,
     panic::stacktrace::{self, StackFrame},
+    println,
 };
 
 static IDT: Once<InterruptDescriptorTable> = Once::new();
@@ -43,9 +44,11 @@ fn general_handler(stack_frame: InterruptStackFrame, index: u8, error_code: Opti
 extern "C" fn page_fault_handler(page_fault_ctx: *mut PageFaultInterruptContext) -> ! {
     UNHANDLED_INTERRUPT.call_once(|| ());
     let ctx = unsafe { &mut *page_fault_ctx };
-    error!("Page fault: {}", ctx.context);
-    error!("Error code: {:?}", ctx.error_code);
-    error!("STACK TRACE:");
+    println!("===== PAGE FAULT =====");
+    println!("{:?}", ctx.error_code);
+    println!("== CPU STATE ==");
+    println!("{}", ctx.context);
+    println!("== STACK TRACE ==");
     stacktrace::print_trace_raw(ctx.context.rbp as *const StackFrame);
     loop {}
 }

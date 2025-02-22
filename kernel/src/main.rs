@@ -43,7 +43,7 @@ pub extern "C" fn _start() -> ! {
 
     println!("Hello, world!");
     println!("Attempting context switch");
-    unsafe { asm!("int 95") };
+    unsafe { asm!("int 95", options(noreturn)) };
     println!("Welcome to NovOS!");
     println!("This is a very long line. This will test that the framebuffer SHOULD NOT, I repeat SHOULD NOT crash. blah blah blah blah blah blah blah");
 
@@ -55,6 +55,13 @@ extern "C" fn switch_stackless(int_ctx: *mut InterruptContext) {
     let stack =
         Stack::allocate_kernel_stack(0x2000, Page::containing_address(VirtAddr::new(0x100000000)))
             .expect("Unable to allocate stack");
+    // Double check that actually writing to the stack works
+    for i in 0..0x2000 {
+        unsafe {
+            let addr = stack.stack_base + i;
+            *(addr.as_mut_ptr::<u8>()) = (i % 256) as u8;
+        }
+    }
     let base = stack.get_stack_base();
     let rip = VirtAddr::new((test_stackless as usize) as u64);
     unsafe {

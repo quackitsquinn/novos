@@ -50,15 +50,16 @@ impl Stack {
         Ok(stack)
     }
 
-    pub fn allocate_kernel_stack(size: u64, base: Page) -> Result<Self, MapError> {
-        let range = Page::range_inclusive(base, base + size);
+    pub fn allocate_kernel_stack(size: u64, start_page: Page) -> Result<Self, MapError> {
+        let end_page = Page::containing_address(start_page.start_address() + size);
+        let range = Page::range_inclusive(start_page, end_page);
         unsafe {
             FRAME_ALLOCATOR
                 .get()
                 .map_range(range, PageTableFlags::PRESENT)?;
         }
 
-        let stack = unsafe { Self::new(&base, &(base + size)) };
+        let stack = unsafe { Self::new(&start_page, &end_page) };
         Ok(stack)
     }
 
