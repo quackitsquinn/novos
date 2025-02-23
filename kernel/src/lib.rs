@@ -17,6 +17,7 @@ use core::arch::asm;
 use interrupts::{set_custom_handler, CUSTOM_HANDLERS};
 use limine::BaseRevision;
 use log::info;
+use spin::Once;
 
 pub mod ctx;
 pub mod display;
@@ -43,36 +44,44 @@ pub fn hlt_loop() -> ! {
     }
 }
 
-pub fn init_kernel() {
+/// Initializes the kernel and takes over the system.
+/// This function should be called from the `_start` function.
+pub fn init_kernel() -> ! {
+    unsafe {
+        init_kernel_services();
+    }
+    // TODO: init_kernel_runtime(); or something similar
+    hlt_loop()
+}
+
+/// Loads all the kernel services that will not take over the system.
+///
+/// # Safety
+/// The caller *must* ensure that this function is only called once. Calling it more than once will
+/// result in undefined behavior.
+pub(crate) unsafe fn init_kernel_services() {
+    static INIT: Once<()> = Once::new();
+    if INIT.is_completed() {
+        panic!("init_kernel_services called more than once");
+    }
+    INIT.call_once(|| ());
     serial::MODULE.init();
     panic::MODULE.init();
-    // set_custom_handler(32, test_handler);
     gdt::MODULE.init();
     interrupts::MODULE.init();
     memory::MODULE.init();
-
     #[cfg(not(test))] // Tests don't have a display
     display::MODULE.init();
-
     pci::MODULE.init();
-    info!("Kernel initialized");
+    info!("Kernel services initialized");
 }
 
 #[macro_export]
 macro_rules! debug_release_select {
-    (debug $run_in_debug: tt, release $run_in_release: tt ) => {{
+    (debug $run_in_debug: block, release $run_in_release: block ) => {{
         #[cfg(debug_assertions)]
         $run_in_debug
         #[cfg(not(debug_assertions))]
         $run_in_release
     }};
-}
-
-#[macro_export]
-macro_rules! assert_or_else {
-    ($assertion: expr, $else_block: block) => {
-        if !$assertion {
-            $else_block
-        }
-    };
 }

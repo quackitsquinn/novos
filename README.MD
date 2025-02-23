@@ -19,9 +19,10 @@ To run the kernel, you need to have the following dependencies installed:
 Then, you can run the kernel with the following command from the root of the repository:
 
 ```sh
-cargo run --bin bios_boot
+cargo run
 ```
 
+This will build the kernel, generate an image, and run it in QEMU.
 
 ## Project structure
 
@@ -65,3 +66,46 @@ All debugging is done through environment variables. The following environment v
 - `LIMINE_CONFIG`: The path to the limine configuration file.
 - `ISO_NAME`: The name of the ISO file to generate.
 - `ISO_ROOT`: The directory to store ISO files in.
+
+
+Alright, you hit the point where you don't have to read the rest of this README. Have fun tinkering with the kernel!
+
+## How I have developed this project
+
+I have written this kernel in a kinda circular way. I have a general idea of what I want to implement, but I don't know how to implement it. So, I do the following:
+
+1. Do a whole heck of a lot of research about the feature I want to implement.
+2. Write some kinda poorly written code that does the thing I want to do.
+3. Work on other parts of the kernel for a while.
+4. Come back to the code with more knowledge and rewrite it.
+
+I did this heavily for the memory management system, and am currently doing it for context switching and scheduling. 
+
+### History
+
+This project originally started as [snakian](https://github.com/quackitsquinn/snakian). I was just trying to make a snake operating system, much inspired by jdh's [Tetris OS Video](https://youtu.be/FaILnmUYS_U). If you look at snakian, I want to warn you that the code is.. not the best.
+
+I quickly in that project realized I wanted to do more than just a snake game (that I never even implemented anyways), so that project shifted to more of a general kernel. By that point though, I had made a lot of mistakes in the codebase, so I decided to start over. That's when I started this project. 
+
+This project does a lot differently than snakian. Snakian was almost a word-for-word following of [Philipp Oppermann's blog](https://os.phil-opp.com/). With nova though, I was confident enough to start off with something quite different. I used limine instead of `bootloader`, and implemented stuff a lot more abstractly.
+
+## Personal note
+
+This is the longest I have ever worked on a single project (15 months... holy cow), so I am really proud of this project. Yes, all this knowledge is incredibly niche, but I have learned a lot about the inner workings of computers and operating systems.
+
+Also, Honestly, It's really cool to have gotten to this point when I remember at the start seeing so many resources saying to not even attempt it if you don't have 10 years of experience or like a bachelor's degree in computer science. I am a senior in high school with no formal education in computer science, and I have gotten to this point. I am really proud of myself for that.
+
+If your reading this, and you are thinking about starting a project this massive and research-heavy, I say do it. 
+
+It wouldn't hurt to try, and you'd at least learn a lot.
+
+
+## Amazing resources
+
+- [Philipp Oppermann's Blog](https://os.phil-opp.com/)
+- [OSDev Wiki](https://wiki.osdev.org/Main_Page)
+   - Heavy on this. So much good information.
+- [Redox Kernel](https://gitlab.redox-os.org/redox-os/kernel)
+   - The whole redox project is helpful, but I have found the kernel to be the most helpful.
+- [EuraliOS](https://github.com/bendudson/EuraliOS)
+    - Small kernel written in rust. Helped me with context switching. (Mainly the assembly stub)

@@ -88,9 +88,11 @@ fn panic(info: &core::panic::PanicInfo) -> ! {
 #[no_mangle]
 #[cfg(test)]
 pub extern "C" fn _start() -> ! {
-    use crate::init_kernel;
+    use crate::init_kernel_services;
 
-    init_kernel();
+    unsafe {
+        init_kernel_services();
+    }
     crate::test_main();
     qemu_exit::exit(true)
 }

@@ -1,3 +1,4 @@
+use log::info;
 use x86_64::{
     structures::paging::{page::PageRangeInclusive, OffsetPageTable, Page, PageTableFlags},
     VirtAddr,
@@ -36,27 +37,35 @@ impl Stack {
         offset_table: &mut OffsetPageTable,
         size: u64,
         base: Page,
+        stack_flags: StackFlags,
     ) -> Result<Self, MapError> {
         let range = Page::range_inclusive(base, base + size);
+        info!("Allocating stack: {:#x?} - {:#x?}", base, base + size);
         unsafe {
-            FRAME_ALLOCATOR.get().map_range_pagetable(
-                range,
-                PageTableFlags::PRESENT,
-                offset_table,
-            )?;
+            FRAME_ALLOCATOR
+                .get()
+                .map_range_pagetable(range, stack_flags.flags(), offset_table)?;
         }
 
         let stack = unsafe { Self::new(&base, &(base + size)) };
         Ok(stack)
     }
 
-    pub fn allocate_kernel_stack(size: u64, start_page: Page) -> Result<Self, MapError> {
+    pub fn allocate_kernel_stack(
+        size: u64,
+        start_page: Page,
+        stack_flags: StackFlags,
+    ) -> Result<Self, MapError> {
         let end_page = Page::containing_address(start_page.start_address() + size);
         let range = Page::range_inclusive(start_page, end_page);
+        info!(
+            "Allocating kernel stack: {:#x?} - {:#x?}",
+            start_page, end_page
+        );
         unsafe {
             FRAME_ALLOCATOR
                 .get()
-                .map_range(range, PageTableFlags::PRESENT)?;
+                .map_range(range, stack_flags.flags())?;
         }
 
         let stack = unsafe { Self::new(&start_page, &end_page) };
@@ -81,5 +90,30 @@ impl Stack {
     /// This is not the base address of the stack, but the address that would be used as the base address for the stack pointer.
     pub fn get_stack_base(&self) -> VirtAddr {
         self.end_page.start_address() + 0x1000
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum StackFlags {
+    RWKernel,
+    RWUser,
+    Custom(PageTableFlags),
+}
+
+impl StackFlags {
+    pub fn flags(&self) -> PageTableFlags {
+        match self {
+            StackFlags::RWKernel => PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
+            StackFlags::RWUser => {
+                PageTableFlags::PRESENT | PageTableFlags::WRITABLE | PageTableFlags::USER_ACCESSIBLE
+            }
+            StackFlags::Custom(flags) => *flags,
+        }
+    }
+}
+
+impl Default for StackFlags {
+    fn default() -> Self {
+        StackFlags::RWKernel
     }
 }
