@@ -25,7 +25,7 @@ static MEMORY_MAP_REQUEST: limine::request::MemoryMapRequest =
     limine::request::MemoryMapRequest::new();
 
 pub static MEMORY_OFFSET: Once<u64> = Once::new();
-pub static OFFSET_PAGE_TABLE: OnceMutex<OffsetPageTable> = OnceMutex::new();
+pub static OFFSET_PAGE_TABLE: OnceMutex<OffsetPageTable> = OnceMutex::uninitialized();
 
 declare_module!("paging", init);
 

@@ -68,10 +68,10 @@ unsafe impl Allocator for LockedAllocator {
 }
 
 #[global_allocator]
-pub static ALLOCATOR: LockedAllocator = LockedAllocator::new();
+pub static ALLOCATOR: LockedAllocator = LockedAllocator::uninitialized();
 
 /// An allocator purely for testing. This allocator is reset after every test, so it is unsafe to store any static variables in this allocator.
-pub static TEST_ALLOCATOR: LockedAllocator = LockedAllocator::new();
+pub static TEST_ALLOCATOR: LockedAllocator = LockedAllocator::uninitialized();
 
 pub type LockedAllocator = OnceMutex<RuntimeAllocator>;
 

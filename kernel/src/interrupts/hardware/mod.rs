@@ -35,7 +35,9 @@ impl Into<usize> for InterruptIndex {
 }
 
 pub(super) fn define_hardware() {
-    super::set_custom_handler(InterruptIndex::Timer as u8, timer::timer_handler);
+    super::IDT
+        .modify()
+        .set_handler(InterruptIndex::Timer as u8, timer::timer_handler);
 }
 
 declare_module!("hardware_interrupts", init);

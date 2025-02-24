@@ -10,7 +10,7 @@ pub mod phys_mem;
 pub static MEMORY_MAP_REQUEST: limine::request::MemoryMapRequest =
     limine::request::MemoryMapRequest::new();
 
-pub static FRAME_ALLOCATOR: OnceMutex<PageFrameAllocator> = OnceMutex::new();
+pub static FRAME_ALLOCATOR: OnceMutex<PageFrameAllocator> = OnceMutex::uninitialized();
 
 declare_module!("physical memory mapping", init, &'static str);
 

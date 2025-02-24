@@ -6,10 +6,9 @@ use spin::Once;
 
 use crate::util::OnceMutex;
 
-
 pub mod serial;
 
-pub static SERIAL_PORT: OnceMutex<Serial> = OnceMutex::new();
+pub static SERIAL_PORT: OnceMutex<Serial> = OnceMutex::uninitialized();
 // TODO: Abstract this and similar things into a Lock type that just has the like is_locked etc.
 pub static PORT_HAS_INIT: Once<()> = Once::new();
 

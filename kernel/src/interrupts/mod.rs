@@ -1,121 +1,138 @@
 use core::{convert::Infallible, error, mem};
 
 use log::{error, info};
-use spin::{Mutex, Once};
+use spin::{Mutex, MutexGuard, Once};
 use x86_64::{
     set_general_handler,
     structures::idt::{
-        HandlerFunc, InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode,
+        Entry, HandlerFunc, InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode,
     },
 };
 
+mod exception;
 pub mod hardware;
 
 use crate::{
-    ctx::PageFaultInterruptContext,
+    ctx::{PageFaultInterruptContext, ProcessorContext},
     declare_module, interrupt_wrapper,
     panic::stacktrace::{self, StackFrame},
     println,
+    util::{InterruptBlock, OnceMutex},
 };
 
-static IDT: Once<InterruptDescriptorTable> = Once::new();
-// no clue if i will use these (or even how) but they are here
-pub(crate) static CUSTOM_HANDLERS: Mutex<[Option<HandlerFunc>; 256 - 32]> =
-    Mutex::new([None; 256 - 32]);
+pub static IDT: InterruptTable = InterruptTable::uninitialized();
 
-pub fn set_custom_handler(index: u8, handler: HandlerFunc) {
-    if index < 32 {
-        panic!("Cannot set a custom handler for a basic interrupt");
-    }
-    let mut handlers = CUSTOM_HANDLERS.lock();
-    handlers[index as usize - 32] = Some(handler);
+/// The interrupt table for the kernel.
+pub struct InterruptTable {
+    table: OnceMutex<InterruptDescriptorTable>,
+    exchange: OnceMutex<InterruptDescriptorTable>,
 }
 
-pub static UNHANDLED_INTERRUPT: Once<()> = Once::new();
-// General handler
-fn general_handler(stack_frame: InterruptStackFrame, index: u8, error_code: Option<u64>) {
-    UNHANDLED_INTERRUPT.call_once(|| ());
-    error!("Interrupt: {} ({})", index, BASIC_HANDLERS[index as usize]);
-    error!("Error code: {:?}", error_code);
-    error!("{:?}", stack_frame);
-    panic!("Unhandled interrupt");
-}
-
-extern "C" fn page_fault_handler(page_fault_ctx: *mut PageFaultInterruptContext) -> ! {
-    UNHANDLED_INTERRUPT.call_once(|| ());
-    let ctx = unsafe { &mut *page_fault_ctx };
-    println!("===== PAGE FAULT =====");
-    println!("{:?}", ctx.error_code);
-    println!("== CPU STATE ==");
-    println!("{}", ctx.context);
-    println!("== STACK TRACE ==");
-    stacktrace::print_trace_raw(ctx.context.rbp as *const StackFrame);
-    loop {}
-}
-
-interrupt_wrapper!(page_fault_handler, raw_page_fault_handler);
-
-declare_module!("interrupts", init);
-
-fn init() -> Result<(), Infallible> {
-    // Initialize hardware interrupts
-    info!("Defining hardware interrupts");
-    hardware::define_hardware();
-    IDT.call_once(|| {
-        let mut idt = InterruptDescriptorTable::new();
-        set_general_handler!(&mut idt, general_handler);
-        idt.page_fault.set_handler_fn(unsafe {
-            mem::transmute(raw_page_fault_handler as extern "x86-interrupt" fn(InterruptStackFrame))
-        });
-        for (i, handler) in CUSTOM_HANDLERS
-            .lock()
-            .iter()
-            .enumerate()
-            .filter(|(_, h)| h.is_some())
-            .map(|(i, h)| (i, h.unwrap()))
-        {
-            idt[i as u8 + 32].set_handler_fn(handler);
-            info!("Custom handler for interrupt {}: {:?}", i + 32, handler);
+impl InterruptTable {
+    /// Create a new, uninitialized interrupt table.
+    pub const fn uninitialized() -> InterruptTable {
+        InterruptTable {
+            table: OnceMutex::uninitialized(),
+            exchange: OnceMutex::uninitialized(),
         }
-        idt
-    });
-    // Load the IDT now that it is & 'static
-    IDT.get().unwrap().load();
-    hardware::MODULE.init();
-    Ok(())
+    }
+    /// Commit the table, returning the old table if it was initialized.
+    ///
+    /// # Safety
+    /// The caller must ensure that all modifications to the exchange table are complete and will not violate memory safety.
+    pub unsafe fn commit(&self) -> Option<InterruptDescriptorTable> {
+        let mut old = None;
+        x86_64::instructions::interrupts::without_interrupts(|| {
+            // If the table is uninitialized, initialize it.
+            if !self.table.is_initialized() {
+                // Interrupts are disabled, so we can safely initialize the table.
+                self.table.init(InterruptDescriptorTable::new());
+                // Get the raw pointer to the table, convert it to &'static, and load it.
+                let table = self.table.get();
+                unsafe {
+                    (&*((&*table) as *const InterruptDescriptorTable)).load();
+                }
+                drop(table);
+            } else {
+                let mut table = self.table.get();
+                old = Some(mem::replace(&mut *table, InterruptDescriptorTable::new()));
+            }
+            // Copy the table to the exchange table.
+            let mut table = self.table.get();
+            let exchange = self.exchange.get();
+
+            // Copy the exchange table to the real table.
+            table.clone_from(&*exchange);
+        });
+        old
+    }
+
+    /// Return a guard to the interrupt table.
+    /// Modifications to this table *will not* take effect until `commit` is called,
+    /// and this table may not be a complete representation of the loaded interrupt table.
+    pub fn modify(&self) -> MutexGuard<InterruptDescriptorTable> {
+        self.exchange.get()
+    }
 }
 
-const BASIC_HANDLERS: [&'static str; 32] = [
-    "Divide Error",
-    "Debug",
-    "Non Maskable Interrupt",
-    "Breakpoint",
-    "Overflow",
-    "Bound Range Exceeded",
-    "Invalid Opcode",
-    "Device Not Available",
-    "Double Fault",
-    "Coprocessor Segment Overrun",
-    "Invalid TSS",
-    "Segment Not Present",
-    "Stack Segment Fault",
-    "General Protection Fault",
-    "Page Fault",
-    "Reserved",
-    "x87 Floating Point Exception",
-    "Alignment Check",
-    "Machine Check",
-    "SIMD Floating Point Exception",
-    "Virtualization Exception",
-    "Control Protection Exception",
-    "Reserved",
-    "Reserved",
-    "Reserved",
-    "Reserved",
-    "Reserved",
-    "Reserved",
-    "Hypervisor Injection Exception",
-    "VMM Communication Exception",
-    "Security Exception",
-    "Reserved",
-];
+/// Wrapper for an interrupt handler. Based on [this implementation](https://github.com/bendudson/EuraliOS/blob/main/kernel/src/interrupts.rs#L117)
+/// which is further based on another rust os which I'm not bothering to go down the rabbit hole to find.
+#[macro_export]
+macro_rules! interrupt_wrapper {
+    ($handler: ident, $raw: ident) => {
+        #[naked]
+        pub extern "x86-interrupt" fn $raw(_: InterruptStackFrame) {
+            unsafe {
+                ::core::arch::naked_asm! {
+                    // Disable interrupts.
+                    "cli",
+                    // Push all registers to the stack. Push the registers in the OPPOSITE order that they are defined in InterruptRegisters.
+                    "push rax",
+                    "push rbx",
+                    "push rcx",
+                    "push rdx",
+                    "push rbp",
+                    "push rdi",
+                    "push rsi",
+                    "push r8",
+                    "push r9",
+                    "push r10",
+                    "push r11",
+                    "push r12",
+                    "push r13",
+                    "push r14",
+                    "push r15",
+
+                    // TODO: We don't do any floating point stuff yet, so we don't need to save the floating point registers.
+
+                    // C abi requires that the first parameter is in rdi, so we need to move the stack pointer to rdi.
+                    "mov rdi, rsp",
+                    "call {handler}",
+
+                    // Pop all registers from the stack. Pop the registers in the SAME order that they are defined in InterruptRegisters.
+                    "pop r15",
+                    "pop r14",
+                    "pop r13",
+                    "pop r12",
+                    "pop r11",
+                    "pop r10",
+                    "pop r9",
+                    "pop r8",
+                    "pop rsi",
+                    "pop rdi",
+                    "pop rbp",
+                    "pop rdx",
+                    "pop rcx",
+                    "pop rbx",
+                    "pop rax",
+
+                    // Re-enable interrupts.
+                    "sti",
+                    // Return from interrupt.
+                    "iretq",
+                    handler = sym $handler,
+                }
+            }
+        }
+    };
+}

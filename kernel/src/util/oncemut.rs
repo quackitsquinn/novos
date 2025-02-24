@@ -10,9 +10,16 @@ pub struct OnceMutex<T> {
 }
 
 impl<'a, T> OnceMutex<T> {
-    pub const fn new() -> Self {
+    pub const fn uninitialized() -> Self {
         Self {
             inner: Once::new(),
+            caller: Mutex::new(None),
+        }
+    }
+
+    pub const fn new_with(value: T) -> Self {
+        Self {
+            inner: Once::initialized(Mutex::new(value)),
             caller: Mutex::new(None),
         }
     }

@@ -15,8 +15,8 @@ use crate::{declare_module, util::OnceMutex};
 
 pub static LIMINE_FRAMEBUFFERS: FramebufferRequest = FramebufferRequest::new();
 
-pub static FRAMEBUFFER: OnceMutex<Framebuffer> = OnceMutex::new();
-pub static TERMINAL: OnceMutex<terminal::Terminal> = OnceMutex::new();
+pub static FRAMEBUFFER: OnceMutex<Framebuffer> = OnceMutex::uninitialized();
+pub static TERMINAL: OnceMutex<terminal::Terminal> = OnceMutex::uninitialized();
 
 declare_module!("display", init);
 

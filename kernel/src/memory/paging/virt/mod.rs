@@ -9,7 +9,7 @@ pub use range::VirtualAddressRange;
 use virt_alloc::VirtualAddressMapper;
 use x86_64::VirtAddr;
 
-pub static VIRT_MAPPER: OnceMutex<VirtualAddressMapper> = OnceMutex::new();
+pub static VIRT_MAPPER: OnceMutex<VirtualAddressMapper> = OnceMutex::uninitialized();
 
 // Upper half of the 48-bit address space + 268mb of virtual memory for the kernel.
 // We have access to 1.8TB of virtual memory
