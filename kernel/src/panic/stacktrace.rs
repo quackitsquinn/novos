@@ -5,7 +5,7 @@ use limine::request::ExecutableFileRequest;
 use rustc_demangle::demangle;
 use spin::Once;
 
-use crate::{ctx::Context, print, println};
+use crate::{print, println};
 
 use super::elf::Elf;
 #[repr(C)]

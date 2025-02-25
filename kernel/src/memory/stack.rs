@@ -1,11 +1,11 @@
 use log::info;
 use x86_64::{
-    structures::paging::{page::PageRangeInclusive, OffsetPageTable, Page, PageTableFlags},
+    structures::paging::{OffsetPageTable, Page, PageTableFlags},
     VirtAddr,
 };
 
 use super::paging::phys::{
-    mapper::{MapError, PageFrameAllocator},
+    mapper::MapError,
     FRAME_ALLOCATOR,
 };
 

@@ -1,25 +1,15 @@
-use core::{convert::Infallible, error, mem};
+use core::{convert::Infallible, mem};
 
-use hardware::define_hardware;
-use log::{error, info};
 use spin::{Mutex, MutexGuard, Once};
-use x86_64::{
-    set_general_handler,
-    structures::idt::{
-        Entry, HandlerFunc, InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode,
-    },
-};
+use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
 
 mod exception;
 pub mod hardware;
 mod macros;
 
 use crate::{
-    ctx::{InterruptCodeContext, InterruptContext, PageFaultInterruptContext, ProcessorContext},
+    ctx::{InterruptCodeContext, InterruptContext, PageFaultInterruptContext},
     declare_module, init_interrupt_table, interrupt_wrapper,
-    panic::stacktrace::{self, StackFrame},
-    println,
-    util::{InterruptBlock, OnceMutex},
 };
 
 pub static IDT: InterruptTable = InterruptTable::uninitialized();
@@ -103,6 +93,8 @@ pub fn init() -> Result<(), Infallible> {
     unsafe {
         IDT.commit();
     }
+
+    hardware::define_hardware();
     x86_64::instructions::interrupts::enable();
     Ok(())
 }

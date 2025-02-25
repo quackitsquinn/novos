@@ -1,6 +1,5 @@
 use core::fmt::Write;
 
-
 use crate::serial::raw::SerialPort;
 
 pub struct Serial {
@@ -27,7 +26,7 @@ impl Serial {
     pub unsafe fn new(port: u16) -> Self {
         let mut port = unsafe { SerialPort::new(port) };
         port.init();
-        for i in 0..10 {
+        for _ in 0..10 {
             // Send 10 FF bytes to make sure that and garbage data is cleared out.
             port.send_raw(0xFF);
         }

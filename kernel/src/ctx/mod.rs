@@ -1,7 +1,4 @@
-use core::arch::asm;
 
-use log::info;
-use x86_64::structures::idt::InterruptStackFrame;
 
 mod contexts;
 mod int_context;

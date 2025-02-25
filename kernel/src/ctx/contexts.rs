@@ -1,6 +1,6 @@
-use core::{arch::naked_asm, fmt::Display, mem::offset_of};
+use core::fmt::Display;
 
-use x86_64::structures::idt::{InterruptStackFrame, InterruptStackFrameValue, PageFaultErrorCode};
+use x86_64::structures::idt::{InterruptStackFrameValue, PageFaultErrorCode};
 
 #[repr(C)]
 #[derive(Debug, Clone)]

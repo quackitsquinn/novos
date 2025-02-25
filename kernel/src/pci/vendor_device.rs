@@ -52,7 +52,7 @@ impl SubDevice {
     }
 }
 
-pub fn get_vendor(vendor_id: u16) -> Option<&'static Vendor> {
+pub fn get_vendor(_vendor_id: u16) -> Option<&'static Vendor> {
     // TODO: REFACTOR.
     // The proc-macro approach made cargo shiver in fear, and shot up compilation times.
     // Working on an in-progress binary format for the PCI database, with a library to generate it in std environments, and a parser for no_std.

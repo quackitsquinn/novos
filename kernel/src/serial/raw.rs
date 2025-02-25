@@ -1,3 +1,7 @@
+#![allow(
+    dead_code,
+    reason = "This is a stub module that is only used on non-x86_64 targets"
+)]
 use core::{fmt, panic};
 
 ///! This is a module that wraps the uart_16550 crate for serial use.
@@ -67,7 +71,7 @@ impl NoOpSerialPort {
     /// This function is unsafe because the caller must ensure that the given base address
     /// really points to a serial port device and that the caller has the necessary rights
     /// to perform the I/O operation.
-    pub const unsafe fn new(base: u16) -> Self {
+    pub const unsafe fn new(_base: u16) -> Self {
         panic!("Serial port not available");
     }
 
@@ -79,17 +83,17 @@ impl NoOpSerialPort {
     }
 
     /// Sends a byte on the serial port.
-    pub fn send(&mut self, data: u8) {
+    pub fn send(&mut self, _data: u8) {
         panic!("Serial port not available");
     }
 
     /// Sends a raw byte on the serial port, intended for binary data.
-    pub fn send_raw(&mut self, data: u8) {
+    pub fn send_raw(&mut self, _data: u8) {
         panic!("Serial port not available");
     }
 
     /// Tries to send a raw byte on the serial port, intended for binary data.
-    pub fn try_send_raw(&mut self, data: u8) -> Result<(), WouldBlockError> {
+    pub fn try_send_raw(&mut self, _data: u8) -> Result<(), WouldBlockError> {
         panic!("Serial port not available");
     }
 
@@ -105,7 +109,7 @@ impl NoOpSerialPort {
 }
 
 impl fmt::Write for NoOpSerialPort {
-    fn write_str(&mut self, s: &str) -> fmt::Result {
+    fn write_str(&mut self, _s: &str) -> fmt::Result {
         panic!("Serial port not available");
     }
 }
@@ -116,7 +120,7 @@ impl fmt::Write for NoOpSerialPort {
 pub struct WouldBlockError;
 
 impl fmt::Display for WouldBlockError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
         panic!("Serial port not available");
     }
 }

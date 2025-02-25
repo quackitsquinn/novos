@@ -1,7 +1,4 @@
-use core::{
-    error::Error,
-    fmt::{Debug, Display},
-};
+use core::fmt::{Debug, Display};
 
 use log::info;
 use spin::Once;

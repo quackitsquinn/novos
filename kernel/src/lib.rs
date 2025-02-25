@@ -29,9 +29,9 @@ pub mod serial;
 pub mod testing;
 pub mod util;
 
-const KERNEL_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const STACK_SIZE: u64 = 1 << 16; // Limine defaults to 16KiB
 
+#[used]
 static BASE_REVISION: BaseRevision = BaseRevision::with_revision(3);
 
 /// Halts the CPU indefinitely.

@@ -1,13 +1,10 @@
-use log::error;
-use x86_64::structures::idt::InterruptStackFrame;
-
 use crate::{
     ctx::{InterruptCodeContext, InterruptContext, PageFaultInterruptContext},
     panic::stacktrace::{self, StackFrame},
     println,
 };
 
-pub fn general_handler(ctx: *mut InterruptContext, index: u8, name: &'static str) {
+pub fn general_handler(ctx: *mut InterruptContext, _: u8, name: &'static str) {
     let ctx = unsafe { &mut *ctx };
     println!("===== {} =====", name);
     println!("(no error code)");
@@ -18,7 +15,7 @@ pub fn general_handler(ctx: *mut InterruptContext, index: u8, name: &'static str
     loop {}
 }
 
-pub fn general_code_handler(ctx: *mut InterruptCodeContext, index: u8, name: &'static str) {
+pub fn general_code_handler(ctx: *mut InterruptCodeContext, _: u8, name: &'static str) {
     let ctx = unsafe { &mut *ctx };
     println!("===== {} =====", name);
     println!("ERROR CODE: {:?}", ctx.code);

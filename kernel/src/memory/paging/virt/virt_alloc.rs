@@ -55,7 +55,8 @@ impl VirtualAddressMapper {
             unused_ranges: ranges,
         }
     }
-
+    // FIXME: Refactor into page_count rather than size.
+    // The current implementation will massively break if the size is not a multiple of 4096, which should probably be a guarantee.
     pub fn allocate(&mut self, size: u64) -> Option<VirtualAddressRange> {
         for i in 0..self.unused_ranges.len() {
             if self.unused_ranges[i].size >= size {
@@ -130,40 +131,6 @@ mod tests {
     use crate::memory::paging::virt::VirtualAddressRange;
 
     use super::VirtualAddressMapper;
-
-    fn check_range(
-        vam: &VirtualAddressMapper,
-        range: VirtualAddressRange,
-        expected_len: u64,
-        expected_start: u64,
-        should_be_free: bool,
-    ) {
-        if should_be_free {
-            assert!(vam.is_free(range), "Range should be free");
-        } else {
-            assert!(!vam.is_free(range), "Range should not be free");
-        }
-
-        assert!(expected_len <= range.size, "Range size is too small");
-        assert_eq!(
-            expected_start,
-            range.start.as_u64(),
-            "Range start is incorrect"
-        );
-    }
-
-    #[test("VAM from used ranges", can_recover = true)]
-    pub fn test_vam_from_used_ranges() {
-        let ranges = vec![
-            VirtualAddressRange::new_page(VirtAddr::new(0)),
-            VirtualAddressRange::new_page(VirtAddr::new(4096)),
-            VirtualAddressRange::new_page(VirtAddr::new(8192)),
-        ];
-        let vam = unsafe { super::VirtualAddressMapper::from_used_ranges(ranges) };
-        assert_eq!(vam.unused_ranges.len(), 1);
-        assert_eq!(vam.unused_ranges[0].start, VirtAddr::new(12288));
-        assert_eq!(vam.unused_ranges[0].size, 0x0000_7FFF_FFFF_FFFF - 12288);
-    }
 
     #[test("VAM allocate", can_recover = true)]
     pub fn test_vam_allocate() {

@@ -35,7 +35,9 @@ impl Into<usize> for InterruptIndex {
 }
 
 pub(super) fn define_hardware() {
-    super::IDT.modify()[InterruptIndex::Timer as u8].set_handler_fn(timer::timer_handler);
+    let mut idt = super::IDT.modify();
+    idt[InterruptIndex::Timer as u8].set_handler_fn(timer::timer_handler);
+    drop(idt);
     unsafe {
         super::IDT.commit();
     }

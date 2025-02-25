@@ -1,8 +1,6 @@
-use core::error;
 
-use alloc::vec::Vec;
 use x86_64::{
-    structures::paging::{mapper::MapToError, Mapper, PageTableFlags, PhysFrame, Size4KiB},
+    structures::paging::{Mapper, PageTableFlags, PhysFrame},
     PhysAddr, VirtAddr,
 };
 
@@ -139,7 +137,7 @@ mod tests {
     use kproc::test;
     use x86_64::structures::paging::FrameAllocator;
 
-    use crate::memory::paging::{phys::FRAME_ALLOCATOR, OFFSET_PAGE_TABLE};
+    use crate::memory::paging::phys::FRAME_ALLOCATOR;
 
     #[test("try map")]
     fn test_map() {

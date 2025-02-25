@@ -1,10 +1,8 @@
-use core::{mem::transmute, sync::atomic::AtomicBool};
+use core::mem::transmute;
 
-use alloc::vec::Vec;
-use log::info;
-use spin::{Mutex, Once, RwLock};
+use spin::{Mutex, RwLock};
 
-use crate::{serial, sprintln, util::OnceMutex};
+use crate::sprintln;
 
 mod qemu_exit;
 pub mod test_fn;
@@ -31,15 +29,8 @@ pub fn test_runner(tests: &[&TestFunction]) /*-> ! */
 #[cfg(test)]
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {
-    use core::{panic::PanicInfo, sync::atomic::Ordering};
-
-    use crate::interrupts::UNHANDLED_INTERRUPT;
-
-    // First, check if we are here because of an unhandled interrupt
-    if UNHANDLED_INTERRUPT.is_completed() {
-        // We are in an unhandled interrupt, we cannot recover
-        crate::panic::panic(info)
-    }
+    use alloc::vec::Vec;
+    
 
     // Then, check if the panic is a internal panic. If it is, panic with kernel handler.
     if let Some(r) = IN_TEST_FRAMEWORK.try_lock() {

@@ -1,9 +1,8 @@
 use core::convert::Infallible;
 
-use log::{info, trace};
+use log::info;
 use x86_64::{
-    structures::paging::{page::PageRangeInclusive, Page, PageTableFlags, Size4KiB},
-    PhysAddr, VirtAddr,
+    structures::paging::{page::PageRangeInclusive, Page, PageTableFlags, Size4KiB}, VirtAddr,
 };
 
 use crate::declare_module;
