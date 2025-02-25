@@ -31,3 +31,33 @@ impl InterruptContext {
         old
     }
 }
+
+#[repr(C)]
+#[derive(Debug, Clone)]
+pub struct InterruptCodeContext {
+    pub context: Context,
+    pub code: u64,
+    pub int_frame: InterruptStackFrameValue,
+}
+
+impl InterruptCodeContext {
+    pub const fn zero() -> InterruptCodeContext {
+        unsafe { core::mem::zeroed() }
+    }
+
+    pub unsafe fn zero_with_frame(frame: InterruptStackFrame, code: u64) -> InterruptCodeContext {
+        let mut ctx = Self::zero();
+        ctx.int_frame = *frame;
+        ctx.code = code;
+        ctx
+    }
+
+    pub unsafe fn switch(&mut self, to: &mut Self) -> Self {
+        let mut old = Self::zero();
+        unsafe {
+            core::ptr::copy_nonoverlapping(self, &mut old, 1);
+            core::ptr::copy_nonoverlapping(to, self, 1);
+        }
+        old
+    }
+}

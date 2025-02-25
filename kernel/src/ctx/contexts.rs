@@ -79,7 +79,7 @@ impl Display for Context {
 #[derive(Debug)]
 pub struct PageFaultInterruptContext {
     pub context: Context,
-    pub int_frame: InterruptStackFrame,
+    pub int_frame: InterruptStackFrameValue,
     pub error_code: PageFaultErrorCode,
 }
 

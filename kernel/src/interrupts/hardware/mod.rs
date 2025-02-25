@@ -35,9 +35,10 @@ impl Into<usize> for InterruptIndex {
 }
 
 pub(super) fn define_hardware() {
-    super::IDT
-        .modify()
-        .set_handler(InterruptIndex::Timer as u8, timer::timer_handler);
+    super::IDT.modify()[InterruptIndex::Timer as u8].set_handler_fn(timer::timer_handler);
+    unsafe {
+        super::IDT.commit();
+    }
 }
 
 declare_module!("hardware_interrupts", init);

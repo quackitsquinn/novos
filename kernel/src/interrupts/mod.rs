@@ -1,5 +1,6 @@
 use core::{convert::Infallible, error, mem};
 
+use hardware::define_hardware;
 use log::{error, info};
 use spin::{Mutex, MutexGuard, Once};
 use x86_64::{
@@ -11,10 +12,11 @@ use x86_64::{
 
 mod exception;
 pub mod hardware;
+mod macros;
 
 use crate::{
-    ctx::{PageFaultInterruptContext, ProcessorContext},
-    declare_module, interrupt_wrapper,
+    ctx::{InterruptCodeContext, InterruptContext, PageFaultInterruptContext, ProcessorContext},
+    declare_module, init_interrupt_table, interrupt_wrapper,
     panic::stacktrace::{self, StackFrame},
     println,
     util::{InterruptBlock, OnceMutex},
@@ -24,46 +26,57 @@ pub static IDT: InterruptTable = InterruptTable::uninitialized();
 
 /// The interrupt table for the kernel.
 pub struct InterruptTable {
-    table: OnceMutex<InterruptDescriptorTable>,
-    exchange: OnceMutex<InterruptDescriptorTable>,
+    table: Mutex<InterruptDescriptorTable>,
+    exchange: Mutex<InterruptDescriptorTable>,
+    init: Once<()>,
 }
+
+pub type CodeHandler = fn(ctx: *mut InterruptCodeContext, index: u8, name: &'static str);
+pub type InterruptHandler = fn(ctx: *mut InterruptContext, index: u8, name: &'static str);
+pub type PageFaultHandler = fn(*mut PageFaultInterruptContext);
 
 impl InterruptTable {
     /// Create a new, uninitialized interrupt table.
     pub const fn uninitialized() -> InterruptTable {
         InterruptTable {
-            table: OnceMutex::uninitialized(),
-            exchange: OnceMutex::uninitialized(),
+            table: Mutex::new(InterruptDescriptorTable::new()),
+            exchange: Mutex::new(InterruptDescriptorTable::new()),
+            init: Once::new(),
         }
     }
     /// Commit the table, returning the old table if it was initialized.
     ///
     /// # Safety
     /// The caller must ensure that all modifications to the exchange table are complete and will not violate memory safety.
-    pub unsafe fn commit(&self) -> Option<InterruptDescriptorTable> {
+    ///
+    /// The caller must ensure that interrupts are disabled when calling this function.
+    pub unsafe fn commit(&'static self) -> Option<InterruptDescriptorTable> {
         let mut old = None;
-        x86_64::instructions::interrupts::without_interrupts(|| {
-            // If the table is uninitialized, initialize it.
-            if !self.table.is_initialized() {
-                // Interrupts are disabled, so we can safely initialize the table.
-                self.table.init(InterruptDescriptorTable::new());
-                // Get the raw pointer to the table, convert it to &'static, and load it.
-                let table = self.table.get();
-                unsafe {
-                    (&*((&*table) as *const InterruptDescriptorTable)).load();
-                }
-                drop(table);
-            } else {
-                let mut table = self.table.get();
-                old = Some(mem::replace(&mut *table, InterruptDescriptorTable::new()));
-            }
-            // Copy the table to the exchange table.
-            let mut table = self.table.get();
-            let exchange = self.exchange.get();
+        let mut table = self.table.try_lock().expect("Interrupt table is locked");
 
-            // Copy the exchange table to the real table.
-            table.clone_from(&*exchange);
-        });
+        // If the table is uninitialized, initialize it.
+        if !self.init.is_completed() {
+            // Interrupts are disabled, so we can safely initialize the table.
+            self.init.call_once(|| ());
+            // Get the raw pointer to the table, convert it to &'static, and load it.
+            unsafe {
+                mem::transmute::<&InterruptDescriptorTable, &'static InterruptDescriptorTable>(
+                    &*table as &InterruptDescriptorTable,
+                )
+                .load();
+            }
+        } else {
+            old = Some(mem::replace(&mut *table, InterruptDescriptorTable::new()));
+        }
+        // Copy the table to the exchange table.
+        let exchange = self
+            .exchange
+            .try_lock()
+            .expect("Interrupt exchange table is locked");
+
+        // Copy the exchange table to the real table.
+        table.clone_from(&*exchange);
+
         old
     }
 
@@ -71,68 +84,60 @@ impl InterruptTable {
     /// Modifications to this table *will not* take effect until `commit` is called,
     /// and this table may not be a complete representation of the loaded interrupt table.
     pub fn modify(&self) -> MutexGuard<InterruptDescriptorTable> {
-        self.exchange.get()
+        self.exchange
+            .try_lock()
+            .expect("Interrupt exchange table is locked")
     }
 }
 
-/// Wrapper for an interrupt handler. Based on [this implementation](https://github.com/bendudson/EuraliOS/blob/main/kernel/src/interrupts.rs#L117)
-/// which is further based on another rust os which I'm not bothering to go down the rabbit hole to find.
-#[macro_export]
-macro_rules! interrupt_wrapper {
-    ($handler: ident, $raw: ident) => {
-        #[naked]
-        pub extern "x86-interrupt" fn $raw(_: InterruptStackFrame) {
-            unsafe {
-                ::core::arch::naked_asm! {
-                    // Disable interrupts.
-                    "cli",
-                    // Push all registers to the stack. Push the registers in the OPPOSITE order that they are defined in InterruptRegisters.
-                    "push rax",
-                    "push rbx",
-                    "push rcx",
-                    "push rdx",
-                    "push rbp",
-                    "push rdi",
-                    "push rsi",
-                    "push r8",
-                    "push r9",
-                    "push r10",
-                    "push r11",
-                    "push r12",
-                    "push r13",
-                    "push r14",
-                    "push r15",
+declare_module!("interrupts", init);
 
-                    // TODO: We don't do any floating point stuff yet, so we don't need to save the floating point registers.
-
-                    // C abi requires that the first parameter is in rdi, so we need to move the stack pointer to rdi.
-                    "mov rdi, rsp",
-                    "call {handler}",
-
-                    // Pop all registers from the stack. Pop the registers in the SAME order that they are defined in InterruptRegisters.
-                    "pop r15",
-                    "pop r14",
-                    "pop r13",
-                    "pop r12",
-                    "pop r11",
-                    "pop r10",
-                    "pop r9",
-                    "pop r8",
-                    "pop rsi",
-                    "pop rdi",
-                    "pop rbp",
-                    "pop rdx",
-                    "pop rcx",
-                    "pop rbx",
-                    "pop rax",
-
-                    // Re-enable interrupts.
-                    "sti",
-                    // Return from interrupt.
-                    "iretq",
-                    handler = sym $handler,
-                }
-            }
-        }
-    };
+pub fn init() -> Result<(), Infallible> {
+    x86_64::instructions::interrupts::disable();
+    init_interrupt_table!(
+        exception::general_code_handler,
+        exception::page_fault_handler,
+        exception::general_handler,
+        IDT
+    );
+    unsafe {
+        IDT.commit();
+    }
+    x86_64::instructions::interrupts::enable();
+    Ok(())
 }
+
+const BASIC_HANDLERS: [&'static str; 32] = [
+    "DIVIDE ERROR",
+    "DEBUG",
+    "NON MASKABLE INTERRUPT",
+    "BREAKPOINT",
+    "OVERFLOW",
+    "BOUND RANGE EXCEEDED",
+    "INVALID OPCODE",
+    "DEVICE NOT AVAILABLE",
+    "DOUBLE FAULT",
+    "COPROCESSOR SEGMENT OVERRUN",
+    "INVALID TSS",
+    "SEGMENT NOT PRESENT",
+    "STACK SEGMENT FAULT",
+    "GENERAL PROTECTION FAULT",
+    "PAGE FAULT",
+    "RESERVED",
+    "X87 FLOATING POINT EXCEPTION",
+    "ALIGNMENT CHECK",
+    "MACHINE CHECK",
+    "SIMD FLOATING POINT EXCEPTION",
+    "VIRTUALIZATION EXCEPTION",
+    "CONTROL PROTECTION EXCEPTION",
+    "RESERVED",
+    "RESERVED",
+    "RESERVED",
+    "RESERVED",
+    "RESERVED",
+    "RESERVED",
+    "HYPERVISOR INJECTION EXCEPTION",
+    "VMM COMMUNICATION EXCEPTION",
+    "SECURITY EXCEPTION",
+    "RESERVED",
+];

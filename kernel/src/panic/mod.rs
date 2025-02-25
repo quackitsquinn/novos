@@ -4,7 +4,7 @@ use spin::Once;
 
 use crate::{
     declare_module, hlt_loop,
-    memory::allocator,
+    memory::{self, allocator},
     print, println,
     serial::{self, raw::SerialPort},
     testing,
@@ -38,25 +38,30 @@ pub fn panic_extended_info(pi: &PanicInfo) {
     write_location(pi);
     println!();
     println!("{}", pi.message());
-    println!("=== HEAP STATE ===");
-    println!("Main heap:");
-    // Safety: We are in a panic, so the allocator should be completely halted
-    let alloc = unsafe { allocator::ALLOCATOR.force_get() };
-    alloc.blocks.print_state();
-    // Drop the allocator so that it isn't locked when we print to the screen
-    drop(alloc);
-    println!("Sending heap state to serial");
-    let alloc = unsafe { allocator::ALLOCATOR.force_get() };
-    alloc.blocks.export_block_binary("heap.raw");
-    drop(alloc);
-    if cfg!(test) {
-        println!("Test heap:");
-        // Safety: Same as above
-        let alloc = unsafe { crate::memory::allocator::TEST_ALLOCATOR.force_get() };
+    if memory::allocator::ALLOCATOR.is_initialized() {
+        println!("=== HEAP STATE ===");
+        println!("Main heap:");
+        // Safety: We are in a panic, so the allocator should be completely halted
+        let alloc = unsafe { allocator::ALLOCATOR.force_get() };
         alloc.blocks.print_state();
-        println!("Sending test heap state to serial");
-        alloc.blocks.export_block_binary("test_heap.raw");
+        // Drop the allocator so that it isn't locked when we print to the screen
+        drop(alloc);
+        println!("Sending heap state to serial");
+        let alloc = unsafe { allocator::ALLOCATOR.force_get() };
+        alloc.blocks.export_block_binary("heap.raw");
+        drop(alloc);
+        if cfg!(test) {
+            println!("Test heap:");
+            // Safety: Same as above
+            let alloc = unsafe { crate::memory::allocator::TEST_ALLOCATOR.force_get() };
+            alloc.blocks.print_state();
+            println!("Sending test heap state to serial");
+            alloc.blocks.export_block_binary("test_heap.raw");
+        }
+    } else {
+        println!("Heap allocator not initialized");
     }
+
     println!("=== STACK TRACE ===");
     stacktrace::print_trace();
     println!("=== END OF PANIC ===");

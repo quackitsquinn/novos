@@ -14,7 +14,6 @@ extern crate alloc;
 
 use core::arch::asm;
 
-use interrupts::{set_custom_handler, CUSTOM_HANDLERS};
 use limine::BaseRevision;
 use log::info;
 use spin::Once;
@@ -74,6 +73,10 @@ pub(crate) unsafe fn init_kernel_services() {
     display::MODULE.init();
     pci::MODULE.init();
     info!("Kernel services initialized");
+    // Test a dummy interrupt
+    unsafe {
+        asm!("int 0x0");
+    }
 }
 
 #[macro_export]

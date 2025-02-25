@@ -35,7 +35,7 @@ impl<'a, T> OnceMutex<T> {
     pub fn mutex(&self) -> &'a Mutex<T> {
         unsafe { &*(self.inner.get().unwrap() as *const Mutex<T>) }
     }
-
+    #[track_caller]
     pub fn get(&self) -> MutexGuard<T> {
         let i = self
             .inner
