@@ -18,7 +18,7 @@ use limine::BaseRevision;
 use log::info;
 use spin::Once;
 
-pub mod ctx;
+pub mod context;
 pub mod display;
 mod gdt;
 pub mod interrupts;
@@ -73,10 +73,6 @@ pub(crate) unsafe fn init_kernel_services() {
     display::MODULE.init();
     pci::MODULE.init();
     info!("Kernel services initialized");
-    // Test a dummy interrupt
-    unsafe {
-        asm!("int 0x0");
-    }
 }
 
 #[macro_export]

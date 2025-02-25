@@ -130,7 +130,7 @@ mod tests {
 
     use crate::memory::paging::virt::VirtualAddressRange;
 
-    use super::VirtualAddressMapper;
+    
 
     #[test("VAM allocate", can_recover = true)]
     pub fn test_vam_allocate() {

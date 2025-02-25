@@ -1,5 +1,5 @@
 use crate::{
-    ctx::{InterruptCodeContext, InterruptContext, PageFaultInterruptContext},
+    context::{InterruptCodeContext, InterruptContext, PageFaultInterruptContext},
     panic::stacktrace::{self, StackFrame},
     println,
 };

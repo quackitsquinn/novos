@@ -49,7 +49,7 @@ fn init() -> Result<(), Infallible> {
     unsafe {
         let mut p = PICS.lock();
         // Unmask interrupts (afaik it's lsb first? idk)
-        //p.write_masks(0b11111110, 0b11111111);
+        p.write_masks(0b11111110, 0b11111111);
         p.initialize();
     }
     x86_64::instructions::interrupts::enable();
