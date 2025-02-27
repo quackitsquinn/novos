@@ -14,6 +14,7 @@ extern crate alloc;
 
 use core::arch::asm;
 
+use alloc::boxed::Box;
 use limine::BaseRevision;
 use log::info;
 use spin::Once;
@@ -25,6 +26,7 @@ pub mod interrupts;
 pub mod memory;
 pub mod panic;
 pub mod pci;
+pub mod proc;
 pub mod serial;
 pub mod testing;
 pub mod util;

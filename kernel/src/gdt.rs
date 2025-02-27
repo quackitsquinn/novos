@@ -16,7 +16,7 @@ use crate::util::KernelModule;
 pub const IST_FAULT_INDEX: u16 = 0;
 
 lazy_static! {
-    static ref TSS: TaskStateSegment = {
+    pub static ref TSS: TaskStateSegment = {
         let mut tss = TaskStateSegment::new();
         tss.interrupt_stack_table[IST_FAULT_INDEX as usize] = {
             const STACK_SIZE: u64 = crate::STACK_SIZE;
@@ -28,7 +28,7 @@ lazy_static! {
         };
         tss
     };
-    static ref GDT: (GlobalDescriptorTable, Selectors) = {
+    pub static ref GDT: (GlobalDescriptorTable, Selectors) = {
         let mut gdt = GlobalDescriptorTable::new();
         let kcode = gdt.append(Descriptor::kernel_code_segment());
         let kdata = gdt.append(Descriptor::kernel_data_segment());
@@ -59,8 +59,22 @@ fn init() -> Result<(), Infallible> {
     Ok(())
 }
 
-struct Selectors {
+pub struct Selectors {
     code_selector: SegmentSelector,
     data_selector: SegmentSelector,
     tss_selector: SegmentSelector,
+}
+
+impl Selectors {
+    pub fn code_selector(&self) -> SegmentSelector {
+        self.code_selector
+    }
+
+    pub fn data_selector(&self) -> SegmentSelector {
+        self.data_selector
+    }
+
+    pub fn tss_selector(&self) -> SegmentSelector {
+        self.tss_selector
+    }
 }

@@ -1,4 +1,13 @@
-use x86_64::structures::idt::{InterruptStackFrame, InterruptStackFrameValue};
+use core::arch::asm;
+
+use x86_64::{
+    registers::rflags::RFlags,
+    structures::{
+        gdt::SegmentSelector,
+        idt::{InterruptStackFrame, InterruptStackFrameValue},
+    },
+    VirtAddr,
+};
 
 use super::Context;
 
@@ -22,6 +31,16 @@ impl InterruptContext {
         ctx
     }
 
+    pub unsafe fn new(rip: VirtAddr, rsp: VirtAddr, cs: SegmentSelector) -> InterruptContext {
+        let mut ctx = Self::zero();
+        ctx.int_frame.instruction_pointer = rip;
+        ctx.int_frame.stack_pointer = rsp;
+        ctx.int_frame.code_segment = cs;
+        // TODO: Check if this is correct
+        ctx.int_frame.cpu_flags = RFlags::INTERRUPT_FLAG | RFlags::IOPL_LOW | RFlags::IOPL_HIGH;
+        ctx
+    }
+
     pub unsafe fn switch(&mut self, to: &mut Self) -> Self {
         let mut old = Self::zero();
         unsafe {
@@ -29,6 +48,14 @@ impl InterruptContext {
             core::ptr::copy_nonoverlapping(to, self, 1);
         }
         old
+    }
+
+    pub unsafe fn load(&self, old: &mut Self) {
+        unsafe {
+            asm! {
+                ""
+            }
+        }
     }
 }
 

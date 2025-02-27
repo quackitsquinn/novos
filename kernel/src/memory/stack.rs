@@ -1,14 +1,16 @@
 use log::info;
 use x86_64::{
-    structures::paging::{OffsetPageTable, Page, PageTableFlags},
+    structures::paging::{OffsetPageTable, Page, PageTableFlags, Size4KiB},
     VirtAddr,
 };
 
-use super::paging::phys::{
-    mapper::MapError,
-    FRAME_ALLOCATOR,
+use super::paging::{
+    phys::{mapper::MapError, FRAME_ALLOCATOR},
+    virt::{virt_alloc::VirtualAddressMapper, VIRT_MAPPER},
 };
 
+/// Represents a stack in the system.
+#[derive(Debug, Clone, Copy)]
 pub struct Stack {
     pub stack_base: VirtAddr,
     pub start_page: Page,
@@ -51,7 +53,7 @@ impl Stack {
         Ok(stack)
     }
 
-    pub fn allocate_kernel_stack(
+    pub fn create_kernel_stack(
         size: u64,
         start_page: Page,
         stack_flags: StackFlags,
@@ -70,6 +72,21 @@ impl Stack {
 
         let stack = unsafe { Self::new(&start_page, &end_page) };
         Ok(stack)
+    }
+
+    pub fn allocate_kernel_stack(size: u64, stack_flags: StackFlags) -> Result<Self, MapError> {
+        // Map enough pages for the stack
+        let range = VIRT_MAPPER
+            .get()
+            .allocate(size)
+            .ok_or(MapError::NoUsableMemory)?;
+        let start_page = Page::containing_address(range.start);
+        let end_page: Page<Size4KiB> = Page::containing_address(range.end());
+        info!(
+            "Allocating kernel stack: {:#x?} - {:#x?}",
+            start_page, end_page
+        );
+        Self::create_kernel_stack(size, start_page, stack_flags)
     }
 
     pub fn deallocate_stack(self, offset_table: &mut OffsetPageTable) -> Result<(), MapError> {
