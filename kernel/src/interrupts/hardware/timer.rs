@@ -2,6 +2,7 @@ use core::{hint::spin_loop, time::Duration};
 
 use x86_64::{instructions::interrupts::without_interrupts, structures::idt::InterruptStackFrame};
 
+use crate::{context::InterruptContext, interrupt_wrapper, println, proc::sched_next};
 
 use super::InterruptIndex;
 
@@ -10,15 +11,19 @@ static mut TICKS: u64 = 0;
 
 pub const TIMER_FREQUENCY: f32 = 18.2065; // stolen from https://wiki.osdev.org/Programmable_Interval_Timer
 
-pub(super) extern "x86-interrupt" fn timer_handler(_stack_frame: InterruptStackFrame) {
+pub(super) extern "C" fn timer_handler(frame: InterruptContext) {
     unsafe {
         TICKS += 1;
+
+        sched_next(frame);
 
         super::PICS
             .lock()
             .notify_end_of_interrupt(InterruptIndex::Timer.into());
     }
 }
+
+interrupt_wrapper!(timer_handler, timer_handler_raw);
 
 pub fn get_ticks() -> u64 {
     without_interrupts(|| unsafe { TICKS })

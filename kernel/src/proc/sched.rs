@@ -5,10 +5,11 @@ use crate::{
     context::{InterruptContext, InterruptContextValue},
     gdt::GDT,
     memory::stack::{Stack, StackFlags},
+    println,
 };
 
-use super::{Thread, ThreadID, ThreadState};
-
+use super::{Thread, ThreadID, ThreadState, SCHEDULER};
+#[derive(Debug)]
 pub struct Scheduler {
     // Would using a VecDeque or LinkedList be better?
     // Threads that terminate are removed from the list, so it might be ideal?

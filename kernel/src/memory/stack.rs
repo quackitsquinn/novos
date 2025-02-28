@@ -1,6 +1,6 @@
 use log::info;
 use x86_64::{
-    structures::paging::{OffsetPageTable, Page, PageTableFlags, Size4KiB},
+    structures::paging::{mapper::MapToError, OffsetPageTable, Page, PageTableFlags, Size4KiB},
     VirtAddr,
 };
 
@@ -86,7 +86,13 @@ impl Stack {
             "Allocating kernel stack: {:#x?} - {:#x?}",
             start_page, end_page
         );
-        Self::create_kernel_stack(size, start_page, stack_flags)
+        let res = Self::create_kernel_stack(size, start_page, stack_flags);
+        match res {
+            Err(MapError::MapError(MapToError::PageAlreadyMapped(_))) => {
+                Self::allocate_kernel_stack(size, stack_flags)
+            }
+            _ => res,
+        }
     }
 
     pub fn deallocate_stack(self, offset_table: &mut OffsetPageTable) -> Result<(), MapError> {

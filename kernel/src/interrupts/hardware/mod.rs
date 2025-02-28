@@ -1,4 +1,4 @@
-use core::convert::Infallible;
+use core::{convert::Infallible, mem::transmute};
 
 use pic8259::ChainedPics;
 use spin::Mutex;
@@ -36,7 +36,8 @@ impl Into<usize> for InterruptIndex {
 
 pub(super) fn define_hardware() {
     let mut idt = super::IDT.modify();
-    idt[InterruptIndex::Timer as u8].set_handler_fn(timer::timer_handler);
+    idt[InterruptIndex::Timer as u8]
+        .set_handler_fn(unsafe { transmute(timer::timer_handler_raw as *mut ()) });
     drop(idt);
     unsafe {
         super::IDT.commit();

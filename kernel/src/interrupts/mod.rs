@@ -70,6 +70,13 @@ impl InterruptTable {
         // Copy the exchange table to the real table.
         table.clone_from(&*exchange);
 
+        unsafe {
+            mem::transmute::<&InterruptDescriptorTable, &'static InterruptDescriptorTable>(
+                &*table as &InterruptDescriptorTable,
+            )
+            .load();
+        }
+
         old
     }
 
@@ -98,7 +105,6 @@ pub fn init() -> Result<(), Infallible> {
     }
 
     hardware::define_hardware();
-    x86_64::instructions::interrupts::enable();
     Ok(())
 }
 
@@ -136,3 +142,11 @@ const BASIC_HANDLERS: [&'static str; 32] = [
     "SECURITY EXCEPTION",
     "RESERVED",
 ];
+
+pub fn int_disable() {
+    x86_64::instructions::interrupts::disable();
+}
+
+pub fn int_enable() {
+    x86_64::instructions::interrupts::enable();
+}

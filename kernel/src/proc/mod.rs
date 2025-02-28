@@ -75,16 +75,12 @@ fn init_proc() -> Result<(), Infallible> {
     Ok(())
 }
 // TODO: I don't think this raw pointer is really needed, as it could just be a reference.
-extern "C" fn timer_handler(ctx: InterruptContext) {
+pub fn sched_next(ctx: InterruptContext) {
     // The interrupt wrapper is guaranteed to disable interrupts and reenable them.
-    let mut sch = SCHEDULER.get();
-    let mut next_index = 0;
-    if let Some(tid) = sch.current {
-        let thread = sch
-            .threads
-            .get_mut(&tid)
-            .expect("Current thread does not exist!");
-        thread.context = *&*ctx;
-        thread.state = ThreadState::Waiting
+    if !SCHEDULER.is_initialized() || SCHEDULER.is_locked() {
+        // Still in kernel initialization, just return and continue
+        return;
     }
+    let mut sch = SCHEDULER.get();
+    sch.handle_timer(ctx);
 }

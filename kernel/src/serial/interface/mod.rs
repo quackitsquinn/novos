@@ -4,7 +4,10 @@ use kserial::{client::SerialAdapter, common::Command};
 use serial::Serial;
 use spin::Once;
 
-use crate::util::OnceMutex;
+use crate::{
+    interrupts::{int_disable, int_enable},
+    util::OnceMutex,
+};
 
 pub mod serial;
 

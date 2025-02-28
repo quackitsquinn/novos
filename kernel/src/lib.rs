@@ -15,8 +15,10 @@ extern crate alloc;
 use core::arch::asm;
 
 use alloc::boxed::Box;
+use interrupts::hardware;
 use limine::BaseRevision;
 use log::info;
+use proc::{sched, SCHEDULER};
 use spin::Once;
 
 pub mod context;
@@ -51,6 +53,18 @@ pub fn init_kernel() -> ! {
     unsafe {
         init_kernel_services();
     }
+    x86_64::instructions::interrupts::disable();
+    let mut sched = SCHEDULER.get();
+    for i in 0..5 {
+        sched.spawn(thread_one as _);
+    }
+    println!("{:?}", sched);
+    x86_64::instructions::interrupts::enable();
+    drop(sched);
+    unsafe {
+        asm!("int 0x20");
+    }
+    loop {}
     // TODO: init_kernel_runtime(); or something similar
     hlt_loop()
 }
@@ -70,11 +84,23 @@ pub(crate) unsafe fn init_kernel_services() {
     panic::MODULE.init();
     gdt::MODULE.init();
     interrupts::MODULE.init();
+    hardware::MODULE.init();
     memory::MODULE.init();
     #[cfg(not(test))] // Tests don't have a display
     display::MODULE.init();
     pci::MODULE.init();
+    proc::MODULE.init();
     info!("Kernel services initialized");
+}
+
+extern "C" fn thread_one() -> ! {
+    let mut i = 0;
+    loop {
+        i += 1;
+        x86_64::instructions::interrupts::disable();
+        sprintln!("{}", i);
+        x86_64::instructions::interrupts::enable();
+    }
 }
 
 #[macro_export]
