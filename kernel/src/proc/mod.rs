@@ -1,6 +1,6 @@
 use core::{convert::Infallible, mem, sync::atomic::AtomicU32};
 
-use sched::Scheduler;
+use sched::KernelThreadScheduler;
 use x86_64::structures::paging::PageTable;
 
 use crate::{
@@ -67,20 +67,20 @@ pub enum ThreadState {
 
 declare_module!("proc", init_proc);
 
-pub static SCHEDULER: OnceMutex<Scheduler> = OnceMutex::uninitialized();
+pub static KERNEL_THREAD_SCHEDULER: OnceMutex<KernelThreadScheduler> = OnceMutex::uninitialized();
 
 fn init_proc() -> Result<(), Infallible> {
-    let scheduler = Scheduler::new();
-    SCHEDULER.init(scheduler);
+    let scheduler = KernelThreadScheduler::new();
+    KERNEL_THREAD_SCHEDULER.init(scheduler);
     Ok(())
 }
-// TODO: I don't think this raw pointer is really needed, as it could just be a reference.
+
 pub fn sched_next(ctx: InterruptContext) {
     // The interrupt wrapper is guaranteed to disable interrupts and reenable them.
-    if !SCHEDULER.is_initialized() || SCHEDULER.is_locked() {
+    if !KERNEL_THREAD_SCHEDULER.is_initialized() || KERNEL_THREAD_SCHEDULER.is_locked() {
         // Still in kernel initialization, just return and continue
         return;
     }
-    let mut sch = SCHEDULER.get();
-    sch.handle_timer(ctx);
+    let mut sch = KERNEL_THREAD_SCHEDULER.get();
+    sch.switch(ctx);
 }

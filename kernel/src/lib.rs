@@ -18,7 +18,7 @@ use alloc::boxed::Box;
 use interrupts::hardware;
 use limine::BaseRevision;
 use log::info;
-use proc::{sched, SCHEDULER};
+use proc::{sched, KERNEL_THREAD_SCHEDULER};
 use spin::Once;
 
 pub mod context;
@@ -54,7 +54,7 @@ pub fn init_kernel() -> ! {
         init_kernel_services();
     }
     x86_64::instructions::interrupts::disable();
-    let mut sched = SCHEDULER.get();
+    let mut sched = KERNEL_THREAD_SCHEDULER.get();
     for i in 0..5 {
         sched.spawn(thread_one as _);
     }

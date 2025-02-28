@@ -8,9 +8,9 @@ use crate::{
     println,
 };
 
-use super::{Thread, ThreadID, ThreadState, SCHEDULER};
+use super::{Thread, ThreadID, ThreadState, KERNEL_THREAD_SCHEDULER};
 #[derive(Debug)]
-pub struct Scheduler {
+pub struct KernelThreadScheduler {
     // Would using a VecDeque or LinkedList be better?
     // Threads that terminate are removed from the list, so it might be ideal?
     pub threads: BTreeMap<ThreadID, Thread>,
@@ -20,9 +20,9 @@ pub struct Scheduler {
 // TODO: Can `extern "C"` be safely removed?
 pub type ThreadEntry = extern "C" fn() -> !;
 
-impl Scheduler {
+impl KernelThreadScheduler {
     pub fn new() -> Self {
-        Scheduler {
+        KernelThreadScheduler {
             threads: BTreeMap::new(),
             current: None,
             index: 0,
@@ -51,7 +51,7 @@ impl Scheduler {
         let thread = Thread::from_stack_context(stack, context);
         self.add_thread(thread);
     }
-    pub fn handle_timer(&mut self, ctx: InterruptContext) {
+    pub fn switch(&mut self, ctx: InterruptContext) {
         if self.threads.is_empty() {
             // No threads to schedule, just return and continue execution.
             return;
