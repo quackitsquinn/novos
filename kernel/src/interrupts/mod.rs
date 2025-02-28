@@ -8,7 +8,10 @@ pub mod hardware;
 mod macros;
 
 use crate::{
-    context::{InterruptCodeContext, InterruptContext, PageFaultInterruptContext},
+    context::{
+        InterruptCodeContext, InterruptCodeContextValue, InterruptContext, InterruptContextValue,
+        PageFaultInterruptContext, PageFaultInterruptContextValue,
+    },
     declare_module, init_interrupt_table, interrupt_wrapper,
 };
 
@@ -21,9 +24,9 @@ pub struct InterruptTable {
     init: Once<()>,
 }
 
-pub type CodeHandler = fn(ctx: *mut InterruptCodeContext, index: u8, name: &'static str);
-pub type InterruptHandler = fn(ctx: *mut InterruptContext, index: u8, name: &'static str);
-pub type PageFaultHandler = fn(*mut PageFaultInterruptContext);
+pub type CodeHandler = fn(ctx: InterruptCodeContext, index: u8, name: &'static str);
+pub type InterruptHandler = fn(ctx: InterruptContext, index: u8, name: &'static str);
+pub type PageFaultHandler = fn(ctx: PageFaultInterruptContext);
 
 impl InterruptTable {
     /// Create a new, uninitialized interrupt table.

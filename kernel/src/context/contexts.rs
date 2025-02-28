@@ -3,8 +3,8 @@ use core::fmt::Display;
 use x86_64::structures::idt::{InterruptStackFrameValue, PageFaultErrorCode};
 
 #[repr(C)]
-#[derive(Debug, Clone)]
-pub struct Context {
+#[derive(Debug, Clone, Copy)]
+pub struct ContextValue {
     pub r15: u64,
     pub r14: u64,
     pub r13: u64,
@@ -22,13 +22,13 @@ pub struct Context {
     pub rax: u64,
 }
 
-impl Context {
-    pub const fn zero() -> Context {
+impl ContextValue {
+    pub const fn zero() -> ContextValue {
         unsafe { core::mem::zeroed() }
     }
 }
 
-impl Display for Context {
+impl Display for ContextValue {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str("\n")?;
         macro_rules! p {
@@ -76,15 +76,15 @@ impl Display for Context {
 }
 
 #[repr(C)]
-#[derive(Debug)]
-pub struct PageFaultInterruptContext {
-    pub context: Context,
+#[derive(Debug, Clone, Copy)]
+pub struct PageFaultInterruptContextValue {
+    pub context: ContextValue,
     pub int_frame: InterruptStackFrameValue,
     pub error_code: PageFaultErrorCode,
 }
 
-impl PageFaultInterruptContext {
-    pub const fn zero() -> PageFaultInterruptContext {
+impl PageFaultInterruptContextValue {
+    pub const fn zero() -> PageFaultInterruptContextValue {
         unsafe { core::mem::zeroed() }
     }
 }

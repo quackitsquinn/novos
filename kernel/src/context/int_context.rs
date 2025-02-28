@@ -9,29 +9,29 @@ use x86_64::{
     VirtAddr,
 };
 
-use super::Context;
+use super::ContextValue;
 
 /// A representation of the context of an interrupt.
 /// Modifications to this struct *WILL* be used when the interrupt returns, so be careful.
 #[repr(C)]
-#[derive(Debug, Clone)]
-pub struct InterruptContext {
-    pub context: Context,
+#[derive(Debug, Clone, Copy)]
+pub struct InterruptContextValue {
+    pub context: ContextValue,
     pub int_frame: InterruptStackFrameValue,
 }
 
-impl InterruptContext {
-    pub const fn zero() -> InterruptContext {
+impl InterruptContextValue {
+    pub const fn zero() -> InterruptContextValue {
         unsafe { core::mem::zeroed() }
     }
 
-    pub unsafe fn zero_with_frame(frame: InterruptStackFrame) -> InterruptContext {
+    pub unsafe fn zero_with_frame(frame: InterruptStackFrame) -> InterruptContextValue {
         let mut ctx = Self::zero();
         ctx.int_frame = *frame;
         ctx
     }
 
-    pub unsafe fn new(rip: VirtAddr, rsp: VirtAddr, cs: SegmentSelector) -> InterruptContext {
+    pub unsafe fn new(rip: VirtAddr, rsp: VirtAddr, cs: SegmentSelector) -> InterruptContextValue {
         let mut ctx = Self::zero();
         ctx.int_frame.instruction_pointer = rip;
         ctx.int_frame.stack_pointer = rsp;
@@ -49,30 +49,25 @@ impl InterruptContext {
         }
         old
     }
-
-    pub unsafe fn load(&self, old: &mut Self) {
-        unsafe {
-            asm! {
-                ""
-            }
-        }
-    }
 }
 
 #[repr(C)]
-#[derive(Debug, Clone)]
-pub struct InterruptCodeContext {
-    pub context: Context,
+#[derive(Debug, Clone, Copy)]
+pub struct InterruptCodeContextValue {
+    pub context: ContextValue,
     pub code: u64,
     pub int_frame: InterruptStackFrameValue,
 }
 
-impl InterruptCodeContext {
-    pub const fn zero() -> InterruptCodeContext {
+impl InterruptCodeContextValue {
+    pub const fn zero() -> InterruptCodeContextValue {
         unsafe { core::mem::zeroed() }
     }
 
-    pub unsafe fn zero_with_frame(frame: InterruptStackFrame, code: u64) -> InterruptCodeContext {
+    pub unsafe fn zero_with_frame(
+        frame: InterruptStackFrame,
+        code: u64,
+    ) -> InterruptCodeContextValue {
         let mut ctx = Self::zero();
         ctx.int_frame = *frame;
         ctx.code = code;

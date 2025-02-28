@@ -64,7 +64,7 @@ macro_rules! define_interrupt {
     ($tbl: expr, $inner: path, $name: ident, $code: literal) => {
         ::paste::paste! {
             extern "C" fn [<_$name>](ctx: *mut ()) {
-                $inner(ctx.cast(), $code, BASIC_HANDLERS[$code as usize]);
+                $inner(unsafe {mem::transmute(ctx)}, $code, BASIC_HANDLERS[$code as usize]);
             }
             interrupt_wrapper!([<_$name>], [<raw_$name>]);
             $tbl.$name.set_handler_fn(unsafe {mem::transmute([<raw_$name>] as *const ())});

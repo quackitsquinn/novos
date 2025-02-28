@@ -1,11 +1,13 @@
 use crate::{
-    context::{InterruptCodeContext, InterruptContext, PageFaultInterruptContext},
+    context::{
+        InterruptCodeContext, InterruptCodeContextValue, InterruptContext, InterruptContextValue,
+        PageFaultInterruptContext, PageFaultInterruptContextValue,
+    },
     panic::stacktrace::{self, StackFrame},
     println,
 };
 
-pub fn general_handler(ctx: *mut InterruptContext, _: u8, name: &'static str) {
-    let ctx = unsafe { &mut *ctx };
+pub fn general_handler(ctx: InterruptContext, _: u8, name: &'static str) {
     println!("===== {} =====", name);
     println!("(no error code)");
     println!("== CPU STATE ==");
@@ -15,8 +17,7 @@ pub fn general_handler(ctx: *mut InterruptContext, _: u8, name: &'static str) {
     loop {}
 }
 
-pub fn general_code_handler(ctx: *mut InterruptCodeContext, _: u8, name: &'static str) {
-    let ctx = unsafe { &mut *ctx };
+pub fn general_code_handler(ctx: InterruptCodeContext, _: u8, name: &'static str) {
     println!("===== {} =====", name);
     println!("ERROR CODE: {:?}", ctx.code);
     println!("== CPU STATE ==");
@@ -26,8 +27,7 @@ pub fn general_code_handler(ctx: *mut InterruptCodeContext, _: u8, name: &'stati
     loop {}
 }
 
-pub fn page_fault_handler(page_fault_ctx: *mut PageFaultInterruptContext) {
-    let ctx = unsafe { &mut *page_fault_ctx };
+pub fn page_fault_handler(ctx: PageFaultInterruptContext) {
     println!("===== PAGE FAULT =====");
     println!("{:?}", ctx.error_code);
     println!("== CPU STATE ==");

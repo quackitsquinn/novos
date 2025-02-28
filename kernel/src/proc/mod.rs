@@ -4,7 +4,7 @@ use sched::Scheduler;
 use x86_64::structures::paging::PageTable;
 
 use crate::{
-    context::{Context, InterruptContext},
+    context::{ContextValue, InterruptContext, InterruptContextValue},
     declare_module,
     memory::stack::Stack,
     util::OnceMutex,
@@ -24,14 +24,19 @@ pub struct Thread {
     pub name: &'static str,
     pub state: ThreadState,
     pub stack: Stack,
-    pub context: InterruptContext,
+    pub context: InterruptContextValue,
     // TODO: pub ring: PrivilegeLevel
     // TODO: pub parent: ProcessID
 }
 
 impl Thread {
     /// Creates a new thread with the given `pid`, `name`, `stack`, and `context`.
-    pub fn new(pid: ThreadID, name: &'static str, stack: Stack, context: InterruptContext) -> Self {
+    pub fn new(
+        pid: ThreadID,
+        name: &'static str,
+        stack: Stack,
+        context: InterruptContextValue,
+    ) -> Self {
         Thread {
             pid,
             name,
@@ -41,12 +46,12 @@ impl Thread {
         }
     }
     /// Creates a new thread with the given `stack` and `context`.
-    pub fn from_stack_context(stack: Stack, context: InterruptContext) -> Self {
+    pub fn from_stack_context(stack: Stack, context: InterruptContextValue) -> Self {
         let pid = NEXT_PID.fetch_add(1, core::sync::atomic::Ordering::SeqCst);
         Thread::new(pid, "main", stack, context)
     }
     /// Updates the thread's context and returns the old context.
-    pub fn update_context(&mut self, context: InterruptContext) -> InterruptContext {
+    pub fn update_context(&mut self, context: InterruptContextValue) -> InterruptContextValue {
         mem::replace(&mut self.context, context)
     }
 }
@@ -69,7 +74,17 @@ fn init_proc() -> Result<(), Infallible> {
     SCHEDULER.init(scheduler);
     Ok(())
 }
-
-extern "C" fn timer_handler(ctx: *mut InterruptContext) {
-    let mut scheduler = SCHEDULER.get();
+// TODO: I don't think this raw pointer is really needed, as it could just be a reference.
+extern "C" fn timer_handler(ctx: InterruptContext) {
+    // The interrupt wrapper is guaranteed to disable interrupts and reenable them.
+    let mut sch = SCHEDULER.get();
+    let mut next_index = 0;
+    if let Some(tid) = sch.current {
+        let thread = sch
+            .threads
+            .get_mut(&tid)
+            .expect("Current thread does not exist!");
+        thread.context = *&*ctx;
+        thread.state = ThreadState::Waiting
+    }
 }
