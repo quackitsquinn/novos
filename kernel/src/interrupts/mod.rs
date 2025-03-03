@@ -143,10 +143,17 @@ const BASIC_HANDLERS: [&'static str; 32] = [
     "RESERVED",
 ];
 
-pub fn int_disable() {
+pub fn disable() {
     x86_64::instructions::interrupts::disable();
 }
 
-pub fn int_enable() {
+pub fn enable() {
     x86_64::instructions::interrupts::enable();
+}
+
+pub fn without_interrupts<F, R>(f: F) -> R
+where
+    F: FnOnce() -> R,
+{
+    x86_64::instructions::interrupts::without_interrupts(f)
 }

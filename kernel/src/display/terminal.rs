@@ -5,7 +5,7 @@ use log::debug;
 
 use crate::{
     framebuffer,
-    interrupts::{int_disable, int_enable},
+    interrupts::{disable, enable, without_interrupts},
     terminal,
 };
 
@@ -185,12 +185,12 @@ impl Write for Terminal {
 #[doc(hidden)]
 pub fn _print(args: core::fmt::Arguments) {
     use core::fmt::Write;
-    int_disable();
-    crate::serial::interface::_print(args);
-    if super::is_initialized() {
-        write!(*terminal!(), "{}", args).unwrap();
-    }
-    int_enable();
+    without_interrupts(|| {
+        crate::serial::interface::_print(args);
+        if super::is_initialized() {
+            write!(*terminal!(), "{}", args).unwrap();
+        }
+    });
 }
 
 #[macro_export]

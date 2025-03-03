@@ -54,21 +54,8 @@ pub fn init_kernel() -> ! {
         init_kernel_services();
     }
     x86_64::instructions::interrupts::disable();
-    let mut sched = KERNEL_THREAD_SCHEDULER.get();
-    for i in 0..5 {
-        sched.spawn(thread_one as _);
-    }
-    println!("{:?}", sched);
-    x86_64::instructions::interrupts::enable();
-    drop(sched);
-    unsafe {
-        asm!("int 0x20");
-    }
     loop {}
-    // TODO: init_kernel_runtime(); or something similar
-    hlt_loop()
 }
-
 /// Loads all the kernel services that will not take over the system.
 ///
 /// # Safety

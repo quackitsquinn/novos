@@ -20,21 +20,10 @@ impl log::Log for SerialLog {
 
     fn log(&self, record: &log::Record) {
         if self.enabled(record.metadata()) {
-            if TERMINAL.is_initialized() && !TERMINAL.is_locked() {
-                println!(
-                    "[{}] {}: {}",
-                    record.level(),
-                    record.target(),
-                    record.args()
-                );
-                return;
-            }
-            sprintln!(
-                "[{}] {}: {}",
-                record.level(),
-                record.target(),
-                record.args()
-            );
+            let file = record.file().unwrap_or("?");
+            let line = record.line().unwrap_or(0);
+            println!("[{}] {}:{} {}", record.level(), file, line, record.args());
+            return;
         }
     }
 

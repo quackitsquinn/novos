@@ -5,7 +5,7 @@ use serial::Serial;
 use spin::Once;
 
 use crate::{
-    interrupts::{int_disable, int_enable},
+    interrupts::{disable, enable},
     util::OnceMutex,
 };
 
