@@ -40,22 +40,6 @@ impl TestFunction {
         }
     }
     pub fn run(&self) {
-        #[allow(unused_unsafe)]
-        {
-            if crate::memory::allocator::TEST_ALLOCATOR.is_locked() {
-                unsafe {
-                    // SAFETY: We got here due to a panic, so we need to unlock the allocator. The `clear` call is safe because no tests should modify the block table.
-                    crate::memory::allocator::TEST_ALLOCATOR.force_unlock();
-                }
-            }
-            unsafe {
-                #[cfg(test)]
-                crate::memory::allocator::TEST_ALLOCATOR
-                    .get()
-                    .blocks
-                    .clear();
-            }
-        }
         if let Some(count) = self.bench_count {
             self.do_bench(count);
         } else {

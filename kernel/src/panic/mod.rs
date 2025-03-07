@@ -42,22 +42,12 @@ pub fn panic_extended_info(pi: &PanicInfo) {
         println!("=== HEAP STATE ===");
         println!("Main heap:");
         // Safety: We are in a panic, so the allocator should be completely halted
-        let alloc = unsafe { allocator::ALLOCATOR.force_get() };
-        alloc.blocks.print_state();
+        let alloc = unsafe { allocator::ALLOCATOR.force_get().unwrap() };
+        alloc.print_state();
         // Drop the allocator so that it isn't locked when we print to the screen
-        drop(alloc);
         println!("Sending heap state to serial");
-        let alloc = unsafe { allocator::ALLOCATOR.force_get() };
-        alloc.blocks.export_block_binary("heap.raw");
-        drop(alloc);
-        if cfg!(test) {
-            println!("Test heap:");
-            // Safety: Same as above
-            let alloc = unsafe { crate::memory::allocator::TEST_ALLOCATOR.force_get() };
-            alloc.blocks.print_state();
-            println!("Sending test heap state to serial");
-            alloc.blocks.export_block_binary("test_heap.raw");
-        }
+
+        // alloc.blocks.export_block_binary("heap.raw"); TODO: Update this to use the new allocator
     } else {
         println!("Heap allocator not initialized");
     }

@@ -1,12 +1,16 @@
 #![no_std]
 #![no_main]
+/* FEATURES */
 #![feature(abi_x86_interrupt)]
-#![forbid(unsafe_op_in_unsafe_fn)]
 #![feature(custom_test_frameworks)]
 #![feature(maybe_uninit_uninit_array)]
 #![feature(allocator_api)]
 #![feature(pointer_is_aligned_to)]
 #![feature(naked_functions)]
+/* LINT OPTS */
+#![forbid(unsafe_op_in_unsafe_fn)]
+#![warn(missing_debug_implementations)]
+/* TEST RUNNER */
 #![test_runner(crate::testing::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 

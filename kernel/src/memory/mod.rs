@@ -2,7 +2,8 @@ use core::convert::Infallible;
 
 use log::info;
 use x86_64::{
-    structures::paging::{page::PageRangeInclusive, Page, PageTableFlags, Size4KiB}, VirtAddr,
+    structures::paging::{page::PageRangeInclusive, Page, PageTableFlags, Size4KiB},
+    VirtAddr,
 };
 
 use crate::declare_module;
@@ -13,10 +14,10 @@ pub mod stack;
 
 // Evaluates to 0x4156_4F4E_0000
 pub const HEAP_MEM_OFFSET: VirtAddr = VirtAddr::new((u32::from_ne_bytes(*b"NOVA") as u64) << 16);
-pub const HEAP_SIZE: u64 = 1024 * 512; // 512 KiB
+pub const HEAP_SIZE: u64 = 1024 * 1024 * 2; // 2 MB
 
 pub const TEST_HEAP_MEM_OFFSET: VirtAddr = VirtAddr::new(HEAP_MEM_OFFSET.as_u64() + HEAP_SIZE);
-pub const TEST_HEAP_SIZE: u64 = HEAP_SIZE; // 512 KiB
+pub const TEST_HEAP_SIZE: u64 = HEAP_SIZE; // 2 MB
 
 declare_module!("memory", init);
 
@@ -29,13 +30,6 @@ fn init() -> Result<(), Infallible> {
 
 fn init_heap() {
     configure_heap_allocator("Kernel", allocator::init, HEAP_MEM_OFFSET, HEAP_SIZE);
-    configure_heap_allocator(
-        "Kernel Test",
-        allocator::init_test,
-        // Align the test heap to a 4 KiB boundary
-        TEST_HEAP_MEM_OFFSET.align_up(4096u64),
-        TEST_HEAP_SIZE,
-    );
 }
 
 /// Configure a heap allocator with the given name, allocator function, and heap size.

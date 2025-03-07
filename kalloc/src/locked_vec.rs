@@ -6,6 +6,8 @@ use core::{
 };
 
 /// A mostly raw vector that requires explicit capacity management.
+///
+/// This type is mainly intended for use in kernel allocators, where the vector cannot use rustc's inbuilt allocation mechanisms.
 pub struct LockedVec<T> {
     base: *mut T,
     len: usize,
@@ -21,6 +23,9 @@ impl<T> LockedVec<T> {
     /// - The base pointer is not used for any other purpose while the vector is alive.
     pub unsafe fn new(base: *mut T, capacity: usize) -> Self {
         assert!(base.is_aligned(), "base pointer must be aligned");
+        unsafe {
+            base.write_bytes(0, capacity);
+        }
         Self {
             base,
             len: 0,
@@ -100,8 +105,13 @@ impl<T> LockedVec<T> {
         let old_ptr = self.base;
         let new_ptr = unsafe { self.base.sub(count) };
         self.capacity += count;
+        self.base = new_ptr;
         // SAFETY: The caller must ensure that the new pointer is valid.
         unsafe { ptr::copy(old_ptr, new_ptr, self.len) };
+    }
+    /// Returns whether the vector is at capacity.
+    pub fn at_capacity(&self) -> bool {
+        self.len == self.capacity
     }
 }
 
@@ -146,19 +156,23 @@ impl<T> Drop for LockedVec<T> {
     fn drop(&mut self) {
         // SAFETY: The vector is the sole owner of the memory.
         unsafe {
-            core::ptr::drop_in_place(core::slice::from_raw_parts_mut(self.base, self.len));
+            for i in 0..self.len {
+                ptr::drop_in_place(self.base.add(i));
+            }
         }
     }
 }
 
+#[cfg(test)]
 mod tests {
-    use super::*;
-    use kproc::test;
+    use core::slice;
+
+    use crate::locked_vec::LockedVec;
 
     // This is kinda gross, but it's easy.
     static mut ARENA: [u32; 0x100] = [0; 0x100];
 
-    #[test("LockedVec push")]
+    #[test]
     fn test_push() {
         let mut vec = unsafe { LockedVec::new((&raw mut ARENA) as *mut u32, 4) };
         assert!(vec.push(1).is_some());
@@ -171,7 +185,7 @@ mod tests {
         assert_eq!(&*vec, &[1, 2, 3, 4]);
     }
 
-    #[test("LockedVec pop")]
+    #[test]
     fn test_pop() {
         let mut vec = unsafe { LockedVec::new((&raw mut ARENA) as *mut u32, 4) };
         assert!(vec.push(1).is_some());
@@ -186,7 +200,7 @@ mod tests {
         assert_eq!(vec.pop(), None);
     }
 
-    #[test("LockedVec remove")]
+    #[test]
     fn test_remove() {
         let mut vec = unsafe { LockedVec::new((&raw mut ARENA) as *mut u32, 4) };
         assert!(vec.push(1).is_some());
@@ -201,7 +215,7 @@ mod tests {
         assert_eq!(vec.remove(0), None);
     }
 
-    #[test("LockedVec grow_down")]
+    #[test]
     fn test_grow_down() {
         let mut vec = unsafe { LockedVec::new(((&raw mut ARENA) as *mut u32).add(4), 4) };
         assert!(vec.push(1).is_some());
@@ -213,12 +227,19 @@ mod tests {
             vec.grow_down(4);
         }
 
-        assert_eq!(vec.len(), 4);
+        assert!(vec.push(5).is_some());
+        assert!(vec.push(6).is_some());
+        assert!(vec.push(7).is_some());
+        assert!(vec.push(8).is_some());
+
+        assert_eq!(vec.len(), 8);
         assert_eq!(vec.capacity(), 8);
-        assert_eq!(&*vec, &[1, 2, 3, 4]);
+        let ptr = unsafe { slice::from_raw_parts(vec.base(), 8) };
+        assert_eq!(ptr[..4], [1, 2, 3, 4]);
+        assert_eq!(ptr[4..], [5, 6, 7, 8]);
     }
 
-    #[test("LockedVec clear")]
+    #[test]
     fn test_clear() {
         let mut vec = unsafe { LockedVec::new((&raw mut ARENA) as *mut u32, 4) };
         assert!(vec.push(1).is_some());
