@@ -30,6 +30,7 @@ where
     }
     /// Initialize the module if it has not been initialized yet. Returns true if the module was initialized.
     /// False does not mean that the module failed to initialize, but rather that it was already initialized.
+    #[track_caller]
     pub fn init(&self) -> bool {
         let mut did_init = false;
         self.state.call_once(|| {

@@ -1,3 +1,5 @@
+use x86_64::registers::control::{Cr2, Cr3};
+
 use crate::{
     context::{
         InterruptCodeContext, InterruptCodeContextValue, InterruptContext, InterruptContextValue,
@@ -29,7 +31,7 @@ pub fn general_code_handler(ctx: InterruptCodeContext, _: u8, name: &'static str
 
 pub fn page_fault_handler(ctx: PageFaultInterruptContext) {
     println!("===== PAGE FAULT =====");
-    println!("{:?}", ctx.error_code);
+    println!("{:?}: {:?}", ctx.error_code, Cr2::read());
     println!("== CPU STATE ==");
     println!("{}", ctx.context);
     println!("== STACK TRACE ==");

@@ -50,6 +50,7 @@ pub fn hlt_loop() -> ! {
 /// Initializes the kernel and takes over the system.
 /// This function should be called from the `_start` function.
 pub fn init_kernel() -> ! {
+    x86_64::instructions::interrupts::disable();
     unsafe {
         init_kernel_services();
     }

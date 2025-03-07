@@ -30,7 +30,8 @@ pub fn test_runner(tests: &[&TestFunction]) /*-> ! */
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {
     use alloc::vec::Vec;
-    
+
+    use crate::panic;
 
     // Then, check if the panic is a internal panic. If it is, panic with kernel handler.
     if let Some(r) = IN_TEST_FRAMEWORK.try_lock() {
@@ -59,6 +60,8 @@ fn panic(info: &core::panic::PanicInfo) -> ! {
     } else {
         test.failed();
     }
+
+    panic::panic_extended_info(info);
 
     // Attempt recovery if possible
     if test.can_recover || test.should_panic {
