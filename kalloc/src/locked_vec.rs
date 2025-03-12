@@ -113,6 +113,11 @@ impl<T> LockedVec<T> {
     pub fn at_capacity(&self) -> bool {
         self.len == self.capacity
     }
+
+    /// Returns the byte size of the vector.
+    pub fn byte_size(&self) -> usize {
+        self.capacity * core::mem::size_of::<T>()
+    }
 }
 
 impl<T> Deref for LockedVec<T> {
@@ -170,7 +175,7 @@ mod tests {
     use crate::locked_vec::LockedVec;
 
     // This is kinda gross, but it's easy.
-    static mut ARENA: [u32; 0x100] = [0; 0x100];
+    static mut ARENA: [u32; 0x100] = [0x3f; 0x100];
 
     #[test]
     fn test_push() {
@@ -251,5 +256,11 @@ mod tests {
 
         assert_eq!(vec.len(), 0);
         assert_eq!(vec.capacity(), 4);
+    }
+
+    #[test]
+    fn test_byte_size() {
+        let vec = unsafe { LockedVec::new((&raw mut ARENA) as *mut u32, 4) };
+        assert_eq!(vec.byte_size(), 16);
     }
 }

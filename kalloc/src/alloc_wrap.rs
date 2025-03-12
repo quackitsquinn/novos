@@ -76,7 +76,7 @@ where
             if self.inner.get().is_none() {
                 panic!("Attempted to allocate with an uninitialized global allocator");
             }
-            // This just means that the mutex is locked, so we can't allocate.
+            // This just means that the mutex is locked, so we can't allocate. This will probably crash down the line, but it ain't our problem.
             aerror!("Attempted to allocate with a locked global allocator");
             core::ptr::null_mut()
         }

@@ -19,7 +19,7 @@ pub mod mut_alloc;
 
 pub use alloc_wrap::GlobalAllocatorWrapper;
 
-pub(crate) const ALLOC_LOG: AtomicBool = AtomicBool::new(false);
+pub(crate) static ALLOC_LOG: AtomicBool = AtomicBool::new(false);
 
 pub fn enable_logging() {
     ALLOC_LOG.store(true, core::sync::atomic::Ordering::Relaxed);

@@ -1,7 +1,8 @@
+// TODO: Strict Provenance? Would that even be possible?
 use core::{
     alloc::Layout,
     fmt::Debug,
-    mem, panic,
+    mem,
     ptr::{self},
 };
 
@@ -18,37 +19,60 @@ pub struct BlockAllocator {
     pub(crate) allocation_balance: isize,
 }
 
-unsafe impl Send for BlockAllocator {}
-unsafe impl Sync for BlockAllocator {}
-
 /// Count of blocks that can be allocated in the initial block table.
 pub const INIT_BLOCK_SIZE: usize = 512;
 /// The minimum heap size required for the block allocator.
 pub const MIN_HEAP_SIZE: usize = INIT_BLOCK_SIZE * mem::size_of::<Block>();
 
 impl BlockAllocator {
-    pub unsafe fn init(heap_start: usize, heap_end: usize) -> Self {
+    /// Initializes the block allocator.
+    ///
+    /// # Safety
+    ///
+    /// - `heap_start` and `heap_end` must be aligned to 8 bytes and are inclusive.
+    /// - `heap_start` must be less than `heap_end`.
+    /// - The heap must be at least `MIN_HEAP_SIZE` bytes.
+    /// - Writes and reads through `heap_start` and `heap_end` must be valid.
+    pub unsafe fn init(heap_start: *mut u64, heap_end: *mut u64) -> Self {
+        // Create a bunch of useful variables.
+        let heap_start_usize = heap_start as usize;
+        let heap_end_usize = heap_end as usize;
+        let heap_start = heap_start as *mut u8;
+        let heap_end = heap_end as *mut u8;
+        let heap_size = heap_end_usize - heap_start_usize;
+        // Precondition checks.
         assert!(
-            heap_end - heap_start > MIN_HEAP_SIZE,
+            heap_size > MIN_HEAP_SIZE,
             "Requested heap size too small, need at least {:#x} bytes",
-            (INIT_BLOCK_SIZE * mem::size_of::<Block>()) + 512
+            MIN_HEAP_SIZE
         );
-        let block_heap_end = (heap_end - mem::size_of::<Block>() as usize) as *mut Block;
-        let block_table_base = unsafe { align(block_heap_end.sub(INIT_BLOCK_SIZE)) };
-        // We already remove one block from the end of the heap, so we do not need to remove another if this is one/
-        let off = block_table_base.1.saturating_sub(1);
+        assert!(
+            heap_start_usize < heap_end_usize,
+            "Heap start must be less than heap end"
+        );
+        assert!(
+            // TODO: Maybe a higher alignment is needed? Might be a good idea to have the alignment be 4k. (Page size)
+            heap_start.is_aligned() && heap_end.is_aligned(),
+            "Heap start and end must be aligned"
+        );
 
-        let (table_block, mut blocks) = unsafe {
-            Self::init_block_table(block_table_base.0 as *mut Block, INIT_BLOCK_SIZE - off)
-        };
+        // Create the base for the block table
+        let (block_table_base, applied_offset) =
+            unsafe { align(heap_end.cast::<Block>().sub(INIT_BLOCK_SIZE)) };
 
-        ainfo!("Block table base: {:p}", block_table_base.0);
+        // If the offset is not 0, we need to subtract 1 from the block table size.
+        let off = if applied_offset == 0 { 0 } else { 1 };
+
+        let (table_block, mut blocks) =
+            unsafe { Self::create_block_table(block_table_base, INIT_BLOCK_SIZE - off) };
+
+        ainfo!("Block table base: {:p}", block_table_base);
 
         // Create a block that encompasses the entire heap.
         let block = Block::new(
             // Encompass all the heap except for the block table.
-            (blocks.as_ptr() as usize - 1) - heap_start,
-            heap_start as *mut u8,
+            heap_size - blocks.byte_size(),
+            heap_start_usize as *mut u8,
             true,
         );
 
@@ -57,36 +81,25 @@ impl BlockAllocator {
         Self {
             blocks,
             table_block,
-            heap_start,
-            heap_end,
-            heap_size: heap_end - heap_start,
+            heap_start: heap_start_usize,
+            heap_end: heap_end_usize,
+            heap_size,
             allocation_balance: 0,
         }
     }
-
-    unsafe fn init_block_table(
+    /// Creates a block table at the specified pointer.
+    unsafe fn create_block_table(
         ptr: *mut Block,
         table_size: usize,
     ) -> (&'static mut Block, LockedVec<Block>) {
         unsafe {
             let mut blocks = LockedVec::new(ptr, table_size);
-            let table_block = Self::create_table_block(&mut blocks);
-            (table_block, blocks)
+            let block = Block::new(blocks.byte_size(), blocks.as_mut_ptr().cast(), false);
+            blocks.push(block).expect("Failed to push block");
+            (&mut *blocks.as_mut_ptr(), blocks)
         }
     }
-
-    unsafe fn create_table_block(vec: &mut LockedVec<Block>) -> &'static mut Block {
-        let block = Block::new(
-            vec.capacity() * mem::size_of::<Block>(),
-            vec.as_ptr() as *mut u8,
-            false,
-        );
-        unsafe {
-            vec.push_unchecked(block);
-            &mut *vec.as_mut_ptr()
-        }
-    }
-
+    /// Pushes a block to the block table.
     unsafe fn push_block(&mut self, block: Block) {
         self.check_block_space();
 
@@ -94,45 +107,49 @@ impl BlockAllocator {
         self.blocks.push(block).expect("Failed to push block");
         self.condition_check();
     }
-
-    /// Returns the block that `ptr` is allocated in.
-    /// The returned block is not guaranteed to be allocated, so it is up to the caller to check if the block is allocated.
-    pub fn find_block_by_ptr(&self, ptr: *mut u8) -> Option<&Block> {
+    /// This is a helper function that finds the block that `ptr` is allocated in.
+    ///
+    /// This function itself is not unsafe, but how the returned value is used can be unsafe.
+    ///
+    /// The return value is guaranteed to be a valid block if it is not `None`.
+    fn find_block_by_ptr_internal(&self, ptr: *mut u8) -> Option<usize> {
         let ptr = ptr as usize;
         for block in &*self.blocks {
             let addr = block.address as usize;
             if ptr >= addr && ptr < addr + block.size {
-                atrace!(
-                    "Found ptr ({:#x}) in block {:#p} (off: {})",
-                    ptr,
-                    block.address,
-                    ptr - addr
-                );
-                return Some(block);
+                return Some(block as *const Block as usize);
             }
         }
         None
     }
 
-    unsafe fn find_block_by_ptr_mut(&mut self, ptr: *mut u8) -> Option<&mut Block> {
-        let ptr = ptr as usize;
-        if ptr < self.heap_start || ptr >= self.heap_end {
-            return None;
-        }
-        for block in &mut *self.blocks {
-            let addr = block.address as usize;
-            if ptr >= addr && ptr < addr + block.size {
-                atrace!(
-                    "Found ptr ({:#x}) in block {:#p} (off: {})",
-                    ptr,
-                    block.address,
-                    ptr - addr
-                );
-                return Some(block);
-            }
+    /// Returns the block that `ptr` is allocated in.
+    /// This will return the block that contains `ptr` even if it is not allocated.
+    pub fn find_block_by_ptr(&self, ptr: *mut u8) -> Option<&Block> {
+        if let Some(ptr) = self.find_block_by_ptr_internal(ptr) {
+            return Some(unsafe { &*(ptr as *const Block) });
         }
         None
     }
+
+    /// Returns the block that `ptr` is allocated in.
+    /// This will return the block that contains `ptr` even if it is not allocated.
+    ///
+    /// # Safety
+    /// This function is *incredibly* unsafe and any modifications to the block should not be taken lightly.
+    /// Virtually almost all modifications can result in undefined behavior.
+    pub unsafe fn find_block_by_ptr_mut(&mut self, ptr: *mut u8) -> Option<&mut Block> {
+        if let Some(ptr) = self.find_block_by_ptr_internal(ptr) {
+            return Some(unsafe { &mut *(ptr as *mut Block) });
+        }
+        None
+    }
+
+    /// Allocates a block of memory with the specified layout.
+    ///
+    /// # Safety
+    ///
+    /// The returned pointer must be deallocated with `deallocate` to prevent memory leaks.
     #[must_use = "Returned pointer must be deallocated with deallocate"]
     pub unsafe fn allocate(&mut self, layout: Layout) -> *mut u8 {
         // If the size is 0, we can just return a null pointer.
@@ -140,7 +157,7 @@ impl BlockAllocator {
             return ptr::null_mut();
         }
         let size = layout.size();
-        self.condition_check();
+
         // If the alignment is 1, we don't need to align it.
         let alignment = if layout.align() == 1 {
             0
@@ -151,16 +168,8 @@ impl BlockAllocator {
         let mut address: *mut u8 = ptr::null_mut();
         let full_size = size + alignment;
 
-        if let Some(blk) = self.try_find_free_block(full_size) {
-            ainfo!("Found free block {:?}", blk);
-            address = blk.address;
-            blk.allocate();
-            if blk.size > full_size {
-                split = blk.split(full_size);
-            }
-        } else {
-            // If we didn't find a block, we need to run the GC and try again.
-            self.gc();
+        // Loop twice to try to find a free block.
+        for _ in 0..2 {
             if let Some(blk) = self.try_find_free_block(full_size) {
                 ainfo!("Found free block {:?}", blk);
                 address = blk.address;
@@ -168,7 +177,9 @@ impl BlockAllocator {
                 if blk.size > full_size {
                     split = blk.split(full_size);
                 }
+                break;
             }
+            self.defrag();
         }
 
         // Because the whole heap is mapped, not finding a block either means that the heap became full or something went horribly wrong.
@@ -203,6 +214,10 @@ impl BlockAllocator {
         None
     }
 
+    /// Deallocates a block of memory.
+    ///
+    /// # Safety
+    /// The pointer must have been allocated by the block allocator.
     pub unsafe fn deallocate(&mut self, ptr: *mut u8, _: Layout) -> Option<()> {
         self.condition_check();
         if let Some(blk) = unsafe { self.find_block_by_ptr_mut(ptr) } {
@@ -213,68 +228,83 @@ impl BlockAllocator {
             blk.deallocate();
             ainfo!("Deallocated block {:?}", blk);
             self.allocation_balance -= 1;
-            self.dbg_print_blocks();
+            self.print_state();
             return Some(());
         }
-        aerror!("Failed to find block for deallocation");
 
-        #[allow(unreachable_code)]
+        aerror!("Failed to find block for deallocation");
         return None;
     }
-    /// Run the block table garbage collector.
-    pub fn gc(&mut self) {
-        let mut last_free: Option<(usize, Block)> = None;
-        let mut i = 0;
+    /// Defragments the block allocator.
+    #[inline]
+    pub fn defrag(&mut self) {
         let mut merge_total = 0;
         let mut merged = usize::MAX;
-        while merged != 0 {
-            merged = 0;
-            while i < self.blocks.len() {
-                let block = &mut self.blocks[i];
-                if block.size == 0 {
-                    aerror!("Found block with size 0: {:?}", block);
-                    self.blocks.remove(i);
-                    continue;
-                }
-                if block.is_free {
-                    if let Some((idx, last_free_block)) = &mut last_free {
-                        if last_free_block.is_adjacent(block) {
-                            let new_block = last_free_block.merge(block);
-                            self.blocks[*idx] = new_block;
-                            self.blocks.remove(i);
-                            merged += 1;
-
-                            continue;
-                        }
-                    }
-                    last_free = Some((i, block.clone()));
-                }
-                i += 1;
-            }
+        while merged > 0 {
+            merged = self.defragment_single_pass();
             merge_total += merged;
-            last_free = None;
-            i = 0;
         }
         adebug!("Merged {} blocks", merge_total);
         self.condition_check();
     }
 
+    /// Runs a single pass of the defragmentation algorithm. Returns the number of blocks merged.\
+    #[inline]
+    fn defragment_single_pass(&mut self) -> usize {
+        let mut i = 0;
+        let mut merged = 0;
+        let mut last_free: Option<(usize, Block)> = None;
+        // We do this while loop because the length of the blocks vector can change.
+        while i < self.blocks.len() {
+            let block = &mut self.blocks[i];
+            // Sanity check
+            debug_assert!(block.size > 0, "Found block with invalid size: {:?}", block);
+
+            // If the block is not free, we can skip it.
+            if !block.is_free {
+                i += 1;
+                continue;
+            }
+
+            // If we haven't found a free block yet, we can just set it and continue.
+            if last_free.is_none() {
+                last_free = Some((i, block.clone()));
+                i += 1;
+                continue;
+            }
+
+            // We know that last_free is not None, so we can unwrap it.
+            let (idx, last_free_block) = &mut last_free.as_mut().unwrap();
+
+            // If the blocks are not adjacent, we can just set the last free block to the current block and continue.
+            if !last_free_block.is_adjacent(block) {
+                i += 1;
+                *last_free_block = block.clone();
+                *idx = i;
+                continue;
+            }
+
+            let new_block = last_free_block.merge(block);
+            self.blocks[*idx] = new_block;
+            self.blocks.remove(i);
+            merged += 1;
+        }
+        merged
+    }
+
     /// Check if a pointer is allocated by the block allocator.
     #[inline]
     pub fn ptr_is_allocated(&self, ptr: *mut u8) -> bool {
-        let ptr = ptr as usize;
-        for block in &*self.blocks {
-            let addr = block.address as usize;
-            if ptr >= addr && ptr < addr + block.size {
-                return !block.is_free;
-            }
-        }
-        false
+        self.find_block_by_ptr(ptr)
+            .map(|b| !b.is_free)
+            .unwrap_or(false)
     }
 
+    /// Check if the block allocator has enough space to allocate a block. If not, it will defragment the block allocator.
+    /// If the block allocator is still full, it will panic.
     fn check_block_space(&mut self) {
         if self.blocks.at_capacity() {
-            self.gc();
+            self.defrag();
         }
 
         if self.blocks.at_capacity() {
@@ -282,44 +312,60 @@ impl BlockAllocator {
         }
     }
 
-    fn dbg_print_blocks(&self) {
-        let mx = self.table_block.size / size_of::<Block>();
+    /// Print debug information about the blocks.
+    pub fn print_state(&self) {
+        let allocated = self.allocated_count();
+        let unallocated = self.blocks.len() - allocated;
         atrace!(
-            "blkcount {}/{} ({}) umapbal: {}",
+            "Allocated / Deallocated: {}/{}; Total/Capacity: {}/{}; Balance: {}; {:#x} - {:#x}",
+            allocated,
+            unallocated,
             self.blocks.len(),
-            mx,
-            self.blocks.len() as f64 / mx as f64,
-            self.allocation_balance
-        );
-
-        let unalloc_count = self.blocks.iter().filter(|b| b.is_free).count();
-        atrace!(
-            "unallocs: {} allocs: {}",
-            unalloc_count,
-            self.blocks.len() - unalloc_count
+            self.blocks.capacity(),
+            self.allocation_balance,
+            self.heap_start,
+            self.heap_end
         );
     }
 
+    /// Get the allocation balance.
     pub fn allocation_balance(&self) -> isize {
         self.allocation_balance
     }
-
+    /// Get the block table.
     pub fn get_block_table<'a>(&'a self) -> &'a LockedVec<Block> {
         &self.blocks
     }
-    // Get the block table mutably. This is unsafe because it allows the block table to be modified.
+
+    /// Get the block table mutably.
+    ///
+    /// This function is incredibly unsafe. **Only** use this function if you know what you are doing.
+    ///
+    /// # Safety
+    ///
+    /// This function is unsafe because it allows for mutable access to the block table. This can lead to undefined behavior if used incorrectly.
     pub unsafe fn get_block_table_mut<'a>(&'a mut self) -> &'a mut LockedVec<Block> {
         &mut self.blocks
     }
 
+    /// Get the block table.
     pub fn table_block(&self) -> &Block {
         self.table_block
     }
+
     /// Gets the count of allocated blocks.
     /// Will always be >= 1 because the table block is always allocated.
     pub fn allocated_count(&self) -> usize {
         self.blocks.iter().filter(|b| !b.is_free).count()
     }
+
+    /// Returns whether the block allocator has leaked memory. This is essentially a check to see if the allocation balance is 0.
+    ///
+    /// This can be a useful heuristic during testing to see if the block allocator has leaked memory.
+    pub fn did_leak(&self) -> bool {
+        self.allocation_balance != 0
+    }
+
     /// Clear the block allocator. This function is ***INCREDIBLY UNSAFE*** and should only be used for testing.
     ///
     /// # Safety
@@ -336,18 +382,9 @@ impl BlockAllocator {
                 self.heap_end - (self.heap_start + 1),
             );
         }
-        *self = unsafe { Self::init(self.heap_start, self.heap_end) };
+        *self = unsafe { Self::init(self.heap_start as *mut u64, self.heap_end as *mut u64) };
     }
-    /// Prints a debug representation of the block allocator.
-    pub fn print_state(&self) {
-        ainfo!("Start: {:#x}, End: {:#x}", self.heap_start, self.heap_end);
-        ainfo!(
-            "Allocated: {:#x}, Deallocated: {:#x}, Balance: {}",
-            self.allocated_count(),
-            self.blocks.len() - self.allocated_count(),
-            self.allocation_balance,
-        );
-    }
+
     #[track_caller]
     pub fn condition_check(&self) {
         ainfo!("Checking block allocator condition");
@@ -357,7 +394,7 @@ impl BlockAllocator {
                 || block.size > self.heap_size as usize
                 || block.address < self.heap_start as *mut u8
             {
-                panic!("Found block with invalid address or size");
+                panic!("Found block with invalid address or size: {:?}", block);
             }
         }
         ainfo!("Block allocator condition check passed");
@@ -382,12 +419,14 @@ impl Debug for BlockAllocator {
 /// # Safety
 ///
 /// This function is unsafe because it does not check if the pointer will overflow.
-unsafe fn align_ptr(ptr: *mut u8, align: usize) -> (*mut u8, usize) {
+unsafe fn align_ptr<T>(ptr: *mut T, align: usize) -> (*mut T, usize) {
+    // Pointer is already aligned.
     if ptr.addr() & (align - 1) == 0 {
         return (ptr, 0);
     }
-    let offset = ptr.align_offset(align);
-    (unsafe { ptr.add(offset) }, offset)
+    let aligned = ptr.addr() & !(align - 1);
+    let offset = ptr.addr() - aligned;
+    (aligned as *mut T, offset)
 }
 
 /// Aligns a pointer to T's alignment.
@@ -398,12 +437,5 @@ unsafe fn align_ptr(ptr: *mut u8, align: usize) -> (*mut u8, usize) {
 ///
 /// This function is unsafe because it does not check if the pointer will overflow.
 unsafe fn align<T>(ptr: *mut T) -> (*mut T, usize) {
-    let align = mem::align_of::<T>();
-    let (ptr, offset) = unsafe { align_ptr(ptr.cast(), align) };
-    if offset == 0 {
-        return (ptr.cast(), 0);
-    }
-    let offset = offset / mem::size_of::<T>();
-    let is_multiple = offset % mem::size_of::<T>() == 0;
-    (ptr.cast(), offset + if is_multiple { 0 } else { 1 })
+    unsafe { align_ptr(ptr, mem::align_of::<T>()) }
 }

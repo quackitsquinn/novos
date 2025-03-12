@@ -14,9 +14,9 @@ fn get_allocator<const SIZE: usize>() -> (BlockAllocator, Pin<Box<[u8]>>) {
     // The tests are crashing and for like 3 different *inconsistent* reasons.
     // This is driving me mad.
     let table = Pin::new(Box::new([0u8; SIZE]));
-    let ptr = table.as_ptr() as usize;
-    let end = ptr + SIZE;
-    let alloc = unsafe { BlockAllocator::init(ptr, end) };
+    let ptr = table.as_ptr();
+    let end = unsafe { ptr.add(SIZE) };
+    let alloc = unsafe { BlockAllocator::init(ptr.cast_mut().cast(), end.cast_mut().cast()) };
     (alloc, table)
 }
 /// Gets a block allocator wrapped in a global allocator wrapper, so it implements GlobalAlloc + Allocator.
@@ -73,6 +73,13 @@ fn min_check<T>(ptr: *mut T, layout: Layout, allocator: &BlockAllocator) {
     allocator.condition_check();
 }
 
+#[cfg(test)]
+#[ctor::ctor]
+static INIT: () = {
+    let _ = env_logger::builder().is_test(true).try_init();
+    crate::enable_logging();
+};
+
 #[test]
 fn test_allocation() {
     let layout = Layout::from_size_align(512, 1).unwrap();
@@ -117,7 +124,7 @@ fn test_block_join() {
     }
 
     // Manually run GC
-    allocator.gc();
+    allocator.defrag();
 
     let block = allocator
         .find_block_by_ptr(ptrs[0])
@@ -165,7 +172,7 @@ fn test_block_reuse_split() {
             .expect("Block failed to free");
     };
 
-    allocator.gc();
+    allocator.defrag();
 
     alloc_check(ptrs[0], layout, &allocator);
     alloc_check(ptrs[3], layout, &allocator);
