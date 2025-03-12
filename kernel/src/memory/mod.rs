@@ -36,7 +36,7 @@ fn init_heap() {
 /// alloc_fn should be a function that takes two usize arguments: the start and end of the heap (in that order).
 fn configure_heap_allocator(
     alloc_name: &str,
-    alloc_fn: unsafe fn(usize, usize),
+    alloc_fn: unsafe fn(*mut u8, *mut u8),
     heap_start: VirtAddr,
     heap_size: u64,
 ) {
@@ -59,6 +59,6 @@ fn configure_heap_allocator(
         alloc_name, heap_start, heap_end
     );
     info!("Initializing {} allocator", alloc_name);
-    unsafe { alloc_fn(heap_start.as_u64() as usize, heap_end.as_u64() as usize) };
+    unsafe { alloc_fn(heap_start.as_mut_ptr(), heap_end.as_mut_ptr()) };
     info!("{} allocator initialized", alloc_name);
 }
