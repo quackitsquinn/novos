@@ -3,7 +3,6 @@
 /* FEATURES */
 #![feature(abi_x86_interrupt)]
 #![feature(custom_test_frameworks)]
-#![feature(maybe_uninit_uninit_array)]
 #![feature(allocator_api)]
 #![feature(pointer_is_aligned_to)]
 #![feature(naked_functions)]
