@@ -1,27 +1,27 @@
-use core::pin::Pin;
+use core::{mem, pin::Pin, ptr::NonNull};
+use std::alloc::{Global, dealloc};
 
 use alloc::{boxed::Box, vec::Vec};
 
-use crate::GlobalAllocatorWrapper;
+use crate::{GlobalAllocatorWrapper, test_common::DeferDealloc};
 
 use super::*;
 // BlockAllocator requires a heap size of 0x3200. Add 0x100 for a little extra space.
 // Must be divisible by 8
 const ARENA_SIZE: usize = 0x10000;
 
-fn get_allocator<const SIZE: usize>() -> (BlockAllocator, Pin<Box<[u8]>>) {
+fn get_allocator<const SIZE: usize>() -> (BlockAllocator, DeferDealloc) {
     // This is to theoretically fix some issues with the allocator really not liking lower alignments ???
-    // The tests are crashing and for like 3 different *inconsistent* reasons.
-    // This is driving me mad.
-    let table = Pin::new(Box::new([0u8; SIZE]));
-    let ptr = table.as_ptr();
-    let end = unsafe { ptr.add(SIZE) };
-    let alloc = unsafe { BlockAllocator::init(ptr.cast_mut().cast(), end.cast_mut().cast()) };
-    (alloc, table)
+    let (alloc_allocation, ptr) =
+        DeferDealloc::alloc(Layout::from_size_align(SIZE, 2 << 11).unwrap());
+    let start = ptr.as_ptr().cast::<u8>();
+    let end = unsafe { start.add(SIZE) };
+    let alloc = unsafe { BlockAllocator::init(start.cast(), end.cast()) };
+    (alloc, alloc_allocation)
 }
 /// Gets a block allocator wrapped in a global allocator wrapper, so it implements GlobalAlloc + Allocator.
-fn get_full_allocator<const SIZE: usize>()
--> (GlobalAllocatorWrapper<BlockAllocator>, Pin<Box<[u8]>>) {
+fn get_full_allocator<const SIZE: usize>() -> (GlobalAllocatorWrapper<BlockAllocator>, DeferDealloc)
+{
     let (alloc, vec) = get_allocator::<SIZE>();
     let gaw = GlobalAllocatorWrapper::new();
     gaw.init(|| alloc);
@@ -84,7 +84,7 @@ static INIT: () = {
 fn test_allocation() {
     let layout = Layout::from_size_align(512, 1).unwrap();
 
-    let (mut allocator, _) = get_allocator::<ARENA_SIZE>();
+    let (mut allocator, _defer_guard) = get_allocator::<ARENA_SIZE>();
 
     let ptr = unsafe { allocator.allocate(layout) };
 
@@ -106,7 +106,7 @@ fn test_allocation() {
 fn test_block_join() {
     let layout = Layout::from_size_align(512, 1).unwrap();
 
-    let (mut allocator, _) = get_allocator::<ARENA_SIZE>();
+    let (mut allocator, _defer_guard) = get_allocator::<ARENA_SIZE>();
 
     let ptrs = [
         unsafe { allocator.allocate(layout) },
@@ -129,7 +129,8 @@ fn test_block_join() {
     let block = allocator
         .find_block_by_ptr(ptrs[0])
         .expect("Block pointer not found");
-    assert!(block.size >= layout.size() * 4);
+    assert!(block.size == layout.size() * 4);
+    allocator.print_state();
     assert!(block.is_free);
 }
 
@@ -137,7 +138,7 @@ fn test_block_join() {
 fn test_block_reuse() {
     let layout = Layout::from_size_align(512, 1).unwrap();
 
-    let (mut allocator, _) = get_allocator::<ARENA_SIZE>();
+    let (mut allocator, _defer_guard) = get_allocator::<ARENA_SIZE>();
 
     let ptr = unsafe { allocator.allocate(layout) };
 
@@ -154,7 +155,7 @@ fn test_block_reuse() {
 fn test_block_reuse_split() {
     let layout = Layout::from_size_align(512, 1).unwrap();
 
-    let (mut allocator, _) = get_allocator::<ARENA_SIZE>();
+    let (mut allocator, _defer_guard) = get_allocator::<ARENA_SIZE>();
 
     let ptrs = [
         unsafe { allocator.allocate(layout) },
@@ -197,7 +198,7 @@ fn test_alignment() {
     for i in 1..=12 {
         let layout = Layout::from_size_align(1, 1 << i).unwrap();
 
-        let (mut allocator, _) = get_allocator::<ARENA_SIZE>();
+        let (mut allocator, _defer_guard) = get_allocator::<ARENA_SIZE>();
 
         let ptr = unsafe { allocator.allocate(layout) };
 
@@ -216,7 +217,7 @@ fn test_alignment() {
 fn test_zst() {
     let layout = Layout::from_size_align(0, 1).unwrap();
 
-    let (mut allocator, _) = get_allocator::<ARENA_SIZE>();
+    let (mut allocator, _defer_guard) = get_allocator::<ARENA_SIZE>();
 
     let ptr = unsafe { allocator.allocate(layout) };
 
@@ -227,7 +228,7 @@ fn test_zst() {
 fn test_box() {
     let value = 32u32;
 
-    let (allocator, _) = get_full_allocator::<ARENA_SIZE>();
+    let (allocator, _defer_guard) = get_full_allocator::<ARENA_SIZE>();
 
     let bx = Box::new_in(value, &allocator);
     let ptr = Box::into_raw(bx);
@@ -242,7 +243,7 @@ fn test_box() {
 }
 #[test]
 fn test_vec() {
-    let (allocator, _) = get_full_allocator::<ARENA_SIZE>();
+    let (allocator, _defer_guard) = get_full_allocator::<ARENA_SIZE>();
     for i in 0..2000 {
         let mut vec: Vec<u32, _> = Vec::new_in(&allocator);
         let layout = Layout::array::<u8>(100).expect("Failed to create layout");
@@ -271,7 +272,7 @@ fn test_large_alloc() {
     for i in 0..5 {
         let layout = Layout::from_size_align(4096, 1).unwrap();
 
-        let (mut allocator, _) = get_allocator::<ARENA_SIZE>();
+        let (mut allocator, _defer_guard) = get_allocator::<ARENA_SIZE>();
 
         let ptr = unsafe { allocator.allocate(layout) };
 
@@ -286,7 +287,7 @@ fn test_large_alloc_free() {
     for i in 0..15 {
         let layout = Layout::from_size_align(4096, 1).unwrap();
 
-        let (mut allocator, _) = get_allocator::<ARENA_SIZE>();
+        let (mut allocator, _defer_guard) = get_allocator::<ARENA_SIZE>();
 
         let ptr = unsafe { allocator.allocate(layout) };
 

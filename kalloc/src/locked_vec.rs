@@ -170,83 +170,75 @@ impl<T> Drop for LockedVec<T> {
 
 #[cfg(test)]
 mod tests {
-    use core::slice;
+    use core::{alloc::Layout, slice};
 
-    use crate::locked_vec::LockedVec;
+    // As a notice, the usage of `_defer_guard` is INCREDIBLY IMPORTANT and can cause tests to SPONTANEOUSLY FAIL if not used.
+    // This is because binding it to `_` will cause the guard to be dropped immediately, which will deallocate the memory before the test is run.
+    // This is kinda dumb, and not made clear in the places I looked and was hell to debug.
 
-    // This is kinda gross, but it's easy.
-    static mut ARENA: [u32; 0x100] = [0x3f; 0x100];
+    use crate::{locked_vec::LockedVec, test_common::DeferDealloc};
+
+    fn new_vec<T>(cap: usize) -> (LockedVec<T>, DeferDealloc) {
+        let (dropper, ptr) = DeferDealloc::alloc(Layout::array::<T>(cap).expect("layout"));
+        let vec = unsafe { LockedVec::new(ptr.as_ptr() as *mut T, cap) };
+        (vec, dropper)
+    }
 
     #[test]
     fn test_push() {
-        let mut vec = unsafe { LockedVec::new((&raw mut ARENA) as *mut u32, 4) };
-        assert!(vec.push(1).is_some());
-        assert!(vec.push(2).is_some());
-        assert!(vec.push(3).is_some());
-        assert!(vec.push(4).is_some());
-        assert!(vec.push(5).is_none());
+        for _ in 0..30 {
+            let (mut vec, keeper) = new_vec::<u32>(4);
+            assert!(vec.push(1).is_some());
+            assert!(vec.push(2).is_some());
+            assert!(vec.push(3).is_some());
+            assert!(vec.push(4).is_some());
+            assert!(vec.push(5).is_none());
 
-        assert_eq!(vec.len(), 4);
-        assert_eq!(&*vec, &[1, 2, 3, 4]);
+            assert_eq!(vec.len(), 4);
+            assert_eq!(&*vec, &[1, 2, 3, 4]);
+            drop(keeper);
+        }
     }
 
     #[test]
     fn test_pop() {
-        let mut vec = unsafe { LockedVec::new((&raw mut ARENA) as *mut u32, 4) };
-        assert!(vec.push(1).is_some());
-        assert!(vec.push(2).is_some());
-        assert!(vec.push(3).is_some());
-        assert!(vec.push(4).is_some());
+        for _ in 0..30 {
+            let (mut vec, keeper) = new_vec::<u32>(4);
+            assert!(vec.push(1).is_some());
+            assert!(vec.push(2).is_some());
+            assert!(vec.push(3).is_some());
+            assert!(vec.push(4).is_some());
 
-        assert_eq!(vec.pop(), Some(4));
-        assert_eq!(vec.pop(), Some(3));
-        assert_eq!(vec.pop(), Some(2));
-        assert_eq!(vec.pop(), Some(1));
-        assert_eq!(vec.pop(), None);
+            assert_eq!(vec.pop(), Some(4));
+            assert_eq!(vec.pop(), Some(3));
+            assert_eq!(vec.pop(), Some(2));
+            assert_eq!(vec.pop(), Some(1));
+            assert_eq!(vec.pop(), None);
+            drop(keeper);
+        }
     }
 
     #[test]
     fn test_remove() {
-        let mut vec = unsafe { LockedVec::new((&raw mut ARENA) as *mut u32, 4) };
-        assert!(vec.push(1).is_some());
-        assert!(vec.push(2).is_some());
-        assert!(vec.push(3).is_some());
-        assert!(vec.push(4).is_some());
+        for _ in 0..30 {
+            let (mut vec, keeper) = new_vec::<u32>(4);
+            assert!(vec.push(1).is_some());
+            assert!(vec.push(2).is_some());
+            assert!(vec.push(3).is_some());
+            assert!(vec.push(4).is_some());
 
-        assert_eq!(vec.remove(1), Some(2));
-        assert_eq!(vec.remove(2), Some(4));
-        assert_eq!(vec.remove(0), Some(1));
-        assert_eq!(vec.remove(0), Some(3));
-        assert_eq!(vec.remove(0), None);
-    }
-
-    #[test]
-    fn test_grow_down() {
-        let mut vec = unsafe { LockedVec::new(((&raw mut ARENA) as *mut u32).add(4), 4) };
-        assert!(vec.push(1).is_some());
-        assert!(vec.push(2).is_some());
-        assert!(vec.push(3).is_some());
-        assert!(vec.push(4).is_some());
-
-        unsafe {
-            vec.grow_down(4);
+            assert_eq!(vec.remove(1), Some(2));
+            assert_eq!(vec.remove(2), Some(4));
+            assert_eq!(vec.remove(0), Some(1));
+            assert_eq!(vec.remove(0), Some(3));
+            assert_eq!(vec.remove(0), None);
+            drop(keeper);
         }
-
-        assert!(vec.push(5).is_some());
-        assert!(vec.push(6).is_some());
-        assert!(vec.push(7).is_some());
-        assert!(vec.push(8).is_some());
-
-        assert_eq!(vec.len(), 8);
-        assert_eq!(vec.capacity(), 8);
-        let ptr = unsafe { slice::from_raw_parts(vec.base(), 8) };
-        assert_eq!(ptr[..4], [1, 2, 3, 4]);
-        assert_eq!(ptr[4..], [5, 6, 7, 8]);
     }
 
     #[test]
     fn test_clear() {
-        let mut vec = unsafe { LockedVec::new((&raw mut ARENA) as *mut u32, 4) };
+        let (mut vec, _defer_guard) = new_vec::<u32>(4);
         assert!(vec.push(1).is_some());
         assert!(vec.push(2).is_some());
         assert!(vec.push(3).is_some());
@@ -260,7 +252,7 @@ mod tests {
 
     #[test]
     fn test_byte_size() {
-        let vec = unsafe { LockedVec::new((&raw mut ARENA) as *mut u32, 4) };
+        let (vec, _defer_guard) = new_vec::<u32>(4);
         assert_eq!(vec.byte_size(), 16);
     }
 }

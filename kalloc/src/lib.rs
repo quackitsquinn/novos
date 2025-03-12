@@ -28,3 +28,30 @@ pub fn enable_logging() {
 pub fn disable_logging() {
     ALLOC_LOG.store(false, core::sync::atomic::Ordering::Relaxed);
 }
+
+#[cfg(test)]
+pub(crate) mod test_common {
+    use core::{alloc::Layout, ptr::NonNull};
+    use std::alloc::{Allocator, Global};
+
+    /// A wrapper around an allocated memory region that will be deallocated when it goes out of scope.
+    pub struct DeferDealloc {
+        layout: Layout,
+        ptr: NonNull<[u8]>,
+    }
+
+    impl DeferDealloc {
+        pub fn alloc(layout: Layout) -> (Self, NonNull<[u8]>) {
+            let ptr = Global.allocate(layout).expect("Failed to allocate");
+            (Self { layout, ptr }, ptr)
+        }
+    }
+
+    impl Drop for DeferDealloc {
+        fn drop(&mut self) {
+            unsafe {
+                Global.deallocate(self.ptr.cast(), self.layout);
+            }
+        }
+    }
+}
