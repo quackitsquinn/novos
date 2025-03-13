@@ -298,3 +298,20 @@ fn test_large_alloc_free() {
         }
     }
 }
+
+#[test]
+fn test_memory_exhaustion() {
+    let (mut allocator, _defer_guard) = get_allocator::<ARENA_SIZE>();
+
+    // Allocate a giant block of memory
+    let huge_layout =
+        Layout::from_size_align(ARENA_SIZE - (allocator.blocks.byte_size() + 0x10), 1)
+            .expect("layout");
+    let huge_ptr = unsafe { allocator.allocate(huge_layout) };
+    min_check(huge_ptr, huge_layout, &allocator);
+
+    // Try to allocate a tiny block of memory
+    let tiny_layout = Layout::from_size_align(0x20, 1).expect("layout");
+    let tiny_ptr = unsafe { allocator.allocate(tiny_layout) };
+    assert!(tiny_ptr.is_null());
+}
