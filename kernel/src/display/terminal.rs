@@ -1,181 +1,152 @@
-use core::fmt::Write;
+use core::{f32, fmt::Write};
 
-use alloc::vec::Vec;
+use alloc::{vec, vec::Vec};
 use log::debug;
 
 use crate::{
     framebuffer,
     interrupts::{disable, enable, without_interrupts},
-    terminal,
+    sprintln, terminal,
 };
 
-use super::{color::Color, screen_char::ScreenChar};
+use super::{color::Color, get_char, screen_char::ScreenChar, FRAMEBUFFER, TERMINAL};
 
+const CHARACTER_BASE_SIZE: usize = 8;
+// TODO: Replace derive(Debug) with a custom implementation that doesn't print the whole buffer
+#[derive(Debug, Clone)]
 pub struct Terminal {
     // x, y -> row, column
-    chars: Vec<Vec<ScreenChar>>,
-    position: (u32, u32),
-    char_size: (u32, u32),
+    front: Vec<Vec<ScreenChar>>,
+    back: Vec<Vec<ScreenChar>>,
+    position: (usize, usize),
     size: (usize, usize),
-    scale: u32,
+    character_size: (usize, usize),
+    character_scale: usize,
+    current_fg: Color,
+    current_bg: Color,
 }
 
 impl Terminal {
-    pub fn new() -> Self {
-        //   sprintln!("Getting fb size");
-        let size = framebuffer!().size();
-        let char_size = ((size.0 / 8) as u32 - 1, (size.1 / 8) as u32 - 1);
-        let mut s = Self {
-            chars: Self::make_vec(char_size),
+    pub fn new(scale: usize, line_spacing: usize) -> Self {
+        let (term_size, glyph_size) = Self::calculate_dimensions(line_spacing, scale);
+        sprintln!("Creating front buffer with size: {:?}", term_size);
+        let front = vec![vec![ScreenChar::default(); term_size.0 as usize]; term_size.1 as usize];
+        sprintln!("Creating back buffer with size: {:?}", term_size);
+        let back = front.clone();
+        Self {
+            front,
+            back,
             position: (0, 0),
-            char_size,
-            size,
-            scale: 1,
-        };
-        // sprintln!("Setting scale");
-        // Default to 2x scale because 90% of the time 8px is too small
-        s.set_scale(1);
-        s
-    }
-
-    fn make_vec(dim: (u32, u32)) -> Vec<Vec<ScreenChar>> {
-        let mut vec: Vec<Vec<ScreenChar>> = Vec::with_capacity(dim.0 as usize);
-
-        for _ in 0..dim.0 {
-            let mut row = Vec::with_capacity(dim.1 as usize);
-            row.fill(ScreenChar::new(' ', Color::new(0, 0, 0)));
-            vec.push(row);
-        }
-
-        vec
-    }
-    /// Set the scale of the terminal.
-    pub fn set_scale(&mut self, scale: u32) {
-        self.scale = scale;
-        let old = self.char_size;
-
-        self.set_char_size((
-            (self.size.0 / (8 * scale as usize)) as u32 - 1,
-            (self.size.1 / (8 * scale as usize)) as u32 - 1,
-        ));
-
-        debug!("Old: {:?}, New: {:?}", old, self.char_size);
-
-        unsafe {
-            self.chars.set_len(self.char_size.0 as usize);
-        }
-
-        for row in self.chars.iter_mut() {
-            unsafe { row.set_len(self.char_size.1 as usize) };
+            size: term_size,
+            character_size: glyph_size,
+            character_scale: scale,
+            current_fg: Color::new(255, 255, 255),
+            current_bg: Color::new(0, 0, 0),
         }
     }
 
-    fn set_char_size(&mut self, size: (u32, u32)) {
-        self.char_size = size;
+    fn calculate_dimensions(line_spacing: usize, scale: usize) -> ((usize, usize), (usize, usize)) {
+        let fb = FRAMEBUFFER.get();
+        let (width, height) = fb.size();
+        let char_width = CHARACTER_BASE_SIZE * scale;
+        let char_height = CHARACTER_BASE_SIZE * scale + line_spacing;
+        let width = width as f64 / char_width as f64;
+        let height = height as f32 / char_height as f32;
+        // For some reason, there are no math functions for either f32 or f64, probably due to no std.
+        // So we have to do this manually.
+        let width_floor = width - (width % 1.0);
+        let height_floor = height - (height % 1.0);
+
+        (
+            (width_floor as usize, height_floor as usize),
+            (char_width as usize, char_height as usize),
+        )
     }
 
-    pub fn set_position(&mut self, x: u32, y: u32) {
-        self.position = (x, y);
-    }
-
-    pub fn shift_up(&mut self) {
-        let last = self.chars.clone();
-        for line in &mut self.chars {
-            line.remove(0);
-            line.push(ScreenChar::new(' ', Color::new(0, 0, 0)));
+    fn advance_cursor(&mut self) -> (usize, usize) {
+        self.position.0 += 1;
+        if self.position.0 >= self.size.0 {
+            self.newline();
         }
-        self.blit_update(last);
+        self.position
     }
 
-    pub fn push_char(&mut self, c: char, color: Color) {
-        //sprintln!("Pushing char: {}", c);
+    fn newline(&mut self) {
+        self.position.0 = 0;
+        self.position.1 += 1;
+        if self.position.1 >= self.size.1 {
+            self.scroll_up();
+        }
+    }
+
+    fn scroll_up(&mut self) {
+        // Copy the screen to the back buffer
+        self.back.clone_from_slice(&self.front);
+        // Scroll up by one line
+        self.front.remove(0);
+        self.front
+            .push(vec![ScreenChar::default(); self.size.0 as usize]);
+        self.position.1 -= 1;
+        self.blit_update();
+    }
+
+    pub fn push_char(&mut self, c: char, flush: bool) {
         if c == '\n' {
             self.newline();
             return;
         }
-        if c == '\r' {
-            self.position.1 = 0;
-            return;
-        }
-        if c == '\t' {
-            self.position.1 += 4;
-            return;
-        }
 
-        if self.position.0 >= self.char_size.0 {
-            self.newline();
-        }
-        self.chars[self.position.0 as usize][self.position.1 as usize] = ScreenChar::new(c, color);
-        self.draw_char(self.position.0, self.position.1);
-        self.update_cursor();
-    }
-
-    pub fn push_str(&mut self, s: &str, color: Color) {
-        //sprintln!("Pushing string: {}", s);
-        for c in s.chars() {
-            self.push_char(c, color);
+        let (x, y) = self.advance_cursor();
+        self.front[y][x] = ScreenChar::new(c, self.current_fg, self.current_bg);
+        if flush {
+            self.flush_character((x, y));
         }
     }
 
-    fn update_cursor(&mut self) {
-        if self.position.0 + 1 >= self.char_size.0 {
-            self.newline();
-        } else {
-            self.position.0 += 1;
-        }
+    fn offset(&self, pos: (usize, usize)) -> (usize, usize) {
+        let (char_width, char_height) = self.character_size;
+        (pos.0 * char_width, pos.1 * char_height)
     }
 
-    fn newline(&mut self) {
-        if self.position.1 + 1 >= self.char_size.1 {
-            self.shift_up();
-        } else {
-            self.position.1 += 1;
-        }
-        self.position.0 = 0;
-    }
-
-    pub fn clear(&mut self) {
-        self.chars = Self::make_vec(self.char_size);
-        self.position = (0, 0);
-        self.set_scale(self.scale);
-    }
-
-    fn draw_char(&self, x: u32, y: u32) {
-        let buf_char = self.chars[x as usize][y as usize];
-        let charac = buf_char.character();
-        let sprite = super::get_char(charac);
-        framebuffer!().draw_scaled_sprite(
-            x as usize * 8 * self.scale as usize,
-            y as usize * 8 * self.scale as usize,
-            self.scale as usize,
-            &sprite,
-            buf_char.foreground(),
-            buf_char.background(),
+    #[inline]
+    fn flush_character(&self, pos: (usize, usize)) {
+        let c = self.front[pos.1][pos.0];
+        let (x, y) = self.offset(pos);
+        let mut fb = FRAMEBUFFER.get();
+        fb.draw_sprite(
+            x,
+            y,
+            self.character_scale,
+            &get_char(c.character()),
+            c.foreground(),
+            c.background(),
         );
     }
 
-    fn draw_all(&mut self) {
-        for (i, row) in self.chars.iter().enumerate() {
-            for (j, _) in row.iter().enumerate() {
-                self.draw_char(i as u32, j as u32);
+    #[inline]
+    fn blit_update(&self) {
+        for y in 0..self.size.1 {
+            let front = &self.front[y];
+            let back = &self.back[y];
+            for x in 0..self.size.0 {
+                if front[x] != back[x] {
+                    self.flush_character((x, y));
+                }
             }
         }
     }
 
-    fn blit_update(&mut self, last: Vec<Vec<ScreenChar>>) {
-        for (i, row) in self.chars.iter().enumerate() {
-            for (j, _) in row.iter().enumerate() {
-                if self.chars[i][j] != last[i][j] {
-                    self.draw_char(i as u32, j as u32);
-                }
-            }
+    pub fn push_str(&mut self, s: &str) {
+        //sprintln!("Pushing string: {}", s);
+        for c in s.chars() {
+            self.push_char(c, true);
         }
     }
 }
 
 impl Write for Terminal {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
-        self.push_str(s, Color::new(255, 255, 255));
+        self.push_str(s);
         Ok(())
     }
 }

@@ -29,7 +29,7 @@ fn init() -> Result<(), Infallible> {
             .next()
             .unwrap(),
     ));
-    TERMINAL.init(terminal::Terminal::new());
+    TERMINAL.init(terminal::Terminal::new(1, 2));
     Ok(())
 }
 

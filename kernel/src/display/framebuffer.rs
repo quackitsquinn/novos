@@ -1,7 +1,6 @@
 use limine::framebuffer::Framebuffer as LimineFramebuffer;
 use log::info;
 
-
 use super::color::Color;
 /// A representation of a framebuffer.
 pub struct Framebuffer {
@@ -79,23 +78,10 @@ impl Framebuffer {
         }
     }
 
-    /// Draws a 8xn sprite at a specific location.
-    /// The origin is the top left corner.
-    #[inline]
-    pub fn draw_sprite(&mut self, x: usize, y: usize, sprite: &[u8], color: Color) {
-        for (i, byte) in sprite.iter().enumerate() {
-            for bit in 0..8 {
-                if byte & (1 << bit) != 0 {
-                    self.set_px(x + bit, y + (i % 8), color);
-                }
-            }
-        }
-    }
-
     /// Draws a scaled 8xn sprite at a specific location.
     /// The origin is the top left corner.
     #[inline]
-    pub fn draw_scaled_sprite(
+    pub fn draw_sprite(
         &mut self,
         x: usize,
         y: usize,
