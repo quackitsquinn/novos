@@ -14,15 +14,20 @@ pub mod stack;
 
 // Evaluates to 0x4156_4F4E_0000
 pub const HEAP_MEM_OFFSET: VirtAddr = VirtAddr::new((u32::from_ne_bytes(*b"NOVA") as u64) << 16);
-pub const HEAP_SIZE: u64 = 1024 * 1024 * 2; // 2 MB
+pub const HEAP_SIZE: u64 = 1024 * 1024 * 10; // 2 MB
 
 pub const TEST_HEAP_MEM_OFFSET: VirtAddr = VirtAddr::new(HEAP_MEM_OFFSET.as_u64() + HEAP_SIZE);
 pub const TEST_HEAP_SIZE: u64 = HEAP_SIZE; // 2 MB
+
+pub const ALLOC_DEBUG: bool = option_env!("ALLOC_DEBUG").is_some();
 
 declare_module!("memory", init);
 
 fn init() -> Result<(), Infallible> {
     paging::MODULE.init();
+    if ALLOC_DEBUG {
+        kalloc::enable_logging();
+    }
     init_heap();
     paging::virt::MODULE.init();
     Ok(())

@@ -31,6 +31,10 @@ impl Command<'_> {
             Command::WriteString(s) => write_string(*adapter, s),
             Command::WriteArguments(args) => write_arguments(*adapter, args),
             Command::SendFile(filename, contents) => send_file(*adapter, filename, contents),
+            Command::InitIncrementalSend(channel, format) => {
+                create_incremental_channel(*adapter, channel, format)
+            }
+            Command::SendIncrementalData(channel, data) => send_file(*adapter, channel, data),
             Command::DisablePacketSupport => {}
         }
     }
@@ -64,4 +68,15 @@ where
     a.send_slice(&len);
 
     a.send_slice(contents);
+}
+
+fn create_incremental_channel<T>(a: &T, channel: &str, format: &str)
+where
+    T: SerialAdapter + ?Sized,
+{
+    a.send_slice(channel.as_bytes());
+    a.send(0);
+
+    a.send_slice(format.as_bytes());
+    a.send(0);
 }

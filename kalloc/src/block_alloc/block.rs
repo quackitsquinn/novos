@@ -45,7 +45,7 @@ impl Block {
             return other.merge(self); // Ensure self is the block with the lower address
         }
 
-        debug_assert!(self.is_adjacent(other));
+        debug_assert!(self.is_adjacent(other), "Blocks are not adjacent");
 
         let new_size = self.size + other.size;
 
@@ -54,9 +54,9 @@ impl Block {
     /// Check if two blocks are adjacent to each other.
     pub fn is_adjacent(&self, other: &Block) -> bool {
         let self_end = self.address as usize + self.size;
+        let other_end = other.address as usize + other.size;
 
-        self_end == other.address as usize
-            || self.address as usize == other.address as usize + other.size
+        self_end == other.address as usize || self.address as usize == other_end
     }
 }
 
@@ -91,6 +91,8 @@ mod tests {
 
         assert!(new_block.is_none());
         assert_eq!(block.size, 1024);
+        assert_eq!(block.address, 0x1000 as *mut u8);
+        assert!(block.is_free);
     }
 
     #[test]
@@ -108,11 +110,22 @@ mod tests {
     }
 
     #[test]
-    fn test_block_merge() {
+    fn test_block_merge_lower_to_higher() {
         let mut block1 = Block::new(512, 0x1000 as *mut u8, true);
         let mut block2 = Block::new(512, 0x1200 as *mut u8, true);
 
         let new_block = block1.merge(&mut block2);
+
+        assert_eq!(new_block.size, 1024);
+        assert_eq!(new_block.address, block1.address);
+    }
+
+    #[test]
+    fn test_block_merge_higher_to_lower() {
+        let mut block1 = Block::new(512, 0x1000 as *mut u8, true);
+        let mut block2 = Block::new(512, 0x1200 as *mut u8, true);
+
+        let new_block = block2.merge(&mut block1);
 
         assert_eq!(new_block.size, 1024);
         assert_eq!(new_block.address, block1.address);
@@ -124,6 +137,7 @@ mod tests {
         let block2 = Block::new(512, 0x1200 as *mut u8, true);
 
         assert!(block1.is_adjacent(&block2));
+        assert!(block2.is_adjacent(&block1));
     }
 
     #[test]
@@ -132,5 +146,6 @@ mod tests {
         let block2 = Block::new(512, 0x1600 as *mut u8, true);
 
         assert!(!block1.is_adjacent(&block2));
+        assert!(!block2.is_adjacent(&block1));
     }
 }

@@ -14,6 +14,11 @@ pub enum Command<'a> {
     SendFile(&'a str, &'a [u8]),
     /// Disable packet support. YOU CAN NOT RE-ENABLE PACKET SUPPORT AT THIS POINT.
     DisablePacketSupport,
+    /// Initialize incremental send mode. (channel name, file_format)
+    /// File format will replace **id** with the number of the file.
+    InitIncrementalSend(&'a str, &'a str),
+    /// Send incremental data. (channel name, data)
+    SendIncrementalData(&'a str, &'a [u8]),
 }
 
 impl Command<'_> {
@@ -25,6 +30,8 @@ impl Command<'_> {
             Command::WriteArguments(_) => 1,
             Command::SendFile(_, _) => 2,
             Command::DisablePacketSupport => 3,
+            Command::InitIncrementalSend(_, _) => 4,
+            Command::SendIncrementalData(_, _) => 5,
         }
     }
 }

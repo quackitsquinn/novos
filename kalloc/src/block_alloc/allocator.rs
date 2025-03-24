@@ -7,7 +7,7 @@ use core::{
 };
 
 use super::block::Block;
-use crate::locked_vec::LockedVec;
+use crate::{frame_output, locked_vec::LockedVec};
 
 pub struct BlockAllocator {
     // The blocks are stored in a downwards-growing vector.
@@ -152,6 +152,9 @@ impl BlockAllocator {
     /// The returned pointer must be deallocated with `deallocate` to prevent memory leaks.
     #[must_use = "Returned pointer must be deallocated with deallocate"]
     pub unsafe fn allocate(&mut self, layout: Layout) -> *mut u8 {
+        frame_output(unsafe {
+            core::slice::from_raw_parts(self.heap_start as *mut u8, self.heap_size)
+        });
         // If the size is 0, we can just return a null pointer.
         if layout.size() == 0 {
             return ptr::null_mut();
@@ -167,15 +170,22 @@ impl BlockAllocator {
         let mut split = None;
         let mut address: *mut u8 = ptr::null_mut();
         let full_size = size + alignment;
+        let mut block_size = 0;
 
         // Loop twice to try to find a free block.
         for _ in 0..2 {
             if let Some(blk) = self.try_find_free_block(full_size) {
                 ainfo!("Found free block {:?}", blk);
                 address = blk.address;
+                block_size = blk.size;
                 blk.allocate();
                 if blk.size > full_size {
-                    split = blk.split(full_size);
+                    let rem = blk.split(full_size);
+                    if rem.is_none() {
+                        aerror!("Failed to split block");
+                        return ptr::null_mut();
+                    }
+                    split = rem;
                 }
                 break;
             }
@@ -188,6 +198,14 @@ impl BlockAllocator {
             return ptr::null_mut();
         }
 
+        if (address as usize + block_size) > self.blocks.as_mut_ptr() as usize {
+            panic!(
+                "Block address is out of bounds: {:#x} > {:#x}",
+                address as usize + size,
+                self.blocks.as_mut_ptr() as usize
+            );
+        }
+
         if let Some(block) = split {
             unsafe { self.push_block(block) };
         }
@@ -195,6 +213,7 @@ impl BlockAllocator {
         self.allocation_balance += 1;
 
         let (ptr, off) = unsafe { align_ptr(address, layout.align()) };
+
         // This probably can't happen, but it's better to be safe than sorry.
         if off + size > full_size {
             panic!("Failed to align pointer");
@@ -202,6 +221,9 @@ impl BlockAllocator {
 
         atrace!("Returning pointer {:p}", ptr);
         self.condition_check();
+        frame_output(unsafe {
+            core::slice::from_raw_parts(self.heap_start as *mut u8, self.heap_size)
+        });
         ptr
     }
 
@@ -243,6 +265,7 @@ impl BlockAllocator {
         while merged > 0 {
             merged = self.defragment_single_pass();
             merge_total += merged;
+            atrace!("GC: Table: {:?}", self.blocks);
         }
         adebug!("Merged {} blocks", merge_total);
         self.condition_check();
@@ -254,6 +277,9 @@ impl BlockAllocator {
         let mut i = 0;
         let mut merged = 0;
         let mut last_free: Option<(usize, Block)> = None;
+        if option_env!("DEFRAG_PRE_DEBUG").is_some() {
+            atrace!("DEFRAG: Table Before: {:?}", self.blocks);
+        }
         // We do this while loop because the length of the blocks vector can change.
         while i < self.blocks.len() {
             let block = &mut self.blocks[i];
@@ -262,6 +288,7 @@ impl BlockAllocator {
 
             // If the block is not free, we can skip it.
             if !block.is_free {
+                atrace!("DEFRAG: Skipping allocated block {:?}", block);
                 i += 1;
                 continue;
             }
@@ -269,6 +296,7 @@ impl BlockAllocator {
             // If we haven't found a free block yet, we can just set it and continue.
             if last_free.is_none() {
                 last_free = Some((i, block.clone()));
+                atrace!("DEFRAG: Found free block {:?}", block);
                 i += 1;
                 continue;
             }
@@ -278,6 +306,7 @@ impl BlockAllocator {
 
             // If the blocks are not adjacent, we can just set the last free block to the current block and continue.
             if !last_free_block.is_adjacent(block) {
+                atrace!("DEFRAG: Found non-adjacent free block {:?}", block);
                 i += 1;
                 *last_free_block = block.clone();
                 *idx = i;
@@ -285,9 +314,25 @@ impl BlockAllocator {
             }
 
             let new_block = last_free_block.merge(block);
-            self.blocks[*idx] = new_block;
-            self.blocks.remove(i);
+            atrace!(
+                "DEFRAG: Merged blocks {:?} and {:?}",
+                last_free_block,
+                block
+            );
+            self.blocks[*idx] = new_block.clone();
+
+            // This can't be inlined into `atrace!` because it is not guaranteed to be evaluated.
+            let removed_block = self.blocks.remove(i);
+
+            atrace!(
+                "DEFRAG: New block[{}] {:?}; Removing block[{}] {:?}",
+                *idx,
+                new_block,
+                i,
+                removed_block,
+            );
             merged += 1;
+            last_free = Some((*idx, new_block));
         }
         merged
     }
@@ -399,6 +444,12 @@ impl BlockAllocator {
         }
         ainfo!("Block allocator condition check passed");
     }
+
+    pub fn heap_snapshot(&self) {
+        let slc =
+            unsafe { core::slice::from_raw_parts(self.heap_start as *const u8, self.heap_size) };
+        crate::frame_output(slc);
+    }
 }
 
 impl Debug for BlockAllocator {
@@ -419,14 +470,17 @@ impl Debug for BlockAllocator {
 /// # Safety
 ///
 /// This function is unsafe because it does not check if the pointer will overflow.
-unsafe fn align_ptr<T>(ptr: *mut T, align: usize) -> (*mut T, usize) {
+pub(crate) unsafe fn align_ptr<T>(ptr: *mut T, align: usize) -> (*mut T, usize) {
+    if !align.is_power_of_two() {
+        panic!("Alignment is not a power of two");
+    }
     // Pointer is already aligned.
-    if ptr.addr() & (align - 1) == 0 {
+    // SAFETY: We know that `align` is a power of two, and so it must be non-zero.
+    if ptr.addr() & (unsafe { align.unchecked_sub(1) }) == 0 {
         return (ptr, 0);
     }
-    let aligned = ptr.addr() & !(align - 1);
-    let offset = ptr.addr() - aligned;
-    (aligned as *mut T, offset)
+    let offset = ptr.cast::<u8>().align_offset(align);
+    (unsafe { ptr.cast::<u8>().add(offset).cast() }, offset)
 }
 
 /// Aligns a pointer to T's alignment.

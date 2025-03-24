@@ -1,8 +1,10 @@
 use std::{
+    collections::HashMap,
     fs::{self, File},
     io::{self, Read, Write},
     os::unix::net::{UnixListener, UnixStream},
     path::Path,
+    sync::{Mutex, MutexGuard, OnceLock},
     thread,
 };
 
@@ -49,6 +51,7 @@ impl Server {
         // First off, we read all bytes from the tty until we encounter a 0xFF byte. This is the handshake byte, so once we read it, we switch to packet mode.
         read_until_ten_ff(&mut self.unix_term_stream)?;
         let mut buf = [0; 1];
+
         loop {
             if let Err(e) = self.unix_term_stream.read_exact(&mut buf) {
                 if e.kind() == io::ErrorKind::UnexpectedEof {
@@ -60,6 +63,8 @@ impl Server {
                 // Both commands are just null-terminated strings, so we can handle them the same way.
                 0x00 | 0x01 => handle_write_string_command(&mut self.unix_term_stream)?,
                 0x02 => handle_send_file_command(&mut self.unix_term_stream)?,
+                0x04 => handle_create_incremental_channel_command(&mut self.unix_term_stream)?,
+                0x05 => handle_send_incremental_data_command(&mut self.unix_term_stream)?,
                 0xFF => break,
                 _ => eprintln!("Invalid byte: {}", buf[0]),
             }
@@ -84,17 +89,86 @@ fn handle_send_file_command(read: &mut dyn Read) -> io::Result<()> {
         .create(true)
         .open(format!("output/{}", filename))?;
 
+    let buf = read_u32_len_data(read)?;
+
+    file.write_all(&buf)?;
+
+    Ok(())
+}
+
+fn read_u32_len_data(read: &mut dyn Read) -> io::Result<Vec<u8>> {
     let mut len_buf = [0; 4];
     read.read_exact(&mut len_buf)?;
 
     let len = u32::from_le_bytes(len_buf) as usize;
     println!("File length: {}", len);
 
-    let mut buf = vec![0; len];
-    read.read_exact(&mut buf)?;
+    let mut all = vec![0; len];
+    let mut buf = [0; 2 << 20];
+    let mut total = 0;
+    let full_block_count = len / buf.len();
+    let remainder = len % buf.len();
 
-    file.write_all(&buf)?;
+    for _ in 0..full_block_count {
+        read.read_exact(&mut buf)?;
+        all[total..total + buf.len()].copy_from_slice(&buf);
+        total += 1;
+        println!("Read block {} out of {}", total, full_block_count);
+    }
 
+    if remainder > 0 {
+        read.read_exact(&mut buf[..remainder])?;
+        all[total..total + remainder].copy_from_slice(&buf[..remainder]);
+    }
+
+    println!("Read {} bytes", total + remainder);
+    Ok(all)
+}
+
+static CHANNELS: OnceLock<Mutex<HashMap<String, (String, usize)>>> = OnceLock::new();
+
+fn channels<'a>() -> (MutexGuard<'a, HashMap<String, (String, usize)>>, bool) {
+    let mut did_init = false;
+    let channels = CHANNELS.get_or_init(|| {
+        did_init = true;
+        Mutex::new(HashMap::new())
+    });
+    (channels.lock().unwrap(), did_init)
+}
+
+fn handle_create_incremental_channel_command(read: &mut dyn Read) -> io::Result<()> {
+    let channel = read_nul_terminated_str(read)?;
+    let format = read_nul_terminated_str(read)?;
+    println!("Creating incremental channel: {}", channel);
+    let (mut channels, _) = channels();
+    if channels.contains_key(&channel) {
+        eprintln!("Channel already exists");
+        return Ok(());
+    }
+    channels.insert(channel, (format, 0));
+    Ok(())
+}
+
+fn handle_send_incremental_data_command(read: &mut dyn Read) -> io::Result<()> {
+    let channel = read_nul_terminated_str(read)?;
+    let data = read_u32_len_data(read)?;
+
+    let (mut channels, did_init) = channels();
+    if did_init {
+        eprintln!("Channel does not exist");
+        return Ok(());
+    }
+    let (format, id) = channels.get_mut(&channel).ok_or_else(|| {
+        eprintln!("Channel does not exist");
+        io::Error::new(io::ErrorKind::NotFound, "Channel does not exist")
+    })?;
+    let filename = format.replace("{{ID}}", &id.to_string());
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .open(format!("output/{}", filename))?;
+    file.write_all(&data)?;
+    *id += 1;
     Ok(())
 }
 

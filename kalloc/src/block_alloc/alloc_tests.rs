@@ -1,11 +1,14 @@
 use core::{mem, pin::Pin, ptr::NonNull};
-use std::alloc::{Global, dealloc};
+use std::{
+    alloc::{Global, dealloc},
+    collections::LinkedList,
+};
 
 use alloc::{boxed::Box, vec::Vec};
 
 use crate::{GlobalAllocatorWrapper, test_common::DeferDealloc};
 
-use super::*;
+use super::{allocator::align_ptr, *};
 // BlockAllocator requires a heap size of 0x3200. Add 0x100 for a little extra space.
 // Must be divisible by 8
 const ARENA_SIZE: usize = 0x10000;
@@ -106,7 +109,7 @@ fn test_allocation() {
 fn test_block_join() {
     let layout = Layout::from_size_align(512, 1).unwrap();
 
-    let (mut allocator, _defer_guard) = get_allocator::<ARENA_SIZE>();
+    let (mut allocator, defer_guard) = get_allocator::<ARENA_SIZE>();
 
     let ptrs = [
         unsafe { allocator.allocate(layout) },
@@ -129,7 +132,12 @@ fn test_block_join() {
     let block = allocator
         .find_block_by_ptr(ptrs[0])
         .expect("Block pointer not found");
-    assert!(block.size == layout.size() * 4);
+    assert!(
+        block.size >= layout.size() * 4,
+        "Block size: {}",
+        block.size
+    );
+    assert!(block.address == defer_guard.ptr.as_ptr().cast());
     allocator.print_state();
     assert!(block.is_free);
 }
@@ -214,7 +222,7 @@ fn test_alignment() {
 }
 
 #[test]
-fn test_zst() {
+fn test_allocate_zst() {
     let layout = Layout::from_size_align(0, 1).unwrap();
 
     let (mut allocator, _defer_guard) = get_allocator::<ARENA_SIZE>();
@@ -314,4 +322,31 @@ fn test_memory_exhaustion() {
     let tiny_layout = Layout::from_size_align(0x20, 1).expect("layout");
     let tiny_ptr = unsafe { allocator.allocate(tiny_layout) };
     assert!(tiny_ptr.is_null());
+}
+
+#[test]
+fn test_ptr_align() {
+    let ptr = 1 as *mut u8;
+    let (ptr, offset) = unsafe { align_ptr(ptr, 8) };
+    assert_eq!(ptr, 8 as *mut u8);
+    assert_eq!(offset, 7);
+}
+
+/// A range of virtual addresses.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct VirtualAddressRange {
+    /// The start of the range.
+    pub start: u64,
+    /// The size of the range.
+    pub size: u64,
+}
+
+#[test]
+fn test_virtual_address_range_allocation_because_it_was_being_dumb() {
+    let (allocator, _defer_guard) = get_full_allocator::<ARENA_SIZE>();
+    let mut v: Vec<VirtualAddressRange, _> = Vec::new_in(&allocator);
+    v.push(VirtualAddressRange {
+        start: 0,
+        size: 0x1000,
+    });
 }
