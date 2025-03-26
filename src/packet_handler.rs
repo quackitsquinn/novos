@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 
-use kserial::server::Server;
+use kserial::server::SerialHandler;
 
 pub fn run(pty: &PathBuf) {
     // Just print the raw output to the console
 
-    Server::new(&pty).unwrap().run().unwrap();
+    SerialHandler::new(&pty).unwrap().run().unwrap();
 }

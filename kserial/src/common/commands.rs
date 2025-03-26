@@ -1,37 +1,99 @@
-use core::fmt::Arguments;
+use bytemuck::{Pod, Zeroable};
 
-/// Commands that can be sent to the serial port. This is used for structured communication.
-/// Each command has a corresponding handler defined in this module.
-/// Modules do *not* send the command id, only the data.
-#[repr(u8)]
-#[must_use = "Commands must be sent to the serial port to have any effect."]
-pub enum Command<'a> {
-    /// Write a string to the serial port.
-    WriteString(&'a str) = 0,
-    /// Write a set of arguments to the serial port. Different from WriteString, because the implementation uses a null-terminated string.
-    WriteArguments(&'a Arguments<'a>),
-    /// Send a file over the serial port. (filename, contents)
-    SendFile(&'a str, &'a [u8]),
-    /// Disable packet support. YOU CAN NOT RE-ENABLE PACKET SUPPORT AT THIS POINT.
-    DisablePacketSupport,
-    /// Initialize incremental send mode. (channel name, file_format)
-    /// File format will replace **id** with the number of the file.
-    InitIncrementalSend(&'a str, &'a str),
-    /// Send incremental data. (channel name, data)
-    SendIncrementalData(&'a str, &'a [u8]),
+use super::{array_vec::ArrayVec, fixed_null_str::FixedNulString, PacketContents};
+
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+#[repr(C)]
+pub struct SendString {
+    pub data: ArrayVec<u8, 4096>,
 }
 
-impl Command<'_> {
-    /// Get the command id.
-    pub fn id(&self) -> u8 {
-        // TODO: If more commands are added, refactor this all into a proc macro.
-        match self {
-            Command::WriteString(_) => 0,
-            Command::WriteArguments(_) => 1,
-            Command::SendFile(_, _) => 2,
-            Command::DisablePacketSupport => 3,
-            Command::InitIncrementalSend(_, _) => 4,
-            Command::SendIncrementalData(_, _) => 5,
-        }
+impl PacketContents for SendString {
+    const ID: u8 = 0x00;
+}
+
+impl SendString {
+    pub fn new(data: &str) -> Option<Self> {
+        let data = ArrayVec::from_str(data)?;
+        Some(Self { data })
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct CreateIncrementalFileChannel {
+    pub name: FixedNulString<16>,
+    pub file_template: FixedNulString<32>,
+}
+
+impl PacketContents for CreateIncrementalFileChannel {
+    const ID: u8 = 0x06;
+}
+
+impl CreateIncrementalFileChannel {
+    pub fn new(name: &str, file_template: &str) -> Option<Self> {
+        let name = FixedNulString::from_str(name)?;
+        let file_template = FixedNulString::from_str(file_template)?;
+        Some(Self {
+            name,
+            file_template,
+        })
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct IncrementalFile {
+    pub name: FixedNulString<16>,
+    pub is_done: bool,
+    pub data: ArrayVec<u8, 4096>,
+}
+
+impl PacketContents for IncrementalFile {
+    const ID: u8 = 0x07;
+}
+
+impl IncrementalFile {
+    pub fn new(name: &str, is_done: bool, data: &[u8]) -> Option<Self> {
+        let name = FixedNulString::from_str(name)?;
+        let data = ArrayVec::try_from_bytes(data)?;
+        Some(Self {
+            name,
+            is_done,
+            data,
+        })
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct CloseIncrementalFileChannel {
+    pub name: FixedNulString<16>,
+}
+
+impl PacketContents for CloseIncrementalFileChannel {
+    const ID: u8 = 0x08;
+}
+
+impl CloseIncrementalFileChannel {
+    pub fn new(name: &str) -> Option<Self> {
+        let name = FixedNulString::from_str(name)?;
+        Some(Self { name })
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct Shutdown {
+    pub code: i32,
+}
+
+impl PacketContents for Shutdown {
+    const ID: u8 = 0x09;
+}
+
+impl Shutdown {
+    pub fn new(code: i32) -> Self {
+        Self { code }
     }
 }
