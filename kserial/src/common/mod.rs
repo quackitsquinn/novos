@@ -1,26 +1,22 @@
 use bytemuck::{Pod, Zeroable};
 
-/// A packet that can be sent over the serial port.
-#[derive(Debug, Clone, Copy, Zeroable)]
-pub struct Packet<T>
-where
-    T: Pod,
-{
-    pub command: u8,
-    pub command_checksum: u8,
-    pub data: T,
-}
-
-// Safety: u8 is Pod, and T is Pod, so Packet<T> is Pod
-unsafe impl<T> Pod for Packet<T> where T: Pod {}
-
 pub mod array_vec;
 pub mod commands;
 pub mod fixed_null_str;
+pub(crate) mod macros;
+pub mod packet;
 
-pub trait PacketContents: Sized {
+pub trait PacketContents: Sized + Pod {
     const ID: u8;
     const SIZE: usize = core::mem::size_of::<Self>();
+
+    fn checksum(&self) -> u8 {
+        pod_checksum(self)
+    }
+
+    fn into_packet(self) -> packet::Packet<Self> {
+        packet::Packet::new(Self::ID, self)
+    }
 }
 
 pub(crate) fn pod_checksum<T>(data: &T) -> u8

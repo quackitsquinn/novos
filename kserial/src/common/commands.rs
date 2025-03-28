@@ -4,22 +4,32 @@ use super::{array_vec::ArrayVec, fixed_null_str::FixedNulString, PacketContents}
 
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
 #[repr(C)]
-pub struct SendString {
-    pub data: ArrayVec<u8, 4096>,
+pub struct StringPacket {
+    // This weird syntax is a const generic parameter. We don't use `Self` because it breaks `Pod` and `Zeroable`.
+    pub data: ArrayVec<u8, { StringPacket::CAPACITY }>,
 }
 
-impl PacketContents for SendString {
+impl PacketContents for StringPacket {
     const ID: u8 = 0x00;
 }
 
-impl SendString {
+impl StringPacket {
+    pub const CAPACITY: usize = 128;
+
     pub fn new(data: &str) -> Option<Self> {
         let data = ArrayVec::from_str(data)?;
         Some(Self { data })
     }
+
+    pub unsafe fn from_bytes_unchecked(bytes: &[u8]) -> Self {
+        // Safety: The caller must ensure that the bytes are valid.
+        // Also, this is a relatively no-op operation, so it's safe to mark as unsafe.
+        let data = ArrayVec::from_bytes_unchecked(bytes);
+        Self { data }
+    }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
 #[repr(C)]
 pub struct CreateIncrementalFileChannel {
     pub name: FixedNulString<16>,
@@ -41,11 +51,13 @@ impl CreateIncrementalFileChannel {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
 #[repr(C)]
 pub struct IncrementalFile {
     pub name: FixedNulString<16>,
-    pub is_done: bool,
+    pub is_done: u8,
+    /// Half reserved for future use, half to remove padding bytes between `is_done` and `data`.
+    _reserved: u8,
     pub data: ArrayVec<u8, 4096>,
 }
 
@@ -59,13 +71,14 @@ impl IncrementalFile {
         let data = ArrayVec::try_from_bytes(data)?;
         Some(Self {
             name,
-            is_done,
+            is_done: is_done as u8,
+            _reserved: 0,
             data,
         })
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
 #[repr(C)]
 pub struct CloseIncrementalFileChannel {
     pub name: FixedNulString<16>,
@@ -82,7 +95,7 @@ impl CloseIncrementalFileChannel {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
 #[repr(C)]
 pub struct Shutdown {
     pub code: i32,

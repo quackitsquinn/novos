@@ -8,7 +8,11 @@ use std::{
     thread,
 };
 
+use crate::common::{packet::Packet, PacketContents};
+use crate::server::read_from::ReadFrom;
+
 mod command_handlers;
+mod read_from;
 
 pub trait RWStream: Read + Write {}
 
@@ -68,4 +72,17 @@ where
         self.dump.write_all(&buf[..res])?;
         Ok(res)
     }
+}
+
+pub(crate) fn read_packet<C: PacketContents>(
+    cmd_id: u8,
+    stream: &mut Stream,
+) -> Result<Packet<C>, io::Error> {
+    let checksum = stream.read_ty::<u8>()?;
+    let packet = stream.read_ty::<C>()?;
+    let full = Packet::from_raw_parts(cmd_id, checksum, packet).ok_or(io::Error::new(
+        io::ErrorKind::InvalidData,
+        "Checksum mismatch",
+    ))?;
+    Ok(full)
 }

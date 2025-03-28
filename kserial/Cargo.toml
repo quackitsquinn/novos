@@ -7,15 +7,11 @@ edition = "2021"
 thiserror = { version = "2.0.7", default-features = false }
 spin = "0.9.8"
 bytemuck = { version = "1.22.0", features = ["derive"] }
+pastey = "0.1.0"
 
 [features]
-default = []
+default = ["client", "server"]
 std = []
 client = []
-server = ["std", "dep:serialport"]
+server = ["std", "client"]
 
-
-# Add serialport if its client
-[dependencies.serialport]
-version = "4.6.1"
-optional = true

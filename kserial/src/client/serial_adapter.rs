@@ -14,3 +14,77 @@ where
     /// Read a slice of bytes from the serial port. Returns Some if reading the slice would block, None otherwise.
     fn read_slice(&self, data: &mut [u8]) -> usize;
 }
+
+#[cfg(test)]
+pub(crate) mod tests {
+    use std::sync::Mutex;
+
+    use super::*;
+
+    pub struct TestSerialAdapter {
+        input: Mutex<(usize, Vec<u8>)>,
+        output: Mutex<Vec<u8>>,
+    }
+
+    impl TestSerialAdapter {
+        pub fn new() -> Self {
+            Self {
+                input: Mutex::new((0, Vec::new())),
+                output: Mutex::new(Vec::new()),
+            }
+        }
+
+        pub fn set_input(&self, input: Vec<u8>) {
+            *self.input.lock().unwrap() = (0, input);
+        }
+
+        pub fn get_output(&self) -> Vec<u8> {
+            self.output.lock().unwrap().clone()
+        }
+
+        pub fn clear_output(&self) {
+            self.output.lock().unwrap().clear();
+        }
+    }
+
+    impl SerialAdapter for TestSerialAdapter {
+        fn send(&self, data: u8) {
+            self.output.lock().unwrap().push(data);
+        }
+
+        fn send_slice(&self, data: &[u8]) {
+            self.output.lock().unwrap().extend_from_slice(data);
+        }
+
+        fn read(&self) -> u8 {
+            let (index, input) = &mut *self.input.lock().unwrap();
+            if *index >= input.len() {
+                return 0;
+            }
+
+            let byte = input[*index];
+            *index += 1;
+            byte
+        }
+
+        fn read_slice(&self, data: &mut [u8]) -> usize {
+            let (index, input) = &mut *self.input.lock().unwrap();
+            let len = data.len().min(input.len() - *index);
+            data[..len].copy_from_slice(&input[*index..*index + len]);
+            *index += len;
+            len
+        }
+    }
+
+    #[test]
+    fn test_test_serial_adapter() {
+        let adapter = TestSerialAdapter::new();
+        adapter.set_input(vec![1, 2, 3, 4, 5]);
+        assert_eq!(adapter.read(), 1);
+        assert_eq!(adapter.read(), 2);
+        assert_eq!(adapter.read(), 3);
+        assert_eq!(adapter.read(), 4);
+        assert_eq!(adapter.read(), 5);
+        assert_eq!(adapter.read(), 0);
+    }
+}

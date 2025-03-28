@@ -1,5 +1,5 @@
 // Enable no_std if the std feature is not enabled
-#![cfg_attr(not(feature = "std"), no_std)]
+#![cfg_attr(all(not(feature = "std"), not(test)), no_std)]
 
 #[cfg(feature = "client")]
 pub mod client;

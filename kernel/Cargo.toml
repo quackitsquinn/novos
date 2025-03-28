@@ -19,7 +19,7 @@ spin = "0.9.8"
 uart_16550 = "0.3.1"
 x86_64 = "0.15.2"
 kproc = { path = "../kproc" }
-kserial = { path = "../kserial", features = ["client"] }
+kserial = { path = "../kserial", features = ["client"], default-features = false }
 kalloc ={ path = "../kalloc" }
 goblin = { version = "0.9.2", default-features = false, features = ["elf64", "elf32"] }
 thiserror = { version = "2.0.3", default-features = false }

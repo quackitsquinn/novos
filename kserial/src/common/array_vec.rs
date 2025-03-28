@@ -57,6 +57,14 @@ impl<const CAP: usize> ArrayVec<u8, CAP> {
             data,
         })
     }
+    #[cfg(feature = "std")]
+    pub fn try_to_string(&self) -> Option<String> {
+        let mut s = String::with_capacity(self.len());
+        for i in 0..self.len() {
+            s.push(self[i] as char);
+        }
+        Some(s)
+    }
 }
 
 impl<T, const CAP: usize> ArrayVec<T, CAP>
