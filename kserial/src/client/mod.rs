@@ -4,7 +4,6 @@ pub mod serial_adapter;
 pub use serial_adapter::SerialAdapter;
 use spin::Once;
 
-use core::fmt::Write;
 
 use crate::common::{commands::StringPacket, PacketContents};
 

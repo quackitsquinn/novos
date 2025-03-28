@@ -1,4 +1,4 @@
-use std::io::{Read, Write};
+use std::io::Read;
 
 pub trait ReadFrom {
     type Error: std::error::Error;

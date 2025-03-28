@@ -38,6 +38,5 @@ macro_rules! cfg_value {
         );
     };
 }
-use core::sync::atomic::AtomicBool;
 
 pub(crate) use cfg_value;

@@ -1,4 +1,3 @@
-use core::fmt::Write;
 
 /// An adapter for serial communication. This is used to abstract the serial port from the rest of the kernel.
 pub trait SerialAdapter

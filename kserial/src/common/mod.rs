@@ -1,4 +1,4 @@
-use bytemuck::{Pod, Zeroable};
+use bytemuck::Pod;
 
 pub mod array_vec;
 pub mod commands;
