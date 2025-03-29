@@ -1,5 +1,5 @@
 use std::{
-    fs::{File},
+    fs::File,
     io::{self, Read, Write},
 };
 
@@ -71,7 +71,7 @@ where
 
 pub(crate) fn read_packet<C: PacketContents>(
     cmd_id: u8,
-    stream: &mut Stream,
+    stream: &mut dyn Read,
 ) -> Result<Packet<C>, io::Error> {
     let checksum = stream.read_ty::<u8>()?;
     let packet = stream.read_ty::<C>()?;

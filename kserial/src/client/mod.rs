@@ -1,52 +1,70 @@
 pub mod cfg;
+pub mod serial;
 pub mod serial_adapter;
 
+use serial::Serial;
 pub use serial_adapter::SerialAdapter;
 use spin::Once;
 
+use crate::common::{commands::StringPacket, test_log::info, PacketContents};
 
-use crate::common::{commands::StringPacket, PacketContents};
-
-static SERIAL_ADAPTER: Once<&'static dyn SerialAdapter> = Once::new();
+static SERIAL_ADAPTER: Serial = Serial::new();
 
 pub fn init(adapter: &'static dyn SerialAdapter) {
-    SERIAL_ADAPTER.call_once(|| adapter);
-}
-/// Sends a POD type over serial.
-///
-/// # Safety
-///
-/// The caller must ensure that the receiver is expecting the same type.
-pub(crate) unsafe fn send_pod<T>(data: &T)
-where
-    T: bytemuck::Pod,
-{
-    if !cfg::should_output_serial() {
-        return;
-    }
-    // We allow sending POD types over serial, even if we are not in packet mode.
-    let adapter = SERIAL_ADAPTER
-        .get()
-        .expect("Serial adapter not initialized");
-    let bytes = bytemuck::bytes_of(data);
-    adapter.send_slice(bytes);
+    SERIAL_ADAPTER.init(adapter);
 }
 
 pub fn send_string(string: &str) {
+    send_string_with(&SERIAL_ADAPTER, string);
+}
+
+pub fn send_string_with(serial: &Serial, string: &str) {
+    let serial_adapter = serial.get().expect("Serial adapter not initialized");
     if !cfg::is_packet_mode() {
-        let adapter = SERIAL_ADAPTER
-            .get()
-            .expect("Serial adapter not initialized");
-        for byte in string.bytes() {
-            adapter.send(byte);
-        }
+        serial_adapter.send_slice(string.as_bytes());
         return;
     }
 
     for chunk in string.as_bytes().chunks(StringPacket::CAPACITY) {
         let pk = unsafe { StringPacket::from_bytes_unchecked(chunk) };
         unsafe {
-            send_pod(&pk.into_packet());
+            let packet = pk.into_packet();
+            info!("Sending packet: {:?}", packet);
+            serial.send_pod(&packet);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Cursor;
+
+    use crate::{
+        common::{commands::StringPacket, packet::Packet, PacketContents},
+        server::read_packet,
+    };
+
+    use super::{cfg, serial::tests::TestSerialWrapper};
+
+    #[test]
+    fn test_send_string() {
+        let tester = TestSerialWrapper::new();
+        let serial = &tester.serial;
+        let adapter = &tester.get_adapter();
+
+        cfg::set_packet_mode(true);
+        super::send_string_with(serial, "Hello, world!");
+        let output = adapter.get_output();
+        let mut cur = Cursor::new(output[1..].to_vec());
+        assert!(
+            output[0] == StringPacket::ID as u8,
+            "Invalid packet ID, Expected: {}, Got: {}: {:?}",
+            StringPacket::ID,
+            output[0],
+            output
+        );
+
+        let packet: Packet<StringPacket> = read_packet(StringPacket::ID, &mut cur).unwrap();
+        assert_eq!(packet.command(), StringPacket::ID);
     }
 }

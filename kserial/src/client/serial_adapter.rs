@@ -1,3 +1,4 @@
+use bytemuck::Pod;
 
 /// An adapter for serial communication. This is used to abstract the serial port from the rest of the kernel.
 pub trait SerialAdapter
@@ -12,6 +13,14 @@ where
     fn read(&self) -> u8;
     /// Read a slice of bytes from the serial port. Returns Some if reading the slice would block, None otherwise.
     fn read_slice(&self, data: &mut [u8]) -> usize;
+}
+
+fn send_pod<T>(adapter: &dyn SerialAdapter, data: &T)
+where
+    T: Pod,
+{
+    let bytes = bytemuck::bytes_of(data);
+    adapter.send_slice(bytes);
 }
 
 #[cfg(test)]
@@ -85,5 +94,37 @@ pub(crate) mod tests {
         assert_eq!(adapter.read(), 4);
         assert_eq!(adapter.read(), 5);
         assert_eq!(adapter.read(), 0);
+    }
+
+    #[test]
+    fn test_test_serial_adapter_slice() {
+        let adapter = TestSerialAdapter::new();
+        adapter.set_input(vec![1, 2, 3, 4, 5]);
+        let mut data = [0; 3];
+        assert_eq!(adapter.read_slice(&mut data), 3);
+        assert_eq!(data, [1, 2, 3]);
+        assert_eq!(adapter.read_slice(&mut data), 2);
+        assert_eq!(data, [4, 5, 3]);
+        assert_eq!(adapter.read_slice(&mut data), 0);
+        assert_eq!(data, [4, 5, 3]);
+    }
+
+    #[test]
+    fn test_test_serial_adapter_send() {
+        let adapter = TestSerialAdapter::new();
+        adapter.send(1);
+        adapter.send(2);
+        adapter.send(3);
+        adapter.send(4);
+        adapter.send(5);
+        assert_eq!(adapter.get_output(), vec![1, 2, 3, 4, 5]);
+    }
+
+    #[test]
+    fn test_test_serial_adapter_send_slice() {
+        let adapter = TestSerialAdapter::new();
+        adapter.send_slice(&[1, 2, 3]);
+        adapter.send_slice(&[4, 5]);
+        assert_eq!(adapter.get_output(), vec![1, 2, 3, 4, 5]);
     }
 }

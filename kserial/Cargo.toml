@@ -15,3 +15,8 @@ std = []
 client = []
 server = ["std", "client"]
 
+[dev-dependencies]
+ctor = "0.4.1"
+env_logger = "0.11.7"
+log = "0.4.27"
+

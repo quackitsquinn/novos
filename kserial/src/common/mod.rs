@@ -30,3 +30,58 @@ where
     }
     checksum
 }
+
+pub(crate) mod test_log {
+    macro_rules! trace {
+        ($($arg:tt)*) => {
+            #[cfg(test)]
+            {
+                ::log::trace!($($arg)*);
+            }
+        };
+
+    }
+    macro_rules! debug {
+        ($($arg:tt)*) => {
+            #[cfg(test)]
+            {
+                ::log::debug!($($arg)*);
+            }
+        };
+    }
+    macro_rules! info {
+        ($($arg:tt)*) => {
+            #[cfg(test)]
+            {
+                ::log::info!($($arg)*);
+            }
+        };
+    }
+    macro_rules! warn {
+        ($($arg:tt)*) => {
+            #[cfg(test)]
+            {
+                ::log::warn!($($arg)*);
+            }
+        };
+    }
+    macro_rules! error {
+        ($($arg:tt)*) => {
+            #[cfg(test)]
+            {
+                ::log::error!($($arg)*);
+            }
+        };
+    }
+
+    #[cfg(test)]
+    mod _init {
+        use ctor::ctor;
+        #[ctor]
+        static INIT: () = {
+            let _ = env_logger::builder().is_test(true).try_init();
+        };
+    }
+
+    pub(crate) use {debug, error, info, trace};
+}
