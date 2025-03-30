@@ -77,7 +77,10 @@ pub(crate) fn read_packet<C: PacketContents>(
     let packet = stream.read_ty::<C>()?;
     let full = Packet::from_raw_parts(cmd_id, checksum, packet).ok_or(io::Error::new(
         io::ErrorKind::InvalidData,
-        "Checksum mismatch",
+        format!(
+            "Checksum mismatch, expected 0 but got {}",
+            packet.checksum()
+        ),
     ))?;
     Ok(full)
 }

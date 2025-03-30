@@ -1,6 +1,6 @@
 use core::{
     mem::MaybeUninit,
-    ops::{Index, IndexMut},
+    ops::{Deref, Index, IndexMut},
 };
 
 use bytemuck::{Pod, Zeroable};
@@ -35,6 +35,11 @@ impl<T: Pod, const CAP: usize> ArrayVec<T, CAP> {
     /// Returns the length of the vector.
     pub fn len(&self) -> usize {
         self.len as usize
+    }
+
+    /// Returns the pointer to the data.
+    pub fn as_ptr(&self) -> *const T {
+        self.data.as_ptr() as *const T
     }
 }
 
@@ -152,3 +157,11 @@ impl<T: Pod + PartialEq, const CAP: usize> PartialEq for ArrayVec<T, CAP> {
 }
 
 impl<T: Pod + Eq, const CAP: usize> Eq for ArrayVec<T, CAP> {}
+
+impl<T: Pod + Eq, const CAP: usize> Deref for ArrayVec<T, CAP> {
+    type Target = [T];
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { core::slice::from_raw_parts(self.data.as_ptr() as *const T, self.len()) }
+    }
+}

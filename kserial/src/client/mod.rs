@@ -66,5 +66,6 @@ mod tests {
 
         let packet: Packet<StringPacket> = read_packet(StringPacket::ID, &mut cur).unwrap();
         assert_eq!(packet.command(), StringPacket::ID);
+        assert_eq!(packet.checksum(), 0);
     }
 }

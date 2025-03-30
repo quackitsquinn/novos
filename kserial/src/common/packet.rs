@@ -4,6 +4,7 @@ use super::pod_checksum;
 
 /// A packet that can be sent over the serial port.
 #[derive(Debug, Clone, Copy, Zeroable)]
+#[repr(C)]
 pub struct Packet<T>
 where
     T: Pod,
@@ -18,12 +19,14 @@ where
     T: Pod,
 {
     pub fn new(command: u8, data: T) -> Self {
-        let command_checksum = !(pod_checksum(&data).wrapping_add(command));
-        Self {
+        let mut no_chk = Self {
             command,
-            command_checksum,
+            command_checksum: 0,
             data,
-        }
+        };
+        let checksum = pod_checksum(&no_chk);
+        no_chk.command_checksum = (!checksum).wrapping_add(1);
+        no_chk
     }
 
     pub unsafe fn from_raw_parts_unchecked(command: u8, command_checksum: u8, data: T) -> Self {
@@ -52,7 +55,7 @@ where
         self.command
     }
 
-    pub fn data(&self) -> &T {
+    pub fn payload(&self) -> &T {
         &self.data
     }
 
@@ -67,3 +70,15 @@ where
 
 // Safety: u8 is Pod, and T is Pod, so Packet<T> is Pod
 unsafe impl<T> Pod for Packet<T> where T: Pod {}
+
+#[cfg(test)]
+mod tests {
+    use crate::common::{commands::StringPacket, PacketContents};
+
+    #[test]
+    fn test_checksum_correct() {
+        let string_payload = StringPacket::new("Hello, world!").unwrap();
+        let packet = string_payload.into_packet();
+        assert_eq!(packet.checksum(), 0);
+    }
+}

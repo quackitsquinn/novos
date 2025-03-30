@@ -6,6 +6,7 @@ pub mod fixed_null_str;
 pub(crate) mod macros;
 pub mod packet;
 
+
 pub trait PacketContents: Sized + Pod {
     const ID: u8;
     const SIZE: usize = core::mem::size_of::<Self>();

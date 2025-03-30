@@ -1,4 +1,3 @@
-
 use crate::common::{commands::StringPacket, PacketContents};
 
 use super::{read_packet, Stream};
@@ -23,7 +22,7 @@ fn print_str(cmd: u8, stream: &mut Stream) -> Result<(), std::io::Error> {
     let data = read_packet::<StringPacket>(cmd, stream)?;
     println!(
         "{}",
-        data.data()
+        data.payload()
             .data
             .try_to_string()
             .ok_or(std::io::ErrorKind::InvalidData)?

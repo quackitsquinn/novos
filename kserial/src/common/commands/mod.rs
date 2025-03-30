@@ -2,32 +2,9 @@ use bytemuck::{Pod, Zeroable};
 
 use super::{array_vec::ArrayVec, fixed_null_str::FixedNulString, PacketContents};
 
-#[derive(Debug, Clone, Copy, Pod, Zeroable)]
-#[repr(C)]
-pub struct StringPacket {
-    // This weird syntax is a const generic parameter. We don't use `Self` because it breaks `Pod` and `Zeroable`.
-    pub data: ArrayVec<u8, { StringPacket::CAPACITY }>,
-}
+mod string_packet;
 
-impl PacketContents for StringPacket {
-    const ID: u8 = 0x00;
-}
-
-impl StringPacket {
-    pub const CAPACITY: usize = 128;
-
-    pub fn new(data: &str) -> Option<Self> {
-        let data = ArrayVec::from_str(data)?;
-        Some(Self { data })
-    }
-
-    pub unsafe fn from_bytes_unchecked(bytes: &[u8]) -> Self {
-        // Safety: The caller must ensure that the bytes are valid.
-        // Also, this is a relatively no-op operation, so it's safe to mark as unsafe.
-        let data = ArrayVec::from_bytes_unchecked(bytes);
-        Self { data }
-    }
-}
+pub use string_packet::StringPacket;
 
 #[derive(Debug, Clone, Copy, Pod, Zeroable)]
 #[repr(C)]
