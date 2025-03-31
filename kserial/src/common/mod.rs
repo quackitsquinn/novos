@@ -6,7 +6,6 @@ pub mod fixed_null_str;
 pub(crate) mod macros;
 pub mod packet;
 
-
 pub trait PacketContents: Sized + Pod {
     const ID: u8;
     const SIZE: usize = core::mem::size_of::<Self>();
@@ -75,14 +74,17 @@ pub(crate) mod test_log {
         };
     }
 
+    pub(crate) use {debug, error, info, trace};
+
     #[cfg(test)]
-    mod _init {
+    mod log_internal {
+        use std::io::{stdout, Write};
+
         use ctor::ctor;
+
         #[ctor]
         static INIT: () = {
-            let _ = env_logger::builder().is_test(true).try_init();
+            env_logger::builder().is_test(true).init();
         };
     }
-
-    pub(crate) use {debug, error, info, trace};
 }

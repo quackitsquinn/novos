@@ -1,4 +1,5 @@
 use core::{
+    fmt::Debug,
     mem::MaybeUninit,
     ops::{Deref, Index, IndexMut},
 };
@@ -9,7 +10,7 @@ use bytemuck::{Pod, Zeroable};
 ///
 /// This implementation of `ArrayVec` has a very specific memory layout, requiring a unique implementation.
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub struct ArrayVec<T, const CAP: usize>
 where
     T: Pod,
@@ -158,10 +159,16 @@ impl<T: Pod + PartialEq, const CAP: usize> PartialEq for ArrayVec<T, CAP> {
 
 impl<T: Pod + Eq, const CAP: usize> Eq for ArrayVec<T, CAP> {}
 
-impl<T: Pod + Eq, const CAP: usize> Deref for ArrayVec<T, CAP> {
+impl<T: Pod, const CAP: usize> Deref for ArrayVec<T, CAP> {
     type Target = [T];
 
     fn deref(&self) -> &Self::Target {
         unsafe { core::slice::from_raw_parts(self.data.as_ptr() as *const T, self.len()) }
+    }
+}
+
+impl<T: Pod + Debug, const CAP: usize> Debug for ArrayVec<T, CAP> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_list().entries(self.iter()).finish()
     }
 }

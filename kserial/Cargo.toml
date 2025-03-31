@@ -13,9 +13,10 @@ pastey = "0.1.0"
 default = ["std"]
 std = []
 
-
-[dev-dependencies]
+# INFO: THIS CFG DIRECTIVE IS *VERY IMPORTANT* FOR THE BUILD SYSTEM
+# If the `cfg(unix)` directive is not present, cargo will insist that you are trying to build this for #![no_std].
+# This will cause rust-analyzer to do *really* weird things, and make you spend 3 hours trying to figure out why
+[target.'cfg(unix)'.dev-dependencies]
 ctor = "0.4.1"
+log = { version = "0.4" }
 env_logger = "0.11.7"
-log = "0.4.27"
-
