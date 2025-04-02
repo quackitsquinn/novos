@@ -5,6 +5,9 @@ pub mod commands;
 pub mod fixed_null_str;
 pub(crate) mod macros;
 pub mod packet;
+// KSerial Packet \0\0 ENTER
+// This should be distinct enough to avoid conflicts with anything else
+pub const PACKET_MODE_ENTRY_SIG: [u8; 10] = *b"KSP\0\0ENTER";
 
 pub trait PacketContents: Sized + Pod {
     const ID: u8;

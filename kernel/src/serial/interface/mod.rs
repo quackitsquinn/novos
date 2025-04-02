@@ -1,6 +1,6 @@
 use core::fmt::Write;
 
-use kserial::{client::SerialAdapter, common::Command};
+use kserial::client::SerialAdapter;
 use serial::Serial;
 use spin::Once;
 
@@ -16,7 +16,6 @@ pub static SERIAL_PORT: OnceMutex<Serial> = OnceMutex::uninitialized();
 pub static PORT_HAS_INIT: Once<()> = Once::new();
 
 impl SerialAdapter for OnceMutex<Serial> {
-    // HACK: All the .force_unlock() calls are to unlock the port, which is weird. I don't know why it's locked in the first place, but this fixed the previous issue.
     fn send(&self, data: u8) {
         let mut s = self.get();
 
@@ -54,19 +53,11 @@ pub fn init() {
     PORT_HAS_INIT.call_once(|| ());
     let mut serial = SERIAL_PORT.get();
     kserial::client::init(&SERIAL_PORT);
-    serial.enable_packet_support();
 }
 
 #[doc(hidden)]
 pub fn _print(args: core::fmt::Arguments) {
-    let mut serial = SERIAL_PORT.get();
-    if serial.has_packet_support() {
-        drop(serial);
-        //writeln!(serial, "AUIFNHAWERIOUGHAWEJIOGJAEHLUIGNAWOI").unwrap();
-        Command::WriteArguments(&args).send();
-    } else {
-        serial.write_fmt(args).unwrap();
-    }
+    writeln!(kserial::client::SerialWriter, "{}", args).unwrap();
 }
 /// Serial print
 #[macro_export]

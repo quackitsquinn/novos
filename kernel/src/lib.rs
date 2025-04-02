@@ -19,6 +19,7 @@ use core::arch::asm;
 
 use alloc::boxed::Box;
 use interrupts::hardware;
+use kserial::client::get_serial_client;
 use limine::BaseRevision;
 use log::info;
 use proc::{sched, KERNEL_THREAD_SCHEDULER};
@@ -76,6 +77,10 @@ pub(crate) unsafe fn init_kernel_services() {
     gdt::MODULE.init();
     interrupts::MODULE.init();
     hardware::MODULE.init();
+    get_serial_client().enable_packet_support();
+    print!(
+        "AAAAAAAAGHIERGOPAEWINBVOIUSEHVNORHBPIOJINERPIGHBNSE[ORVNBPIRBG[SOENGPIEBGERNPIERBG[IEFGI"
+    );
     memory::MODULE.init();
     #[cfg(not(test))] // Tests don't have a display
     display::MODULE.init();

@@ -21,8 +21,10 @@ Raw mode is switched back into when the system receive any invalid bytes.
 To switch into `Packet` mode, the system must receive the following bytes:
 
 ```rust
-pub const PACKET_MODE_ENTRY: [u8; 8] = /* TBD */
+pub const PACKET_MODE_ENTRY: [u8; 8] = b"KSP\0\0ENTER"
 ```
+
+TODO: Add a challenge if 2-way comms are possible
 
 ### Packet Structure
 

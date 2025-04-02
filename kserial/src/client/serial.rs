@@ -2,13 +2,15 @@ use core::ops::Deref;
 
 use spin::Once;
 
+use crate::common::PACKET_MODE_ENTRY_SIG;
+
 use super::{cfg, SerialAdapter};
 
-pub struct Serial {
+pub struct SerialClient {
     adapter: Once<&'static dyn SerialAdapter>,
 }
 
-impl Serial {
+impl SerialClient {
     pub const fn new() -> Self {
         Self {
             adapter: Once::new(),
@@ -35,6 +37,13 @@ impl Serial {
     pub fn get(&self) -> Option<&'static dyn SerialAdapter> {
         self.adapter.get().map(|a| *a)
     }
+
+    pub fn enable_packet_support(&self) {
+        cfg::set_packet_mode(true);
+        unsafe {
+            self.send_pod(&PACKET_MODE_ENTRY_SIG); // Send a marker to indicate packet mode is enabled.
+        }
+    }
 }
 
 #[cfg(test)]
@@ -45,7 +54,7 @@ pub mod tests {
     use crate::client::serial_adapter::tests::TestSerialAdapter;
 
     pub struct TestSerialWrapper {
-        pub serial: Serial,
+        pub serial: SerialClient,
         adapter: Pin<Box<TestSerialAdapter>>,
     }
 
@@ -54,7 +63,7 @@ pub mod tests {
             let adapter = Box::pin(TestSerialAdapter::new());
             // SAFETY: adapter is pinned and will be dropped after serial.
             let adapter_ptr = unsafe { &*(adapter.as_ref().get_ref() as *const _) };
-            let serial = Serial::new();
+            let serial = SerialClient::new();
             serial.init(&*adapter_ptr);
             Self { serial, adapter }
         }
@@ -65,7 +74,7 @@ pub mod tests {
     }
 
     impl Deref for TestSerialWrapper {
-        type Target = Serial;
+        type Target = SerialClient;
 
         fn deref(&self) -> &Self::Target {
             &self.serial
