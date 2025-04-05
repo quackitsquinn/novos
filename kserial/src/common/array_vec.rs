@@ -16,7 +16,7 @@ where
     T: Pod,
 {
     len: u16,
-    data: [MaybeUninit<T>; CAP],
+    data: [T; CAP],
 }
 
 impl<T: Pod, const CAP: usize> ArrayVec<T, CAP> {
@@ -24,12 +24,12 @@ impl<T: Pod, const CAP: usize> ArrayVec<T, CAP> {
     pub fn new() -> Self {
         ArrayVec {
             len: 0,
-            data: [const { MaybeUninit::uninit() }; CAP],
+            data: [Zeroable::zeroed(); CAP],
         }
     }
 
     /// Creates a new `ArrayVec` from a length and an array of `MaybeUninit`.
-    pub unsafe fn from_raw_parts(len: u16, data: [MaybeUninit<T>; CAP]) -> Self {
+    pub unsafe fn from_raw_parts(len: u16, data: [T; CAP]) -> Self {
         ArrayVec { len, data }
     }
 
@@ -50,11 +50,11 @@ impl<const CAP: usize> ArrayVec<u8, CAP> {
             return None;
         }
 
-        let mut data: [MaybeUninit<u8>; CAP] = [const { MaybeUninit::uninit() }; CAP];
+        let mut data: [u8; CAP] = [0; CAP];
         let mut len = 0;
 
         for c in s.chars() {
-            data[len] = MaybeUninit::new(c as u8);
+            data[len] = c as u8; // Convert the character to a byte
             len += 1;
         }
 
@@ -67,6 +67,7 @@ impl<const CAP: usize> ArrayVec<u8, CAP> {
     pub fn try_to_string(&self) -> Option<String> {
         let mut s = String::with_capacity(self.len());
         for i in 0..self.len() {
+            if self[i] as char == '\n' {}
             s.push(self[i] as char);
         }
         Some(s)
@@ -78,12 +79,12 @@ where
     T: Pod,
 {
     pub unsafe fn from_bytes_unchecked(bytes: &[u8]) -> Self {
-        let mut data: [MaybeUninit<T>; CAP] = [MaybeUninit::uninit(); CAP];
+        let mut data: [T; CAP] = [Zeroable::zeroed(); CAP];
         let mut len = 0;
 
         for chunk in bytes.chunks_exact(core::mem::size_of::<T>()) {
             let chunk = bytemuck::from_bytes(chunk);
-            data[len] = MaybeUninit::new(*chunk);
+            data[len] = *chunk;
             len += 1;
         }
 
@@ -124,7 +125,7 @@ impl<T: Pod, const CAP: usize> Index<usize> for ArrayVec<T, CAP> {
             panic!("ArrayVec::index: index out of bounds");
         }
 
-        unsafe { &*self.data[index].as_ptr() }
+        &self.data[index]
     }
 }
 
@@ -134,7 +135,7 @@ impl<T: Pod, const CAP: usize> IndexMut<usize> for ArrayVec<T, CAP> {
             panic!("ArrayVec::index_mut: index out of bounds");
         }
 
-        unsafe { &mut *self.data[index].as_mut_ptr() }
+        &mut self.data[index]
     }
 }
 

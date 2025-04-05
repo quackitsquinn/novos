@@ -16,7 +16,7 @@ impl PacketContents for StringPacket {
 }
 
 impl StringPacket {
-    pub const CAPACITY: usize = 16;
+    pub const CAPACITY: usize = 32;
 
     pub fn new(data: &str) -> Option<Self> {
         let data = ArrayVec::from_str(data)?;

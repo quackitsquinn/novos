@@ -64,6 +64,7 @@ mod tests {
 
     #[test]
     fn test_send_string() {
+        const TEST_STRING: &str = "Hello, world! hEllo, world! heLlo, world!";
         let tester = TestSerialWrapper::new();
         let serial = &tester.serial;
         let adapter = &tester.get_adapter();
@@ -85,5 +86,13 @@ mod tests {
         let packet: Packet<StringPacket> = read_packet(StringPacket::ID, &mut ser).unwrap();
         assert_eq!(packet.command(), StringPacket::ID);
         assert_eq!(packet.checksum(), 0);
+        let contents = packet.payload();
+        assert_eq!(
+            contents.as_str(),
+            &TEST_STRING[..StringPacket::CAPACITY],
+            "Failed to read the correct string from the packet."
+        );
+
+        //let remaining_output = read_packet(Str, stream)
     }
 }

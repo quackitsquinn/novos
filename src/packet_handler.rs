@@ -21,7 +21,7 @@ pub fn run(pty: &PathBuf) {
         let (stream, addr) = listener.accept().expect("Failed to accept connection");
         println!("Connected to {:?}", addr);
 
-        SerialHandler::new(stream).unwrap().run().unwrap();
+        if let Err(e) = SerialHandler::new(stream).unwrap().run() {}
         println!("Server stopped");
         break;
     }

@@ -20,13 +20,7 @@ fn invalid(i: u8, stream: &mut SerialStream) -> Result<(), std::io::Error> {
 
 fn print_str(cmd: u8, stream: &mut SerialStream) -> Result<(), std::io::Error> {
     let data = read_packet::<StringPacket>(cmd, stream)?;
-    print!(
-        "{}",
-        data.payload()
-            .data
-            .try_to_string()
-            .ok_or(std::io::ErrorKind::InvalidData)?
-    );
+    println!("{:?}", data);
     Ok(())
 }
 

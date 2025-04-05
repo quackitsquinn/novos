@@ -79,6 +79,7 @@ pub(crate) fn read_packet<C: PacketContents>(
 
 fn read_until_signature(stream: &mut SerialStream, signature: &[u8]) -> Result<(), io::Error> {
     let mut sig_index = 0;
+
     loop {
         let mut byte = [0; 1];
         let res = stream.get_inner().read_exact(&mut byte);
