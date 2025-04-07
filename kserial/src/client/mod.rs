@@ -70,7 +70,7 @@ mod tests {
         let adapter = &tester.get_adapter();
 
         cfg::set_packet_mode(true);
-        super::send_string_with(serial, "Hello, world!");
+        super::send_string_with(serial, TEST_STRING);
         let output = adapter.get_output();
         let cur = Cursor::new(output[1..].to_vec());
         assert!(

@@ -57,7 +57,7 @@ pub fn init() {
 
 #[doc(hidden)]
 pub fn _print(args: core::fmt::Arguments) {
-    writeln!(kserial::client::SerialWriter, "{}", args).unwrap();
+    write!(kserial::client::SerialWriter, "{}", args).unwrap();
 }
 /// Serial print
 #[macro_export]

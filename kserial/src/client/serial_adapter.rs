@@ -15,14 +15,6 @@ where
     fn read_slice(&self, data: &mut [u8]) -> usize;
 }
 
-fn send_pod<T>(adapter: &dyn SerialAdapter, data: &T)
-where
-    T: Pod,
-{
-    let bytes = bytemuck::bytes_of(data);
-    adapter.send_slice(bytes);
-}
-
 #[cfg(test)]
 pub(crate) mod tests {
     use std::sync::Mutex;
