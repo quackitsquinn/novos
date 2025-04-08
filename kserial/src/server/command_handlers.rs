@@ -8,6 +8,7 @@ static COMMANDS: [Command; 255] = {
     let mut commands = [invalid as Command; 255];
 
     commands[StringPacket::ID as usize] = print_str as Command;
+    commands[0xFE] = echo as Command;
 
     commands
 };
@@ -21,6 +22,13 @@ fn invalid(i: u8, stream: &mut SerialStream) -> Result<(), std::io::Error> {
 fn print_str(cmd: u8, stream: &mut SerialStream) -> Result<(), std::io::Error> {
     let data = read_packet::<StringPacket>(cmd, stream)?;
     print!("{}", data.payload().as_str());
+    Ok(())
+}
+
+fn echo(cmd: u8, stream: &mut SerialStream) -> Result<(), std::io::Error> {
+    let data = read_packet::<StringPacket>(cmd, stream)?;
+    stream.write_ty(&data)?;
+    stream.get_inner().flush()?;
     Ok(())
 }
 

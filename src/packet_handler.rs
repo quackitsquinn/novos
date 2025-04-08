@@ -21,7 +21,14 @@ pub fn run(pty: &PathBuf) {
         let (stream, addr) = listener.accept().expect("Failed to accept connection");
         println!("Connected to {:?}", addr);
 
-        if let Err(e) = SerialHandler::new(stream).unwrap().run() {}
+        if let Err(e) = SerialHandler::new(stream).unwrap().run() {
+            if e.kind() == std::io::ErrorKind::UnexpectedEof {
+                println!("Connection closed");
+                break;
+            } else {
+                panic!("SerialHandler ran into an unexpected error: {}", e);
+            }
+        }
         println!("Server stopped");
         break;
     }

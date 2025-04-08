@@ -4,11 +4,14 @@ pub mod serial_adapter;
 
 use core::fmt;
 
+use bytemuck::Zeroable;
 use serial::SerialClient;
 pub use serial_adapter::SerialAdapter;
 use spin::Once;
 
-use crate::common::{commands::StringPacket, test_log::info, PacketContents};
+use crate::common::{commands::StringPacket, packet::Packet, test_log::info, PacketContents};
+
+// TODO: This crate assumes there is a serial connection that works 2 way. This is not always true. We should add a way to test this at some point.
 
 static SERIAL_ADAPTER: SerialClient = SerialClient::new();
 
@@ -40,6 +43,18 @@ pub fn send_string_with(serial: &SerialClient, string: &str) {
             serial.send_pod(&packet);
         }
     }
+}
+
+pub fn test_two_way_serial() {
+    let serial = &SERIAL_ADAPTER;
+    let packet = StringPacket::new("Hello, world!").unwrap();
+    let echo_packet = Packet::new(0xFE, packet);
+    unsafe { serial.send_pod(&echo_packet) };
+    let mut echoed_packet: Packet<StringPacket> = Zeroable::zeroed();
+    unsafe { serial.read_pod(&mut echoed_packet) };
+    assert_eq!(echoed_packet.command(), 0xFE);
+    assert_eq!(echoed_packet.checksum(), 0);
+    assert_eq!(echoed_packet.payload().as_str(), "Hello, world!");
 }
 
 pub struct SerialWriter;

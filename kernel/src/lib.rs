@@ -19,7 +19,7 @@ use core::arch::asm;
 
 use alloc::boxed::Box;
 use interrupts::hardware;
-use kserial::client::get_serial_client;
+use kserial::client::{get_serial_client, test_two_way_serial};
 use limine::BaseRevision;
 use log::info;
 use proc::{sched, KERNEL_THREAD_SCHEDULER};
@@ -78,9 +78,8 @@ pub(crate) unsafe fn init_kernel_services() {
     interrupts::MODULE.init();
     hardware::MODULE.init();
     get_serial_client().enable_packet_support();
-    print!(
-        "AAAAAAAAGHIERGOPAEWINBVOIUSEHVNORHBPIOJINERPIGHBNSE[ORVNBPIRBG[SOENGPIEBGERNPIERBG[IEFGI"
-    );
+
+    test_two_way_serial();
     memory::MODULE.init();
     #[cfg(not(test))] // Tests don't have a display
     display::MODULE.init();

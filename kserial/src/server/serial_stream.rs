@@ -32,4 +32,10 @@ impl SerialStream {
         self.inner.read_exact(&mut buf)?;
         Ok(*bytemuck::from_bytes(&buf))
     }
+
+    pub fn write_ty<T: Pod + 'static>(&mut self, data: &T) -> Result<(), io::Error> {
+        let bytes = bytemuck::bytes_of(data);
+        self.inner.write_all(bytes)?;
+        Ok(())
+    }
 }

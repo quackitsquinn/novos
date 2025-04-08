@@ -1,5 +1,6 @@
-use core::ops::Deref;
+use core::{mem, ops::Deref, slice};
 
+use bytemuck::Zeroable;
 use spin::Once;
 
 use crate::common::PACKET_MODE_ENTRY_SIG;
@@ -32,6 +33,21 @@ impl SerialClient {
         let adapter = self.adapter.get().expect("Serial adapter not initialized");
         let bytes = bytemuck::bytes_of(data);
         adapter.send_slice(bytes);
+    }
+
+    pub unsafe fn read_pod<T>(&self, dest: &mut T)
+    where
+        T: bytemuck::Pod,
+    {
+        // TODO: Is this good behavior? Probably not.
+        if !cfg::should_input_serial() {
+            return Zeroable::zeroed();
+        }
+        let adapter = self.adapter.get().expect("Serial adapter not initialized");
+        let mut bytes =
+            unsafe { slice::from_raw_parts_mut(dest as *mut T as *mut u8, mem::size_of::<T>()) };
+        // TODO: Error type over panic
+        assert_eq!(adapter.read_slice(&mut bytes), mem::size_of::<T>());
     }
 
     pub fn get(&self) -> Option<&'static dyn SerialAdapter> {
