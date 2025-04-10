@@ -1,4 +1,4 @@
-use core::ops::Deref;
+use core::{ops::Deref, slice};
 
 use bytemuck::{Pod, Zeroable};
 
@@ -12,13 +12,19 @@ impl<const N: usize> FixedNulString<N> {
         Self { data: [0; N] }
     }
 
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub const fn from_str(s: &str) -> Option<Self> {
         if s.len() >= N {
             return None;
         }
 
         let mut data = [0; N];
-        data[..s.len()].copy_from_slice(s.as_bytes());
+        // SAFETY: We can't call `bytes()` because it is not const, so we have to do this ugly thing.
+        let slice_data = unsafe { slice::from_raw_parts(s.as_ptr(), s.len()) };
+        let mut i = 0;
+        while i < s.len() {
+            data[i] = slice_data[i];
+            i += 1;
+        }
         Some(Self { data })
     }
 }
@@ -34,3 +40,13 @@ impl<const N: usize> Deref for FixedNulString<N> {
         core::str::from_utf8(&self.data[..len]).unwrap()
     }
 }
+
+mod null_macro {
+    macro_rules! null_str {
+    ($cap: expr) => {
+        FixedNulString<{$cap}>
+    };}
+    pub(crate) use null_str;
+}
+
+pub(crate) use null_macro::null_str;

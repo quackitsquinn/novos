@@ -9,8 +9,8 @@ use serial_stream::SerialStream;
 
 use crate::common::{packet::Packet, PacketContents, PACKET_MODE_ENTRY_SIG};
 
-mod command_handlers;
 mod copy_rw;
+mod handlers;
 pub(crate) mod serial_stream;
 
 pub struct SerialHandler<T>
@@ -122,7 +122,7 @@ fn read_until_signature(stream: &mut SerialStream, signature: &[u8]) -> Result<(
 fn run_packet_mode(stream: &mut SerialStream) -> Result<(), io::Error> {
     loop {
         let cmd_id = stream.read_ty::<u8>()?;
-        match command_handlers::handle_command(cmd_id, stream) {
+        match handlers::handle_command(cmd_id, stream) {
             Ok(_) => {}
             Err(e) => {
                 eprintln!("Failed to handle command {}: {}", cmd_id, e);

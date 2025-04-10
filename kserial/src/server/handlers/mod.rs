@@ -2,6 +2,8 @@ use crate::common::{commands::StringPacket, PacketContents};
 
 use super::{read_packet, serial_stream::SerialStream};
 
+mod file;
+
 pub type Command = fn(u8, &mut SerialStream) -> Result<(), std::io::Error>;
 
 static COMMANDS: [Command; 255] = {

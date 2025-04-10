@@ -2,9 +2,11 @@ use bytemuck::{Pod, Zeroable};
 
 use super::PacketContents;
 
+mod file;
 mod incremental;
 mod string_packet;
 
+pub use file::{FileFlags, FileHandle, OpenFile};
 pub use incremental::{CloseIncrementalFileChannel, CreateIncrementalFileChannel, IncrementalFile};
 pub use string_packet::StringPacket;
 

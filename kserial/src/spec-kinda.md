@@ -93,11 +93,11 @@ Creates a new file on the host machine. The file will be created with the specif
 pub struct OpenFile {
     // The name of the file to create. null-terminated.
     pub name: NullTerminatedString<64>,
-    pub mode: Mode,
+    pub mode: FileFlags,
 }
 
 bitflags! {
-    pub struct Mode: u8 {
+    pub struct FileFlags: u8 {
         const READ = 0b00000001;
         const WRITE = 0b00000010;
         const APPEND = 0b00000100;

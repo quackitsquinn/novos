@@ -8,6 +8,8 @@ thiserror = { version = "2.0.7", default-features = false }
 spin = "0.9.8"
 bytemuck = { version = "1.22.0", features = ["derive"] }
 pastey = "0.1.0"
+bitflags = { version = "2.9.0", features = ["bytemuck"] }
+lazy_static = "1.5.0"
 
 [features]
 default = ["std"]
