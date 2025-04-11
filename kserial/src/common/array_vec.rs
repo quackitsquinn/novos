@@ -173,3 +173,14 @@ impl<T: Pod + Debug, const CAP: usize> Debug for ArrayVec<T, CAP> {
         f.debug_list().entries(self.iter()).finish()
     }
 }
+
+mod arr_vec_macro {
+    macro_rules! varlen {
+        ($ty: ty, $cap: expr) => {
+            ArrayVec<$ty, {$cap}>
+        };
+    }
+    pub(crate) use varlen;
+}
+
+pub(crate) use arr_vec_macro::varlen;

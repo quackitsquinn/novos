@@ -2,13 +2,15 @@ use core::{ops::Deref, str};
 
 use bytemuck::{Pod, Zeroable};
 
-use crate::common::{array_vec::ArrayVec, PacketContents};
+use crate::common::{
+    array_vec::{varlen, ArrayVec},
+    PacketContents,
+};
 
 #[derive(Debug, Clone, Copy, Pod, Zeroable, PartialEq, Eq)]
 #[repr(C)]
 pub struct StringPacket {
-    // This weird syntax is a const generic parameter. We don't use `Self` because it breaks `Pod` and `Zeroable`.
-    pub data: ArrayVec<u8, { StringPacket::CAPACITY }>,
+    pub data: varlen!(u8, StringPacket::CAPACITY),
 }
 
 impl PacketContents for StringPacket {

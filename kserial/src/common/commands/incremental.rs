@@ -1,7 +1,7 @@
 use bytemuck::{Pod, Zeroable};
 
 use crate::common::{
-    array_vec::ArrayVec,
+    array_vec::{varlen, ArrayVec},
     fixed_null_str::{null_str, FixedNulString},
     PacketContents,
 };
@@ -38,7 +38,7 @@ pub struct IncrementalFile {
     pub is_done: u8,
     /// Half reserved for future use, half to remove padding bytes between `is_done` and `data`.
     _reserved: u8,
-    pub data: ArrayVec<u8, 4096>,
+    pub data: varlen!(u8, IncrementalFile::MAX_DATA_SIZE),
 }
 
 impl IncrementalFile {
