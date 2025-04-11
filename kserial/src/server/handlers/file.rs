@@ -1,23 +1,29 @@
+use core::mem::transmute;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fs::{File, OpenOptions},
+    os::fd::{AsRawFd, IntoRawFd},
+    path::Path,
     sync::Mutex,
 };
 
 use lazy_static::lazy_static;
 
 use crate::{
-    common::commands::{FileFlags, OpenFile},
+    common::{
+        commands::{FileFlags, FileResponse, OpenFile},
+        PacketContents,
+    },
     server::{read_packet, serial_stream::SerialStream},
 };
 
-struct FileData {
-    file_table: HashMap<u64, File>,
+struct FileCommandState {
+    open_files: HashSet<u64>,
 }
 
 lazy_static! {
-    static ref FILE_DATA: Mutex<FileData> = Mutex::new(FileData {
-        file_table: HashMap::new(),
+    static ref FILE_DATA: Mutex<FileCommandState> = Mutex::new(FileCommandState {
+        open_files: HashSet::new(),
     });
 }
 
@@ -29,6 +35,26 @@ pub fn open_file(i: u8, stream: &mut SerialStream) -> Result<(), std::io::Error>
     opts.read(cmd.flags.contains(FileFlags::READ));
     opts.create(cmd.flags.contains(FileFlags::CREATE));
     opts.append(cmd.flags.contains(FileFlags::APPEND));
+    let file = opts.open(Path::new(&*cmd.filename));
+
+    let res;
+
+    match file {
+        Ok(file) => {
+            let mut file_data = FILE_DATA.lock().unwrap();
+            let raw_fd_u64 = unsafe { transmute::<_, u32>(file.into_raw_fd()) } as u64;
+            let handle = file_data.open_files.insert(raw_fd_u64);
+            if !handle {
+                panic!("Is this infallible? I don't know. If this ever panics, please report it.");
+            }
+            res = FileResponse::new(raw_fd_u64);
+        }
+        Err(e) => {
+            res = FileResponse::err(&e.to_string());
+        }
+    }
+
+    stream.write_ty(&res.into_packet())?;
 
     Ok(())
 }

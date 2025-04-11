@@ -1,4 +1,7 @@
-use crate::common::{commands::StringPacket, PacketContents};
+use crate::common::{
+    commands::{OpenFile, StringPacket},
+    PacketContents,
+};
 
 use super::{read_packet, serial_stream::SerialStream};
 
@@ -10,6 +13,7 @@ static COMMANDS: [Command; 255] = {
     let mut commands = [invalid as Command; 255];
 
     commands[StringPacket::ID as usize] = print_str as Command;
+    commands[OpenFile::ID as usize] = file::open_file as Command;
     commands[0xFE] = echo as Command;
 
     commands

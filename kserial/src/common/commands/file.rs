@@ -43,8 +43,6 @@ impl OpenFile {
     }
 
     pub const fn create(filename: &str) -> Option<Self> {
-        // UGHHH more const weirdness. I forgot how god awful compile time functions are in rust.
-        // only place I really like about Zig is the compile time functions.
         Self::new(filename, FileFlags::CREATE_OVERWRITE)
     }
 
@@ -69,6 +67,7 @@ bitflags! {
         const WRITE = 0b1 << 1;
         const APPEND = 0b1 << 2;
         const CREATE = 0b1 << 3;
+        // Convenience flags for const fns
         const CREATE_OVERWRITE = Self::WRITE.bits() | Self::CREATE.bits();
         const CREATE_APPEND = Self::APPEND.bits() | Self::CREATE.bits();
     }
@@ -87,4 +86,18 @@ impl PacketContents for FileResponse {
 
 impl FileResponse {
     pub const ERR_MAX_LEN: usize = 64;
+
+    pub fn new(handle: u64) -> Self {
+        Self {
+            handle: FileHandle::new(handle),
+            err: FixedNulString::new(),
+        }
+    }
+
+    pub fn err(err: &str) -> Self {
+        let mut response = Self::new(0);
+        let err = FixedNulString::from_str(err).unwrap();
+        response.err = err;
+        response
+    }
 }

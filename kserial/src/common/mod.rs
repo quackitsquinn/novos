@@ -18,7 +18,7 @@ pub trait PacketContents: Sized + Pod {
     }
 
     fn into_packet(self) -> packet::Packet<Self> {
-        packet::Packet::new(Self::ID, self)
+        unsafe { packet::Packet::new(Self::ID, self) }
     }
 }
 

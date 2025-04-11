@@ -48,7 +48,7 @@ pub fn send_string_with(serial: &SerialClient, string: &str) {
 pub fn test_two_way_serial() {
     let serial = &SERIAL_ADAPTER;
     let packet = StringPacket::new("Hello, world!").unwrap();
-    let echo_packet = Packet::new(0xFE, packet);
+    let echo_packet = unsafe { Packet::new(0xFE, packet) };
     unsafe { serial.send_pod(&echo_packet) };
     let mut echoed_packet: Packet<StringPacket> = Zeroable::zeroed();
     unsafe { serial.read_pod(&mut echoed_packet) };

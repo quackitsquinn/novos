@@ -18,7 +18,7 @@ impl<T> Packet<T>
 where
     T: Pod,
 {
-    pub fn new(command: u8, data: T) -> Self {
+    pub unsafe fn new(command: u8, data: T) -> Self {
         let mut no_chk = Self {
             command,
             command_checksum: 0,
