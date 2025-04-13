@@ -2,23 +2,12 @@ use bitflags::bitflags;
 use bytemuck::{Pod, Zeroable};
 
 use crate::common::{
+    commands::FileHandle,
     fixed_null_str::{null_str, FixedNulString},
     PacketContents,
 };
 
-#[derive(Debug, Pod, Zeroable, Clone, Copy, PartialEq, Eq)]
-#[repr(transparent)]
-pub struct FileHandle(u64);
-
-impl FileHandle {
-    pub(crate) const fn new(handle: u64) -> Self {
-        Self(handle)
-    }
-    /// Is the file handle valid?
-    pub fn is_valid(&self) -> bool {
-        self.0 != 0
-    }
-}
+use super::{FileFlags, IOError, OsError};
 
 #[derive(Debug, Clone, Copy, Pod, Zeroable, PartialEq, Eq)]
 #[repr(C)]
@@ -59,27 +48,12 @@ impl PacketContents for OpenFile {
     const ID: u8 = 0x01;
 }
 
-bitflags! {
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Pod, Zeroable)]
-    #[repr(transparent)]
-    pub struct FileFlags: u8 {
-        const READ = 0b1;
-        const WRITE = 0b1 << 1;
-        const APPEND = 0b1 << 2;
-        const CREATE = 0b1 << 3;
-        // Convenience flags for const fns
-        const CREATE_OVERWRITE = Self::WRITE.bits() | Self::CREATE.bits();
-        const CREATE_APPEND = Self::APPEND.bits() | Self::CREATE.bits();
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Pod, Zeroable)]
 #[repr(C)]
 pub struct FileResponse {
     pub handle: FileHandle,
     _pad: [u8; 4],
-    pub err: OsError,
-    pub err_str: null_str!(FileResponse::ERR_MAX_LEN),
+    pub err: IOError,
 }
 
 impl PacketContents for FileResponse {
@@ -97,22 +71,21 @@ impl FileResponse {
         Self {
             handle: FileHandle::new(handle),
             _pad: [0; 4],
-            err: OsError::empty(),
-            err_str: FixedNulString::from_str("").unwrap(),
+            err: IOError::empty(),
         }
     }
 
     pub fn err(code: OsError, err: &str) -> Self {
         let mut response = Self::new(0);
-        let err = FixedNulString::from_str(err).unwrap();
-        response.err_str = err;
-        response.err = code;
+        response.err = IOError::new(code, err);
         response
     }
 
     #[cfg(feature = "std")]
     pub fn from_io_err(err: std::io::Error) -> Self {
         use std::io::ErrorKind;
+
+        use crate::common::commands::file::OsError;
 
         let str_err: null_str!(Self::ERR_MAX_LEN) =
             FixedNulString::from_str(&err.to_string()).unwrap();
@@ -123,16 +96,5 @@ impl FileResponse {
             _ => OsError::UNKNOWN,
         };
         Self::err(err_code, &str_err)
-    }
-}
-
-bitflags! {
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Pod, Zeroable)]
-    #[repr(transparent)]
-    pub struct OsError: u32 {
-        const NOT_FOUND = 1 << 0;
-        const PERM_DENIED = 1 << 1;
-        const ALREADY_EXISTS = 1 << 2;
-        const UNKNOWN = 1 << 3;
     }
 }

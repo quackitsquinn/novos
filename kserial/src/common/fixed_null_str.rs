@@ -44,7 +44,7 @@ impl<const N: usize> Deref for FixedNulString<N> {
 mod null_macro {
     macro_rules! null_str {
     ($cap: expr) => {
-        FixedNulString<{$cap}>
+        $crate::common::fixed_null_str::FixedNulString<{$cap}>
     };}
     pub(crate) use null_str;
 }
