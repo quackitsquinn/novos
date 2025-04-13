@@ -19,7 +19,7 @@ static COMMANDS: [Command; 255] = {
     commands
 };
 
-fn invalid(i: u8, stream: &mut SerialStream) -> Result<(), std::io::Error> {
+fn invalid(i: u8, _: &mut SerialStream) -> Result<(), std::io::Error> {
     let ich = i as char;
     print!("Invalid command: {ich} (0x{:02X}).", i);
     Ok(())

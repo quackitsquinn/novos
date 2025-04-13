@@ -1,6 +1,5 @@
 use core::{
     fmt::Debug,
-    mem::MaybeUninit,
     ops::{Deref, Index, IndexMut},
 };
 

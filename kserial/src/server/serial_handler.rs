@@ -1,10 +1,9 @@
 use std::{
     fs::File,
     io::{self, Read, Write},
-    path::PathBuf,
 };
 
-use crate::common::{packet::Packet, PacketContents, PACKET_MODE_ENTRY_SIG};
+use crate::common::PACKET_MODE_ENTRY_SIG;
 
 use super::{copy_rw::CopiedReadWrite, handlers, serial_stream::SerialStream};
 

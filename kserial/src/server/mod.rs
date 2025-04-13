@@ -1,13 +1,8 @@
-use core::pin::Pin;
-use std::{
-    fs::File,
-    io::{self, Read, Write},
-};
+use std::io::{self};
 
-use copy_rw::CopiedReadWrite;
 use serial_stream::SerialStream;
 
-use crate::common::{macros::cfg_value, packet::Packet, PacketContents, PACKET_MODE_ENTRY_SIG};
+use crate::common::{packet::Packet, PacketContents};
 
 mod copy_rw;
 mod handlers;

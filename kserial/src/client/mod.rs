@@ -8,7 +8,6 @@ use core::fmt;
 use bytemuck::Zeroable;
 use serial::SerialClient;
 pub use serial_adapter::SerialAdapter;
-use spin::Once;
 
 use crate::common::{commands::StringPacket, packet::Packet, test_log::info, PacketContents};
 

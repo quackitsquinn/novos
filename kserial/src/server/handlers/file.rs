@@ -1,11 +1,5 @@
 use core::mem::transmute;
-use std::{
-    collections::{HashMap, HashSet},
-    fs::{self, File, OpenOptions},
-    os::fd::{AsRawFd, IntoRawFd},
-    path::{Path, PathBuf},
-    sync::Mutex,
-};
+use std::{collections::HashSet, fs::OpenOptions, os::fd::IntoRawFd, path::PathBuf, sync::Mutex};
 
 use lazy_static::lazy_static;
 

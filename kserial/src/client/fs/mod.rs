@@ -5,7 +5,7 @@ use crate::common::{
     PacketContents,
 };
 
-use super::{cfg::is_packet_mode, send_string, serial::SerialClient, SerialAdapter};
+use super::{cfg::is_packet_mode, send_string, serial::SerialClient};
 
 pub struct File {
     handle: FileHandle,

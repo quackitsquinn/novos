@@ -33,7 +33,7 @@ where
     }
     checksum
 }
-
+#[allow(unused)]
 pub(crate) mod test_log {
     macro_rules! trace {
         ($($arg:tt)*) => {
@@ -77,11 +77,10 @@ pub(crate) mod test_log {
         };
     }
 
-    pub(crate) use {debug, error, info, trace};
+    pub(crate) use info;
 
     #[cfg(test)]
     mod log_internal {
-        use std::io::{stdout, Write};
 
         use ctor::ctor;
 

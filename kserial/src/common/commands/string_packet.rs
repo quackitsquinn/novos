@@ -1,4 +1,4 @@
-use core::{ops::Deref, str};
+use core::str;
 
 use bytemuck::{Pod, Zeroable};
 

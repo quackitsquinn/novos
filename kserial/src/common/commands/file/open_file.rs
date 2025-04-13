@@ -1,4 +1,3 @@
-use bitflags::bitflags;
 use bytemuck::{Pod, Zeroable};
 
 use crate::common::{

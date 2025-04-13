@@ -1,4 +1,4 @@
-use core::{mem, ops::Deref, slice};
+use core::{mem, slice};
 
 use bytemuck::Zeroable;
 use spin::Once;
@@ -66,7 +66,7 @@ impl SerialClient {
 
 #[cfg(test)]
 pub mod tests {
-    use core::pin::Pin;
+    use core::{ops::Deref, pin::Pin};
 
     use super::*;
     use crate::client::serial_adapter::tests::TestSerialAdapter;
