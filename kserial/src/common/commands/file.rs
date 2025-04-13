@@ -24,7 +24,7 @@ impl FileHandle {
 #[repr(C)]
 pub struct OpenFile {
     // This weird syntax is a const generic parameter. We don't use `Self` because it breaks `Pod` and `Zeroable`.
-    pub filename: null_str!(OpenFile::FILENAME_MAX_LEN),
+    pub path: null_str!(OpenFile::FILENAME_MAX_LEN),
     pub flags: FileFlags,
 }
 
@@ -37,7 +37,7 @@ impl OpenFile {
             return None;
         }
         Some(Self {
-            filename: filename.unwrap(),
+            path: filename.unwrap(),
             flags,
         })
     }
@@ -77,7 +77,9 @@ bitflags! {
 #[repr(C)]
 pub struct FileResponse {
     pub handle: FileHandle,
-    pub err: null_str!(FileResponse::ERR_MAX_LEN),
+    _pad: [u8; 4],
+    pub err: OsError,
+    pub err_str: null_str!(FileResponse::ERR_MAX_LEN),
 }
 
 impl PacketContents for FileResponse {
@@ -88,16 +90,49 @@ impl FileResponse {
     pub const ERR_MAX_LEN: usize = 64;
 
     pub fn new(handle: u64) -> Self {
+        assert!(
+            handle != 0,
+            "File handle must be non-zero! Use `err` instead."
+        );
         Self {
             handle: FileHandle::new(handle),
-            err: FixedNulString::new(),
+            _pad: [0; 4],
+            err: OsError::empty(),
+            err_str: FixedNulString::from_str("").unwrap(),
         }
     }
 
-    pub fn err(err: &str) -> Self {
+    pub fn err(code: OsError, err: &str) -> Self {
         let mut response = Self::new(0);
         let err = FixedNulString::from_str(err).unwrap();
-        response.err = err;
+        response.err_str = err;
+        response.err = code;
         response
+    }
+
+    #[cfg(feature = "std")]
+    pub fn from_io_err(err: std::io::Error) -> Self {
+        use std::io::ErrorKind;
+
+        let str_err: null_str!(Self::ERR_MAX_LEN) =
+            FixedNulString::from_str(&err.to_string()).unwrap();
+        let err_code = match err.kind() {
+            ErrorKind::NotFound => OsError::NOT_FOUND,
+            ErrorKind::PermissionDenied => OsError::PERM_DENIED,
+            ErrorKind::AlreadyExists => OsError::ALREADY_EXISTS,
+            _ => OsError::UNKNOWN,
+        };
+        Self::err(err_code, &str_err)
+    }
+}
+
+bitflags! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Pod, Zeroable)]
+    #[repr(transparent)]
+    pub struct OsError: u32 {
+        const NOT_FOUND = 1 << 0;
+        const PERM_DENIED = 1 << 1;
+        const ALREADY_EXISTS = 1 << 2;
+        const UNKNOWN = 1 << 3;
     }
 }

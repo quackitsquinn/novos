@@ -1,4 +1,5 @@
 pub mod cfg;
+pub mod fs;
 pub mod serial;
 pub mod serial_adapter;
 

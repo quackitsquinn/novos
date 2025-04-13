@@ -22,6 +22,8 @@ impl SerialClient {
         self.adapter.call_once(|| adapter);
     }
 
+    // TODO: Add a send_packet function?
+
     pub unsafe fn send_pod<T>(&self, data: &T)
     where
         T: bytemuck::Pod,

@@ -1,9 +1,9 @@
 use core::mem::transmute;
 use std::{
     collections::{HashMap, HashSet},
-    fs::{File, OpenOptions},
+    fs::{self, File, OpenOptions},
     os::fd::{AsRawFd, IntoRawFd},
-    path::Path,
+    path::{Path, PathBuf},
     sync::Mutex,
 };
 
@@ -35,7 +35,7 @@ pub fn open_file(i: u8, stream: &mut SerialStream) -> Result<(), std::io::Error>
     opts.read(cmd.flags.contains(FileFlags::READ));
     opts.create(cmd.flags.contains(FileFlags::CREATE));
     opts.append(cmd.flags.contains(FileFlags::APPEND));
-    let file = opts.open(Path::new(&*cmd.filename));
+    let file = opts.open(PathBuf::from("output/").join(&*cmd.path));
 
     let res;
 
@@ -50,7 +50,7 @@ pub fn open_file(i: u8, stream: &mut SerialStream) -> Result<(), std::io::Error>
             res = FileResponse::new(raw_fd_u64);
         }
         Err(e) => {
-            res = FileResponse::err(&e.to_string());
+            res = FileResponse::from_io_err(e);
         }
     }
 
