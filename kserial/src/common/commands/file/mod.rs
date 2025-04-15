@@ -1,8 +1,10 @@
 mod open_file;
+mod write_file;
 
 use bitflags::bitflags;
 use bytemuck::{Pod, Zeroable};
 pub use open_file::{FileResponse, OpenFile};
+pub use write_file::{WriteFile, WriteFileResponse};
 
 use crate::common::fixed_null_str::{null_str, FixedNulString};
 
@@ -17,6 +19,10 @@ impl FileHandle {
     /// Is the file handle valid?
     pub fn is_valid(&self) -> bool {
         self.0 != 0
+    }
+    /// Get the inner file handle
+    pub fn inner(&self) -> u64 {
+        self.0
     }
 }
 
@@ -42,6 +48,7 @@ bitflags! {
         const PERM_DENIED = 1 << 1;
         const ALREADY_EXISTS = 1 << 2;
         const UNKNOWN = 1 << 3;
+        const INVALID_HANDLE = 1 << 4;
     }
 }
 
@@ -55,13 +62,37 @@ impl OsError {
 #[repr(C)]
 pub struct IOError {
     pub err: OsError,
-    pub err_str: null_str!(FileResponse::ERR_MAX_LEN),
+    pub err_str: null_str!(IOError::ERR_MAX_LEN),
 }
 
 impl IOError {
-    pub fn new(err: OsError, err_str: &str) -> Self {
+    pub const ERR_MAX_LEN: usize = 256;
+    pub const INVALID_HANDLE: Self = Self::new(OsError::INVALID_HANDLE, "Invalid handle");
+    pub const NOT_FOUND: Self = Self::new(OsError::NOT_FOUND, "File not found");
+    pub const PERM_DENIED: Self = Self::new(OsError::PERM_DENIED, "Permission denied");
+    pub const ALREADY_EXISTS: Self = Self::new(OsError::ALREADY_EXISTS, "File already exists");
+    pub const OK: Self = Self::new(OsError::empty(), "");
+
+    pub const fn new(err: OsError, err_str: &str) -> Self {
         let err_str = FixedNulString::from_str(err_str).unwrap();
         Self { err, err_str }
+    }
+
+    #[cfg(feature = "std")]
+    pub fn from_io_err(err: std::io::Error) -> Self {
+        use std::io::ErrorKind;
+
+        use crate::common::commands::file::OsError;
+
+        let str_err: null_str!(Self::ERR_MAX_LEN) =
+            FixedNulString::from_str(&err.to_string()).unwrap();
+        let err_code = match err.kind() {
+            ErrorKind::NotFound => OsError::NOT_FOUND,
+            ErrorKind::PermissionDenied => OsError::PERM_DENIED,
+            ErrorKind::AlreadyExists => OsError::ALREADY_EXISTS,
+            _ => OsError::UNKNOWN,
+        };
+        Self::new(err_code, &str_err)
     }
 
     pub fn empty() -> Self {

@@ -1,8 +1,10 @@
-use std::{fs, os::unix::net::UnixListener, path::PathBuf, thread};
+use std::{
+    fs, os::unix::net::UnixListener, panic::catch_unwind, path::PathBuf, process::Child, thread,
+};
 
 use kserial::server::SerialHandler;
 
-pub fn run(pty: &PathBuf) {
+pub fn run(pty: &PathBuf, qemu: &mut Child) {
     let _ = fs::remove_file(pty);
     let _ = fs::create_dir("output");
     for i in 0..10 {
@@ -20,15 +22,16 @@ pub fn run(pty: &PathBuf) {
 
         let (stream, addr) = listener.accept().expect("Failed to accept connection");
         println!("Connected to {:?}", addr);
-
-        if let Err(e) = SerialHandler::new(stream).unwrap().run() {
-            if e.kind() == std::io::ErrorKind::UnexpectedEof {
-                println!("Connection closed");
-                break;
-            } else {
-                panic!("SerialHandler ran into an unexpected error: {}", e);
+        catch_unwind(|| {
+            if let Err(e) = SerialHandler::new(stream).unwrap().run() {
+                if e.kind() == std::io::ErrorKind::UnexpectedEof {
+                    println!("Connection closed");
+                } else {
+                    panic!("SerialHandler ran into an unexpected error: {}", e);
+                }
             }
-        }
+        });
+        qemu.kill().expect("Failed to kill QEMU");
         println!("Server stopped");
         break;
     }

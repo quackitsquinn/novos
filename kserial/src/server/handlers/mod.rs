@@ -1,5 +1,5 @@
 use crate::common::{
-    commands::{OpenFile, StringPacket},
+    commands::{OpenFile, StringPacket, WriteFile},
     PacketContents,
 };
 
@@ -14,6 +14,7 @@ static COMMANDS: [Command; 255] = {
 
     commands[StringPacket::ID as usize] = print_str as Command;
     commands[OpenFile::ID as usize] = file::open_file as Command;
+    commands[WriteFile::ID as usize] = file::write_file as Command;
     commands[0xFE] = echo as Command;
 
     commands

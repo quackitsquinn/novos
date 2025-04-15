@@ -6,7 +6,7 @@ mod file;
 mod incremental;
 mod string_packet;
 
-pub use file::{FileFlags, FileHandle, FileResponse, OpenFile};
+pub use file::*;
 pub use incremental::{CloseIncrementalFileChannel, CreateIncrementalFileChannel, IncrementalFile};
 pub use string_packet::StringPacket;
 

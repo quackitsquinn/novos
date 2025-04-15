@@ -1,11 +1,20 @@
 use core::mem::transmute;
-use std::{collections::HashSet, fs::OpenOptions, os::fd::IntoRawFd, path::PathBuf, sync::Mutex};
+use std::{
+    collections::HashSet,
+    fs::OpenOptions,
+    io::Write,
+    os::fd::{FromRawFd, IntoRawFd},
+    path::PathBuf,
+    sync::Mutex,
+};
 
 use lazy_static::lazy_static;
 
 use crate::{
     common::{
-        commands::{FileFlags, FileResponse, OpenFile},
+        commands::{
+            FileFlags, FileResponse, IOError, OpenFile, OsError, WriteFile, WriteFileResponse,
+        },
         PacketContents,
     },
     server::{read_packet, serial_stream::SerialStream},
@@ -49,6 +58,32 @@ pub fn open_file(i: u8, stream: &mut SerialStream) -> Result<(), std::io::Error>
     }
 
     stream.write_ty(&res.into_packet())?;
+    stream.get_inner().flush()?;
+    Ok(())
+}
+
+pub fn write_file(i: u8, stream: &mut SerialStream) -> Result<(), std::io::Error> {
+    let data = read_packet::<WriteFile>(i, stream)?;
+    let cmd = data.payload();
+    let file_data = FILE_DATA.lock().unwrap();
+    if !file_data.open_files.contains(&cmd.file().inner()) {
+        stream.write_ty(&WriteFileResponse::err(IOError::INVALID_HANDLE).into_packet())?;
+        stream.get_inner().flush()?;
+        return Ok(());
+    }
+
+    let mut file = unsafe { std::fs::File::from_raw_fd(cmd.file().inner() as i32) };
+
+    let res = match file.write_all(cmd.data()) {
+        Ok(_) => WriteFileResponse::ok(),
+        Err(e) => WriteFileResponse::err(IOError::from_io_err(e)),
+    };
+
+    stream.write_ty(&res.into_packet())?;
+    stream.get_inner().flush()?;
+
+    // Not our responsibility to close the file
+    let _ = file.into_raw_fd();
 
     Ok(())
 }

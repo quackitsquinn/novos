@@ -176,7 +176,7 @@ impl<T: Pod + Debug, const CAP: usize> Debug for ArrayVec<T, CAP> {
 mod arr_vec_macro {
     macro_rules! varlen {
         ($ty: ty, $cap: expr) => {
-            ArrayVec<$ty, {$cap}>
+            $crate::common::array_vec::ArrayVec<$ty, {$cap}>
         };
     }
     pub(crate) use varlen;

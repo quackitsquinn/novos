@@ -1,4 +1,3 @@
-
 /// An adapter for serial communication. This is used to abstract the serial port from the rest of the kernel.
 pub trait SerialAdapter
 where
@@ -33,8 +32,8 @@ pub(crate) mod tests {
             }
         }
 
-        pub fn set_input(&self, input: Vec<u8>) {
-            *self.input.lock().unwrap() = (0, input);
+        pub fn set_input(&self, input: &[u8]) {
+            *self.input.lock().unwrap() = (0, input.to_vec());
         }
 
         pub fn get_output(&self) -> Vec<u8> {
@@ -78,7 +77,7 @@ pub(crate) mod tests {
     #[test]
     fn test_test_serial_adapter() {
         let adapter = TestSerialAdapter::new();
-        adapter.set_input(vec![1, 2, 3, 4, 5]);
+        adapter.set_input(&[1, 2, 3, 4, 5]);
         assert_eq!(adapter.read(), 1);
         assert_eq!(adapter.read(), 2);
         assert_eq!(adapter.read(), 3);
@@ -90,7 +89,7 @@ pub(crate) mod tests {
     #[test]
     fn test_test_serial_adapter_slice() {
         let adapter = TestSerialAdapter::new();
-        adapter.set_input(vec![1, 2, 3, 4, 5]);
+        adapter.set_input(&[1, 2, 3, 4, 5]);
         let mut data = [0; 3];
         assert_eq!(adapter.read_slice(&mut data), 3);
         assert_eq!(data, [1, 2, 3]);

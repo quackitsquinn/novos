@@ -50,7 +50,7 @@ impl Config {
         let stdout = qemu.stdout.take().expect("Failed to get stdout");
         let stderr = qemu.stderr.take().expect("Failed to get stderr");
 
-        packet_handler::run(&PathBuf::from("target/serial0.sock"));
+        packet_handler::run(&PathBuf::from("target/serial0.sock"), &mut qemu);
 
         spawn_out_handler(Box::new(stdout), "stdout", false);
         spawn_out_handler(Box::new(stderr), "stderr", false);

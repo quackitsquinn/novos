@@ -66,6 +66,10 @@ where
     pub fn checksum(&self) -> u8 {
         pod_checksum(self)
     }
+    /// Validates the checksum of the packet.
+    pub fn validate(&self) -> bool {
+        self.checksum() == 0
+    }
 }
 
 // Safety: u8 is Pod, and T is Pod, so Packet<T> is Pod
