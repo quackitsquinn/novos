@@ -69,7 +69,7 @@ mod tests {
 
     use crate::{
         common::{commands::StringPacket, packet::Packet, PacketContents},
-        server::{read_packet, serial_stream::SerialStream},
+        server::serial_stream::SerialStream,
     };
 
     use super::{cfg, serial::tests::TestSerialWrapper};
@@ -95,7 +95,7 @@ mod tests {
 
         let mut ser = SerialStream::new(cur);
 
-        let packet: Packet<StringPacket> = read_packet(StringPacket::ID, &mut ser).unwrap();
+        let packet: Packet<StringPacket> = ser.read_packet(StringPacket::ID).unwrap();
         assert_eq!(packet.command(), StringPacket::ID);
         assert_eq!(packet.checksum(), 0);
         let contents = packet.payload();

@@ -17,7 +17,7 @@ use crate::{
         },
         PacketContents,
     },
-    server::{read_packet, serial_stream::SerialStream},
+    server::serial_stream::SerialStream,
 };
 
 struct FileCommandState {
@@ -31,7 +31,7 @@ lazy_static! {
 }
 
 pub fn open_file(i: u8, stream: &mut SerialStream) -> Result<(), std::io::Error> {
-    let data = read_packet::<OpenFile>(i, stream)?;
+    let data = stream.read_packet::<OpenFile>(i)?;
     let cmd = data.payload();
     let mut opts = OpenOptions::new();
     opts.write(cmd.flags.contains(FileFlags::WRITE));
@@ -57,17 +57,17 @@ pub fn open_file(i: u8, stream: &mut SerialStream) -> Result<(), std::io::Error>
         }
     }
 
-    stream.write_ty(&res.into_packet())?;
+    stream.write_packet(&res.into_packet())?;
     stream.get_inner().flush()?;
     Ok(())
 }
 
 pub fn write_file(i: u8, stream: &mut SerialStream) -> Result<(), std::io::Error> {
-    let data = read_packet::<WriteFile>(i, stream)?;
+    let data = stream.read_packet::<WriteFile>(i)?;
     let cmd = data.payload();
     let file_data = FILE_DATA.lock().unwrap();
     if !file_data.open_files.contains(&cmd.file().inner()) {
-        stream.write_ty(&WriteFileResponse::err(IOError::INVALID_HANDLE).into_packet())?;
+        stream.write_packet(&WriteFileResponse::err(IOError::INVALID_HANDLE).into_packet())?;
         stream.get_inner().flush()?;
         return Ok(());
     }
@@ -79,7 +79,7 @@ pub fn write_file(i: u8, stream: &mut SerialStream) -> Result<(), std::io::Error
         Err(e) => WriteFileResponse::err(IOError::from_io_err(e)),
     };
 
-    stream.write_ty(&res.into_packet())?;
+    stream.write_packet(&res.into_packet())?;
     stream.get_inner().flush()?;
 
     // Not our responsibility to close the file

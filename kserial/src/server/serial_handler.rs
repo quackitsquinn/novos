@@ -102,7 +102,8 @@ fn read_until_signature(stream: &mut SerialStream, signature: &[u8]) -> Result<(
 
 fn run_packet_mode(stream: &mut SerialStream) -> Result<(), io::Error> {
     loop {
-        let cmd_id = stream.read_ty::<u8>()?;
+        // SAFETY: All we need here is the byte, no header or anything else.
+        let cmd_id = unsafe { stream.read_ty::<u8>()? };
         match handlers::handle_command(cmd_id, stream) {
             Ok(_) => {}
             Err(e) => {

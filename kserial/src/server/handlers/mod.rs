@@ -3,7 +3,7 @@ use crate::common::{
     PacketContents,
 };
 
-use super::{read_packet, serial_stream::SerialStream};
+use super::serial_stream::SerialStream;
 
 mod file;
 
@@ -27,14 +27,14 @@ fn invalid(i: u8, _: &mut SerialStream) -> Result<(), std::io::Error> {
 }
 
 fn print_str(cmd: u8, stream: &mut SerialStream) -> Result<(), std::io::Error> {
-    let data = read_packet::<StringPacket>(cmd, stream)?;
+    let data = stream.read_packet::<StringPacket>(cmd)?;
     print!("{}", data.payload().as_str());
     Ok(())
 }
 
 fn echo(cmd: u8, stream: &mut SerialStream) -> Result<(), std::io::Error> {
-    let data = read_packet::<StringPacket>(cmd, stream)?;
-    stream.write_ty(&data)?;
+    let data = stream.read_packet::<StringPacket>(cmd)?;
+    stream.write_packet(&data)?;
     stream.get_inner().flush()?;
     Ok(())
 }
