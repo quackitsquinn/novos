@@ -41,13 +41,8 @@ impl<'a> File<'a> {
             return None;
         }
 
-        // TODO: Refactor raw serial comms to a lower level function
-        unsafe { serial.send_pod(&open_file.into_packet()) };
-        let mut response: Packet<FileResponse> = Zeroable::zeroed();
-        unsafe { serial.read_pod(&mut response) };
-        if !response.validate() {
-            return None;
-        }
+        serial.send_packet(&open_file.into_packet());
+        let response: Packet<FileResponse> = serial.read_packet()?;
         let response = response.payload();
 
         if !response.err.is_ok() {
@@ -64,10 +59,10 @@ impl<'a> File<'a> {
         Self::create_file_with(&super::SERIAL_ADAPTER, name)
     }
 
-    pub fn write(&self, data: &[u8]) -> bool {
+    pub fn write(&self, data: &[u8]) -> Option<()> {
         if !is_packet_mode() {
             send_string("Packet mode is not enabled, cannot write to file.");
-            return false;
+            return None;
         }
 
         for chunk in data.chunks(WriteFile::CAPACITY) {
@@ -75,15 +70,14 @@ impl<'a> File<'a> {
             let packet = write_file.into_packet();
             // writeln!(SerialWriter, "{:?}", packet).ok();
             // writeln!(SerialWriter, "{:?}", bytemuck::bytes_of(packet.payload())).ok();
-            unsafe { self.client.send_pod(&packet) };
-            let mut response: Packet<WriteFileResponse> = Packet::zeroed();
-            unsafe { self.client.read_pod(&mut response) };
+            self.client.send_packet(&packet);
+            let response: Packet<WriteFileResponse> = self.client.read_packet()?;
             if !response.payload().is_ok() {
-                return false;
+                return None;
             }
         }
 
-        true
+        Some(())
     }
 
     pub fn handle(&self) -> &FileHandle {
@@ -137,6 +131,6 @@ mod tests {
         let file = File::create_file_with(&serial, "test.txt").expect("Create file failed");
         assert_eq!(file.handle(), &FileHandle::new(0x1234));
         assert_eq!(file.open_mode(), &FileFlags::CREATE_OVERWRITE);
-        assert!(file.write(b"Hello, world!"));
+        assert!(file.write(b"Hello, world!").is_some());
     }
 }

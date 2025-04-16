@@ -3,7 +3,7 @@ use core::{mem, slice};
 use bytemuck::Zeroable;
 use spin::Once;
 
-use crate::common::PACKET_MODE_ENTRY_SIG;
+use crate::common::{packet::Packet, PacketContents, PACKET_MODE_ENTRY_SIG};
 
 use super::{cfg, SerialAdapter};
 
@@ -22,8 +22,42 @@ impl SerialClient {
         self.adapter.call_once(|| adapter);
     }
 
-    // TODO: Add a send_packet function?
+    /// Sends a packet over the serial connection.
+    pub fn send_packet<T>(&self, data: &Packet<T>)
+    where
+        T: PacketContents,
+    {
+        if !cfg::should_output_serial() {
+            return;
+        }
 
+        unsafe {
+            self.send_pod(data);
+        }
+    }
+
+    /// Reads a packet from the serial connection. Validates the checksum and returns None if it is invalid.
+    pub fn read_packet<T>(&self) -> Option<Packet<T>>
+    where
+        T: PacketContents,
+    {
+        if !cfg::should_input_serial() {
+            return None;
+        }
+        let mut value = Packet::zeroed();
+        unsafe {
+            self.read_pod(&mut value);
+        }
+
+        if value.validate() {
+            Some(value)
+        } else {
+            None
+        }
+    }
+
+    /// Writes a POD type to the serial connection.
+    /// This is *almost certainly* not the function you want to use. Use `send_packet` instead.
     pub unsafe fn send_pod<T>(&self, data: &T)
     where
         T: bytemuck::Pod,
@@ -37,6 +71,8 @@ impl SerialClient {
         adapter.send_slice(bytes);
     }
 
+    /// Reads a POD type from the serial connection.
+    /// This is *almost certainly* not the function you want to use. Use `read_packet` instead.
     pub unsafe fn read_pod<T>(&self, dest: &mut T)
     where
         T: bytemuck::Pod,

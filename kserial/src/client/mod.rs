@@ -37,11 +37,9 @@ pub fn send_string_with(serial: &SerialClient, string: &str) {
 
     for chunk in string.as_bytes().chunks(StringPacket::CAPACITY) {
         let pk = unsafe { StringPacket::from_bytes_unchecked(chunk) };
-        unsafe {
-            let packet = pk.into_packet();
-            info!("Sending packet: {:?}", packet);
-            serial.send_pod(&packet);
-        }
+
+        let packet = pk.into_packet();
+        serial.send_packet(&packet);
     }
 }
 
@@ -49,9 +47,8 @@ pub fn test_two_way_serial() {
     let serial = &SERIAL_ADAPTER;
     let packet = StringPacket::new("Hello, world!").unwrap();
     let echo_packet = unsafe { Packet::new(0xFE, packet) };
-    unsafe { serial.send_pod(&echo_packet) };
-    let mut echoed_packet: Packet<StringPacket> = Zeroable::zeroed();
-    unsafe { serial.read_pod(&mut echoed_packet) };
+    serial.send_packet(&echo_packet);
+    let echoed_packet: Packet<StringPacket> = serial.read_packet().expect("Failed to read packet");
     assert_eq!(echoed_packet.command(), 0xFE);
     assert_eq!(echoed_packet.checksum(), 0);
     assert_eq!(echoed_packet.payload().as_str(), "Hello, world!");
