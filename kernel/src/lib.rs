@@ -19,7 +19,7 @@ use core::arch::asm;
 
 use alloc::boxed::Box;
 use interrupts::hardware;
-use kserial::client::{get_serial_client, test_two_way_serial};
+use kserial::client::{fs::File, get_serial_client, test_two_way_serial};
 use limine::BaseRevision;
 use log::info;
 use proc::{sched, KERNEL_THREAD_SCHEDULER};
@@ -78,6 +78,9 @@ pub(crate) unsafe fn init_kernel_services() {
     interrupts::MODULE.init();
     hardware::MODULE.init();
     get_serial_client().enable_packet_support();
+
+    let e = File::create_file("test.txt").unwrap();
+    e.write(b"Hello, world!").unwrap();
 
     test_two_way_serial();
     memory::MODULE.init();

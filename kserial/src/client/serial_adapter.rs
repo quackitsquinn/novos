@@ -43,6 +43,27 @@ pub(crate) mod tests {
         pub fn clear_output(&self) {
             self.output.lock().unwrap().clear();
         }
+
+        #[track_caller]
+        pub fn assert_send(&self, count: usize) {
+            let output = self.output.lock().unwrap().len();
+            assert_eq!(
+                output, count,
+                "Expected {} bytes to be sent, but got {}",
+                count, output,
+            );
+        }
+        #[track_caller]
+        pub fn assert_read(&self, count: usize) {
+            let input = self.input.lock().unwrap().0;
+            assert_eq!(
+                input,
+                count,
+                "Expected {} bytes to be read, but got {}",
+                input,
+                self.input.lock().unwrap().0
+            );
+        }
     }
 
     impl SerialAdapter for TestSerialAdapter {

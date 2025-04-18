@@ -1,4 +1,5 @@
 use bytemuck::Pod;
+use packet::Packet;
 
 pub mod array_vec;
 pub mod commands;
@@ -12,6 +13,7 @@ pub const PACKET_MODE_ENTRY_SIG: [u8; 10] = *b"KSP\0\0ENTER";
 pub trait PacketContents: Sized + Pod {
     const ID: u8;
     const SIZE: usize = core::mem::size_of::<Self>();
+    const PACKET_SIZE: usize = core::mem::size_of::<Packet<Self>>();
 
     fn checksum(&self) -> u8 {
         pod_checksum(self)

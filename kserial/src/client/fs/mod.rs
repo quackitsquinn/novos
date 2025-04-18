@@ -96,7 +96,10 @@ mod tests {
     use crate::{
         client::{cfg::set_packet_mode, serial::tests::TestSerialWrapper},
         common::{
-            commands::{FileFlags, FileHandle, FileResponse, WriteFileResponse},
+            commands::{
+                FileFlags, FileHandle, FileResponse, OpenFile, WriteFile, WriteFileResponse,
+            },
+            packet::Packet,
             PacketContents,
         },
     };
@@ -114,6 +117,8 @@ mod tests {
         let file = file.unwrap();
         assert_eq!(file.handle(), &FileHandle::new(0x1234));
         assert_eq!(file.open_mode(), &FileFlags::CREATE_OVERWRITE);
+        serial.get_adapter().assert_send(OpenFile::PACKET_SIZE);
+        serial.get_adapter().assert_read(FileResponse::PACKET_SIZE);
     }
 
     #[test]
@@ -132,5 +137,11 @@ mod tests {
         assert_eq!(file.handle(), &FileHandle::new(0x1234));
         assert_eq!(file.open_mode(), &FileFlags::CREATE_OVERWRITE);
         assert!(file.write(b"Hello, world!").is_some());
+        serial
+            .get_adapter()
+            .assert_send(OpenFile::PACKET_SIZE + WriteFile::PACKET_SIZE);
+        serial
+            .get_adapter()
+            .assert_read(FileResponse::PACKET_SIZE + WriteFileResponse::PACKET_SIZE);
     }
 }
