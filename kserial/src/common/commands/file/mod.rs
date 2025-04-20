@@ -10,10 +10,10 @@ use crate::common::fixed_null_str::{null_str, FixedNulString};
 
 #[derive(Debug, Pod, Zeroable, Clone, Copy, PartialEq, Eq)]
 #[repr(transparent)]
-pub struct FileHandle(u64);
+pub struct FileHandle(i32);
 
 impl FileHandle {
-    pub(crate) const fn new(handle: u64) -> Self {
+    pub(crate) const fn new(handle: i32) -> Self {
         Self(handle)
     }
     /// Is the file handle valid?
@@ -21,7 +21,7 @@ impl FileHandle {
         self.0 != 0
     }
     /// Get the inner file handle
-    pub fn inner(&self) -> u64 {
+    pub fn inner(&self) -> i32 {
         self.0
     }
 }

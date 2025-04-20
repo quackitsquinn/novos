@@ -99,7 +99,6 @@ mod tests {
             commands::{
                 FileFlags, FileHandle, FileResponse, OpenFile, WriteFile, WriteFileResponse,
             },
-            packet::Packet,
             PacketContents,
         },
     };

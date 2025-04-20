@@ -62,7 +62,7 @@ impl PacketContents for FileResponse {
 impl FileResponse {
     pub const ERR_MAX_LEN: usize = 64;
 
-    pub fn new(handle: u64) -> Self {
+    pub fn new(handle: i32) -> Self {
         assert!(
             handle != 0,
             "File handle must be non-zero! Use `err` instead."

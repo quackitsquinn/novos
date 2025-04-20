@@ -21,7 +21,7 @@ use crate::{
 };
 
 struct FileCommandState {
-    open_files: HashSet<u64>,
+    open_files: HashSet<i32>,
 }
 
 lazy_static! {
@@ -45,12 +45,12 @@ pub fn open_file(i: u8, stream: &mut SerialStream) -> Result<(), std::io::Error>
     match file {
         Ok(file) => {
             let mut file_data = FILE_DATA.lock().unwrap();
-            let raw_fd_u64 = unsafe { transmute::<_, u32>(file.into_raw_fd()) } as u64;
-            let handle = file_data.open_files.insert(raw_fd_u64);
+            let raw_fd = file.into_raw_fd();
+            let handle = file_data.open_files.insert(raw_fd);
             if !handle {
                 panic!("Is this infallible? I don't know. If this ever panics, please report it.");
             }
-            res = FileResponse::new(raw_fd_u64);
+            res = FileResponse::new(raw_fd);
         }
         Err(e) => {
             res = FileResponse::from_io_err(e);

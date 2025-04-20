@@ -22,7 +22,7 @@ pub fn run(pty: &PathBuf, qemu: &mut Child) {
 
         let (stream, addr) = listener.accept().expect("Failed to accept connection");
         println!("Connected to {:?}", addr);
-        catch_unwind(|| {
+        let _ = catch_unwind(|| {
             if let Err(e) = SerialHandler::new(stream).unwrap().run() {
                 if e.kind() == std::io::ErrorKind::UnexpectedEof {
                     println!("Connection closed");
