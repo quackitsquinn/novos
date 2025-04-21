@@ -1,4 +1,5 @@
 use bytemuck::{Pod, Zeroable};
+use kserial_derive::Validate;
 
 use super::PacketContents;
 
@@ -10,7 +11,7 @@ pub use file::*;
 pub use incremental::{CloseIncrementalFileChannel, CreateIncrementalFileChannel, IncrementalFile};
 pub use string_packet::StringPacket;
 
-#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable, Validate)]
 #[repr(C)]
 pub struct Shutdown {
     pub code: i32,

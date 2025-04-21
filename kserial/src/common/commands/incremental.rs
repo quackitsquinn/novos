@@ -1,4 +1,5 @@
 use bytemuck::{Pod, Zeroable};
+use kserial_derive::Validate;
 
 use crate::common::{
     array_vec::{varlen, ArrayVec},
@@ -6,7 +7,7 @@ use crate::common::{
     PacketContents,
 };
 
-#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable, Validate)]
 #[repr(C)]
 pub struct CreateIncrementalFileChannel {
     pub name: null_str!(CreateIncrementalFileChannel::NAME_MAX_LEN),
@@ -31,7 +32,7 @@ impl CreateIncrementalFileChannel {
     }
 }
 
-#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable, Validate)]
 #[repr(C)]
 pub struct IncrementalFile {
     pub name: null_str!(IncrementalFile::NAME_MAX_LEN),
@@ -67,7 +68,7 @@ impl IncrementalFile {
     }
 }
 
-#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable, Validate)]
 #[repr(C)]
 pub struct CloseIncrementalFileChannel {
     pub name: null_str!(CloseIncrementalFileChannel::NAME_MAX_LEN),

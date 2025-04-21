@@ -1,13 +1,14 @@
 use core::str;
 
 use bytemuck::{Pod, Zeroable};
+use kserial_derive::Validate;
 
 use crate::common::{
     array_vec::{varlen, ArrayVec},
     PacketContents,
 };
 
-#[derive(Debug, Clone, Copy, Pod, Zeroable, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable, PartialEq, Eq, Validate)]
 #[repr(C)]
 pub struct StringPacket {
     pub data: varlen!(u8, StringPacket::CAPACITY),

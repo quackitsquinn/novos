@@ -3,12 +3,16 @@ mod write_file;
 
 use bitflags::bitflags;
 use bytemuck::{Pod, Zeroable};
+use kserial_derive::Validate;
 pub use open_file::{FileResponse, OpenFile};
 pub use write_file::{WriteFile, WriteFileResponse};
 
-use crate::common::fixed_null_str::{null_str, FixedNulString};
+use crate::common::{
+    fixed_null_str::{null_str, FixedNulString},
+    validate::Validate,
+};
 
-#[derive(Debug, Pod, Zeroable, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Pod, Zeroable, Clone, Copy, PartialEq, Eq, Validate)]
 #[repr(transparent)]
 pub struct FileHandle(i32);
 
@@ -40,6 +44,12 @@ bitflags::bitflags! {
     }
 }
 
+impl Validate for FileFlags {
+    fn validate(&self) -> bool {
+        true
+    }
+}
+
 bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Pod, Zeroable)]
     #[repr(transparent)]
@@ -58,7 +68,13 @@ impl OsError {
     }
 }
 
-#[derive(Debug, Clone, Copy, Pod, Zeroable, PartialEq, Eq)]
+impl Validate for OsError {
+    fn validate(&self) -> bool {
+        true
+    }
+}
+
+#[derive(Debug, Clone, Copy, Pod, Zeroable, PartialEq, Eq, Validate)]
 #[repr(C)]
 pub struct IOError {
     pub err: OsError,

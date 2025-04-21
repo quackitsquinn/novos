@@ -41,6 +41,12 @@ impl<const N: usize> Deref for FixedNulString<N> {
     }
 }
 
+impl<const N: usize> Validate for FixedNulString<N> {
+    fn validate(&self) -> bool {
+        true
+    }
+}
+
 mod null_macro {
     macro_rules! null_str {
     ($cap: expr) => {
@@ -50,3 +56,5 @@ mod null_macro {
 }
 
 pub(crate) use null_macro::null_str;
+
+use super::validate::Validate;

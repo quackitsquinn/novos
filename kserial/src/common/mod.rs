@@ -1,16 +1,19 @@
 use bytemuck::Pod;
 use packet::Packet;
+use validate::Validate;
 
 pub mod array_vec;
 pub mod commands;
 pub mod fixed_null_str;
 pub(crate) mod macros;
 pub mod packet;
+pub mod validate;
+
 // KSerial Packet \0\0 ENTER
 // This should be distinct enough to avoid conflicts with anything else
 pub const PACKET_MODE_ENTRY_SIG: [u8; 10] = *b"KSP\0\0ENTER";
 
-pub trait PacketContents: Sized + Pod {
+pub trait PacketContents: Sized + Pod + Validate {
     const ID: u8;
     const SIZE: usize = core::mem::size_of::<Self>();
     const PACKET_SIZE: usize = core::mem::size_of::<Packet<Self>>();

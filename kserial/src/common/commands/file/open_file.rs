@@ -1,4 +1,5 @@
 use bytemuck::{Pod, Zeroable};
+use kserial_derive::Validate;
 
 use crate::common::{
     commands::FileHandle,
@@ -8,7 +9,7 @@ use crate::common::{
 
 use super::{FileFlags, IOError, OsError};
 
-#[derive(Debug, Clone, Copy, Pod, Zeroable, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable, PartialEq, Eq, Validate)]
 #[repr(C)]
 pub struct OpenFile {
     // This weird syntax is a const generic parameter. We don't use `Self` because it breaks `Pod` and `Zeroable`.
@@ -47,7 +48,7 @@ impl PacketContents for OpenFile {
     const ID: u8 = 0x01;
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Pod, Zeroable)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Pod, Zeroable, Validate)]
 #[repr(C)]
 pub struct FileResponse {
     pub handle: FileHandle,

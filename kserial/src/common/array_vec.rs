@@ -173,6 +173,22 @@ impl<T: Pod + Debug, const CAP: usize> Debug for ArrayVec<T, CAP> {
     }
 }
 
+impl<T: Validate + Pod, const CAP: usize> Validate for ArrayVec<T, CAP> {
+    fn validate(&self) -> bool {
+        // First off, validate ourselves
+        if self.len() > CAP {
+            return false;
+        }
+        // Then validate each element
+        for i in 0..self.len() {
+            if !self[i].validate() {
+                return false;
+            }
+        }
+        true
+    }
+}
+
 mod arr_vec_macro {
     macro_rules! varlen {
         ($ty: ty, $cap: expr) => {
@@ -183,3 +199,5 @@ mod arr_vec_macro {
 }
 
 pub(crate) use arr_vec_macro::varlen;
+
+use super::validate::Validate;

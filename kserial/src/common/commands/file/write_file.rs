@@ -1,4 +1,5 @@
 use bytemuck::{Pod, Zeroable};
+use kserial_derive::Validate;
 
 use crate::common::{
     array_vec::{varlen, ArrayVec},
@@ -7,7 +8,7 @@ use crate::common::{
 
 use super::{FileHandle, IOError};
 
-#[derive(Debug, Clone, Copy, Zeroable, Pod)]
+#[derive(Debug, Clone, Copy, Zeroable, Pod, Validate)]
 #[repr(C)]
 pub struct WriteFile {
     file: FileHandle,
@@ -44,7 +45,7 @@ impl PacketContents for WriteFile {
     const ID: u8 = 0x02;
 }
 
-#[derive(Debug, Clone, Copy, Zeroable, Pod)]
+#[derive(Debug, Clone, Copy, Zeroable, Pod, Validate)]
 #[repr(C)]
 pub struct WriteFileResponse {
     pub err: IOError,
