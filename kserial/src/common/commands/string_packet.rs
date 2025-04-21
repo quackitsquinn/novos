@@ -8,6 +8,8 @@ use crate::common::{
     PacketContents,
 };
 
+use super::ids::STRING_PACKET_ID;
+
 #[derive(Debug, Clone, Copy, Pod, Zeroable, PartialEq, Eq, Validate)]
 #[repr(C)]
 pub struct StringPacket {
@@ -15,7 +17,7 @@ pub struct StringPacket {
 }
 
 impl PacketContents for StringPacket {
-    const ID: u8 = 0x00;
+    const ID: u8 = STRING_PACKET_ID;
 }
 
 impl StringPacket {

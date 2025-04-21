@@ -2,7 +2,7 @@ use bytemuck::{Pod, Zeroable};
 use kserial_derive::Validate;
 
 use crate::common::{
-    commands::FileHandle,
+    commands::{ids::OPEN_FILE_ID, FileHandle},
     fixed_null_str::{null_str, FixedNulString},
     PacketContents,
 };
@@ -45,7 +45,7 @@ impl OpenFile {
 }
 
 impl PacketContents for OpenFile {
-    const ID: u8 = 0x01;
+    const ID: u8 = OPEN_FILE_ID;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Pod, Zeroable, Validate)]

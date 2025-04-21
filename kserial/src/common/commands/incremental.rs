@@ -7,6 +7,10 @@ use crate::common::{
     PacketContents,
 };
 
+use super::ids::{
+    CLOSE_INCREMENTAL_FILE_CHANNEL_ID, CREATE_INCREMENTAL_FILE_CHANNEL_ID, INCREMENTAL_FILE_ID,
+};
+
 #[derive(Debug, Clone, Copy, Pod, Zeroable, Validate)]
 #[repr(C)]
 pub struct CreateIncrementalFileChannel {
@@ -15,7 +19,7 @@ pub struct CreateIncrementalFileChannel {
 }
 
 impl PacketContents for CreateIncrementalFileChannel {
-    const ID: u8 = 0x06;
+    const ID: u8 = CREATE_INCREMENTAL_FILE_CHANNEL_ID;
 }
 
 impl CreateIncrementalFileChannel {
@@ -52,7 +56,7 @@ impl IncrementalFile {
 }
 
 impl PacketContents for IncrementalFile {
-    const ID: u8 = 0x07;
+    const ID: u8 = INCREMENTAL_FILE_ID;
 }
 
 impl IncrementalFile {
@@ -75,7 +79,7 @@ pub struct CloseIncrementalFileChannel {
 }
 
 impl PacketContents for CloseIncrementalFileChannel {
-    const ID: u8 = 0x08;
+    const ID: u8 = CLOSE_INCREMENTAL_FILE_CHANNEL_ID;
 }
 
 impl CloseIncrementalFileChannel {

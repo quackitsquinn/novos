@@ -3,6 +3,7 @@ use kserial_derive::Validate;
 
 use crate::common::{
     array_vec::{varlen, ArrayVec},
+    commands::ids::WRITE_FILE_ID,
     PacketContents,
 };
 
@@ -42,7 +43,7 @@ impl WriteFile {
 }
 
 impl PacketContents for WriteFile {
-    const ID: u8 = 0x02;
+    const ID: u8 = WRITE_FILE_ID;
 }
 
 #[derive(Debug, Clone, Copy, Zeroable, Pod, Validate)]
