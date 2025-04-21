@@ -1,13 +1,13 @@
 use bytemuck::{Pod, Zeroable};
 
-use super::pod_checksum;
+use super::{pod_checksum, validate::Validate};
 
 /// A packet that can be sent over the serial port.
 #[derive(Debug, Clone, Copy, Zeroable)]
 #[repr(C)]
 pub struct Packet<T>
 where
-    T: Pod,
+    T: Pod + Validate,
 {
     command: u8,
     command_checksum: u8,
@@ -16,7 +16,7 @@ where
 
 impl<T> Packet<T>
 where
-    T: Pod,
+    T: Pod + Validate,
 {
     pub unsafe fn new(command: u8, data: T) -> Self {
         let mut no_chk = Self {
@@ -44,7 +44,7 @@ where
             data,
         };
 
-        if new.checksum() != 0 {
+        if !new.validate() {
             return None;
         }
 
@@ -68,12 +68,12 @@ where
     }
     /// Validates the checksum of the packet.
     pub fn validate(&self) -> bool {
-        self.checksum() == 0
+        (self.checksum() == 0) && self.data.validate()
     }
 }
 
 // Safety: u8 is Pod, and T is Pod, so Packet<T> is Pod
-unsafe impl<T> Pod for Packet<T> where T: Pod {}
+unsafe impl<T> Pod for Packet<T> where T: Pod + Validate {}
 
 #[cfg(test)]
 mod tests {

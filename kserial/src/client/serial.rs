@@ -31,6 +31,10 @@ impl SerialClient {
             return;
         }
 
+        if !data.validate() {
+            panic!("Invalid packet data");
+        }
+
         unsafe {
             self.send_pod(data);
         }

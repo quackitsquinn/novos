@@ -53,6 +53,12 @@ impl SerialStream {
         &mut self,
         packet: &Packet<C>,
     ) -> Result<(), io::Error> {
+        if !packet.validate() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Invalid packet data",
+            ));
+        }
         unsafe {
             self.write_ty(packet)?;
         }
