@@ -12,7 +12,8 @@ use lazy_static::lazy_static;
 use crate::{
     common::{
         commands::{
-            FileFlags, FileResponse, IOError, OpenFile, WriteFile, WriteFileResponse,
+            CloseFile, CloseFileResponse, FileFlags, FileResponse, IOError, OpenFile, WriteFile,
+            WriteFileResponse,
         },
         PacketContents,
     },
@@ -84,5 +85,27 @@ pub fn write_file(i: u8, stream: &mut SerialStream) -> Result<(), std::io::Error
     // Not our responsibility to close the file
     let _ = file.into_raw_fd();
 
+    Ok(())
+}
+
+pub fn close_file(i: u8, stream: &mut SerialStream) -> Result<(), std::io::Error> {
+    let data = stream.read_packet::<CloseFile>(i)?;
+    let cmd = data.payload();
+    let mut file_data = FILE_DATA.lock().unwrap();
+    let handle = file_data.open_files.take(&cmd.handle.inner());
+    if handle.is_none() {
+        stream.write_packet(&CloseFileResponse::new(IOError::INVALID_HANDLE).into_packet())?;
+        stream.get_inner().flush()?;
+        return Ok(());
+    }
+    let handle = handle.unwrap();
+    let file = unsafe { std::fs::File::from_raw_fd(handle) };
+    let res = match file.sync_all() {
+        Ok(_) => CloseFileResponse::new(IOError::OK),
+        Err(e) => CloseFileResponse::new(IOError::from_io_err(e)),
+    };
+    stream.write_packet(&res.into_packet())?;
+    stream.get_inner().flush()?;
+    drop(file);
     Ok(())
 }

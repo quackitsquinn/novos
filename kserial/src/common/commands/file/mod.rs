@@ -1,8 +1,10 @@
+mod close_file;
 mod open_file;
 mod write_file;
 
 use bitflags::bitflags;
 use bytemuck::{Pod, Zeroable};
+pub use close_file::{CloseFile, CloseFileResponse};
 use kserial_derive::Validate;
 pub use open_file::{FileResponse, OpenFile};
 pub use write_file::{WriteFile, WriteFileResponse};
@@ -54,6 +56,7 @@ bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Pod, Zeroable)]
     #[repr(transparent)]
     pub struct OsError: u32 {
+        const OK = 0;
         const NOT_FOUND = 1 << 0;
         const PERM_DENIED = 1 << 1;
         const ALREADY_EXISTS = 1 << 2;
@@ -64,7 +67,7 @@ bitflags! {
 
 impl OsError {
     pub const fn is_ok(&self) -> bool {
-        self.bits() == 0
+        self.bits() == Self::OK.bits()
     }
 }
 

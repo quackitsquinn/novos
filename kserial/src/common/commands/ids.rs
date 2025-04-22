@@ -5,6 +5,7 @@
 pub const STRING_PACKET_ID: u8 = 0x00;
 pub const OPEN_FILE_ID: u8 = 0x01;
 pub const WRITE_FILE_ID: u8 = 0x02;
+pub const CLOSE_FILE_ID: u8 = 0x03;
 
 pub const CREATE_INCREMENTAL_FILE_CHANNEL_ID: u8 = 0x06;
 pub const INCREMENTAL_FILE_ID: u8 = 0x07;
