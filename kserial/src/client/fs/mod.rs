@@ -114,7 +114,7 @@ mod tests {
         set_packet_mode(true);
         let serial = TestSerialWrapper::new();
         let file_resp = FileResponse::new(0x1234).into_packet();
-        serial.get_adapter().set_input(bytes_of(&file_resp));
+        serial.get_adapter().set_input(&file_resp.as_bytes());
         let file = File::create_file_with(&serial, "test.txt");
         assert!(file.is_ok());
         let file = file.unwrap();
@@ -131,15 +131,15 @@ mod tests {
         let file_resp = FileResponse::new(0x1234).into_packet();
         let write_resp = WriteFileResponse::ok().into_packet();
         let mut data = Vec::new();
-        data.extend_from_slice(bytes_of(&file_resp));
-        data.extend_from_slice(bytes_of(&write_resp));
+        data.extend_from_slice(&file_resp.as_bytes());
+        data.extend_from_slice(&write_resp.as_bytes());
 
         serial.get_adapter().set_input(&data);
 
         let file = File::create_file_with(&serial, "test.txt").expect("Create file failed");
         assert_eq!(file.handle(), &FileHandle::new(0x1234));
         assert_eq!(file.open_mode(), &FileFlags::CREATE_OVERWRITE);
-        assert!(file.write(b"Hello, world!").is_some());
+        assert!(file.write(b"Hello, world!").is_ok());
         serial
             .get_adapter()
             .assert_send(OpenFile::PACKET_SIZE + WriteFile::PACKET_SIZE);

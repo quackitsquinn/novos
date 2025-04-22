@@ -74,6 +74,14 @@ where
     pub fn validate(&self) -> bool {
         (self.checksum() == 0) && self.data.validate()
     }
+    #[cfg(feature = "std")]
+    pub fn as_bytes(&self) -> std::vec::Vec<u8> {
+        let mut bytes = std::vec::Vec::with_capacity(std::mem::size_of::<Self>());
+        bytes.push(self.command);
+        bytes.push(self.command_checksum);
+        bytes.extend_from_slice(bytemuck::bytes_of(&self.data));
+        bytes
+    }
 }
 
 #[cfg(test)]
