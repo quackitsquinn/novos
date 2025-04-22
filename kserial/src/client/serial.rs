@@ -36,7 +36,10 @@ impl SerialClient {
         }
 
         unsafe {
-            self.send_pod(data);
+            // TODO: This is a band-aid. I forgot about padding so raw-dogging the packet is not safe, so just send the fields independently.
+            self.send_pod(&data.command());
+            self.send_pod(&data.contained_checksum());
+            self.send_pod(data.payload());
         }
     }
 
@@ -48,13 +51,19 @@ impl SerialClient {
         if !cfg::should_input_serial() {
             return None;
         }
-        let mut value = Packet::zeroed();
+        let mut command = 0;
+        let mut checksum = 0;
+        let mut value = T::zeroed();
         unsafe {
+            self.read_pod(&mut command);
+            self.read_pod(&mut checksum);
             self.read_pod(&mut value);
         }
 
-        if value.validate() {
-            Some(value)
+        let packet = Packet::from_raw_parts(command, checksum, value)?;
+
+        if packet.validate() {
+            Some(packet)
         } else {
             None
         }

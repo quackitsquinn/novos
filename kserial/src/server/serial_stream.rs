@@ -40,10 +40,10 @@ impl SerialStream {
     ) -> Result<Packet<C>, io::Error> {
         let checksum = unsafe { self.read_ty::<u8>()? };
         let packet = unsafe { self.read_ty::<C>()? };
-        if TypeId::of::<C>() == TypeId::of::<WriteFile>() {
-            println!("Received packet: {packet:?}");
-            println!("As bytes: {:?}", bytemuck::bytes_of(&packet));
-        }
+        // //   if TypeId::of::<C>() == TypeId::of::<WriteFile>() {
+        // println!("Received packet: {packet:?}");
+        // println!("As bytes: {:?}", bytemuck::bytes_of(&packet));
+        // //  }
         let full = Packet::from_raw_parts(cmd_id, checksum, packet)
             .ok_or_else(|| handle_invalid_checksum(packet.checksum()))?;
         Ok(full)
@@ -60,7 +60,9 @@ impl SerialStream {
             ));
         }
         unsafe {
-            self.write_ty(packet)?;
+            self.write_ty::<u8>(&packet.command())?;
+            self.write_ty::<u8>(&packet.checksum())?;
+            self.write_ty::<C>(&packet.payload())?;
         }
         Ok(())
     }
