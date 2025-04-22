@@ -1,4 +1,5 @@
 use bytemuck::Zeroable;
+use err::FileError;
 
 use core::fmt::Write;
 
@@ -9,6 +10,8 @@ use crate::common::{
 };
 
 use super::{cfg::is_packet_mode, send_string, serial::SerialClient, SerialWriter};
+
+pub mod err;
 
 pub struct File<'a> {
     handle: FileHandle,
@@ -29,8 +32,8 @@ impl<'a> File<'a> {
         }
     }
 
-    pub fn create_file_with(serial: &'a SerialClient, name: &str) -> Option<Self> {
-        let open_file = OpenFile::create(name)?;
+    pub fn create_file_with(serial: &'a SerialClient, name: &str) -> Result<Self, FileError> {
+        let open_file = OpenFile::create(name).ok_or(FileError::FilenameTooLong)?;
         // Copy the flags so that if the flags for `create` are changed, we don't have to change this function.
         let flags = open_file.flags;
 
@@ -38,31 +41,31 @@ impl<'a> File<'a> {
         if !is_packet_mode() {
             // TODO: User configurable error handling / Error type
             //send_string("Packet mode is not enabled, cannot create file.");
-            return None;
+            return Err(FileError::NotInPacketMode);
         }
 
         serial.send_packet(&open_file.into_packet());
-        let response: Packet<FileResponse> = serial.read_packet()?;
+        let response: Packet<FileResponse> = serial.read_packet().ok_or(FileError::ReadError)?;
         let response = response.payload();
 
         if !response.err.is_ok() {
-            return None;
+            return Err(FileError::IoError(response.err));
         }
 
         let handle = response.handle;
 
         let file = unsafe { File::new(handle, flags, serial) };
-        Some(file)
+        Ok(file)
     }
 
-    pub fn create_file(name: &str) -> Option<Self> {
+    pub fn create_file(name: &str) -> Result<Self, FileError> {
         Self::create_file_with(&super::SERIAL_ADAPTER, name)
     }
 
-    pub fn write(&self, data: &[u8]) -> Option<()> {
+    pub fn write(&self, data: &[u8]) -> Result<(), FileError> {
         if !is_packet_mode() {
             send_string("Packet mode is not enabled, cannot write to file.");
-            return None;
+            return Err(FileError::NotInPacketMode);
         }
 
         for chunk in data.chunks(WriteFile::CAPACITY) {
@@ -71,13 +74,14 @@ impl<'a> File<'a> {
             // writeln!(SerialWriter, "{:?}", packet).ok();
             // writeln!(SerialWriter, "{:?}", bytemuck::bytes_of(packet.payload())).ok();
             self.client.send_packet(&packet);
-            let response: Packet<WriteFileResponse> = self.client.read_packet()?;
+            let response: Packet<WriteFileResponse> =
+                self.client.read_packet().ok_or(FileError::ReadError)?;
             if !response.payload().is_ok() {
-                return None;
+                return Err(FileError::IoError(response.payload().err));
             }
         }
 
-        Some(())
+        Ok(())
     }
 
     pub fn handle(&self) -> &FileHandle {
@@ -112,7 +116,7 @@ mod tests {
         let file_resp = FileResponse::new(0x1234).into_packet();
         serial.get_adapter().set_input(bytes_of(&file_resp));
         let file = File::create_file_with(&serial, "test.txt");
-        assert!(file.is_some());
+        assert!(file.is_ok());
         let file = file.unwrap();
         assert_eq!(file.handle(), &FileHandle::new(0x1234));
         assert_eq!(file.open_mode(), &FileFlags::CREATE_OVERWRITE);

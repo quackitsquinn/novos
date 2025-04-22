@@ -61,7 +61,7 @@ impl SerialStream {
         }
         unsafe {
             self.write_ty::<u8>(&packet.command())?;
-            self.write_ty::<u8>(&packet.checksum())?;
+            self.write_ty::<u8>(&packet.contained_checksum())?;
             self.write_ty::<C>(&packet.payload())?;
         }
         Ok(())

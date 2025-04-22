@@ -1,5 +1,7 @@
 use bytemuck::{Pod, Zeroable};
 
+use crate::client::send_string;
+
 use super::{pod_checksum, validate::Validate};
 
 /// A packet that can be sent over the serial port.
@@ -24,7 +26,7 @@ where
             command_checksum: 0,
             data,
         };
-        let checksum = pod_checksum(&no_chk);
+        let checksum = no_chk.checksum();
         no_chk.command_checksum = (!checksum).wrapping_add(1);
         no_chk
     }
@@ -64,16 +66,15 @@ where
     }
 
     pub fn checksum(&self) -> u8 {
-        pod_checksum(self)
+        self.command_checksum
+            .wrapping_add(self.command)
+            .wrapping_add(pod_checksum(&self.data))
     }
     /// Validates the checksum of the packet.
     pub fn validate(&self) -> bool {
         (self.checksum() == 0) && self.data.validate()
     }
 }
-
-// Safety: u8 is Pod, and T is Pod, so Packet<T> is Pod
-unsafe impl<T> Pod for Packet<T> where T: Pod + Validate {}
 
 #[cfg(test)]
 mod tests {
