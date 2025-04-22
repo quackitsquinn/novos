@@ -1,13 +1,17 @@
 use err::FileError;
 
-
 use crate::common::{
-    commands::{FileFlags, FileHandle, FileResponse, OpenFile, WriteFile, WriteFileResponse},
+    commands::{
+        CloseFile, CloseFileResponse, FileFlags, FileHandle, FileResponse, OpenFile, WriteFile,
+        WriteFileResponse,
+    },
     packet::Packet,
     PacketContents,
 };
 
-use super::{cfg::is_packet_mode, send_string, serial::SerialClient};
+use super::{cfg::is_packet_mode, send_string, serial::SerialClient, SerialWriter};
+
+use core::fmt::Write;
 
 pub mod err;
 
@@ -81,6 +85,26 @@ impl<'a> File<'a> {
 
         Ok(())
     }
+    /// Close the file.
+    ///
+    /// # Safety
+    /// The caller must ensure that this file will be discarded after this call.
+    /// Any following calls to this file will result in undefined behavior.
+    pub unsafe fn close(&self) -> Result<(), FileError> {
+        if !is_packet_mode() {
+            send_string("Packet mode is not enabled, cannot close file.");
+            return Err(FileError::NotInPacketMode);
+        }
+        let close_file = CloseFile::new(self.handle);
+        self.client.send_packet(&close_file.into_packet());
+        let response: Packet<CloseFileResponse> =
+            self.client.read_packet().ok_or(FileError::ReadError)?;
+        let response = response.payload();
+        if !response.is_ok() {
+            return Err(FileError::IoError(response.err()));
+        }
+        Ok(())
+    }
 
     pub fn handle(&self) -> &FileHandle {
         &self.handle
@@ -91,9 +115,18 @@ impl<'a> File<'a> {
     }
 }
 
+// impl Drop for File<'_> {
+//     fn drop(&mut self) {
+//         unsafe {
+//             if let Err(e) = self.close() {
+//                 let _ = writeln!(SerialWriter, "Failed to close file: {e}");
+//             }
+//         }
+//     }
+// }
+
 #[cfg(test)]
 mod tests {
-    
 
     use crate::{
         client::{cfg::set_packet_mode, serial::tests::TestSerialWrapper},
