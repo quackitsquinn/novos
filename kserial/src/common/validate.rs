@@ -1,6 +1,4 @@
-use bytemuck::Pod;
 
-use super::fixed_null_str::FixedNulString;
 
 pub trait Validate {
     fn validate(&self) -> bool;

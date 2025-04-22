@@ -1,6 +1,5 @@
 use bytemuck::{Pod, Zeroable};
 
-use crate::client::send_string;
 
 use super::{pod_checksum, validate::Validate};
 

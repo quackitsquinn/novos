@@ -1,9 +1,6 @@
-use core::{any::TypeId, fmt::Debug};
 use std::io::{self};
 
-use serial_stream::SerialStream;
 
-use crate::common::{commands::WriteFile, packet::Packet, PacketContents};
 
 mod copy_rw;
 mod handlers;

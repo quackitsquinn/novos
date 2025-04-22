@@ -1,4 +1,3 @@
-use core::mem::transmute;
 use std::{
     collections::HashSet,
     fs::OpenOptions,
@@ -13,7 +12,7 @@ use lazy_static::lazy_static;
 use crate::{
     common::{
         commands::{
-            FileFlags, FileResponse, IOError, OpenFile, OsError, WriteFile, WriteFileResponse,
+            FileFlags, FileResponse, IOError, OpenFile, WriteFile, WriteFileResponse,
         },
         PacketContents,
     },

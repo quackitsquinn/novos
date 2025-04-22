@@ -1,4 +1,3 @@
-use core::any::TypeId;
 use std::{
     fmt,
     io::{self, Read, Write},
@@ -6,7 +5,7 @@ use std::{
 
 use bytemuck::Pod;
 
-use crate::common::{commands::WriteFile, packet::Packet, PacketContents};
+use crate::common::{packet::Packet, PacketContents};
 
 use super::handle_invalid_checksum;
 

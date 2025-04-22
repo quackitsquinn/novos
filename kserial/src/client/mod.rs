@@ -5,11 +5,10 @@ pub mod serial_adapter;
 
 use core::fmt;
 
-use bytemuck::Zeroable;
 use serial::SerialClient;
 pub use serial_adapter::SerialAdapter;
 
-use crate::common::{commands::StringPacket, packet::Packet, test_log::info, PacketContents};
+use crate::common::{commands::StringPacket, packet::Packet, PacketContents};
 
 // TODO: This crate assumes there is a serial connection that works 2 way. This is not always true. We should add a way to test this at some point.
 

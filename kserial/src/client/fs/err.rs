@@ -1,4 +1,4 @@
-use crate::common::commands::{IOError, OsError};
+use crate::common::commands::IOError;
 
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum FileError {

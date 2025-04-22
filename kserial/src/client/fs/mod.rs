@@ -1,7 +1,5 @@
-use bytemuck::Zeroable;
 use err::FileError;
 
-use core::fmt::Write;
 
 use crate::common::{
     commands::{FileFlags, FileHandle, FileResponse, OpenFile, WriteFile, WriteFileResponse},
@@ -9,7 +7,7 @@ use crate::common::{
     PacketContents,
 };
 
-use super::{cfg::is_packet_mode, send_string, serial::SerialClient, SerialWriter};
+use super::{cfg::is_packet_mode, send_string, serial::SerialClient};
 
 pub mod err;
 
@@ -95,7 +93,7 @@ impl<'a> File<'a> {
 
 #[cfg(test)]
 mod tests {
-    use bytemuck::bytes_of;
+    
 
     use crate::{
         client::{cfg::set_packet_mode, serial::tests::TestSerialWrapper},
