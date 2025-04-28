@@ -8,7 +8,8 @@ use x86_64::{
     structures::paging::{
         mapper::{MapToError, UnmapError},
         page::PageRangeInclusive,
-        FrameAllocator, FrameDeallocator, Mapper, OffsetPageTable, Page, PhysFrame, Size4KiB,
+        FrameAllocator, FrameDeallocator, Mapper, OffsetPageTable, Page, PageTableFlags, PhysFrame,
+        Size4KiB,
     },
     PhysAddr,
 };
@@ -179,6 +180,11 @@ impl PageFrameAllocator {
             }
         }
         Ok(())
+    }
+
+    pub fn is_page_mapped(&mut self, page: Page<Size4KiB>) -> Option<PhysFrame<Size4KiB>> {
+        let mapper = memory::paging::OFFSET_PAGE_TABLE.get();
+        mapper.translate_page(page).ok()
     }
 }
 
