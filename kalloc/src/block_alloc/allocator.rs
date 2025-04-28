@@ -27,13 +27,15 @@ pub const MIN_HEAP_SIZE: usize = INIT_BLOCK_SIZE * mem::size_of::<Block>();
 impl BlockAllocator {
     /// Initializes the block allocator.
     ///
+    /// `write_uninit` is used to determine if the heap should be fully written with `0x0F` (or 0x00f) or not.
+    ///
     /// # Safety
     ///
     /// - `heap_start` and `heap_end` must be aligned to 8 bytes and are inclusive.
     /// - `heap_start` must be less than `heap_end`.
     /// - The heap must be at least `MIN_HEAP_SIZE` bytes.
     /// - Writes and reads through `heap_start` and `heap_end` must be valid.
-    pub unsafe fn init(heap_start: *mut u64, heap_end: *mut u64) -> Self {
+    pub unsafe fn init(heap_start: *mut u64, heap_end: *mut u64, write_uninit: bool) -> Self {
         // Create a bunch of useful variables.
         let heap_start_usize = heap_start as usize;
         let heap_end_usize = heap_end as usize;
@@ -55,6 +57,12 @@ impl BlockAllocator {
             heap_start.is_aligned() && heap_end.is_aligned(),
             "Heap start and end must be aligned"
         );
+
+        if write_uninit {
+            unsafe {
+                ptr::write_bytes(heap_start, 0x0F, heap_size);
+            }
+        }
 
         // Create the base for the block table
         let (block_table_base, applied_offset) =
@@ -418,7 +426,7 @@ impl BlockAllocator {
     /// This function is so unsafe because it in essence calls mem::forget on anything allocated in the block allocator. This means that any pointers returned by the block allocator are now invalid and dereferencing them is undefined behavior.
     /// This function should only be used for testing purposes, and even then, it should be used with caution.
     #[cfg(test)]
-    pub unsafe fn clear(&mut self) {
+    pub unsafe fn clear(&mut self, write_uninit: bool) {
         // Zero the whole heap
         unsafe {
             ptr::write_bytes(
@@ -427,7 +435,13 @@ impl BlockAllocator {
                 self.heap_end - (self.heap_start + 1),
             );
         }
-        *self = unsafe { Self::init(self.heap_start as *mut u64, self.heap_end as *mut u64) };
+        *self = unsafe {
+            Self::init(
+                self.heap_start as *mut u64,
+                self.heap_end as *mut u64,
+                write_uninit,
+            )
+        };
     }
 
     #[track_caller]

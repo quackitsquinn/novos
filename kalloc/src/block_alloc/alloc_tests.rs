@@ -19,7 +19,8 @@ fn get_allocator<const SIZE: usize>() -> (BlockAllocator, DeferDealloc) {
         DeferDealloc::alloc(Layout::from_size_align(SIZE, 2 << 11).unwrap());
     let start = ptr.as_ptr().cast::<u8>();
     let end = unsafe { start.add(SIZE) };
-    let alloc = unsafe { BlockAllocator::init(start.cast(), end.cast()) };
+    // Use write_uninit because we are in a test and want to detect uninitialized memory
+    let alloc = unsafe { BlockAllocator::init(start.cast(), end.cast(), true) };
     (alloc, alloc_allocation)
 }
 /// Gets a block allocator wrapped in a global allocator wrapper, so it implements GlobalAlloc + Allocator.
