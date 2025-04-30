@@ -12,6 +12,7 @@ where
     T: Read + Write,
 {
     datastream: CopiedReadWrite<T, File>,
+    string_output: Box<dyn Write>,
 }
 
 impl<T> SerialHandler<T>
@@ -38,12 +39,24 @@ where
                 write_dump: write_dump,
                 inner: stream,
             },
+            string_output: Box::new(io::stdout()),
         })
+    }
+
+    pub fn with_output<W>(self, output: W) -> Self
+    where
+        W: Write + 'static,
+    {
+        SerialHandler {
+            datastream: self.datastream,
+            string_output: Box::new(output),
+        }
     }
 
     pub fn run(self) -> Result<(), io::Error> {
         println!("Server started");
-        let mut stream = SerialStream::new(self.datastream);
+        let mut stream = SerialStream::new(self.datastream, self.string_output);
+
         loop {
             println!("Waiting for packet mode entry signature...");
             read_until_signature(&mut stream, &PACKET_MODE_ENTRY_SIG)?;

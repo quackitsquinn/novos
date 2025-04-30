@@ -64,7 +64,7 @@ impl fmt::Write for SerialWriter {
 
 #[cfg(test)]
 mod tests {
-    use std::io::Cursor;
+    use std::io::{self, Cursor};
 
     use crate::{
         common::{commands::StringPacket, packet::Packet, PacketContents},
@@ -92,7 +92,7 @@ mod tests {
             output
         );
 
-        let mut ser = SerialStream::new(cur);
+        let mut ser = SerialStream::new(cur, io::stdout());
 
         let packet: Packet<StringPacket> = ser.read_packet(StringPacket::ID).unwrap();
         assert_eq!(packet.command(), StringPacket::ID);
