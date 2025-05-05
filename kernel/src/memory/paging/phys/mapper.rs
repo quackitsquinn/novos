@@ -3,7 +3,7 @@ use limine::{
     memory_map::{Entry, EntryType},
     response::MemoryMapResponse,
 };
-use log::error;
+use log::{debug, error, info};
 use x86_64::{
     structures::paging::{
         mapper::{MapToError, UnmapError},
@@ -46,13 +46,25 @@ impl PageFrameAllocator {
     }
 
     fn next_usable(&mut self) -> Option<(usize, Entry)> {
-        self.map
+        let mmr = self
+            .map
             .entries()
             .iter()
-            .skip(self.off)
             .enumerate()
+            .skip(self.off)
             .find(|e| e.1.entry_type == EntryType::USABLE)
-            .map(|(i, e)| (i, **e))
+            .map(|(i, e)| (i, **e));
+        if let Some((off, entry)) = mmr {
+            self.off = off + 1;
+            info!(
+                "Found memory chunk {}[{:x}]({:x}): {}",
+                off,
+                entry.base,
+                entry.length,
+                Self::fmt_entry_type(&entry)
+            );
+        }
+        mmr
     }
 
     ///  Maps a page to the kernel's page table
@@ -72,6 +84,9 @@ impl PageFrameAllocator {
         flags: x86_64::structures::paging::PageTableFlags,
         pagetable: &mut OffsetPageTable,
     ) -> Result<(), MapError> {
+        if let Ok(phys) = pagetable.translate_page(page) {
+            return Err(MapError::MapError(MapToError::PageAlreadyMapped(phys)));
+        }
         unsafe {
             pagetable
                 .map_to(
@@ -116,8 +131,7 @@ impl PageFrameAllocator {
         flags: x86_64::structures::paging::PageTableFlags,
     ) -> Result<(), MapError> {
         let mut mapper = memory::paging::OFFSET_PAGE_TABLE.get();
-        unsafe { self.map_range_pagetable(page_range, flags, &mut *mapper)? }
-        Ok(())
+        unsafe { self.map_range_pagetable(page_range, flags, &mut *mapper) }
     }
 
     pub unsafe fn map_range_pagetable(
@@ -134,9 +148,10 @@ impl PageFrameAllocator {
                         self.allocate_frame().ok_or(MapError::NoUsableMemory)?,
                         flags,
                         &mut *self,
-                    )
-                    .map(|flush| flush.flush())?;
+                    )?
+                    .flush();
             }
+            debug!("Mapped page: {:?}", page);
         }
         Ok(())
     }
@@ -182,9 +197,31 @@ impl PageFrameAllocator {
         Ok(())
     }
 
+    pub fn is_mapped_in_pagetable(
+        &mut self,
+        page: Page<Size4KiB>,
+        pagetable: &mut OffsetPageTable,
+    ) -> Option<PhysFrame<Size4KiB>> {
+        pagetable.translate_page(page).ok()
+    }
+
     pub fn is_page_mapped(&mut self, page: Page<Size4KiB>) -> Option<PhysFrame<Size4KiB>> {
-        let mapper = memory::paging::OFFSET_PAGE_TABLE.get();
-        mapper.translate_page(page).ok()
+        let mut mapper = memory::paging::OFFSET_PAGE_TABLE.get();
+        self.is_mapped_in_pagetable(page, &mut *mapper)
+    }
+
+    fn fmt_entry_type(entry: &Entry) -> &'static str {
+        match entry.entry_type {
+            EntryType::USABLE => "USABLE",
+            EntryType::RESERVED => "RESERVED",
+            EntryType::ACPI_RECLAIMABLE => "ACPI_RECLAIMABLE",
+            EntryType::ACPI_NVS => "ACPI_NVS",
+            EntryType::BAD_MEMORY => "BAD_MEMORY",
+            EntryType::BOOTLOADER_RECLAIMABLE => "BOOTLOADER_RECLAIMABLE",
+            EntryType::EXECUTABLE_AND_MODULES => "EXECUTABLE_AND_MODULES",
+            EntryType::FRAMEBUFFER => "FRAMEBUFFER",
+            _ => "UNKNOWN",
+        }
     }
 }
 
@@ -223,8 +260,7 @@ unsafe impl FrameAllocator<Size4KiB> for PageFrameAllocator {
             self.entry_offset += 4096;
             Some(frame)
         } else {
-            let (off, entry) = self.next_usable()?;
-            self.off = off;
+            let (_, entry) = self.next_usable()?;
             self.current = entry;
             self.entry_offset = 0;
             self.allocate_frame()

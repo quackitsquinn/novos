@@ -77,6 +77,6 @@ pub mod map {
 
     pub const KERNEL_START: u64 = HIGHER_HALF_START + 0x1000_0000;
 
-    define_map!(KERNEL_HEAP, KERNEL_START, 0xA0_0000); // 10MB
+    define_map!(KERNEL_HEAP, KERNEL_START, 0x10_0000); // 1MB
     define_map!(KERNEL_PHYS_MAP, KERNEL_HEAP_END.as_u64(), 0x1000_0000); // 256MB
 }
