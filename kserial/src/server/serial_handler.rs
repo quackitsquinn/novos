@@ -57,11 +57,13 @@ where
         println!("Server started");
         let mut stream = SerialStream::new(self.datastream, self.string_output);
 
+        println!("Waiting for packet mode entry signature...");
         loop {
-            println!("Waiting for packet mode entry signature...");
             read_until_signature(&mut stream, &PACKET_MODE_ENTRY_SIG)?;
             println!("Entered packet mode, starting to process packets.");
-            run_packet_mode(&mut stream)?;
+            let text = run_packet_mode(&mut stream)?;
+            let text = String::from_utf8_lossy(&text);
+            print!("{}", text);
         }
     }
 }
@@ -113,16 +115,32 @@ fn read_until_signature(stream: &mut SerialStream, signature: &[u8]) -> Result<(
     }
 }
 
-fn run_packet_mode(stream: &mut SerialStream) -> Result<(), io::Error> {
+pub const MAX_CONTINUOUS_INVALID_BYTES: usize = 10;
+fn run_packet_mode(stream: &mut SerialStream) -> Result<Vec<u8>, io::Error> {
+    let mut invalid_bytes = Vec::new();
     loop {
         // SAFETY: All we need here is the byte, no header or anything else.
         let cmd_id = unsafe { stream.read_ty::<u8>()? };
         match handlers::handle_command(cmd_id, stream) {
-            Ok(_) => {}
-            Err(e) => {
-                eprintln!("Failed to handle command {}: {}", cmd_id, e);
-                return Err(e);
+            Ok(_) => {
+                invalid_bytes.clear();
             }
+            Err(e) => {
+                if e.is_invalid_command() {
+                    invalid_bytes.push(cmd_id);
+                }
+                if e.is_invalid_checksum() {
+                    println!("Invalid checksum for command {cmd_id}");
+                }
+                if e.is_io_error() {
+                    println!("IO error for command {cmd_id}: {}", e.io_error().unwrap());
+                }
+            }
+        }
+
+        if invalid_bytes.len() > MAX_CONTINUOUS_INVALID_BYTES {
+            println!("Too many invalid bytes, exiting packet mode.");
+            return Ok(invalid_bytes);
         }
     }
 }

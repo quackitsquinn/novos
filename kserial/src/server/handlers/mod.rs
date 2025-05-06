@@ -3,11 +3,12 @@ use crate::common::{
     PacketContents,
 };
 
-use super::serial_stream::SerialStream;
+use super::{packet_error::PacketError, serial_stream::SerialStream};
 
 mod file;
 
-pub type Command = fn(u8, &mut SerialStream) -> Result<(), std::io::Error>;
+pub type PacketResult = Result<(), PacketError>;
+pub type Command = fn(u8, &mut SerialStream) -> PacketResult;
 
 static COMMANDS: [Command; 255] = {
     let mut commands = [invalid as Command; 255];
@@ -21,25 +22,23 @@ static COMMANDS: [Command; 255] = {
     commands
 };
 
-fn invalid(i: u8, _: &mut SerialStream) -> Result<(), std::io::Error> {
-    let ich = i as char;
-    print!("Invalid command: {ich} (0x{:02X}).", i);
-    Ok(())
+fn invalid(i: u8, _: &mut SerialStream) -> PacketResult {
+    Err(PacketError::InvalidCommand)
 }
 
-fn print_str(cmd: u8, stream: &mut SerialStream) -> Result<(), std::io::Error> {
+fn print_str(cmd: u8, stream: &mut SerialStream) -> PacketResult {
     let data = stream.read_packet::<StringPacket>(cmd)?;
     write!(stream.output(), "{}", data.payload().as_str())?;
     Ok(())
 }
 
-fn echo(cmd: u8, stream: &mut SerialStream) -> Result<(), std::io::Error> {
+fn echo(cmd: u8, stream: &mut SerialStream) -> PacketResult {
     let data = stream.read_packet::<StringPacket>(cmd)?;
     stream.write_packet(&data)?;
     stream.get_inner().flush()?;
     Ok(())
 }
 
-pub fn handle_command(i: u8, stream: &mut SerialStream) -> Result<(), std::io::Error> {
+pub fn handle_command(i: u8, stream: &mut SerialStream) -> Result<(), PacketError> {
     COMMANDS[i as usize](i, stream)
 }

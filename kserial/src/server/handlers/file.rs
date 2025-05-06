@@ -20,6 +20,8 @@ use crate::{
     server::serial_stream::SerialStream,
 };
 
+use super::PacketResult;
+
 struct FileCommandState {
     open_files: HashSet<i32>,
 }
@@ -30,7 +32,7 @@ lazy_static! {
     });
 }
 
-pub fn open_file(i: u8, stream: &mut SerialStream) -> Result<(), std::io::Error> {
+pub fn open_file(i: u8, stream: &mut SerialStream) -> PacketResult {
     let data = stream.read_packet::<OpenFile>(i)?;
     let cmd = data.payload();
     let mut opts = OpenOptions::new();
@@ -62,7 +64,7 @@ pub fn open_file(i: u8, stream: &mut SerialStream) -> Result<(), std::io::Error>
     Ok(())
 }
 
-pub fn write_file(i: u8, stream: &mut SerialStream) -> Result<(), std::io::Error> {
+pub fn write_file(i: u8, stream: &mut SerialStream) -> PacketResult {
     let data = stream.read_packet::<WriteFile>(i)?;
     let cmd = data.payload();
     let file_data = FILE_DATA.lock().unwrap();
@@ -88,7 +90,7 @@ pub fn write_file(i: u8, stream: &mut SerialStream) -> Result<(), std::io::Error
     Ok(())
 }
 
-pub fn close_file(i: u8, stream: &mut SerialStream) -> Result<(), std::io::Error> {
+pub fn close_file(i: u8, stream: &mut SerialStream) -> PacketResult {
     let data = stream.read_packet::<CloseFile>(i)?;
     let cmd = data.payload();
     let mut file_data = FILE_DATA.lock().unwrap();

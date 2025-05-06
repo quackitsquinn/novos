@@ -7,7 +7,7 @@ use bytemuck::Pod;
 
 use crate::common::{packet::Packet, PacketContents};
 
-use super::handle_invalid_checksum;
+use super::{handle_invalid_checksum, packet_error::PacketError};
 
 /// A marker trait for types that can be read from and written to, suitable for serial communication.
 pub trait ReadWrite: Read + Write + 'static {}
@@ -39,7 +39,7 @@ impl SerialStream {
     pub(crate) fn read_packet<C: PacketContents + fmt::Debug>(
         &mut self,
         cmd_id: u8,
-    ) -> Result<Packet<C>, io::Error> {
+    ) -> Result<Packet<C>, PacketError> {
         let checksum = unsafe { self.read_ty::<u8>()? };
         let packet = unsafe { self.read_ty::<C>()? };
         // //   if TypeId::of::<C>() == TypeId::of::<WriteFile>() {
