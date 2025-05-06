@@ -90,6 +90,7 @@ pub(crate) unsafe fn init_kernel_services() {
     memory::MODULE.init();
     #[cfg(not(test))] // Tests don't have a display
     display::MODULE.init();
+    println!("Hello, world!");
     pci::MODULE.init();
     proc::MODULE.init();
     info!("Kernel services initialized");

@@ -158,7 +158,7 @@ pub fn _print(args: core::fmt::Arguments) {
     use core::fmt::Write;
     without_interrupts(|| {
         crate::serial::interface::_print(args);
-        if super::is_initialized() {
+        if super::is_initialized() && !TERMINAL.is_locked() {
             write!(*terminal!(), "{}", args).unwrap();
         }
     });
