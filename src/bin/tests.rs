@@ -7,7 +7,7 @@ use std::{
 
 use jzon::JsonValue;
 use kbuild::config::Config as KConfig;
-use novos::Config;
+use krun::Config;
 
 // TODO: Figure out how to pass test args to the test build command to be able to run specific tests
 fn main() {

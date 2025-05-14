@@ -1,14 +1,14 @@
 use std::{
     env,
     fs::File,
-    io::{stdout, BufRead, Read, Write},
+    io::{BufRead, Read, Write, stdout},
     path::PathBuf,
     process::{Command, Stdio},
 };
 
 use ovmf_prebuilt::Source;
 
-mod packet_handler;
+use crate::{packet::run_kserial, qemu_ctl::QemuCtl};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Config {
@@ -50,12 +50,9 @@ impl Config {
         let stdout = qemu.stdout.take().expect("Failed to get stdout");
         let stderr = qemu.stderr.take().expect("Failed to get stderr");
 
-        packet_handler::run(&PathBuf::from("target/serial0.sock"), &mut qemu);
+        let qemu = QemuCtl::new(qemu, PathBuf::from("target/serial0.sock"));
 
-        spawn_out_handler(Box::new(stdout), "stdout", false);
-        spawn_out_handler(Box::new(stderr), "stderr", false);
-        qemu.wait().expect("Failed to wait for qemu");
-        println!("QEMU exited");
+        run_kserial(qemu.clone());
     }
 
     pub fn empty() -> Config {

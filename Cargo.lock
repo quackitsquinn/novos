@@ -488,6 +488,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "krun"
+version = "0.1.0"
+dependencies = [
+ "kserial",
+ "ovmf-prebuilt",
+]
+
+[[package]]
 name = "kserial"
 version = "0.1.0"
 dependencies = [
@@ -614,6 +622,7 @@ dependencies = [
  "jzon",
  "kbuild",
  "kernel",
+ "krun",
  "kserial",
  "lazy_static",
  "ovmf-prebuilt",
@@ -637,9 +646,9 @@ checksum = "1261fe7e33c73b354eab43b1273a57c8f967d0391e80353e51f764ac02cf6775"
 
 [[package]]
 name = "ovmf-prebuilt"
-version = "0.2.2"
+version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54830fd518fa4cdeb0cd5fad927f0ff6627a41e9705fe874679671108142ccfa"
+checksum = "190088f8c186fed557e7ac7ea795cb72f281a6600ccc743898db7871ad8f68b8"
 dependencies = [
  "log",
  "lzma-rs",

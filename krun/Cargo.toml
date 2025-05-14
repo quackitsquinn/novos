@@ -1,0 +1,8 @@
+[package]
+name = "krun"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+kserial = { path = "../kserial"}
+ovmf-prebuilt = "0.2.3"

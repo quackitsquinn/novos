@@ -3,26 +3,31 @@ use std::{
     io::{self, Write},
     os::unix::net::UnixListener,
     panic::catch_unwind,
-    path::PathBuf,
-    process::Child,
     thread,
+    time::Duration,
 };
 
 use kserial::server::SerialHandler;
 
-pub fn run(pty: &PathBuf, qemu: &mut Child) {
-    let _ = fs::remove_file(pty);
+use crate::qemu_ctl::QemuCtl;
+
+const SOCKET_CREATION_WAIT_INTERVAL: Duration = Duration::from_millis(500);
+const MAX_SOCKET_CREATION_ATTEMPTS: u8 = 10;
+
+pub fn run_kserial(qemu: QemuCtl) {
+    let pty = qemu.get_pty_path();
+    let _ = fs::remove_file(&pty);
     let _ = fs::create_dir("output");
     let stdout = JointStdoutFileStream::new();
-    for i in 0..10 {
-        let listener = match UnixListener::bind(pty) {
+    for i in 0..MAX_SOCKET_CREATION_ATTEMPTS {
+        let listener = match UnixListener::bind(&pty) {
             Ok(tty) => tty,
             Err(e) => {
                 if i == 9 {
                     panic!("Failed to bind to socket after 10 attempts: {}", e);
                 }
                 println!("Failed to bind to socket, retrying in 500ms");
-                thread::sleep(std::time::Duration::from_millis(500));
+                thread::sleep(SOCKET_CREATION_WAIT_INTERVAL);
                 continue;
             }
         };
@@ -42,7 +47,7 @@ pub fn run(pty: &PathBuf, qemu: &mut Child) {
                 }
             }
         });
-        qemu.kill().expect("Failed to kill QEMU");
+        qemu.try_shutdown().expect("Failed to shutdown QEMU");
         println!("Server stopped");
         break;
     }

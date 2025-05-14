@@ -1,4 +1,4 @@
-use novos::Config;
+use krun::Config;
 
 pub fn main() {
     let mut cfg = Config::default();
