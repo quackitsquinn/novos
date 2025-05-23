@@ -1,12 +1,6 @@
-mod cfg;
 mod gdb;
 mod packet;
+mod qemu_cfg;
 mod qemu_ctl;
 
-use std::sync::Arc;
-
-pub use cfg::Config;
-
-pub trait HasInteriorMut {}
-
-impl<T> HasInteriorMut for Arc<T> {}
+pub use qemu_cfg::QemuConfig;

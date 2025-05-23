@@ -11,7 +11,7 @@ use ovmf_prebuilt::Source;
 use crate::{packet::run_kserial, qemu_ctl::QemuCtl};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Config {
+pub struct QemuConfig {
     pub iso: String,
     pub wait_for_debugger: bool,
     pub graphics: bool,
@@ -23,7 +23,7 @@ pub struct Config {
     pub extra_args: Vec<String>,
 }
 
-impl Config {
+impl QemuConfig {
     pub fn run(&mut self) {
         let mut args = vec!["-cdrom".to_string(), self.iso.to_string()];
         self.add_debug_flags(&mut args);
@@ -40,23 +40,18 @@ impl Config {
             println!("QEMU Invocation: qemu-system-x86_64 {}", args.join(" "));
         }
 
-        let mut qemu = Command::new("qemu-system-x86_64")
+        let qemu = Command::new("qemu-system-x86_64")
             .args(&args)
-            .stderr(Stdio::piped())
-            .stdout(Stdio::piped())
             .spawn()
             .expect("qemu-system-x86_64 failed to start");
-
-        let stdout = qemu.stdout.take().expect("Failed to get stdout");
-        let stderr = qemu.stderr.take().expect("Failed to get stderr");
 
         let qemu = QemuCtl::new(qemu, PathBuf::from("target/serial0.sock"));
 
         run_kserial(qemu.clone());
     }
 
-    pub fn empty() -> Config {
-        Config {
+    pub fn empty() -> QemuConfig {
+        QemuConfig {
             iso: "".to_string(),
             wait_for_debugger: false,
             graphics: true,
@@ -122,7 +117,7 @@ impl Config {
     }
 }
 
-impl Default for Config {
+impl Default for QemuConfig {
     /// Creates the default configuration based on the environment variables.
     fn default() -> Self {
         let debug_mode = env::var("DEBUG").is_ok();
@@ -137,7 +132,7 @@ impl Default for Config {
                 pre.get_file(ovmf_prebuilt::Arch::X64, ovmf_prebuilt::FileType::Vars),
             ));
         }
-        let mut cfg = Config::empty();
+        let mut cfg = QemuConfig::empty();
         cfg.iso = iso_path;
         cfg.memory = kernel_mem;
         cfg.dev_exit = no_display || debug_mode;
@@ -150,32 +145,5 @@ impl Default for Config {
         }
         cfg.serial.push("pty".to_string());
         cfg
-    }
-}
-
-fn spawn_out_handler(out: Box<dyn Read + Send>, name: &str, print: bool) {
-    let name = name.to_string();
-    std::thread::spawn(move || spawn_out_handler_inner(out, name, print));
-}
-
-fn spawn_out_handler_inner(out: Box<dyn Read>, name: String, print: bool) {
-    let mut br = std::io::BufReader::new(out);
-    let mut f = File::create(format!("{}.log", name)).expect("Failed to create log file");
-    // We would use a buffer writer, but having to flush it would be painful and probably won't increase performance in any meaningful way
-    let mut buf = Vec::new();
-    loop {
-        let len = br.read_until(b'\n', &mut buf).expect("Failed to read line");
-        if len == 0 {
-            break;
-        }
-        if print {
-            // Preserve whatever we read. Might be bad, but if the vm is spitting out garbage, we want to see it
-            stdout()
-                .lock()
-                .write_all(&buf)
-                .expect("Failed to write to stdout");
-        }
-        f.write_all(&buf).expect("Failed to write to file");
-        buf.clear();
     }
 }

@@ -7,7 +7,7 @@ use std::{
 
 use jzon::JsonValue;
 use kbuild::config::Config as KConfig;
-use krun::Config;
+use krun::QemuConfig;
 
 // TODO: Figure out how to pass test args to the test build command to be able to run specific tests
 fn main() {
@@ -24,7 +24,7 @@ fn main() {
     }
     println!("Running tests");
 
-    let mut cfg = Config::default();
+    let mut cfg = QemuConfig::default();
     cfg.iso = "boot_images/kernel_tests.iso".to_string();
     cfg.dev_exit = true;
     cfg.graphics = false;
