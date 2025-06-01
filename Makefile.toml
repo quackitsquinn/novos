@@ -1,0 +1,9 @@
+[tasks.format]
+description = "Format the code using rustfmt"
+command = "cargo fmt --all -- --check"
+dependencies = ["check"]
+
+[tasks.check]
+description = "Run cargo check to ensure the code compiles"
+command = "cargo check --all-features"
+dependencies = ["test"]
