@@ -35,11 +35,15 @@ pub fn copy_limine_boot(cfg: &Config) {
     fs::create_dir_all(&boot)
         .expect(format!("Failed to create iso/boot directory with {:?}", boot).as_str());
 
-    copy_all(&boot, &limine, &vec![
-        "limine-bios.sys",
-        "limine-bios-cd.bin",
-        "limine-uefi-cd.bin",
-    ]);
+    copy_all(
+        &boot,
+        &limine,
+        &vec![
+            "limine-bios.sys",
+            "limine-bios-cd.bin",
+            "limine-uefi-cd.bin",
+        ],
+    );
 
     fs::create_dir_all(&efi).expect("Failed to create iso/EFI/BOOT directory");
 

@@ -1,6 +1,5 @@
 use bytemuck::{Pod, Zeroable};
 
-
 use super::{pod_checksum, validate::Validate};
 
 /// A packet that can be sent over the serial port.

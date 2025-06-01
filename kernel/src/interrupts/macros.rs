@@ -3,7 +3,7 @@
 #[macro_export]
 macro_rules! interrupt_wrapper {
     ($handler: path, $raw: ident) => {
-        #[naked]
+        #[unsafe(naked)]
         pub extern "x86-interrupt" fn $raw(_: InterruptStackFrame) {
             unsafe {
                 ::core::arch::naked_asm! {

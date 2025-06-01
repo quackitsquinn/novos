@@ -130,8 +130,6 @@ mod tests {
 
     use crate::memory::paging::virt::VirtualAddressRange;
 
-    
-
     #[test("VAM allocate", can_recover = true)]
     pub fn test_vam_allocate() {
         let ranges = vec![
