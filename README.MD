@@ -62,7 +62,6 @@ All debugging is done through environment variables. The following environment v
 - `ALLOC_DEBUG`: If set, will print out information about memory allocations and deallocations.
 - `REINSTALL_LIMINE`: If set, limine will be re-downloaded from it's git repository and reinstalled.
 - `ARTIFACT_DIR`: The directory to store build artifacts in.
-    - TODO: Rename this to `BUILD_DIR` or something.
 - `LIMINE_CONFIG`: The path to the limine configuration file.
 - `ISO_NAME`: The name of the ISO file to generate.
 - `ISO_ROOT`: The directory to store ISO files in.
@@ -87,7 +86,7 @@ This project originally started as [snakian](https://github.com/quackitsquinn/sn
 
 I quickly in that project realized I wanted to do more than just a snake game (that I never even implemented anyways), so that project shifted to more of a general kernel. By that point though, I had made a lot of mistakes in the codebase, so I decided to start over. That's when I started this project. 
 
-This project does a lot differently than snakian. Snakian was almost a word-for-word following of [Philipp Oppermann's blog](https://os.phil-opp.com/). With nova though, I was confident enough to start off with something quite different. I used limine instead of `bootloader`, and implemented stuff a lot more abstractly.
+This project does a lot differently than snakian. Snakian was almost a word-for-word following of [Philipp Oppermann's blog](https://os.phil-opp.com/). With nova though, I was confident enough to start off with something quite different. I used limine instead of `bootloader`, and implemented stuff with a lot more care and abstraction.
 
 ## Personal note
 
