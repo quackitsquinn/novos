@@ -4,11 +4,16 @@ use std::{
     io::{BufRead, Read, Write, stdout},
     path::PathBuf,
     process::{Command, Stdio},
+    thread::{self, Thread, spawn},
 };
 
 use ovmf_prebuilt::Source;
 
-use crate::{packet::run_kserial, qemu_ctl::QemuCtl};
+use crate::{
+    gdb::{GdbConfig, run_gdb},
+    packet::run_kserial,
+    qemu_ctl::QemuCtl,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct QemuConfig {
@@ -47,7 +52,14 @@ impl QemuConfig {
 
         let qemu = QemuCtl::new(qemu, PathBuf::from("target/serial0.sock"));
 
-        run_kserial(qemu.clone());
+        let thing = spawn(move || run_kserial(qemu.clone()));
+
+        if env::var("DEBUG").is_ok() {
+            // If we're in debug mode, we want to wait for the debugger to attach
+            run_gdb(&mut GdbConfig::default());
+        }
+
+        thing.join().expect("Failed to run kserial thread");
     }
 
     pub fn empty() -> QemuConfig {
