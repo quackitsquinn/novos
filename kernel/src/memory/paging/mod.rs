@@ -20,10 +20,6 @@ static PAGE_TABLE_REQUEST: limine::request::PagingModeRequest =
 #[used]
 static MEMORY_OFFSET_REQUEST: limine::request::HhdmRequest = limine::request::HhdmRequest::new();
 
-#[used]
-static MEMORY_MAP_REQUEST: limine::request::MemoryMapRequest =
-    limine::request::MemoryMapRequest::new();
-
 pub static MEMORY_OFFSET: Once<u64> = Once::new();
 pub static OFFSET_PAGE_TABLE: OnceMutex<OffsetPageTable> = OnceMutex::uninitialized();
 
