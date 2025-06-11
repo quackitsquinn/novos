@@ -54,12 +54,17 @@ impl QemuConfig {
 
         let thing = spawn(move || run_kserial(qemu.clone()));
 
+        let mut gdb = None;
         if env::var("DEBUG").is_ok() {
             // If we're in debug mode, we want to wait for the debugger to attach
-            run_gdb(&mut GdbConfig::default());
+            gdb = Some(run_gdb(&mut GdbConfig::default()));
         }
 
         thing.join().expect("Failed to run kserial thread");
+        if let Some(mut gdb) = gdb {
+            // If we have a GDB instance, we need to wait for it to finish
+            gdb.kill();
+        }
     }
 
     pub fn empty() -> QemuConfig {

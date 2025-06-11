@@ -12,12 +12,18 @@ use crate::gdb::{BINARY_PATH, GdbConfig, GdbInvocation};
 pub struct Gdb(Child);
 
 impl Gdb {
-    fn wait_terminate(&mut self) {
+    pub fn wait_terminate(&mut self) {
         if let Err(e) = self.0.wait() {
             eprintln!("GDB process terminated with error: {}", e);
             exit(1);
         }
         exit(0);
+    }
+
+    pub fn kill(&mut self) {
+        if let Err(e) = self.0.kill() {
+            eprintln!("Failed to kill GDB process: {}", e);
+        }
     }
 }
 
