@@ -71,7 +71,13 @@ impl JointStdoutFileStream {
 impl Write for JointStdoutFileStream {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         self.stdout.write(buf)?;
-        io::stdout().write(buf)?;
+        for byte in buf {
+            if *byte == b'\n' {
+                io::stdout().write_all(b"\n\r")?;
+            } else {
+                io::stdout().write_all(&[*byte])?;
+            }
+        }
         Ok(buf.len())
     }
 
