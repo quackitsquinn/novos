@@ -58,6 +58,17 @@ impl Block {
 
         self_end == other.address as usize || self.address as usize == other_end
     }
+
+    /// Check if this block contains another block, even partially.
+    pub fn contains(&self, other: &Block) -> bool {
+        let self_start = self.address as usize;
+        let self_end = self_start + self.size;
+        let other_start = other.address as usize;
+        let other_end = other_start + other.size;
+
+        (self_start <= other_start && self_end >= other_end)
+            || (other_start <= self_start && other_end >= self_end)
+    }
 }
 
 impl PartialOrd for Block {
@@ -147,5 +158,17 @@ mod tests {
 
         assert!(!block1.is_adjacent(&block2));
         assert!(!block2.is_adjacent(&block1));
+    }
+
+    #[test]
+    fn test_block_contains() {
+        let block1 = Block::new(1024, 0x1000 as *mut u8, true);
+        let block2 = Block::new(512, 0x1100 as *mut u8, true);
+        let block3 = Block::new(512, 0x120000 as *mut u8, true);
+
+        assert!(block1.contains(&block2));
+        assert!(block2.contains(&block1));
+        assert!(!block1.contains(&block3));
+        assert!(!block2.contains(&block3));
     }
 }

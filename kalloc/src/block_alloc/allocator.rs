@@ -215,6 +215,14 @@ impl BlockAllocator {
         }
 
         if let Some(block) = split {
+            for blk in &*self.blocks {
+                if blk.contains(&block) {
+                    panic!(
+                        "Memory Corruption: Block {:?} contains split block {:?}",
+                        blk, block
+                    );
+                }
+            }
             unsafe { self.push_block(block) };
         }
 
