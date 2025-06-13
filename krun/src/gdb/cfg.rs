@@ -18,9 +18,10 @@ const DEFAULT_GDB_TOML: &str = r#"
 # Default GDB configuration
 
 [connection]
-gdb_invocation = "gdb"
-gdb_port = 1234
-gdb_host = "localhost"
+host = "localhost"
+port = 1234
+invocation = "gdb"
+
 
 "#;
 
