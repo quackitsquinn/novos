@@ -53,6 +53,5 @@ fn init() -> Result<(), Infallible> {
         p.write_masks(0b11111110, 0b11111111);
         p.initialize();
     }
-    x86_64::instructions::interrupts::enable();
     Ok(())
 }
