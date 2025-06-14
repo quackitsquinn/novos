@@ -115,6 +115,16 @@ impl<'a> File<'a> {
     }
 }
 
+impl<'a> Write for File<'a> {
+    fn write_str(&mut self, s: &str) -> core::fmt::Result {
+        if !is_packet_mode() {
+            send_string("Packet mode is not enabled, cannot write to file.");
+            return Err(core::fmt::Error);
+        }
+        self.write(s.as_bytes()).map_err(|_| core::fmt::Error)
+    }
+}
+
 // impl Drop for File<'_> {
 //     fn drop(&mut self) {
 //         unsafe {

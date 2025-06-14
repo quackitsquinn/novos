@@ -7,7 +7,7 @@ use x86_64::{
     VirtAddr,
 };
 
-use crate::declare_module;
+use crate::{declare_module, memory::paging::KernelPageSize};
 
 pub mod allocator;
 pub mod paging;
@@ -47,7 +47,7 @@ fn configure_heap_allocator(
     let heap_end = heap_start + heap_size;
     let heap_start_page = Page::containing_address(heap_start);
     let heap_end_page = Page::containing_address(heap_end);
-    let heap_range: PageRangeInclusive<Size4KiB> =
+    let heap_range: PageRangeInclusive<KernelPageSize> =
         Page::range_inclusive(heap_start_page, heap_end_page);
 
     info!(

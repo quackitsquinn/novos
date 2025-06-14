@@ -4,6 +4,8 @@ use x86_64::{
     VirtAddr,
 };
 
+use crate::memory::paging::KernelPage;
+
 use super::paging::{
     phys::{mapper::MapError, FRAME_ALLOCATOR},
     virt::{virt_alloc::VirtualAddressMapper, VIRT_MAPPER},
@@ -81,7 +83,7 @@ impl Stack {
             .allocate(size)
             .ok_or(MapError::NoUsableMemory)?;
         let start_page = Page::containing_address(range.start);
-        let end_page: Page<Size4KiB> = Page::containing_address(range.end());
+        let end_page: KernelPage = Page::containing_address(range.end());
         info!(
             "Allocating kernel stack: {:#x?} - {:#x?}",
             start_page, end_page

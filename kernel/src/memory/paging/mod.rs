@@ -4,7 +4,7 @@ use limine::paging::Mode;
 use spin::Once;
 use x86_64::{
     registers::control::Cr3,
-    structures::paging::{MappedPageTable, OffsetPageTable, PageTable},
+    structures::paging::{MappedPageTable, OffsetPageTable, Page, PageTable, PhysFrame, Size4KiB},
     VirtAddr,
 };
 
@@ -12,6 +12,10 @@ use crate::{declare_module, util::OnceMutex};
 
 pub mod phys;
 pub mod virt;
+
+pub type KernelPageSize = Size4KiB;
+pub type KernelPage = Page<KernelPageSize>;
+pub type KernelPhysFrame = PhysFrame<KernelPageSize>;
 
 #[used]
 static PAGE_TABLE_REQUEST: limine::request::PagingModeRequest =

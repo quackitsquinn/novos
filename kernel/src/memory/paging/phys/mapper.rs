@@ -14,14 +14,17 @@ use x86_64::{
     PhysAddr,
 };
 
-use crate::memory;
+use crate::memory::{
+    self,
+    paging::{KernelPage, KernelPhysFrame},
+};
 
 pub struct PageFrameAllocator {
     map: &'static MemoryMapResponse,
     off: usize,
     current: Entry,
     entry_offset: u64,
-    unused: Vec<PhysFrame<Size4KiB>>,
+    unused: Vec<KernelPhysFrame>,
 }
 
 impl PageFrameAllocator {
@@ -81,7 +84,7 @@ impl PageFrameAllocator {
     ///  Maps a page to the kernel's page table
     pub unsafe fn map_page(
         &mut self,
-        page: Page<Size4KiB>,
+        page: KernelPage,
         flags: x86_64::structures::paging::PageTableFlags,
     ) -> Result<(), MapError> {
         let mut mapper = memory::paging::OFFSET_PAGE_TABLE.get();
@@ -91,7 +94,7 @@ impl PageFrameAllocator {
     /// Maps a page to the kernel's page table using the provided page table
     pub unsafe fn map_page_pagetable(
         &mut self,
-        page: Page<Size4KiB>,
+        page: KernelPage,
         flags: x86_64::structures::paging::PageTableFlags,
         pagetable: &mut OffsetPageTable,
     ) -> Result<(), MapError> {
@@ -114,8 +117,8 @@ impl PageFrameAllocator {
     /// Maps a page to the kernel's page table using the provided frame
     pub unsafe fn map_to(
         &mut self,
-        page: Page<Size4KiB>,
-        frame: PhysFrame<Size4KiB>,
+        page: KernelPage,
+        frame: KernelPhysFrame,
         flags: x86_64::structures::paging::PageTableFlags,
     ) -> Result<(), MapError> {
         let mut mapper = memory::paging::OFFSET_PAGE_TABLE.get();
@@ -125,8 +128,8 @@ impl PageFrameAllocator {
     /// Maps a page to the given page table using the provided frame
     pub unsafe fn map_to_pagetable(
         &mut self,
-        page: Page<Size4KiB>,
-        frame: PhysFrame<Size4KiB>,
+        page: KernelPage,
+        frame: KernelPhysFrame,
         flags: x86_64::structures::paging::PageTableFlags,
         pagetable: &mut OffsetPageTable,
     ) -> Result<(), MapError> {
@@ -161,14 +164,14 @@ impl PageFrameAllocator {
         Ok(())
     }
 
-    pub unsafe fn unmap_page(&mut self, page: Page<Size4KiB>) -> Result<(), MapError> {
+    pub unsafe fn unmap_page(&mut self, page: KernelPage) -> Result<(), MapError> {
         let mut mapper = memory::paging::OFFSET_PAGE_TABLE.get();
         unsafe { self.unmap_page_pagetable(page, &mut *mapper) }
     }
 
     pub unsafe fn unmap_page_pagetable(
         &mut self,
-        page: Page<Size4KiB>,
+        page: KernelPage,
         pagetable: &mut OffsetPageTable,
     ) -> Result<(), MapError> {
         unsafe {
@@ -204,13 +207,13 @@ impl PageFrameAllocator {
 
     pub fn is_mapped_in_pagetable(
         &mut self,
-        page: Page<Size4KiB>,
+        page: KernelPage,
         pagetable: &mut OffsetPageTable,
-    ) -> Option<PhysFrame<Size4KiB>> {
+    ) -> Option<KernelPhysFrame> {
         pagetable.translate_page(page).ok()
     }
 
-    pub fn is_page_mapped(&mut self, page: Page<Size4KiB>) -> Option<PhysFrame<Size4KiB>> {
+    pub fn is_page_mapped(&mut self, page: KernelPage) -> Option<KernelPhysFrame> {
         let mut mapper = memory::paging::OFFSET_PAGE_TABLE.get();
         self.is_mapped_in_pagetable(page, &mut *mapper)
     }
@@ -254,7 +257,7 @@ impl From<UnmapError> for MapError {
 }
 
 unsafe impl FrameAllocator<Size4KiB> for PageFrameAllocator {
-    fn allocate_frame(&mut self) -> Option<PhysFrame<Size4KiB>> {
+    fn allocate_frame(&mut self) -> Option<KernelPhysFrame> {
         if self.unused.len() > 0 {
             return self.unused.pop();
         }
@@ -274,7 +277,7 @@ unsafe impl FrameAllocator<Size4KiB> for PageFrameAllocator {
 }
 
 impl FrameDeallocator<Size4KiB> for PageFrameAllocator {
-    unsafe fn deallocate_frame(&mut self, frame: PhysFrame<Size4KiB>) {
+    unsafe fn deallocate_frame(&mut self, frame: KernelPhysFrame) {
         if memory::is_initialized() {
             self.unused.push(frame);
         } else {

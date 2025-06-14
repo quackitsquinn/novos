@@ -3,6 +3,8 @@ use x86_64::{
     VirtAddr,
 };
 
+use crate::memory::paging::{KernelPage, KernelPageSize};
+
 /// A range of virtual addresses.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct VirtualAddressRange {
@@ -68,13 +70,13 @@ impl VirtualAddressRange {
         self.size += size;
     }
     /// Returns the range as a page range.
-    pub fn as_page_range(&self) -> PageRangeInclusive<Size4KiB> {
+    pub fn as_page_range(&self) -> PageRangeInclusive<KernelPageSize> {
         let start = Page::containing_address(self.start);
         let end = Page::containing_address(self.end() - 1u64);
         Page::range_inclusive(start, end)
     }
     /// Returns the range as a page.
-    pub fn as_page(&self) -> Page<Size4KiB> {
+    pub fn as_page(&self) -> KernelPage {
         Page::containing_address(self.start)
     }
     /// Returns the range as a pointer.
