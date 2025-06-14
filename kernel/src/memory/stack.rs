@@ -1,6 +1,6 @@
 use log::info;
 use x86_64::{
-    structures::paging::{mapper::MapToError, OffsetPageTable, Page, PageTableFlags, Size4KiB},
+    structures::paging::{mapper::MapToError, OffsetPageTable, Page, PageTableFlags},
     VirtAddr,
 };
 
@@ -8,7 +8,7 @@ use crate::memory::paging::KernelPage;
 
 use super::paging::{
     phys::{mapper::MapError, FRAME_ALLOCATOR},
-    virt::{virt_alloc::VirtualAddressMapper, VIRT_MAPPER},
+    virt::VIRT_MAPPER,
 };
 
 /// Represents a stack in the system.

@@ -2,7 +2,6 @@ use core::convert::Infallible;
 
 use crate::{
     declare_module,
-    memory::{self, allocator},
     util::OnceMutex,
 };
 
@@ -11,7 +10,6 @@ pub mod virt_alloc;
 
 pub use range::VirtualAddressRange;
 use virt_alloc::VirtualAddressMapper;
-use x86_64::VirtAddr;
 
 use super::map;
 

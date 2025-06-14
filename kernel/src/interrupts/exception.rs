@@ -1,9 +1,9 @@
-use x86_64::registers::control::{Cr2, Cr3};
+use x86_64::registers::control::Cr2;
 
 use crate::{
     context::{
-        InterruptCodeContext, InterruptCodeContextValue, InterruptContext, InterruptContextValue,
-        PageFaultInterruptContext, PageFaultInterruptContextValue,
+        InterruptCodeContext, InterruptContext,
+        PageFaultInterruptContext,
     },
     panic::stacktrace::{self, StackFrame},
     println,

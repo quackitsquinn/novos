@@ -4,7 +4,7 @@ use limine::paging::Mode;
 use spin::Once;
 use x86_64::{
     registers::control::Cr3,
-    structures::paging::{MappedPageTable, OffsetPageTable, Page, PageTable, PhysFrame, Size4KiB},
+    structures::paging::{OffsetPageTable, Page, PageTable, PhysFrame, Size4KiB},
     VirtAddr,
 };
 

@@ -3,7 +3,7 @@ use kserial_derive::Validate;
 
 use crate::common::{commands::ids::CLOSE_FILE_ID, PacketContents};
 
-use super::{FileHandle, IOError, OsError};
+use super::{FileHandle, IOError};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Pod, Zeroable, Validate)]
 #[repr(transparent)]

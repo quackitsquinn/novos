@@ -1,14 +1,13 @@
-use alloc::{collections::btree_map::BTreeMap, vec::Vec};
-use x86_64::{structures::gdt::SegmentSelector, VirtAddr};
+use alloc::collections::btree_map::BTreeMap;
+use x86_64::VirtAddr;
 
 use crate::{
     context::{InterruptContext, InterruptContextValue},
     gdt::GDT,
     memory::stack::{Stack, StackFlags},
-    println,
 };
 
-use super::{Thread, ThreadID, ThreadState, KERNEL_THREAD_SCHEDULER};
+use super::{Thread, ThreadID, ThreadState};
 #[derive(Debug)]
 pub struct KernelThreadScheduler {
     // Would using a VecDeque or LinkedList be better?

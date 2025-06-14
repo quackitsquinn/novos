@@ -1,10 +1,9 @@
 use core::{convert::Infallible, mem, sync::atomic::AtomicU32};
 
 use sched::KernelThreadScheduler;
-use x86_64::structures::paging::PageTable;
 
 use crate::{
-    context::{ContextValue, InterruptContext, InterruptContextValue},
+    context::{InterruptContext, InterruptContextValue},
     declare_module,
     memory::stack::Stack,
     util::OnceMutex,

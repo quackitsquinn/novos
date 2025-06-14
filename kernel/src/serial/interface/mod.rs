@@ -4,10 +4,7 @@ use kserial::client::SerialAdapter;
 use serial::Serial;
 use spin::Once;
 
-use crate::{
-    interrupts::{disable, enable},
-    util::OnceMutex,
-};
+use crate::util::OnceMutex;
 
 pub mod serial;
 
@@ -51,7 +48,7 @@ impl SerialAdapter for OnceMutex<Serial> {
 pub fn init() {
     SERIAL_PORT.init(unsafe { Serial::new(0x3F8) });
     PORT_HAS_INIT.call_once(|| ());
-    let mut serial = SERIAL_PORT.get();
+    let serial = SERIAL_PORT.get();
     kserial::client::init(&SERIAL_PORT);
 }
 

@@ -1,7 +1,6 @@
 mod contexts;
 mod int_context;
 
-use core::fmt::write;
 use core::fmt::Debug;
 use core::fmt::Display;
 use core::ops::Deref;

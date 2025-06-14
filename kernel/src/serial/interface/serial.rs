@@ -1,6 +1,6 @@
 use core::fmt::Write;
 
-use kserial::client::{cfg, get_serial_client, send_string, serial::SerialClient};
+use kserial::client::{get_serial_client, send_string};
 
 use crate::serial::raw::SerialPort;
 

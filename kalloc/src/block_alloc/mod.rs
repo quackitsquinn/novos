@@ -7,7 +7,6 @@
 //! IT'S AN ALLOCATOR!!!! THE MEMORY BETWEEN THE TWO IS THE SAME!!! WHY DOES MAC OS RANDOMLY *RANDOMLY* FAIL??? FOR LIKE 4 DIFFERENT, INCONSISTENT REASONS????
 
 use core::alloc::Allocator;
-use core::alloc::GlobalAlloc;
 use core::alloc::Layout;
 
 use allocator::BlockAllocator;

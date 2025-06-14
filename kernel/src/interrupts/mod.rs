@@ -9,8 +9,8 @@ mod macros;
 
 use crate::{
     context::{
-        InterruptCodeContext, InterruptCodeContextValue, InterruptContext, InterruptContextValue,
-        PageFaultInterruptContext, PageFaultInterruptContextValue,
+        InterruptCodeContext, InterruptContext,
+        PageFaultInterruptContext,
     },
     declare_module, init_interrupt_table, interrupt_wrapper,
 };

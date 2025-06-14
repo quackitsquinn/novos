@@ -1,10 +1,6 @@
-use core::{mem, ptr};
 
 use kalloc::{block_alloc::allocator::BlockAllocator, GlobalAllocatorWrapper};
-use log::{debug, error};
-use x86_64::{structures::paging::Page, VirtAddr};
 
-use super::paging;
 
 #[global_allocator]
 pub static ALLOCATOR: GlobalAllocatorWrapper<BlockAllocator> = GlobalAllocatorWrapper::new();

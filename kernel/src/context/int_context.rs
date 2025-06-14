@@ -1,4 +1,3 @@
-use core::arch::asm;
 
 use x86_64::{
     registers::rflags::RFlags,

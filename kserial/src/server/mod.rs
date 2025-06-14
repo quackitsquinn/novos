@@ -1,4 +1,3 @@
-use std::io::{self};
 
 mod copy_rw;
 mod handlers;

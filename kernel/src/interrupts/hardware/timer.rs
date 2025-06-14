@@ -2,7 +2,7 @@ use core::{hint::spin_loop, time::Duration};
 
 use x86_64::{instructions::interrupts::without_interrupts, structures::idt::InterruptStackFrame};
 
-use crate::{context::InterruptContext, interrupt_wrapper, println, proc::sched_next};
+use crate::{context::InterruptContext, interrupt_wrapper, proc::sched_next};
 
 use super::InterruptIndex;
 

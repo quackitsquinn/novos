@@ -17,12 +17,10 @@ extern crate alloc;
 
 use core::arch::asm;
 
-use alloc::boxed::Box;
 use interrupts::hardware;
 use kserial::client::{fs::File, get_serial_client, test_two_way_serial};
 use limine::BaseRevision;
 use log::info;
-use proc::{sched, KERNEL_THREAD_SCHEDULER};
 use spin::Once;
 
 pub mod context;

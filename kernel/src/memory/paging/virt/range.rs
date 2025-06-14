@@ -1,5 +1,5 @@
 use x86_64::{
-    structures::paging::{page::PageRangeInclusive, Page, Size4KiB},
+    structures::paging::{page::PageRangeInclusive, Page},
     VirtAddr,
 };
 

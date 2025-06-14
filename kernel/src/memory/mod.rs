@@ -3,7 +3,7 @@ use core::convert::Infallible;
 use log::info;
 use paging::map::{KERNEL_HEAP_SIZE, KERNEL_HEAP_START};
 use x86_64::{
-    structures::paging::{page::PageRangeInclusive, Page, PageTableFlags, Size4KiB},
+    structures::paging::{page::PageRangeInclusive, Page, PageTableFlags},
     VirtAddr,
 };
 

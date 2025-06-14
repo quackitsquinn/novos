@@ -9,7 +9,7 @@ use crate::common::{
     PacketContents,
 };
 
-use super::{cfg::is_packet_mode, send_string, serial::SerialClient, SerialWriter};
+use super::{cfg::is_packet_mode, send_string, serial::SerialClient};
 
 use core::fmt::Write;
 

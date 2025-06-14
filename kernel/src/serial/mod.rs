@@ -4,7 +4,7 @@
 
 use core::convert::Infallible;
 
-use crate::{declare_module, display::TERMINAL, println, sprintln};
+use crate::{declare_module, println};
 
 pub mod interface;
 pub mod raw; // Things to interact with the serial port directly

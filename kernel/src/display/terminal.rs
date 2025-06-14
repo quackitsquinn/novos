@@ -1,11 +1,9 @@
 use core::{f32, fmt::Write};
 
 use alloc::{vec, vec::Vec};
-use log::debug;
 
 use crate::{
-    framebuffer,
-    interrupts::{disable, enable, without_interrupts},
+    interrupts::without_interrupts,
     sprintln, terminal,
 };
 
