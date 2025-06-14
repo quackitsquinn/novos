@@ -35,9 +35,20 @@ impl PageFrameAllocator {
             .expect("No usable memory regions found")
             .clone();
 
+        debug!("Frames in memory map {{ ");
+        for entry in map.entries() {
+            debug!(
+                "  [{:x}]({:x}): {}",
+                entry.base,
+                entry.length,
+                Self::fmt_entry_type(entry)
+            );
+        }
+        debug!("}}");
+
         Self {
             map,
-            off: current,
+            off: current + 1,
             current: **entry,
             entry_offset: 0,
             // This is okay before we have a heap because this will not allocate until anything is pushed to it
@@ -141,17 +152,11 @@ impl PageFrameAllocator {
         pagetable: &mut OffsetPageTable,
     ) -> Result<(), MapError> {
         for page in page_range {
+            let frame = self.allocate_frame().ok_or(MapError::NoUsableMemory)?;
             unsafe {
-                pagetable
-                    .map_to(
-                        page,
-                        self.allocate_frame().ok_or(MapError::NoUsableMemory)?,
-                        flags,
-                        &mut *self,
-                    )?
-                    .flush();
+                pagetable.map_to(page, frame, flags, &mut *self)?.flush();
             }
-            debug!("Mapped page: {:?}", page);
+            debug!("Mapped page {:?} to frame {:?}", page, frame);
         }
         Ok(())
     }

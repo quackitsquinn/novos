@@ -10,7 +10,6 @@ use x86_64::{
 
 use crate::{declare_module, util::OnceMutex};
 
-pub mod debug;
 pub mod phys;
 pub mod virt;
 
