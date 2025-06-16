@@ -1,7 +1,6 @@
 use core::convert::Infallible;
 
 use framebuffer::Framebuffer;
-use limine::request::FramebufferRequest;
 
 mod character;
 pub mod color;
@@ -11,9 +10,7 @@ pub mod terminal;
 
 pub use character::get_char;
 
-use crate::{declare_module, util::OnceMutex};
-
-pub static LIMINE_FRAMEBUFFERS: FramebufferRequest = FramebufferRequest::new();
+use crate::{declare_module, requests::FRAMEBUFFERS, util::OnceMutex};
 
 pub static FRAMEBUFFER: OnceMutex<Framebuffer> = OnceMutex::uninitialized();
 pub static TERMINAL: OnceMutex<terminal::Terminal> = OnceMutex::uninitialized();
@@ -22,9 +19,9 @@ declare_module!("display", init);
 
 fn init() -> Result<(), Infallible> {
     FRAMEBUFFER.init(Framebuffer::new(
-        &LIMINE_FRAMEBUFFERS
-            .get_response()
-            .unwrap()
+        &FRAMEBUFFERS
+            .get()
+            .expect("framebuffer uninit")
             .framebuffers()
             .next()
             .unwrap(),

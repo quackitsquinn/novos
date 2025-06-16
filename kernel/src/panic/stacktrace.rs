@@ -1,11 +1,10 @@
 use core::{arch::asm, fmt::Write, slice};
 
 use goblin::elf64::sym;
-use limine::request::ExecutableFileRequest;
 use rustc_demangle::demangle;
 use spin::Once;
 
-use crate::{print, println};
+use crate::{print, println, requests::EXECUTABLE_FILE};
 
 use super::elf::Elf;
 #[repr(C)]
@@ -33,8 +32,6 @@ pub fn print_trace_raw(rbp: *const StackFrame) {
         rbp = frame.rbp;
     }
 }
-
-static KERNEL_FILE_REQUEST: ExecutableFileRequest = ExecutableFileRequest::new();
 
 static KERNEL_FILE: Once<&[u8]> = Once::new();
 
@@ -80,11 +77,12 @@ unsafe fn sym_trace_inner(addr: *const (), writer: &mut dyn Write) {
 }
 
 pub fn init() {
-    let kern_file = KERNEL_FILE_REQUEST
-        .get_response()
-        .expect("Kernel file not loaded");
-    let size = kern_file.file().size();
-    let ptr = kern_file.file().addr();
+    let kern_file = EXECUTABLE_FILE
+        .get()
+        .expect("Kernel file not loaded")
+        .file();
+    let size = kern_file.size();
+    let ptr = kern_file.addr();
     let slice = unsafe { slice::from_raw_parts(ptr as *const u8, size as usize) };
     KERNEL_FILE.call_once(|| slice);
 }
