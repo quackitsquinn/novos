@@ -2,7 +2,7 @@ use core::{ffi::CStr, mem::transmute, str};
 
 use goblin::{
     elf::section_header::SHT_SYMTAB,
-    elf64::{header, section_header, sym},
+    elf64::{header, program_header::ProgramHeader, section_header, sym},
 };
 
 /// An ELF executable
@@ -66,6 +66,10 @@ impl<'a> Elf<'a> {
 
     pub fn strings(&'a self) -> Option<ElfStrings<'a>> {
         Some(ElfStrings::new(self.data, self))
+    }
+
+    pub fn segments(&'a self) -> ElfSegments<'a> {
+        ElfSegments::new(self.data, self.header)
     }
 }
 
@@ -162,6 +166,37 @@ impl ElfStrings<'_> {
         // Safety: We are casting a &str to a &'a str, which is safe because the lifetime of data is 'a
         unsafe {
             transmute(str::from_utf8(string.to_bytes()).map_err(|_| "Unable to convert into utf-8"))
+        }
+    }
+}
+
+pub struct ElfSegments<'a> {
+    header: &'a header::Header,
+    phdr: *const ProgramHeader,
+    i: usize,
+}
+
+impl<'a> ElfSegments<'a> {
+    fn new(data: &'a [u8], header: &'a header::Header) -> ElfSegments<'a> {
+        let phdr = unsafe {
+            data.as_ptr()
+                .add(header.e_phoff as usize)
+                .cast::<ProgramHeader>()
+        };
+        ElfSegments { header, phdr, i: 0 }
+    }
+}
+
+impl<'a> Iterator for ElfSegments<'a> {
+    type Item = &'a ProgramHeader;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.i < self.header.e_phnum as usize {
+            // SAFETY: The pointer is valid because we are iterating over the program headers
+            let item = unsafe { &*self.phdr.add(self.i) };
+            self.i += 1;
+            Some(item)
+        } else {
+            None
         }
     }
 }

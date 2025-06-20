@@ -24,6 +24,7 @@ fn init() -> Result<(), Infallible> {
     }
     init_heap();
     paging::virt::MODULE.init();
+    paging::kernel::MODULE.init();
     Ok(())
 }
 

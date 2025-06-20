@@ -10,6 +10,8 @@ use x86_64::{
 
 use crate::{declare_module, requests::PHYSICAL_MEMORY_OFFSET, util::OnceMutex};
 
+mod builder;
+pub mod kernel;
 pub mod phys;
 pub mod virt;
 
@@ -50,6 +52,8 @@ pub mod map {
     macro_rules! define_map {
         ($name:ident, $start:expr, $size:expr) => {
             const _: () = {
+                assert!($start % 0x1000 == 0);
+                assert!($size % 0x1000 == 0);
                 assert!($start < MAX_VIRT_ADDR.as_u64());
                 assert!($size < MAX_VIRT_ADDR.as_u64());
                 assert!($start + $size < MAX_VIRT_ADDR.as_u64());
@@ -59,6 +63,10 @@ pub mod map {
                 pub const [<$name _START>]: ::x86_64::VirtAddr = ::x86_64::VirtAddr::new_truncate($start);
                 pub const [<$name _SIZE>]: u64 = $size;
                 pub const [<$name _END>]: ::x86_64::VirtAddr = ::x86_64::VirtAddr::new_truncate($start + $size);
+                pub const [<$name _START_PAGE>]: super::KernelPage = super::KernelPage::containing_address([<$name _START>]);
+                pub const [<$name _END_PAGE>]: super::KernelPage = super::KernelPage::containing_address([<$name _END>]);
+                pub const [<$name _PAGE_RANGE>]: ::x86_64::structures::paging::page::PageRangeInclusive<super::KernelPageSize> =
+                    super::KernelPage::range_inclusive([<$name _START_PAGE>], [<$name _END_PAGE>]);
             }
         };
     }
@@ -72,4 +80,7 @@ pub mod map {
 
     define_map!(KERNEL_HEAP, KERNEL_START, 0x10_0000); // 1MB
     define_map!(KERNEL_PHYS_MAP, KERNEL_HEAP_END.as_u64(), 0x1000_0000); // 256MB
+
+    // Area used to remap the kernel onto a new page table. This area will not be used after the pml4 switch
+    define_map!(KERNEL_REMAP, KERNEL_PHYS_MAP_END.as_u64(), 0x1000_0000); // 256MB
 }
