@@ -77,6 +77,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "arrayvec"
+version = "0.7.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7c02d123df017efcdfbd739ef81735b36c5ba83ec3c59c80a9d7ecc718f92e50"
+
+[[package]]
 name = "autocfg"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -484,7 +490,7 @@ dependencies = [
  "ctor",
  "env_logger",
  "log",
- "spin",
+ "spin 0.9.8",
 ]
 
 [[package]]
@@ -506,7 +512,7 @@ dependencies = [
  "paste",
  "pic8259",
  "rustc-demangle",
- "spin",
+ "spin 0.9.8",
  "thiserror",
  "uart_16550",
  "x86_64",
@@ -543,7 +549,7 @@ dependencies = [
  "lazy_static",
  "log",
  "pastey",
- "spin",
+ "spin 0.9.8",
  "thiserror",
 ]
 
@@ -557,12 +563,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "kvmm"
+version = "0.1.0"
+dependencies = [
+ "arrayvec",
+ "log",
+ "spin 0.10.0",
+ "x86_64",
+]
+
+[[package]]
 name = "lazy_static"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 dependencies = [
- "spin",
+ "spin 0.9.8",
 ]
 
 [[package]]
@@ -968,6 +984,15 @@ name = "spin"
 version = "0.9.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6980e8d7511241f8acf4aebddbb1ff938df5eebe98691418c4468d0b72a96a67"
+dependencies = [
+ "lock_api",
+]
+
+[[package]]
+name = "spin"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d5fe4ccb98d9c292d56fec89a5e07da7fc4cf0dc11e156b41793132775d3e591"
 dependencies = [
  "lock_api",
 ]

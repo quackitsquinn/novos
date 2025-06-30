@@ -1,9 +1,9 @@
 use x86_64::{
-    structures::paging::{page::PageRangeInclusive, Page},
     VirtAddr,
+    structures::paging::{Page, page::PageRangeInclusive},
 };
 
-use crate::memory::paging::{KernelPage, KernelPageSize};
+use crate::{KernelPage, KernelPageSize};
 
 /// A range of virtual addresses.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
