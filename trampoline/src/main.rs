@@ -8,6 +8,5 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
 
 #[unsafe(no_mangle)]
 extern "C" fn _start() -> ! {
-    // This is the entry point for the trampoline.
-    loop {}
+    trampoline::jump()
 }
