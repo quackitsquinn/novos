@@ -1,12 +1,11 @@
 use core::{arch::asm, fmt::Write, slice};
 
-use goblin::elf64::sym;
+use kelp::{goblin::elf64::sym, Elf};
 use rustc_demangle::demangle;
 use spin::Once;
 
 use crate::{print, println, requests::EXECUTABLE_FILE};
 
-use super::elf::Elf;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct StackFrame {

@@ -1,5 +1,6 @@
 use core::{convert::Infallible, slice};
 
+use kelp::Elf;
 use limine::{
     file::File,
     paging::Mode,
@@ -13,7 +14,7 @@ use limine::{
 };
 use spin::Once;
 
-use crate::{declare_module, panic::elf::Elf};
+use crate::declare_module;
 
 #[used]
 pub static PHYSICAL_MEMORY_OFFSET_REQUEST: HhdmRequest = HhdmRequest::new();

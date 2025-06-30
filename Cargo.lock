@@ -498,12 +498,20 @@ name = "kbuild"
 version = "0.1.0"
 
 [[package]]
+name = "kelp"
+version = "0.1.0"
+dependencies = [
+ "goblin",
+ "thiserror",
+]
+
+[[package]]
 name = "kernel"
 version = "0.1.0"
 dependencies = [
  "bitflags 2.9.0",
- "goblin",
  "kalloc",
+ "kelp",
  "kproc",
  "kserial",
  "lazy_static",

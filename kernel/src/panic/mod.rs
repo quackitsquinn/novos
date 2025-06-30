@@ -12,7 +12,6 @@ use crate::{
     testing,
 };
 
-pub(crate) mod elf;
 pub mod stacktrace;
 
 pub fn panic_basic(pi: &PanicInfo) {
