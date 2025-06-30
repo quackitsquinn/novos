@@ -29,8 +29,8 @@ mod gdt;
 pub mod interrupts;
 pub mod memory;
 pub mod panic;
-pub mod pci;
-pub mod proc;
+// pub mod pci;
+// pub mod proc;
 mod requests;
 pub mod serial;
 pub mod testing;
@@ -87,12 +87,12 @@ pub(crate) unsafe fn init_kernel_services() {
     }
 
     test_two_way_serial();
-    memory::MODULE.init();
-    #[cfg(not(test))] // Tests don't have a display
-    display::MODULE.init();
+    //memory::MODULE.init();
+    //#[cfg(not(test))] // Tests don't have a display
+    //display::MODULE.init();
     println!("Hello, world!");
-    pci::MODULE.init();
-    proc::MODULE.init();
+    //pci::MODULE.init();
+    //proc::MODULE.init();
     info!("Kernel services initialized");
 }
 

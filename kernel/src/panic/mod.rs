@@ -3,9 +3,11 @@ use core::{convert::Infallible, fmt::Write, panic::PanicInfo};
 use spin::Once;
 
 use crate::{
-    declare_module, hlt_loop,
-    memory::{self, allocator},
-    print, println,
+    declare_module,
+    hlt_loop,
+    //    memory::{self, allocator},
+    print,
+    println,
     serial::{self, raw::SerialPort},
     testing,
 };
@@ -38,19 +40,19 @@ pub fn panic_extended_info(pi: &PanicInfo) {
     write_location(pi);
     println!();
     println!("{}", pi.message());
-    if memory::allocator::ALLOCATOR.is_initialized() {
-        println!("=== HEAP STATE ===");
-        println!("Main heap:");
-        // Safety: We are in a panic, so the allocator should be completely halted
-        let alloc = unsafe { allocator::ALLOCATOR.force_get().unwrap() };
-        alloc.print_state();
-        // Drop the allocator so that it isn't locked when we print to the screen
-        println!("Sending heap state to serial");
+    // if memory::allocator::ALLOCATOR.is_initialized() {
+    //     println!("=== HEAP STATE ===");
+    //     println!("Main heap:");
+    //     // Safety: We are in a panic, so the allocator should be completely halted
+    //     let alloc = unsafe { allocator::ALLOCATOR.force_get().unwrap() };
+    //     alloc.print_state();
+    //     // Drop the allocator so that it isn't locked when we print to the screen
+    //     println!("Sending heap state to serial");
 
-        // alloc.blocks.export_block_binary("heap.raw"); TODO: Update this to use the new allocator
-    } else {
-        println!("Heap allocator not initialized");
-    }
+    //     // alloc.blocks.export_block_binary("heap.raw"); TODO: Update this to use the new allocator
+    // } else {
+    //     println!("Heap allocator not initialized");
+    // }
 
     println!("=== STACK TRACE ===");
     stacktrace::print_trace();

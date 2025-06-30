@@ -2,7 +2,7 @@ use core::{hint::spin_loop, time::Duration};
 
 use x86_64::{instructions::interrupts::without_interrupts, structures::idt::InterruptStackFrame};
 
-use crate::{context::InterruptContext, interrupt_wrapper, proc::sched_next};
+use crate::{context::InterruptContext, interrupt_wrapper};
 
 use super::InterruptIndex;
 
@@ -15,7 +15,7 @@ pub(super) extern "C" fn timer_handler(frame: InterruptContext) {
     unsafe {
         TICKS += 1;
 
-        sched_next(frame);
+        //sched_next(frame);
 
         super::PICS
             .lock()
