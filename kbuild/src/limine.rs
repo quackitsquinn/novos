@@ -51,5 +51,8 @@ pub fn copy_limine_boot(cfg: &Config) {
 
     fs::copy(&cfg.kernel_binary, cfg.iso("boot/kernel.bin")).expect("Failed to copy kernel.bin");
 
+    fs::copy(&cfg.trampoline_binary, cfg.iso("boot/trampoline.bin"))
+        .expect("Failed to copy trampoline.bin");
+
     fs::copy(&cfg.limine_config, cfg.iso("boot/limine.conf")).expect("Failed to copy limine.cfg");
 }

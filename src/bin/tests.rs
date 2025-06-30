@@ -84,14 +84,16 @@ fn build_tests(test_args: Vec<String>) -> (PathBuf, bool) {
     panic!("Failed to build tests");
 }
 
-fn make_test_iso(kernel_path: PathBuf) {
-    let cfg = KConfig::new(
-        "target/artifacts".parse().unwrap(),
-        kernel_path,
-        "boot_cfg/test.conf".parse().unwrap(),
-        "boot_images".parse().unwrap(),
-        "kernel_tests.iso".parse().unwrap(),
-    );
+fn make_test_iso(kernel_binary: PathBuf) {
+    let cfg = KConfig {
+        artifact_dir: "target/artifacts".parse().unwrap(),
+        trampoline_binary: todo!(),
+        kernel_binary,
+        limine_config: "boot_cfg/test.conf".parse().unwrap(),
+        iso_root: "boot_images".parse().unwrap(),
+        iso_name: "kernel_tests.iso".parse().unwrap(),
+        reinstall_limine: false,
+    };
 
     kbuild::build(&cfg);
 }
