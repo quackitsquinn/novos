@@ -3,7 +3,7 @@
 
 #[panic_handler]
 fn panic_handler(info: &core::panic::PanicInfo) -> ! {
-    loop {}
+    trampoline::panic(info);
 }
 
 #[unsafe(no_mangle)]

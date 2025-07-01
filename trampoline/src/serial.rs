@@ -20,6 +20,10 @@ pub fn init() {
     info!("Serial port initialized!")
 }
 
+pub fn is_init() -> bool {
+    SERIAL.is_completed()
+}
+
 #[doc(hidden)]
 pub fn _print(args: core::fmt::Arguments) {
     let serial = SERIAL.get().expect("serial");
