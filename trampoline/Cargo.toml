@@ -8,6 +8,8 @@ limine = "0.5.0"
 log = "0.4.27"
 spin = "0.10.0"
 uart_16550 = "0.3.1"
+x86_64 = "0.15.2"
+kvmm = {path = "../kvmm"}
 
 [[bin]]
 name = "trampoline"

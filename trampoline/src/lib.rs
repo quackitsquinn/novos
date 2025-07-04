@@ -1,15 +1,21 @@
 #![no_main]
 #![no_std]
 
-use log::error;
+use log::{error, info};
 
-pub mod serial;
+mod mem;
+mod requests;
+mod serial;
 
 /// Kernel load & jump routine.
 /// This function is called by the bootloader to load the kernel and jump to it.
 /// This does not function as an actual trampoline, so please do not jump on it.
 pub fn jump() -> ! {
     serial::init();
+    requests::load();
+    info!("Loaded requests...");
+    mem::init();
+    info!("Memory initialized...");
     loop {}
 }
 

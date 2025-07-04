@@ -1108,10 +1108,12 @@ checksum = "bfb942dfe1d8e29a7ee7fcbde5bd2b9a25fb89aa70caea2eba3bee836ff41076"
 name = "trampoline"
 version = "0.1.0"
 dependencies = [
+ "kvmm",
  "limine 0.5.0",
  "log",
  "spin 0.10.0",
  "uart_16550",
+ "x86_64",
 ]
 
 [[package]]
