@@ -1,9 +1,11 @@
 use limine::{
     paging::Mode,
-    request::{HhdmRequest, MemoryMapRequest, PagingModeRequest},
+    request::{HhdmRequest, MemoryMapRequest, PagingModeRequest, StackSizeRequest},
     response::MemoryMapResponse,
 };
 use spin::Once;
+
+use crate::STACK_SIZE;
 
 #[used]
 pub static PAGING_MODE_REQUEST: PagingModeRequest =
@@ -17,6 +19,10 @@ pub static PHYSICAL_MEMORY_OFFSET: Once<u64> = Once::new();
 pub static MEMORY_MAP_REQUEST: MemoryMapRequest = MemoryMapRequest::new();
 pub static MEMORY_MAP: Once<&'static MemoryMapResponse> = Once::new();
 
+#[used]
+pub static STACK_SIZE_REQUEST: StackSizeRequest =
+    StackSizeRequest::new().with_size(STACK_SIZE as u64);
+
 pub fn load() {
     let offset = PHYSICAL_MEMORY_OFFSET_REQUEST
         .get_response()
@@ -25,4 +31,7 @@ pub fn load() {
     PHYSICAL_MEMORY_OFFSET.call_once(|| offset);
     let mmap = MEMORY_MAP_REQUEST.get_response().unwrap();
     MEMORY_MAP.call_once(|| mmap);
+    if STACK_SIZE_REQUEST.get_response().is_none() {
+        panic!("Stack size request failed!")
+    }
 }
