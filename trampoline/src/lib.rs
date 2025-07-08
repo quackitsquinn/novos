@@ -1,8 +1,10 @@
 #![no_main]
 #![no_std]
+#![feature(abi_x86_interrupt)]
 
 use log::{error, info};
 
+mod idt;
 mod mem;
 mod requests;
 mod serial;
@@ -16,6 +18,7 @@ pub fn jump() -> ! {
     serial::init();
     requests::load();
     info!("Loaded requests...");
+    idt::load();
     mem::init();
     info!("Memory initialized...");
     loop {}
