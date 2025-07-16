@@ -1,6 +1,9 @@
+use core::slice;
+
 use limine::{
+    file::File,
     paging::Mode,
-    request::{HhdmRequest, MemoryMapRequest, PagingModeRequest, StackSizeRequest},
+    request::{HhdmRequest, MemoryMapRequest, ModuleRequest, PagingModeRequest, StackSizeRequest},
     response::MemoryMapResponse,
 };
 use spin::Once;
@@ -23,6 +26,10 @@ pub static MEMORY_MAP: Once<&'static MemoryMapResponse> = Once::new();
 pub static STACK_SIZE_REQUEST: StackSizeRequest =
     StackSizeRequest::new().with_size(STACK_SIZE as u64);
 
+#[used]
+pub static MODULES: ModuleRequest = ModuleRequest::new();
+pub static KERNEL_FILE: Once<&'static [u8]> = Once::new();
+
 pub fn load() {
     let offset = PHYSICAL_MEMORY_OFFSET_REQUEST
         .get_response()
@@ -34,4 +41,22 @@ pub fn load() {
     if STACK_SIZE_REQUEST.get_response().is_none() {
         panic!("Stack size request failed!")
     }
+
+    MODULES
+        .get_response()
+        .expect("Module request failed!")
+        .modules()
+        .iter()
+        .find(|m| {
+            if let Ok(name) = m.path().to_str() {
+                if name.contains("kernel.bin") {
+                    return true;
+                }
+            }
+            return false;
+        })
+        .map(|m| {
+            KERNEL_FILE.call_once(|| unsafe { slice::from_raw_parts(m.addr(), m.size() as usize) });
+        })
+        .expect("Kernel module not found in module request response");
 }
