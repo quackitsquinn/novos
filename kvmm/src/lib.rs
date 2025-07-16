@@ -1,13 +1,12 @@
-#![no_std]
-#![no_main]
+#![cfg_attr(not(test), no_std)]
 
 use x86_64::structures::paging::{Page, PhysFrame, Size4KiB};
 
-#[cfg(feature = "alloc")]
+#[cfg(any(feature = "alloc", test))]
 extern crate alloc;
 
 pub mod phys;
-#[cfg(feature = "alloc")]
+#[cfg(any(feature = "alloc", test))]
 pub mod virt;
 
 pub type KernelPageSize = Size4KiB;
