@@ -5,8 +5,7 @@ edition = "2024"
 
 [dependencies]
 arrayvec = {version = "0.7.6", default-features = false}
-log = "0.4.27"
-spin = "0.10.0"
+cake = { path = "../cake" }
 x86_64 = "0.15.2"
 
 [features]

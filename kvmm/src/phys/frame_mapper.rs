@@ -1,5 +1,6 @@
 use arrayvec::ArrayVec;
-use log::warn;
+
+use cake::warn;
 use x86_64::structures::paging::{
     FrameAllocator, FrameDeallocator, frame::PhysFrameRangeInclusive,
 };

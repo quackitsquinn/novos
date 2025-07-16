@@ -583,8 +583,7 @@ name = "kvmm"
 version = "0.1.0"
 dependencies = [
  "arrayvec",
- "log",
- "spin 0.10.0",
+ "cake",
  "x86_64",
 ]
 
