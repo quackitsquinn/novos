@@ -11,7 +11,7 @@ pub struct Owned<T> {
 
 impl<T> Owned<T> {
     /// Creates a new `Owned` instance from a raw pointer.
-    pub fn new(val: *mut T) -> Self {
+    pub unsafe fn new(val: *mut T) -> Self {
         Owned {
             val: NonNull::new(val).expect("Owned::new called with null pointer"),
         }
