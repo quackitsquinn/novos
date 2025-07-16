@@ -5,11 +5,13 @@
 
 mod module;
 mod once_mutex;
+mod owned;
 
 pub use bitflags::bitflags;
 pub use log::{self, debug, error, info, trace, warn};
 pub use module::KernelModule;
 pub use once_mutex::OnceMutex;
+pub use owned::Owned;
 pub use spin::{self, Mutex, Once, RwLock};
 
 static CALLER_INSTRUCTION_POINTER_FN: Once<fn() -> usize> = Once::new();
