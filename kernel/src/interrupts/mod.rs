@@ -1,6 +1,6 @@
 use core::{convert::Infallible, mem};
 
-use spin::{Mutex, MutexGuard, Once};
+use cake::{declare_module, spin::MutexGuard, Mutex, Once};
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
 
 mod exception;
@@ -8,11 +8,8 @@ pub mod hardware;
 mod macros;
 
 use crate::{
-    context::{
-        InterruptCodeContext, InterruptContext,
-        PageFaultInterruptContext,
-    },
-    declare_module, init_interrupt_table, interrupt_wrapper,
+    context::{InterruptCodeContext, InterruptContext, PageFaultInterruptContext},
+    init_interrupt_table, interrupt_wrapper,
 };
 
 pub static IDT: InterruptTable = InterruptTable::uninitialized();

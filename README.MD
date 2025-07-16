@@ -32,6 +32,10 @@ The project is split into several crates:
 - `kernel`: The main kernel crate.
 - `kproc`: Various procedural macros used in the kernel. Currently only contains the `test` macro.
 - `kerial`: A qemu serial driver for the kernel. Used for debugging.
+- `kvmm`: The kernel's virtual memory manager.`
+- `kelp`: A library for parsing elf files. Used for loading the kernel.
+- `trampoline`: The binary that loads the kernel into memory and jumps to it. Acts as a separator between the kernel and the bootloader.
+- `cake`: (that's a piece of cake) Utility crate for kernel space. Provides utilites and pulls in general purpose utilities like `log` and `once`
 
 Some other folders that appear in the root of the repository:
 

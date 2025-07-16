@@ -1,11 +1,10 @@
 use core::mem::transmute;
 
-use spin::{Mutex, RwLock};
-
 use crate::sprintln;
 
 mod qemu_exit;
 pub mod test_fn;
+use cake::{Mutex, RwLock};
 pub use test_fn::TestFunction;
 
 static TESTS: RwLock<&'static [&'static TestFunction]> = RwLock::new(&[]);

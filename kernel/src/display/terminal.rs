@@ -2,10 +2,7 @@ use core::{f32, fmt::Write};
 
 use alloc::{vec, vec::Vec};
 
-use crate::{
-    interrupts::without_interrupts,
-    sprintln, terminal,
-};
+use crate::{interrupts::without_interrupts, sprintln, terminal};
 
 use super::{color::Color, get_char, screen_char::ScreenChar, FRAMEBUFFER, TERMINAL};
 

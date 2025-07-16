@@ -1,9 +1,8 @@
 use core::{convert::Infallible, fmt::Write, panic::PanicInfo};
 
-use spin::Once;
+use cake::{declare_module, Once};
 
 use crate::{
-    declare_module,
     hlt_loop,
     //    memory::{self, allocator},
     print,

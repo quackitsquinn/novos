@@ -1,5 +1,6 @@
 use core::convert::Infallible;
 
+use cake::KernelModule;
 use lazy_static::lazy_static;
 use x86_64::{
     instructions::tables::load_tss,
@@ -10,8 +11,6 @@ use x86_64::{
     },
     VirtAddr,
 };
-
-use crate::util::KernelModule;
 
 pub const IST_FAULT_INDEX: u16 = 0;
 

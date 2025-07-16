@@ -1,5 +1,6 @@
 use core::{convert::Infallible, slice};
 
+use cake::{declare_module, Once};
 use kelp::Elf;
 use limine::{
     file::File,
@@ -12,9 +13,6 @@ use limine::{
         ExecutableAddressResponse, ExecutableFileResponse, FramebufferResponse, MemoryMapResponse,
     },
 };
-use spin::Once;
-
-use crate::declare_module;
 
 #[used]
 pub static PHYSICAL_MEMORY_OFFSET_REQUEST: HhdmRequest = HhdmRequest::new();

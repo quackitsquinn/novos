@@ -1,5 +1,5 @@
+use cake::info;
 use limine::framebuffer::Framebuffer as LimineFramebuffer;
-use log::info;
 
 use super::color::Color;
 /// A representation of a framebuffer.

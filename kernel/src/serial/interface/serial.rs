@@ -1,11 +1,12 @@
 use core::fmt::Write;
 
-use kserial::client::{get_serial_client, send_string};
+use cake::Mutex;
+use kserial::client::{get_serial_client, send_string, SerialAdapter};
 
 use crate::serial::raw::SerialPort;
 
 pub struct Serial {
-    port: SerialPort,
+    port: Mutex<SerialPort>,
 }
 
 impl Serial {
@@ -17,7 +18,9 @@ impl Serial {
         let mut port = unsafe { SerialPort::new(port) };
         port.init();
 
-        Serial { port }
+        Serial {
+            port: Mutex::new(port),
+        }
     }
 
     pub fn enable_packet_support(&mut self) {
@@ -31,7 +34,7 @@ impl Serial {
     }
 
     pub unsafe fn send_raw(&mut self, data: u8) {
-        self.port.send_raw(data);
+        self.port.lock().send(data);
     }
 
     pub unsafe fn send_slice_raw(&mut self, data: &[u8]) {
@@ -43,15 +46,36 @@ impl Serial {
     pub fn has_packet_support(&self) -> bool {
         true
     }
-
-    pub unsafe fn get_inner(&mut self) -> &mut SerialPort {
-        &mut self.port
-    }
 }
 
 impl Write for Serial {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
         send_string(s);
         Ok(()) // Return Ok to indicate success
+    }
+}
+
+impl SerialAdapter for Serial {
+    fn send(&self, data: u8) {
+        self.port.lock().send(data);
+    }
+
+    fn send_slice(&self, data: &[u8]) {
+        for byte in data {
+            self.send(*byte);
+        }
+    }
+
+    fn read(&self) -> u8 {
+        self.port.lock().receive()
+    }
+
+    fn read_slice(&self, data: &mut [u8]) -> usize {
+        let mut count = 0;
+        for byte in data.iter_mut() {
+            *byte = self.read();
+            count += 1;
+        }
+        count
     }
 }

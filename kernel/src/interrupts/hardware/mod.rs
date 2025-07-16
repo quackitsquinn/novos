@@ -1,9 +1,7 @@
 use core::{convert::Infallible, mem::transmute};
 
+use cake::{declare_module, Mutex};
 use pic8259::ChainedPics;
-use spin::Mutex;
-
-use crate::declare_module;
 
 pub mod timer;
 

@@ -1,8 +1,9 @@
 use core::panic;
 
+use log::debug;
 use spin::{Mutex, MutexGuard, Once};
 
-use crate::panic::stacktrace::{fmt_symbol, get_caller_rip};
+use crate::get_caller_rip;
 
 pub struct OnceMutex<T> {
     pub inner: Once<Mutex<T>>,
@@ -41,16 +42,30 @@ impl<'a, T> OnceMutex<T> {
             .inner
             .get()
             .expect("Attempted to get an uninitialized OnceMutex!");
-        // TODO: Do some fancy stack trace stuff here and save the last lock location. Would be greatly useful for debugging.
         if let Some(i) = i.try_lock() {
-            self.caller.lock().replace(get_caller_rip());
+            *self.caller.lock() = get_caller_rip();
             return i;
         }
         let caller = self.caller.lock();
+
+        if !crate::CALLER_INSTRUCTION_POINTER_FN.is_completed() {
+            debug!("No caller instruction pointer function set, using default");
+            panic!("OnceMutex locked by unknown caller!");
+        }
+
         if let Some(caller) = *caller {
-            panic!("Mutex already locked by: {}", fmt_symbol(caller));
+            let mut sym = "unknown";
+            if !crate::CALLER_INSTRUCTION_POINTER_NAME_RESOLVER.is_completed() {
+                sym = "unknown (no resolver set)";
+            } else if let Some(name) = crate::resolve_symbol(caller) {
+                sym = name;
+            }
+            panic!(
+                "OnceMutex locked by caller at address {:p} ({})",
+                caller, sym
+            );
         } else {
-            panic!("Mutex already locked by unknown location");
+            panic!("OnceMutex locked by unknown caller!");
         }
     }
 
@@ -72,7 +87,7 @@ impl<'a, T> OnceMutex<T> {
         }
         let t = self.get();
         // Set the caller to the correct value
-        self.caller.lock().replace(get_caller_rip());
+        *self.caller.lock() = get_caller_rip();
         t
     }
 }

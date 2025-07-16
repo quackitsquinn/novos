@@ -1,4 +1,4 @@
-use log::info;
+use cake::{info, log};
 
 use crate::{serial, sprintln};
 

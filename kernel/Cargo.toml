@@ -13,15 +13,14 @@ bitflags = "2.5.0"
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 # TODO: When this is released, use the version from crates.io
 limine = {git = "https://github.com/jasondyoungberg/limine-rs.git", branch = "master", commit = "e7c2359"}
-log = "0.4.22"
 pic8259 = "0.11.0"
-spin = "0.9.8"
 uart_16550 = "0.3.1"
 x86_64 = "0.15.2"
 kproc = { path = "../kproc" }
 kserial = { path = "../kserial", default-features = false }
 kalloc = { path = "../kalloc" }
 kelp = { path = "../kelp" }
+cake = {path = "../cake"}
 thiserror = { version = "2.0.3", default-features = false }
 rustc-demangle = { version = "0.1.24", default-features = false }
 # TODO: Find an alternative to this, because it's now deprecated

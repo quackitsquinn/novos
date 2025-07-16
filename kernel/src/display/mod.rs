@@ -1,5 +1,6 @@
 use core::convert::Infallible;
 
+use cake::{declare_module, OnceMutex};
 use framebuffer::Framebuffer;
 
 mod character;
@@ -10,7 +11,7 @@ pub mod terminal;
 
 pub use character::get_char;
 
-use crate::{declare_module, requests::FRAMEBUFFERS, util::OnceMutex};
+use crate::requests::FRAMEBUFFERS;
 
 pub static FRAMEBUFFER: OnceMutex<Framebuffer> = OnceMutex::uninitialized();
 pub static TERMINAL: OnceMutex<terminal::Terminal> = OnceMutex::uninitialized();
