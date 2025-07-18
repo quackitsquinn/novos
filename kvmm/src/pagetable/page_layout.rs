@@ -126,6 +126,19 @@ impl PageLayout {
     pub fn contains(&self, indexes: PageTablePath) -> bool {
         self.index_of(indexes).is_some()
     }
+
+    /// Reclaims the pages in the layout, calling `page_dealloc` for each page.
+    /// This will *not* deallocate any entries in the layout, only the layout itself.
+    pub unsafe fn reclaim(&mut self, page_dealloc: unsafe fn(KernelPage)) {
+        let mut cur = self.next.take();
+
+        while let Some(mut next) = cur.take() {
+            let next_page = next.next.take();
+            let page = VirtAddr::from_ptr(next.into_raw().cast_const());
+            unsafe { page_dealloc(KernelPage::from_start_address(page).expect("unaligned")) };
+            cur = next_page;
+        }
+    }
 }
 
 impl Index<usize> for PageLayout {

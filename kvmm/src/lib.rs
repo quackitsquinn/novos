@@ -24,15 +24,15 @@ mod tests {
 
     pub struct DummyPageAllocator {
         pages: Vec<(KernelPage, KernelPhysFrame)>,
-        index: usize,
     }
 
     impl DummyPageAllocator {
         pub fn new() -> Self {
-            DummyPageAllocator {
-                pages: Vec::new(),
-                index: 0,
-            }
+            DummyPageAllocator { pages: Vec::new() }
+        }
+
+        pub fn used_pages(&self) -> &[(KernelPage, KernelPhysFrame)] {
+            &self.pages
         }
     }
 
@@ -46,9 +46,7 @@ mod tests {
             }
 
             let page = KernelPage::from_start_address(VirtAddr::new(res as u64)).unwrap();
-            let frame =
-                KernelPhysFrame::from_start_address(PhysAddr::new(self.index as u64)).unwrap();
-            self.index += 4096;
+            let frame = KernelPhysFrame::from_start_address(PhysAddr::new(res as u64)).unwrap();
             self.pages.push((page, frame));
             Some((page, frame))
         }
@@ -65,5 +63,14 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn test_dummy_page_allocator_valid_memory() {
+        let mut allocator = DummyPageAllocator::new();
+        let (page, frame) = allocator.next().expect("Failed to allocate page");
+        assert!(page.start_address().as_u64() != 0);
+        assert!(frame.start_address().as_u64() != 0);
+        unsafe { page.start_address().as_mut_ptr::<()>().write_bytes(0, 4096) };
     }
 }
