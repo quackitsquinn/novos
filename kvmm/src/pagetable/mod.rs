@@ -191,7 +191,7 @@ impl<T: Iterator<Item = (KernelPage, KernelPhysFrame)>> PagetableBuilder<T> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_arch = "x86_64"))]
 mod tests {
     use super::*;
     use crate::test_util::DummyPageAllocator;
@@ -217,7 +217,7 @@ mod tests {
             assert!(pml4[i].is_unused());
         }
 
-        let ptr = pml4.into_raw();
+        let ptr = unsafe { pml4.into_raw() };
         for (page, addr) in alloc.used_pages() {
             if frame == *addr {
                 assert_eq!(page.start_address().as_u64(), ptr as u64);

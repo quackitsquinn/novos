@@ -1,7 +1,9 @@
 use core::fmt::Write;
 
-use log::{Log, info};
-use spin::{Mutex, Once};
+use cake::{
+    Mutex, Once, info,
+    log::{self, Log},
+};
 use uart_16550::SerialPort;
 
 static SERIAL: Once<Mutex<SerialPort>> = Once::new();

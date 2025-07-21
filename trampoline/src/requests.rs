@@ -1,12 +1,12 @@
 use core::slice;
 
+use cake::Once;
 use limine::{
     file::File,
     paging::Mode,
     request::{HhdmRequest, MemoryMapRequest, ModuleRequest, PagingModeRequest, StackSizeRequest},
     response::MemoryMapResponse,
 };
-use spin::Once;
 
 use crate::STACK_SIZE;
 

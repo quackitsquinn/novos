@@ -1,8 +1,7 @@
-use log::info;
-use spin::Once;
+use cake::Once;
 use x86_64::{
     set_general_handler,
-    structures::idt::{GeneralHandlerFunc, InterruptDescriptorTable, InterruptStackFrame},
+    structures::idt::{InterruptDescriptorTable, InterruptStackFrame},
 };
 
 static IDT: Once<InterruptDescriptorTable> = Once::new();

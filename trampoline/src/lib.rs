@@ -2,7 +2,7 @@
 #![no_std]
 #![feature(abi_x86_interrupt)]
 
-use log::{error, info};
+use cake::{error, info};
 
 mod idt;
 mod mem;
