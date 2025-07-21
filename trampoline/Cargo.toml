@@ -3,6 +3,11 @@ name = "trampoline"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "trampoline"
+test = false
+bench = false
+
 [dependencies]
 limine = "0.5.0"
 log = "0.4.27"
@@ -11,10 +16,6 @@ uart_16550 = "0.3.1"
 x86_64 = "0.15.2"
 kvmm = {path = "../kvmm"}
 
-[[bin]]
-name = "trampoline"
-test = false
-bench = false
 
 [profile.release]
 panic = "abort"
@@ -23,5 +24,10 @@ debug = true
 [profile.dev]
 panic = "abort"
 # Include all debug info
+debug = true
+opt-level = 0
+
+[profile.test]
+panic = "abort"
 debug = true
 opt-level = 0

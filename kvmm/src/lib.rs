@@ -7,6 +7,7 @@ extern crate alloc;
 
 pub mod pagetable;
 pub mod phys;
+
 #[cfg(any(feature = "alloc", test))]
 pub mod virt;
 
@@ -15,12 +16,14 @@ pub type KernelPage = Page<KernelPageSize>;
 pub type KernelPhysFrame = PhysFrame<KernelPageSize>;
 
 #[cfg(test)]
-mod tests {
+mod test_util {
+    //! This module provides a few utility types and functions for host testing.
+    use core::mem::transmute;
     use std::alloc::{Layout, alloc, dealloc};
 
     use x86_64::{PhysAddr, VirtAddr};
 
-    use super::*;
+    use crate::*;
 
     pub struct DummyPageAllocator {
         pages: Vec<(KernelPage, KernelPhysFrame)>,
@@ -45,7 +48,7 @@ mod tests {
                 panic!("Failed to allocate page");
             }
 
-            let page = KernelPage::from_start_address(VirtAddr::new(res as u64)).unwrap();
+            let page = unsafe { transmute::<_, KernelPage>(res) };
             let frame = KernelPhysFrame::from_start_address(PhysAddr::new(res as u64)).unwrap();
             self.pages.push((page, frame));
             Some((page, frame))

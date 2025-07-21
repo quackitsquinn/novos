@@ -193,20 +193,21 @@ impl<T: Iterator<Item = (KernelPage, KernelPhysFrame)>> PagetableBuilder<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tests::DummyPageAllocator;
+    use crate::test_util::DummyPageAllocator;
 
     #[test]
     fn test_pagetable_builder_new() {
         let mut alloc = DummyPageAllocator::new();
-        unsafe {
+        println!(
+            "{:p}",
             alloc
                 .next()
                 .expect("No pages provided")
                 .0
                 .start_address()
-                .as_mut_ptr::<u8>()
-                .write_bytes(0, 4096)
-        };
+                .as_mut_ptr::<PageTable>()
+        );
+
         let builder = PagetableBuilder::new(alloc.by_ref());
 
         let (pml4, frame, _) = builder.build_and_release(None);

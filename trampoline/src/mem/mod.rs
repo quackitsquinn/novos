@@ -1,4 +1,9 @@
-use kvmm::phys::{PhysAddrRange, frame_mapper::FrameMapper};
+use core::{iter::Zip, slice::Iter};
+
+use kvmm::{
+    KernelPage, KernelPhysFrame,
+    phys::{PhysAddrRange, frame_mapper::FrameMapper},
+};
 use limine::{
     memory_map::{Entry, EntryType},
     request::MemoryMapRequest,
@@ -8,8 +13,12 @@ use spin::{Mutex, Once};
 use x86_64::{
     PhysAddr, VirtAddr,
     registers::control::Cr3,
-    structures::paging::{OffsetPageTable, PageTable},
+    structures::paging::{
+        Mapper, OffsetPageTable, Page, PageTable, frame::PhysFrameRangeInclusive, page::PageRange,
+    },
 };
+
+mod kernel_map;
 
 use crate::requests::MEMORY_MAP;
 

@@ -85,3 +85,14 @@ where
         }
     }
 }
+
+impl<T> Iterator for FrameMapper<T>
+where
+    T: Iterator<Item = PhysAddrRange>,
+{
+    type Item = KernelPhysFrame;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.next_frame()
+    }
+}
