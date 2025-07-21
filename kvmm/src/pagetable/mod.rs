@@ -1,6 +1,7 @@
 use core::{
     mem::{MaybeUninit, transmute},
     ops::{Index, IndexMut},
+    ptr,
 };
 
 use cake::{Owned, info};
@@ -37,7 +38,7 @@ impl<T: Iterator<Item = (KernelPage, KernelPhysFrame)>> PagetableBuilder<T> {
         let pml4 = pml4.start_address().as_mut_ptr::<PageTable>();
         info!("Creating pagetable at {:#x}", pml4 as u64);
         unsafe {
-            pml4.write_bytes(0, 4096);
+            pml4.write_bytes(0, 1);
         }
         let pml4 = unsafe { Owned::new(pml4) };
 
@@ -82,7 +83,7 @@ impl<T: Iterator<Item = (KernelPage, KernelPhysFrame)>> PagetableBuilder<T> {
         let (page, frame) = self.next_page();
         let pagetable = page.start_address().as_mut_ptr::<PageTable>();
         unsafe {
-            pagetable.write_bytes(0, 4096);
+            pagetable.write_bytes(0, 1);
         }
 
         (frame, unsafe { Owned::new(pagetable) })
@@ -166,9 +167,9 @@ impl<T: Iterator<Item = (KernelPage, KernelPhysFrame)>> PagetableBuilder<T> {
     fn release(mut self, dtor: fn(KernelPage)) {
         unsafe { self.layout().reclaim(dtor) };
         dtor(
-            KernelPage::from_start_address(VirtAddr::from_ptr(
-                self.layout.take().unwrap().into_raw(),
-            ))
+            KernelPage::from_start_address(VirtAddr::from_ptr(unsafe {
+                self.layout.take().unwrap().into_raw()
+            }))
             .expect("unaligned"),
         );
     }

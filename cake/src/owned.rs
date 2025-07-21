@@ -19,7 +19,7 @@ impl<T> Owned<T> {
 
     /// Converts the `Owned` instance into a raw pointer.
     #[must_use = "Returned value must be used to avoid memory leaks"]
-    pub fn into_raw(self) -> *mut T {
+    pub unsafe fn into_raw(self) -> *mut T {
         let ptr = self.val.as_ptr();
         core::mem::forget(self); // Prevents the destructor from being called
         ptr

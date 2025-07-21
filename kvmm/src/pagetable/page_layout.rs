@@ -34,7 +34,7 @@ impl PageLayout {
     pub unsafe fn create_in_page(page: KernelPage) -> Owned<Self> {
         let ptr = page.start_address().as_mut_ptr::<PageLayout>();
         unsafe {
-            ptr.write_bytes(0, 4096);
+            ptr.write_bytes(0, 1);
             Owned::new(ptr)
         }
     }
