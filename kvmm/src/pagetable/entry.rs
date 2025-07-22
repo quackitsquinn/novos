@@ -105,7 +105,7 @@ fn indexes_to_virtaddr(indexes: (PageTableIndex, PageTableIndex, PageTableIndex)
     addr |= u64::from(p4_index) << 39;
     addr |= u64::from(p3_index) << 30;
     addr |= u64::from(p2_index) << 21;
-    VirtAddr::new(addr)
+    VirtAddr::new_truncate(addr)
 }
 
 #[cfg(test)]

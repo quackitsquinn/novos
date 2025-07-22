@@ -19,7 +19,8 @@ pub fn jump() -> ! {
     requests::load();
     info!("Loaded requests...");
     idt::load();
-    mem::init();
+    let kernel = mem::init();
+    info!("Kernel info: {:?}", kernel);
     info!("Memory initialized...");
     loop {}
 }

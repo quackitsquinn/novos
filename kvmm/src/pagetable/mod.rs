@@ -51,7 +51,8 @@ impl<T: Iterator<Item = (KernelPage, KernelPhysFrame)>> PagetableBuilder<T> {
         }
     }
 
-    fn next_page(&mut self) -> (KernelPage, KernelPhysFrame) {
+    /// Returns the next page from the allocator.
+    pub fn next_page(&mut self) -> (KernelPage, KernelPhysFrame) {
         self.alloc
             .as_mut()
             .expect("reclaimed")

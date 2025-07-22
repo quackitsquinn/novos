@@ -17,7 +17,7 @@ x86_64 = "0.15.2"
 # On this episode of "Incredibly weird quirks with rust-analyzer": This silents the missing function warnings for configured out
 # x86_64 instructions module. I don't know why, as the crate itself doesn't really do anything interesting with configuring stuff out.
 pic8259 = "0.11.0"
-
+kelp = {path = "../kelp"}
 
 [profile.release]
 panic = "abort"

@@ -14,11 +14,14 @@ use x86_64::{
     PhysAddr, VirtAddr,
     registers::control::Cr3,
     structures::paging::{
-        Mapper, OffsetPageTable, Page, PageTable, frame::PhysFrameRangeInclusive, page::PageRange,
+        Mapper, OffsetPageTable, Page, PageTable, PhysFrame, frame::PhysFrameRangeInclusive,
+        page::PageRange,
     },
 };
 
-mod kernel_map;
+mod kernel;
+
+pub(crate) use kernel::Kernel;
 
 use crate::requests::MEMORY_MAP;
 
@@ -60,7 +63,7 @@ impl Iterator for UsableRangeIterator {
 static MAPPER: Once<Mutex<FrameMapper<UsableRangeIterator>>> = Once::new();
 static PAGETABLE: Once<Mutex<OffsetPageTable>> = Once::new();
 
-pub fn init() {
+pub fn init() -> Kernel {
     info!("Initializing frame mapper and offset page table...");
     MAPPER.call_once(|| {
         let iter = UsableRangeIterator::new();
@@ -85,4 +88,5 @@ pub fn init() {
         Mutex::new(pagetable)
     });
     info!("Offset page table initialized!");
+    kernel::map_kernel()
 }
