@@ -10,6 +10,7 @@ use x86_64::{
 };
 
 use crate::{
+    arch::{KERNEL_JUMP_LOAD_POINT, copy_jump_point},
     mem::{MAPPER, PAGETABLE},
     requests::KERNEL_FILE,
 };
@@ -113,6 +114,18 @@ pub fn map_kernel() -> Kernel {
             builder.map_page(dest_page, dest_frame, flags);
         }
     }
+
+    let (jump_page, jump_frame) = builder.next_page();
+
+    unsafe {
+        copy_jump_point(jump_page);
+    }
+
+    builder.map_page(
+        KERNEL_JUMP_LOAD_POINT,
+        jump_frame,
+        PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
+    );
 
     let stack_page_range = KernelPage::range_inclusive(
         KernelPage::containing_address(STACK_BASE),

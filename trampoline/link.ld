@@ -34,6 +34,13 @@ SECTIONS
         *(.rodata .rodata.*)
     } :rodata
 
+    . = ALIGN(CONSTANT(MAXPAGESIZE));
+    trampoline_start = .;
+    .trampoline : ALIGN(4K) {
+        KEEP(*(.trampoline))
+    }
+    trampoline_end = .;
+
     /* Move to the next memory page for .data */
     . = ALIGN(CONSTANT(MAXPAGESIZE));
 

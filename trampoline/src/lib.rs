@@ -4,6 +4,7 @@
 
 use cake::{error, info};
 
+mod arch;
 mod idt;
 mod mem;
 mod requests;
@@ -21,8 +22,10 @@ pub fn jump() -> ! {
     idt::load();
     let kernel = mem::init();
     info!("Kernel info: {:?}", kernel);
-    info!("Memory initialized...");
-    loop {}
+    info!("Loading jump point...");
+    arch::load_jump_point();
+    info!("Jumping to kernel...");
+    unsafe { arch::jump(kernel) };
 }
 
 pub fn panic(info: &core::panic::PanicInfo) -> ! {

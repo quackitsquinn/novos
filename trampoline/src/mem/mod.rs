@@ -60,8 +60,8 @@ impl Iterator for UsableRangeIterator {
     }
 }
 
-static MAPPER: Once<Mutex<FrameMapper<UsableRangeIterator>>> = Once::new();
-static PAGETABLE: Once<Mutex<OffsetPageTable>> = Once::new();
+pub(crate) static MAPPER: Once<Mutex<FrameMapper<UsableRangeIterator>>> = Once::new();
+pub(crate) static PAGETABLE: Once<Mutex<OffsetPageTable>> = Once::new();
 
 pub fn init() -> Kernel {
     info!("Initializing frame mapper and offset page table...");
