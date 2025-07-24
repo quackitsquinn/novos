@@ -60,7 +60,11 @@ impl<T: Iterator<Item = (KernelPage, KernelPhysFrame)>> PagetableBuilder<T> {
             .expect("No more pages available")
     }
 
-    fn layout(&mut self) -> &mut PageLayout {
+    fn layout(&self) -> &PageLayout {
+        self.layout.as_ref().expect("reclaimed")
+    }
+
+    fn layout_mut(&mut self) -> &mut PageLayout {
         self.layout.as_mut().expect("reclaimed")
     }
 
@@ -69,15 +73,15 @@ impl<T: Iterator<Item = (KernelPage, KernelPhysFrame)>> PagetableBuilder<T> {
         pagetable: Owned<PageTable>,
         path: PageTablePath,
     ) -> &mut PageTable {
-        if self.layout().has_cap(1) {
+        if self.layout_mut().has_cap(1) {
             // We just checked that the layout has space, so unless something is horribly wrong, this should never fail.
-            return self.layout().push(pagetable, path);
+            return self.layout_mut().push(pagetable, path);
         }
 
         let (page, _) = self.next_page();
-        self.layout().extend(page);
+        self.layout_mut().extend(page);
 
-        self.layout().push(pagetable, path)
+        self.layout_mut().push(pagetable, path)
     }
 
     fn create_pagetable(&mut self) -> (KernelPhysFrame, Owned<PageTable>) {
@@ -93,8 +97,8 @@ impl<T: Iterator<Item = (KernelPage, KernelPhysFrame)>> PagetableBuilder<T> {
     fn get_or_create_l3(&mut self, pml4_index: PageTableIndex) -> &mut PageTable {
         let path = (pml4_index, None, None);
 
-        if let Some(entry) = self.layout().index_of(path) {
-            return self.layout()[entry].pagetable();
+        if let Some(entry) = self.layout_mut().index_of(path) {
+            return self.layout_mut()[entry].pagetable_mut();
         }
 
         let (paddr, pagetable) = self.create_pagetable();
@@ -111,8 +115,8 @@ impl<T: Iterator<Item = (KernelPage, KernelPhysFrame)>> PagetableBuilder<T> {
     ) -> &mut PageTable {
         let path = (pml4_index, Some(pml3_index), None);
 
-        if let Some(entry) = self.layout().index_of(path) {
-            return self.layout()[entry].pagetable();
+        if let Some(entry) = self.layout_mut().index_of(path) {
+            return self.layout_mut()[entry].pagetable_mut();
         }
 
         let (paddr, pagetable) = self.create_pagetable();
@@ -130,8 +134,8 @@ impl<T: Iterator<Item = (KernelPage, KernelPhysFrame)>> PagetableBuilder<T> {
     ) -> &mut PageTable {
         let path = (pml4_index, Some(pml3_index), Some(pml2_index));
 
-        if let Some(entry) = self.layout().index_of(path) {
-            return self.layout()[entry].pagetable();
+        if let Some(entry) = self.layout_mut().index_of(path) {
+            return self.layout_mut()[entry].pagetable_mut();
         }
 
         let (paddr, pagetable) = self.create_pagetable();
@@ -166,13 +170,30 @@ impl<T: Iterator<Item = (KernelPage, KernelPhysFrame)>> PagetableBuilder<T> {
     }
 
     fn release(mut self, dtor: fn(KernelPage)) {
-        unsafe { self.layout().reclaim(dtor) };
+        unsafe { self.layout_mut().reclaim(dtor) };
         dtor(
             KernelPage::from_start_address(VirtAddr::from_ptr(unsafe {
                 self.layout.take().unwrap().into_raw()
             }))
             .expect("unaligned"),
         );
+    }
+
+    pub fn frame(&self, page: KernelPage) -> Option<KernelPhysFrame> {
+        let pml4_index = page.p4_index();
+        let pml3_index = page.p3_index();
+        let pml2_index = page.p2_index();
+        let pte_index = page.p1_index();
+
+        if let Some(entry) =
+            self.layout()
+                .index_of((pml4_index, Some(pml3_index), Some(pml2_index)))
+        {
+            let pagetable = self.layout()[entry].pagetable();
+            return Some(pagetable[pte_index].frame().ok()?);
+        }
+
+        None
     }
 
     /// Build the pagetable and release the resources.

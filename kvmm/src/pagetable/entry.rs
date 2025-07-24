@@ -22,7 +22,12 @@ impl Entry {
     }
 
     /// Get the pagetable associated with this entry.
-    pub fn pagetable(&mut self) -> &mut PageTable {
+    pub fn pagetable(&self) -> &PageTable {
+        &self.pagetable
+    }
+
+    /// Get the pagetable associated with this entry.
+    pub fn pagetable_mut(&mut self) -> &mut PageTable {
         &mut self.pagetable
     }
 

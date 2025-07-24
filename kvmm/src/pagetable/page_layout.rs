@@ -63,7 +63,7 @@ impl PageLayout {
         Ok(unsafe {
             self.entries[self.len as usize - 1]
                 .assume_init_mut()
-                .pagetable()
+                .pagetable_mut()
         })
     }
 
