@@ -1,22 +1,11 @@
-use core::{iter::Zip, slice::Iter};
-
 use cake::{Mutex, Once, debug, info};
-use kvmm::{
-    KernelPage, KernelPhysFrame,
-    phys::{PhysAddrRange, frame_mapper::FrameMapper},
-};
-use limine::{
-    memory_map::{Entry, EntryType},
-    request::MemoryMapRequest,
-};
+use kvmm::phys::{PhysAddrRange, frame_mapper::FrameMapper};
+use limine::memory_map::{Entry, EntryType};
 
 use x86_64::{
     PhysAddr, VirtAddr,
     registers::control::Cr3,
-    structures::paging::{
-        Mapper, OffsetPageTable, Page, PageTable, PhysFrame, frame::PhysFrameRangeInclusive,
-        page::PageRange,
-    },
+    structures::paging::{OffsetPageTable, PageTable},
 };
 
 mod kernel;

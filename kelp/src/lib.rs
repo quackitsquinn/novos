@@ -5,11 +5,9 @@
 
 #![no_std]
 
-use core::{ffi::CStr, mem::transmute, str};
-
 use goblin::{
     elf::section_header::SHT_SYMTAB,
-    elf64::{header, program_header::ProgramHeader, section_header},
+    elf64::{header, section_header},
 };
 
 pub use goblin;

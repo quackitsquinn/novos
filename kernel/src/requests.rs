@@ -3,7 +3,6 @@ use core::{convert::Infallible, slice};
 use cake::{declare_module, Once};
 use kelp::Elf;
 use limine::{
-    file::File,
     paging::Mode,
     request::{
         ExecutableAddressRequest, ExecutableFileRequest, FramebufferRequest, HhdmRequest,

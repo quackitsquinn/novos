@@ -1,7 +1,6 @@
 use core::fmt::Write;
 
-use cake::{Once, OnceMutex};
-use kserial::client::SerialAdapter;
+use cake::Once;
 use serial::Serial;
 
 pub mod serial;

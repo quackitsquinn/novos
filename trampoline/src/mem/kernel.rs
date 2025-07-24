@@ -5,7 +5,6 @@ use kelp::Elf;
 use kvmm::{KernelPage, KernelPhysFrame, pagetable::PagetableBuilder};
 use x86_64::{
     VirtAddr,
-    registers::model_specific::LStar,
     structures::paging::{Mapper, Page, PageTableFlags, PhysFrame, page::PageRange},
 };
 

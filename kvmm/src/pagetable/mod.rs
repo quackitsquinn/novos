@@ -1,19 +1,10 @@
-use core::{
-    mem::{MaybeUninit, transmute},
-    ops::{Index, IndexMut},
-    ptr,
-};
-
 use cake::{Owned, info};
 use x86_64::{
     VirtAddr,
-    structures::paging::{Page, PageTable, PageTableFlags, PageTableIndex, Size4KiB},
+    structures::paging::{PageTable, PageTableFlags, PageTableIndex},
 };
 
-use crate::{
-    KernelPage, KernelPhysFrame,
-    pagetable::{entry::Entry, page_layout::PageLayout},
-};
+use crate::{KernelPage, KernelPhysFrame, pagetable::page_layout::PageLayout};
 
 mod entry;
 mod page_layout;

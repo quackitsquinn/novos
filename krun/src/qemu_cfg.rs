@@ -1,11 +1,4 @@
-use std::{
-    env,
-    fs::File,
-    io::{BufRead, Read, Write, stdout},
-    path::PathBuf,
-    process::{Command, Stdio},
-    thread::{self, Thread, spawn},
-};
+use std::{env, path::PathBuf, process::Command, thread::spawn};
 
 use ovmf_prebuilt::Source;
 

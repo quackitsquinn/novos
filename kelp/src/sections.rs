@@ -1,7 +1,4 @@
-use goblin::{
-    elf::section_header::SHT_SYMTAB,
-    elf64::{header, program_header::ProgramHeader, section_header, sym},
-};
+use goblin::elf64::{header, section_header};
 
 pub struct ElfSections<'a> {
     data: &'a [u8],
