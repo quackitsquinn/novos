@@ -1,4 +1,4 @@
-use core::arch::naked_asm;
+use core::{arch::naked_asm, mem::transmute};
 
 use cake::debug;
 use kvmm::KernelPage;
@@ -85,9 +85,19 @@ pub fn load_jump_point() {
 pub unsafe fn jump(kernel: Kernel) -> ! {
     let Kernel { cr3, rip, rsp } = kernel;
 
+    let cr3 = cr3.start_address().as_u64();
+    let rip = rip.as_u64();
+    let rsp = rsp.as_u64();
+
     let ptr = KERNEL_JUMP_LOAD_POINT
         .start_address()
         .as_ptr::<unsafe extern "sysv64" fn(u64, u64, u64) -> !>();
 
-    unsafe { (*ptr)(cr3.start_address().as_u64(), rip.as_u64(), rsp.as_u64()) }
+    let jump_fn: unsafe extern "sysv64" fn(u64, u64, u64) -> ! = unsafe { transmute(ptr) };
+
+    debug!(
+        "Jumping to kernel at {:#x} with CR3 {:#x} and RSP {:#x}",
+        rip, cr3, rsp
+    );
+    unsafe { jump_fn(cr3, rip, rsp) }
 }

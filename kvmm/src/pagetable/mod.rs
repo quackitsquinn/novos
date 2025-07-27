@@ -202,6 +202,10 @@ impl<T: Iterator<Item = (KernelPage, KernelPhysFrame)>> PagetableBuilder<T> {
         }
         (pml4, frame, t)
     }
+
+    pub fn iterator(&mut self) -> &mut T {
+        self.alloc.as_mut().expect("reclaimed")
+    }
 }
 
 #[cfg(all(test, target_arch = "x86_64"))]

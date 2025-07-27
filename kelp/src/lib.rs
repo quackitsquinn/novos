@@ -7,13 +7,22 @@
 
 use goblin::{
     elf::section_header::SHT_SYMTAB,
-    elf64::{header, section_header},
+    elf64::{
+        header,
+        program_header::ProgramHeader,
+        reloc::SIZEOF_RELA,
+        section_header,
+        sym::{SIZEOF_SYM, Sym},
+    },
 };
 
 pub use goblin;
 
 use crate::{
-    phdr::ElfSegments, reloc::ElfRelocations, sections::ElfSections, strings::ElfStrings,
+    phdr::ElfSegments,
+    reloc::{ElfRelocation, ElfRelocations},
+    sections::ElfSections,
+    strings::ElfStrings,
     sym::ElfSymbols,
 };
 
@@ -80,9 +89,39 @@ impl<'a> Elf<'a> {
         Some(unsafe { ElfSymbols::new(self.data, symtab) })
     }
 
+    /// Returns the symbols in the ELF file as a slice.
+    pub fn symbols_slice(&'a self) -> Option<&'a [Sym]> {
+        let symtab = self
+            .sections()
+            .find(|section| section.sh_type == SHT_SYMTAB)?;
+
+        let size = symtab.sh_size as usize / SIZEOF_SYM;
+        let offset = symtab.sh_offset as usize;
+
+        Some(unsafe {
+            core::slice::from_raw_parts(self.data.as_ptr().add(offset).cast::<Sym>(), size)
+        })
+    }
+
     /// Iterate over the segments in the ELF file.
     pub fn segments(&'a self) -> ElfSegments<'a> {
         unsafe { ElfSegments::new(self.data, self.header) }
+    }
+
+    /// Returns the segments in the ELF file as a slice.
+    pub fn segments_slice(&'a self) -> Option<&'a [ProgramHeader]> {
+        if self.header.e_phnum == 0 {
+            return None;
+        }
+        let size = self.header.e_phnum as usize;
+        let offset = self.header.e_phoff as usize;
+
+        Some(unsafe {
+            core::slice::from_raw_parts(
+                self.data.as_ptr().add(offset).cast::<ProgramHeader>(),
+                size,
+            )
+        })
     }
 
     /// Returns the string table in the ELF file.
@@ -97,5 +136,22 @@ impl<'a> Elf<'a> {
             .find(|section| section.sh_type == section_header::SHT_RELA)?;
 
         Some(ElfRelocations::new(self.data, reloc_section))
+    }
+
+    /// Returns the relocations in the ELF file as a slice.
+    pub fn relocations_slice(&'a self) -> Option<&'a [ElfRelocation]> {
+        let reloc_section = self
+            .sections()
+            .find(|section| section.sh_type == section_header::SHT_RELA)?;
+
+        let size = reloc_section.sh_size as usize / SIZEOF_RELA;
+        let offset = reloc_section.sh_offset as usize;
+
+        Some(unsafe {
+            core::slice::from_raw_parts(
+                self.data.as_ptr().add(offset).cast::<ElfRelocation>(),
+                size,
+            )
+        })
     }
 }
