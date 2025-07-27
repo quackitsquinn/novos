@@ -9,6 +9,7 @@ use x86_64::{
 };
 
 mod kernel;
+mod map;
 
 pub(crate) use kernel::Kernel;
 
@@ -77,5 +78,5 @@ pub fn init() -> Kernel {
         Mutex::new(pagetable)
     });
     info!("Offset page table initialized!");
-    kernel::map_kernel()
+    map::map_kernel()
 }
