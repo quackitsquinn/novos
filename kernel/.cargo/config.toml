@@ -2,7 +2,7 @@
 target = "x86_64-unknown-none"
 
 [target.x86_64-unknown-none]
-rustflags = ["-Cforce-frame-pointers=true", "-Cdebuginfo=2"]
+rustflags = ["-Cforce-frame-pointers=true", "-Cdebuginfo=2", "-Crelocation-model=static"]
 
 [unstable]
 build-std = ["core", "compiler_builtins", "alloc"]
