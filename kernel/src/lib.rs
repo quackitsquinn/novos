@@ -70,6 +70,7 @@ pub(crate) unsafe fn init_kernel_services() {
     }
     INIT.call_once(|| ());
     serial::MODULE.init();
+    panic!("limine doesn't exist anymore so everything else will fail spectacularly");
     requests::MODULE.init();
     panic::MODULE.init();
     gdt::MODULE.init();

@@ -16,7 +16,6 @@ impl Serial {
     /// The caller must ensure that the port number is valid, and that the port is not already in use.
     pub unsafe fn new(port: u16) -> Self {
         let mut port = unsafe { SerialPort::new(port) };
-        port.init();
 
         Serial {
             port: Mutex::new(port),
