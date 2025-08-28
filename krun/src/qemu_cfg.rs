@@ -48,7 +48,7 @@ impl QemuConfig {
         let thing = spawn(move || run_kserial(qemu.clone()));
 
         let mut gdb = None;
-        if env::var("DEBUG").is_ok() {
+        if env::var("ATTACH_GDB").is_ok() {
             // If we're in debug mode, we want to wait for the debugger to attach
             gdb = Some(run_gdb(&mut GdbConfig::default()));
         }

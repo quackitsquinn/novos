@@ -60,6 +60,7 @@ All debugging is done through environment variables. The following environment v
 - `ISO`: Override the iso file to boot from.
 - `NO_EXIT`: Prevents QEMU from exiting after the kernel exits.
 - `REBUILD`: Forces a rebuild of the *test* binary. This will have no effect on the kernel itself, as the kernel is not build at runtime.
+- `ATTACH_GDB`: If set, a instance of gdb will be spawned and attached to QEMU. This will cause QEMU to wait for gdb to attach before continuing.
 
 ### Build-time options
 
