@@ -12,7 +12,7 @@ bench = false
 limine = "0.5.0"
 cake = {path = "../cake"}
 uart_16550 = "0.3.1"
-kvmm = {path = "../kvmm"}
+kvmm = {path = "../kvmm", features = ["alloc"]}
 x86_64 = "0.15.2"
 # On this episode of "Incredibly weird quirks with rust-analyzer": This silents the missing function warnings for configured out
 # x86_64 instructions module. I don't know why, as the crate itself doesn't really do anything interesting with configuring stuff out.

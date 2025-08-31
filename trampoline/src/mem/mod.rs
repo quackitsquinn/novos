@@ -1,19 +1,27 @@
 use cake::{Mutex, Once, debug, info};
-use kvmm::phys::{PhysAddrRange, frame_mapper::FrameMapper};
+use kvmm::{
+    KernelPage,
+    phys::{PhysAddrRange, frame_mapper::FrameMapper},
+    virt::alloc::SimplePageAllocator,
+};
 use limine::memory_map::{Entry, EntryType};
 
 use x86_64::{
     PhysAddr, VirtAddr,
     registers::control::Cr3,
-    structures::paging::{OffsetPageTable, PageTable},
+    structures::paging::{Mapper, OffsetPageTable, Page, PageTable, PageTableFlags, frame},
 };
 
+mod alloc;
 mod kernel;
 mod map;
 
 pub(crate) use kernel::Kernel;
 
-use crate::requests::MEMORY_MAP;
+use crate::{mem::alloc::TrampolineAllocator, requests::MEMORY_MAP};
+
+const ALLOC_BASE: VirtAddr = VirtAddr::new(0x100_000_100);
+const ALLOC_PAGES: usize = 256; // 1 MiB
 
 pub struct UsableRangeIterator {
     map: &'static [&'static Entry],
@@ -52,6 +60,8 @@ impl Iterator for UsableRangeIterator {
 
 pub(crate) static MAPPER: Once<Mutex<FrameMapper<UsableRangeIterator>>> = Once::new();
 pub(crate) static PAGETABLE: Once<Mutex<OffsetPageTable>> = Once::new();
+#[global_allocator]
+pub(crate) static ALLOCATOR: TrampolineAllocator = TrampolineAllocator::new();
 
 pub fn init() -> Kernel {
     info!("Initializing frame mapper and offset page table...");
@@ -78,5 +88,34 @@ pub fn init() -> Kernel {
         Mutex::new(pagetable)
     });
     info!("Offset page table initialized!");
+    init_alloc();
     map::map_kernel()
+}
+
+fn init_alloc() {
+    info!("Initializing global allocator...");
+
+    let base_page = KernelPage::containing_address(ALLOC_BASE);
+    let end_page = KernelPage::containing_address(ALLOC_BASE + 4096 * ALLOC_PAGES as u64);
+    let page_range = base_page..end_page;
+
+    let mut mapper_guard = PAGETABLE.get().expect("PAGETABLE not initialized").lock();
+    let mut frame_mapper_guard = MAPPER.get().expect("MAPPER not initialized").lock();
+    let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE | PageTableFlags::NO_EXECUTE;
+
+    for page in page_range {
+        let frame = frame_mapper_guard
+            .next_frame()
+            .expect("Out of memory: could not allocate frame for global allocator");
+        unsafe {
+            mapper_guard
+                .map_to(page, frame, flags, &mut *frame_mapper_guard)
+                .expect("map_to failed")
+                .flush();
+        }
+    }
+
+    let allocator = unsafe { SimplePageAllocator::new(base_page, ALLOC_PAGES) };
+    ALLOCATOR.init(allocator);
+    info!("Global allocator initialized!");
 }

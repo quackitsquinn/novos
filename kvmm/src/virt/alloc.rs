@@ -1,5 +1,6 @@
 use crate::KernelPage;
 use bitvec::{BitArr, array::BitArray, order::Msb0};
+use cake::error;
 use x86_64::structures::paging::{Page, page::PageRange};
 
 pub struct SimplePageAllocator {
@@ -42,6 +43,7 @@ impl SimplePageAllocator {
             let page = self.range.start + start as u64;
             return page.start_address().as_mut_ptr();
         }
+        error!("alloc failed: out of memory");
         core::ptr::null_mut()
     }
 
@@ -52,6 +54,11 @@ impl SimplePageAllocator {
     /// If `pagecount` is incorrect in any way, the behavior is undefined and will likely lead to memory corruption.
     pub unsafe fn dealloc(&mut self, ptr: *mut u8, pagecount: usize) {
         let index = self.get_index_from_ptr(ptr);
+        if index.is_none() {
+            error!("dealloc failed: pointer {:p} is out of range", ptr);
+            return;
+        }
+        let index = index.unwrap();
         for i in index as usize..index as usize + pagecount {
             self.bits.set(i, false);
         }
@@ -67,6 +74,11 @@ impl SimplePageAllocator {
             return ptr;
         }
         let index = self.get_index_from_ptr(ptr);
+        if index.is_none() {
+            error!("realloc failed: pointer {:p} is out of range", ptr);
+            return core::ptr::null_mut();
+        }
+        let index = index.unwrap();
         let index_end = index + old_pagecount;
         let new_index_end = index + new_pagecount;
 
@@ -103,6 +115,7 @@ impl SimplePageAllocator {
 
         // Fallback to bog standard alloc + copy + free
         // TODO: Somehow allow for in-place reallocs that move the memory block (e.g. moving the block back a bit)
+        // Would also help reduce fragmentation
         #[allow(unreachable_code)]
         let new_ptr = unsafe { self.alloc(new_pagecount) };
         if !new_ptr.is_null() {
@@ -149,13 +162,32 @@ impl SimplePageAllocator {
         None
     }
 
-    fn get_index_from_ptr(&self, ptr: *mut u8) -> usize {
+    fn get_index_from_ptr(&self, ptr: *mut u8) -> Option<usize> {
         let page = KernelPage::containing_address(x86_64::VirtAddr::new(ptr as u64));
         let index =
             (page.start_address().as_u64() - self.range.start.start_address().as_u64()) / 0x1000;
-        assert!(index < self.cap as u64, "Pointer {:p} is out of range", ptr);
-        index as usize
+        if index >= self.cap as u64 {
+            return None;
+        }
+        Some(index as usize)
     }
+}
+
+/// Converts a `usize` size in bytes to the number of 4KiB pages required to satisfy the size.
+pub fn usize_to_pages(size: usize) -> usize {
+    let page_size = 4096;
+    let pages = (size + page_size - 1) / page_size;
+    pages
+}
+
+/// Converts a `core::alloc::Layout` to the number of 4KiB pages required to satisfy the layout.
+///
+/// This does not account for alignment above 4KiB.
+#[cfg(any(feature = "alloc", test))]
+pub fn layout_to_pages(layout: core::alloc::Layout) -> usize {
+    let size = layout.size();
+    let pages = usize_to_pages(size);
+    pages
 }
 
 #[cfg(test)]
@@ -258,5 +290,20 @@ mod tests {
         let ptr_realloc = unsafe { allocator.realloc(ptr, 3, 5) };
         assert!(ptr_realloc.is_null());
         assert!(allocator.realloc_fallback);
+    }
+
+    #[test]
+    fn test_layout_to_pages() {
+        for i in 1..4097 {
+            let layout = core::alloc::Layout::from_size_align(i, 1).unwrap();
+            let pages = layout_to_pages(layout);
+            assert_eq!(pages, 1);
+        }
+
+        for i in 4097..8193 {
+            let layout = core::alloc::Layout::from_size_align(i, 1).unwrap();
+            let pages = layout_to_pages(layout);
+            assert_eq!(pages, 2);
+        }
     }
 }
