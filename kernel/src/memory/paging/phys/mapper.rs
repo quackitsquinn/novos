@@ -3,13 +3,12 @@ use limine::{
     memory_map::{Entry, EntryType},
     response::MemoryMapResponse,
 };
-use log::{debug, error, info};
+use log::{debug, error, info, trace};
 use x86_64::{
     structures::paging::{
         mapper::{MapToError, UnmapError},
         page::PageRangeInclusive,
-        FrameAllocator, FrameDeallocator, Mapper, OffsetPageTable, PhysFrame,
-        Size4KiB,
+        FrameAllocator, FrameDeallocator, Mapper, OffsetPageTable, PhysFrame, Size4KiB,
     },
     PhysAddr,
 };
@@ -159,7 +158,6 @@ impl PageFrameAllocator {
             unsafe {
                 pagetable.map_to(page, frame, flags, &mut *self)?.flush();
             }
-            debug!("Mapped page {:?} to frame {:?}", page, frame);
         }
         Ok(())
     }

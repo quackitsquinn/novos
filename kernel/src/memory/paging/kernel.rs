@@ -1,5 +1,6 @@
-use core::convert::Infallible;
+use core::{convert::Infallible, iter};
 
+use goblin::elf64::program_header::ProgramHeader;
 use log::{debug, info};
 use x86_64::{
     registers::control::{Cr3, Cr3Flags},
@@ -27,17 +28,6 @@ pub fn create_kernel_pagetable() -> KernelPhysFrame {
     // First, map the kernel to the same address as right now.
     map_kernel(&mut builder);
 
-    for (indexes, pagetable) in builder.pagetables.iter() {
-        info!("{:?}", indexes);
-        for page in pagetable
-            .1
-            .iter()
-            .filter(|p| p.flags().contains(PageTableFlags::PRESENT))
-        {
-            info!("{:?}", page);
-        }
-    }
-
     builder.build()
 }
 
@@ -62,24 +52,50 @@ fn map_kernel<T: Iterator<Item = Page>>(builder: &mut PageTableBuilder<T>) {
     };
 
     for segment in kernel_elf.segments() {
-        info!("Mapping section: {:?}", segment);
-        let pt_flags = segment_to_pt(segment.p_flags);
-        let start_page = KernelPage::containing_address(VirtAddr::new(segment.p_vaddr));
-        let end_page =
-            KernelPage::containing_address(VirtAddr::new(segment.p_vaddr + segment.p_memsz));
-        let mut page_range = KernelPage::range_inclusive(start_page, end_page);
-        let mut segment_frames = kernel_elf.data
-            [segment.p_offset as usize..=(segment.p_offset + segment.p_filesz) as usize]
-            .chunks(4096)
-            .map(|c| {
-                opt.translate_page(KernelPage::containing_address(VirtAddr::new(
-                    c.as_ptr() as usize as u64,
-                )))
-                .expect("Failed to translate page")
-            });
-
-        builder.map_range(&mut page_range, &mut segment_frames, pt_flags);
+        debug!("Mapping segment: {:?}", segment);
+        map_segment(builder, segment, &opt);
     }
+
+    map_stack(builder, &opt);
+}
+
+fn map_segment(
+    builder: &mut PageTableBuilder<impl Iterator<Item = KernelPage>>,
+    segment: &ProgramHeader,
+    opt: &OffsetPageTable,
+) {
+    let pt_flags = segment_to_pt(segment.p_flags);
+    let start_page = KernelPage::containing_address(VirtAddr::new(segment.p_vaddr));
+    let end_page = KernelPage::containing_address(VirtAddr::new(segment.p_vaddr + segment.p_memsz));
+    let mut page_range = KernelPage::range_inclusive(start_page, end_page);
+
+    let mut segment_frames =
+        (start_page..=end_page).map(|p| opt.translate_page(p).expect("Failed to translate page"));
+
+    builder.map_range(&mut page_range, &mut segment_frames, pt_flags);
+}
+
+fn map_stack(
+    builder: &mut PageTableBuilder<impl Iterator<Item = KernelPage>>,
+    opt: &OffsetPageTable,
+) {
+    let stack_base = KernelPage::containing_address(VirtAddr::new(
+        *crate::STACK_BASE.get().expect("Stack base not initialized"),
+    ));
+    let stack_end = KernelPage::containing_address(VirtAddr::new(
+        // x86_64 stacks grow downwards
+        *crate::STACK_BASE.get().expect("Stack base not initialized") - (crate::STACK_SIZE - 1),
+    ));
+    let mut stack_range = KernelPage::range_inclusive(stack_end, stack_base);
+
+    let mut segment_frames =
+        (stack_end..=stack_base).map(|p| opt.translate_page(p).expect("Failed to translate page"));
+
+    builder.map_range(
+        &mut stack_range,
+        &mut segment_frames,
+        PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
+    );
 }
 
 fn segment_to_pt(segment_flags: u32) -> PageTableFlags {

@@ -38,6 +38,8 @@ pub mod util;
 
 pub const STACK_SIZE: u64 = 1 << 16; // Limine defaults to 16KiB
 
+pub static STACK_BASE: Once<u64> = Once::new();
+
 #[used]
 static BASE_REVISION: BaseRevision = BaseRevision::with_revision(3);
 
@@ -52,7 +54,9 @@ pub fn hlt_loop() -> ! {
 
 /// Initializes the kernel and takes over the system.
 /// This function should be called from the `_start` function.
-pub fn init_kernel() -> ! {
+#[unsafe(no_mangle)]
+pub extern "sysv64" fn init_kernel(rsp: u64) -> ! {
+    STACK_BASE.call_once(|| rsp);
     x86_64::instructions::interrupts::disable();
     unsafe {
         init_kernel_services();
@@ -60,11 +64,14 @@ pub fn init_kernel() -> ! {
     x86_64::instructions::interrupts::disable();
     loop {}
 }
+
 /// Loads all the kernel services that will not take over the system.
 ///
 /// # Safety
 /// The caller *must* ensure that this function is only called once. Calling it more than once will
 /// result in undefined behavior.
+///
+/// The caller must also ensure that [STACK_BASE] has been initialized.
 pub(crate) unsafe fn init_kernel_services() {
     static INIT: Once<()> = Once::new();
     if INIT.is_completed() {
