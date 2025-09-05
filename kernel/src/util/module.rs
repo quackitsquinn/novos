@@ -4,6 +4,7 @@ use log::info;
 use spin::Once;
 
 /// A kernel module that can be initialized once. If the initialization fails, the kernel will panic.
+#[derive(Debug)]
 pub struct KernelModule<T>
 where
     T: Debug + Display,
@@ -51,16 +52,17 @@ where
 
 #[macro_export]
 macro_rules! declare_module {
-    ($name: expr, $func: ident, $error_type: ty) => {
+    ($name: literal, $func: ident, $error_type: ty) => {
         pub static MODULE: $crate::util::KernelModule<$error_type> =
             $crate::util::KernelModule::new($name, $func);
 
+        #[allow(dead_code)]
         pub fn is_initialized() -> bool {
             MODULE.is_initialized()
         }
     };
 
-    ($name: expr, $func: ident) => {
+    ($name: literal, $func: ident) => {
         declare_module!($name, $func, core::convert::Infallible);
     };
 }
