@@ -1,4 +1,3 @@
-use limine::framebuffer::Framebuffer as LimineFramebuffer;
 use log::info;
 
 use crate::display::req_data::FramebufferInfo;

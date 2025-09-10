@@ -1,15 +1,15 @@
-use alloc::collections::{btree_map::Entry, BTreeMap};
+use alloc::collections::BTreeMap;
 use log::debug;
 use x86_64::{
     structures::paging::{
-        frame::PhysFrameRange, page::PageRange, page_table::PageTableEntry, FrameAllocator, Mapper,
-        Page, PageTable, PageTableFlags, PageTableIndex,
+        page_table::PageTableEntry, FrameAllocator, Mapper, PageTable, PageTableFlags,
+        PageTableIndex,
     },
     VirtAddr,
 };
 
 use crate::memory::paging::{
-    phys::FRAME_ALLOCATOR, KernelPage, KernelPageSize, KernelPhysFrame, OFFSET_PAGE_TABLE,
+    phys::FRAME_ALLOCATOR, KernelPage, KernelPhysFrame, OFFSET_PAGE_TABLE,
 };
 
 pub struct PageTableBuilder<'a, T>

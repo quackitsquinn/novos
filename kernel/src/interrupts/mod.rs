@@ -8,10 +8,7 @@ pub mod hardware;
 mod macros;
 
 use crate::{
-    context::{
-        InterruptCodeContext, InterruptContext,
-        PageFaultInterruptContext,
-    },
+    context::{InterruptCodeContext, InterruptContext, PageFaultInterruptContext},
     declare_module, init_interrupt_table, interrupt_wrapper,
 };
 

@@ -1,26 +1,18 @@
-use core::{convert::Infallible, ptr, slice};
+use core::{convert::Infallible, slice};
 
 use limine::{
-    file::File,
-    framebuffer::Framebuffer,
     paging::Mode,
     request::{
         ExecutableAddressRequest, ExecutableFileRequest, FramebufferRequest, HhdmRequest,
         MemoryMapRequest, PagingModeRequest,
     },
-    response::{
-        ExecutableAddressResponse, ExecutableFileResponse, FramebufferResponse, MemoryMapResponse,
-    },
+    response::{ExecutableAddressResponse, ExecutableFileResponse},
 };
-use log::info;
 use spin::Once;
 
 use crate::{
-    declare_module,
-    display::req_data::FramebufferInfo,
-    memory::req_data::MemoryMap,
-    panic::elf::Elf,
-    util::{LimineRequest, OnceMutex},
+    declare_module, display::req_data::FramebufferInfo, elf::Elf, memory::req_data::MemoryMap,
+    util::LimineRequest,
 };
 
 #[used]

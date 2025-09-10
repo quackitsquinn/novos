@@ -1,6 +1,4 @@
-
 use kalloc::{block_alloc::allocator::BlockAllocator, GlobalAllocatorWrapper};
-
 
 #[global_allocator]
 pub static ALLOCATOR: GlobalAllocatorWrapper<BlockAllocator> = GlobalAllocatorWrapper::new();

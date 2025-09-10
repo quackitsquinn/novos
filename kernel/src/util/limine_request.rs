@@ -1,9 +1,6 @@
 use core::sync::atomic::AtomicBool;
 
-use limine::{request::FramebufferRequest, response::FramebufferResponse};
 use spin::Once;
-
-use crate::util::OnceMutex;
 
 pub trait RawLimineRequest {
     type Response;

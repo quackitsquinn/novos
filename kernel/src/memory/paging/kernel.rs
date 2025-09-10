@@ -1,6 +1,6 @@
 //! Big ol' file that handles setting up the kernel's page tables.
 //! In the future, this will almost certainly be converted into it's own module.
-use core::{convert::Infallible, iter, ptr};
+use core::convert::Infallible;
 
 use goblin::elf64::program_header::ProgramHeader;
 use log::{debug, info};
@@ -9,27 +9,19 @@ use x86_64::{
     structures::paging::{
         frame::PhysFrameRangeInclusive,
         mapper::{MappedFrame, TranslateResult},
-        page::{PageRange, PageRangeInclusive},
-        page_table::PageTableEntry,
-        Mapper, OffsetPageTable, Page, PageTable, PageTableFlags, PageTableIndex, PhysFrame,
-        RecursivePageTable, Translate,
+        OffsetPageTable, Page, PageTable, PageTableFlags, PhysFrame, Translate,
     },
-    PhysAddr, VirtAddr,
+    VirtAddr,
 };
 
 use crate::{
     declare_module,
-    elf::Elf,
-    memory::{
-        paging::{
-            builder::PageTableBuilder,
-            map::{FRAMEBUFFER_START_PAGE, KERNEL_REMAP_PAGE_RANGE},
-            KernelPage, KernelPageSize, KernelPhysFrame, OFFSET_PAGE_TABLE,
-        },
-        stack,
+    memory::paging::{
+        builder::PageTableBuilder,
+        map::{FRAMEBUFFER_START_PAGE, KERNEL_REMAP_PAGE_RANGE},
+        KernelPage, KernelPhysFrame,
     },
-    print,
-    requests::{EXECUTABLE_ADDRESS, EXECUTABLE_ELF, EXECUTABLE_FILE, FRAMEBUFFER},
+    requests::{EXECUTABLE_ADDRESS, EXECUTABLE_ELF, FRAMEBUFFER},
     sprint,
 };
 

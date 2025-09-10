@@ -1,11 +1,7 @@
-use core::{mem, ops::Deref};
+use core::ops::Deref;
 
-use alloc::vec::Vec;
 use arrayvec::ArrayVec;
 use limine::{memory_map::Entry, response::MemoryMapResponse};
-use spin::Mutex;
-
-use crate::util::requests_terminated;
 
 // FIXME: Somehow account for Entry not implementing Debug for totally sane reasons.
 #[allow(missing_debug_implementations)]

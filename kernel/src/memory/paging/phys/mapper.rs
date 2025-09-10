@@ -1,9 +1,6 @@
 use alloc::vec::Vec;
-use limine::{
-    memory_map::{Entry, EntryType},
-    response::MemoryMapResponse,
-};
-use log::{debug, error, info, trace};
+use limine::memory_map::{Entry, EntryType};
+use log::{debug, error, info};
 use x86_64::{
     structures::paging::{
         mapper::{MapToError, UnmapError},
@@ -13,11 +10,7 @@ use x86_64::{
     PhysAddr,
 };
 
-use crate::memory::{
-    self,
-    paging::{KernelPage, KernelPhysFrame},
-    req_data::MemoryMap,
-};
+use crate::memory::{self, paging::KernelPhysFrame, req_data::MemoryMap};
 
 pub(crate) struct PageFrameAllocator {
     map: &'static MemoryMap,
