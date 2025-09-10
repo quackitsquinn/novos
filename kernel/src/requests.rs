@@ -18,6 +18,7 @@ use spin::Once;
 use crate::{
     declare_module,
     display::req_data::FramebufferInfo,
+    memory::req_data::MemoryMap,
     panic::elf::Elf,
     util::{LimineRequest, OnceMutex},
 };
@@ -27,8 +28,8 @@ pub static PHYSICAL_MEMORY_OFFSET_REQUEST: HhdmRequest = HhdmRequest::new();
 pub static PHYSICAL_MEMORY_OFFSET: Once<u64> = Once::new();
 
 #[used]
-pub static MEMORY_MAP_REQUEST: MemoryMapRequest = MemoryMapRequest::new();
-pub static MEMORY_MAP: Once<&'static MemoryMapResponse> = Once::new();
+pub static MEMORY_MAP: LimineRequest<MemoryMapRequest, MemoryMap> =
+    LimineRequest::new(MemoryMapRequest::new());
 
 #[used]
 pub static PAGING_MODE_REQUEST: PagingModeRequest =
@@ -54,8 +55,7 @@ pub fn init() -> Result<(), Infallible> {
         .offset();
     PHYSICAL_MEMORY_OFFSET.call_once(|| offset);
 
-    let mmap = MEMORY_MAP_REQUEST.get_response().unwrap();
-    MEMORY_MAP.call_once(|| mmap);
+    MEMORY_MAP.init(MemoryMap::new);
 
     let exec_file = EXECUTABLE_FILE_REQUEST.get_response().unwrap();
     EXECUTABLE_FILE.call_once(|| exec_file);

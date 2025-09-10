@@ -21,6 +21,8 @@ where
     curr_page_range: T,
     /// Maps a tuple of (PML4 index, PDPT index, PD index) to a tuple of (frame, PageTable)
     /// This is weird, but keep in mind that as soon as this pagetable is loaded, it will be recursively mapped to the PML4 entry 510.
+    // TODO: There is a way to optimize this by using the fact that we discard the lower 12 bits of the address.
+    // It can be compacted to a single u64 key, which then can be formatted in a way to appease the b-tree gods.
     pub pagetables: BTreeMap<
         (
             PageTableIndex,

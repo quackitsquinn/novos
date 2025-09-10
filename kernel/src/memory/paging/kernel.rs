@@ -68,6 +68,7 @@ fn map_kernel<T: Iterator<Item = Page>>(builder: &mut PageTableBuilder<T>) {
 
     map_stack(builder, &opt);
     map_framebuffer(builder, &opt);
+    map_heap(builder, &opt);
 }
 
 fn map_segment(
@@ -148,6 +149,21 @@ fn map_framebuffer(
     unsafe {
         fb.update_ptr(remap_ptr(fb.ptr_unchecked(), start_page).cast_mut());
     }
+}
+
+fn map_heap(
+    builder: &mut PageTableBuilder<impl Iterator<Item = KernelPage>>,
+    opt: &OffsetPageTable,
+) {
+    let heap_start = crate::memory::paging::map::KERNEL_HEAP_START_PAGE;
+    let heap_end = crate::memory::paging::map::KERNEL_HEAP_END_PAGE;
+    let mut heap_range = KernelPage::range_inclusive(heap_start, heap_end);
+
+    builder.map_range(
+        &mut heap_range,
+        &mut CopyPages::new(heap_start..=heap_end, opt),
+        PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
+    );
 }
 
 /// A helper struct to copy pages from one page table to another.
@@ -258,16 +274,6 @@ fn init() -> Result<(), Infallible> {
         kernel_frame
     );
 
-    // This is fine since nothing uses the internal reference just yet.
-    let fb = FRAMEBUFFER.get();
-
-    // Framebuffer attempts to dereference it's inner pointer and torpedoes the whole system due to the page fault handler
-    // page faulting due to the kernel elf not being mapped in the new pagetable.
-    // TODO: copy kernel to new pagetable
-    let total = fb.pitch * fb.height;
-    info!("Framebuffer size: {} bytes", total);
-    unsafe { ptr::write_bytes(fb.ptr(), 0xff, total as usize) };
-    loop {}
     Ok(())
 }
 

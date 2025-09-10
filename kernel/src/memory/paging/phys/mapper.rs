@@ -16,10 +16,11 @@ use x86_64::{
 use crate::memory::{
     self,
     paging::{KernelPage, KernelPhysFrame},
+    req_data::MemoryMap,
 };
 
 pub struct PageFrameAllocator {
-    map: &'static MemoryMapResponse,
+    map: &'static MemoryMap,
     off: usize,
     current: Entry,
     entry_offset: u64,
@@ -27,10 +28,9 @@ pub struct PageFrameAllocator {
 }
 
 impl PageFrameAllocator {
-    pub fn new(map: &'static MemoryMapResponse) -> Self {
+    pub fn new(map: &'static MemoryMap) -> Self {
         // Find the first usable entry
         let (current, entry) = map
-            .entries()
             .iter()
             .enumerate()
             .find(|e| e.1.entry_type == EntryType::USABLE)
@@ -38,7 +38,7 @@ impl PageFrameAllocator {
             .clone();
 
         debug!("Frames in memory map {{ ");
-        for entry in map.entries() {
+        for entry in map.iter() {
             debug!(
                 "  [{:x}]({:x}): {}",
                 entry.base,
@@ -51,7 +51,7 @@ impl PageFrameAllocator {
         Self {
             map,
             off: current + 1,
-            current: **entry,
+            current: *entry,
             entry_offset: 0,
             // This is okay before we have a heap because this will not allocate until anything is pushed to it
             unused: Vec::new(),
@@ -61,12 +61,11 @@ impl PageFrameAllocator {
     fn next_usable(&mut self) -> Option<(usize, Entry)> {
         let mmr = self
             .map
-            .entries()
             .iter()
             .enumerate()
             .skip(self.off)
             .find(|e| e.1.entry_type == EntryType::USABLE)
-            .map(|(i, e)| (i, **e));
+            .map(|(i, e)| (i, *e));
         if let Some((off, entry)) = mmr {
             self.off = off + 1;
             info!(

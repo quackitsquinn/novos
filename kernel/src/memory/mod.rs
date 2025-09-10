@@ -11,6 +11,7 @@ use crate::{declare_module, memory::paging::KernelPageSize};
 
 pub mod allocator;
 pub mod paging;
+pub mod req_data;
 pub mod stack;
 
 pub const ALLOC_DEBUG: bool = option_env!("ALLOC_DEBUG").is_some();

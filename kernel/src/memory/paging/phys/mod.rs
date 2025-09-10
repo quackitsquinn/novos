@@ -10,8 +10,6 @@ pub static FRAME_ALLOCATOR: OnceMutex<PageFrameAllocator> = OnceMutex::uninitial
 declare_module!("physical memory mapping", init, &'static str);
 
 fn init() -> Result<(), &'static str> {
-    FRAME_ALLOCATOR.init(PageFrameAllocator::new(
-        MEMORY_MAP.get().expect("memory map uninit"),
-    ));
+    FRAME_ALLOCATOR.init(PageFrameAllocator::new(MEMORY_MAP.get()));
     Ok(())
 }

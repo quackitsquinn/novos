@@ -26,6 +26,7 @@ thiserror = { version = "2.0.3", default-features = false }
 rustc-demangle = { version = "0.1.24", default-features = false }
 # TODO: Find an alternative to this, because it's now deprecated
 paste = "1.0.15"
+arrayvec = { version = "0.7.6", default-features = false }
 
 [profile.release]
 panic = "abort"
