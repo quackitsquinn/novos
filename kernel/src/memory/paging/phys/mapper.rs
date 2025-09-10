@@ -76,15 +76,15 @@ impl PageFrameAllocator {
         page_range: PageRangeInclusive<Size4KiB>,
         flags: x86_64::structures::paging::PageTableFlags,
     ) -> Result<(), MapError> {
-        let mut mapper = memory::paging::OFFSET_PAGE_TABLE.get();
+        let mut mapper = memory::paging::KERNEL_PAGE_TABLE.get();
         unsafe { self.map_range_pagetable(page_range, flags, &mut *mapper) }
     }
 
-    pub unsafe fn map_range_pagetable(
+    pub unsafe fn map_range_pagetable<T: Mapper<Size4KiB>>(
         &mut self,
         page_range: PageRangeInclusive<Size4KiB>,
         flags: x86_64::structures::paging::PageTableFlags,
-        pagetable: &mut OffsetPageTable,
+        pagetable: &mut T,
     ) -> Result<(), MapError> {
         for page in page_range {
             let frame = self.allocate_frame().ok_or(MapError::NoUsableMemory)?;
@@ -99,14 +99,14 @@ impl PageFrameAllocator {
         &mut self,
         page_range: PageRangeInclusive<Size4KiB>,
     ) -> Result<(), MapError> {
-        let mut mapper = memory::paging::OFFSET_PAGE_TABLE.get();
+        let mut mapper = memory::paging::KERNEL_PAGE_TABLE.get();
         unsafe { self.unmap_range_pagetable(page_range, &mut *mapper) }
     }
 
-    pub unsafe fn unmap_range_pagetable(
+    pub unsafe fn unmap_range_pagetable<T: Mapper<Size4KiB>>(
         &mut self,
         page_range: PageRangeInclusive<Size4KiB>,
-        pagetable: &mut OffsetPageTable,
+        pagetable: &mut T,
     ) -> Result<(), MapError> {
         for page in page_range {
             unsafe {

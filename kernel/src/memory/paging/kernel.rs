@@ -9,7 +9,7 @@ use x86_64::{
     structures::paging::{
         frame::PhysFrameRangeInclusive,
         mapper::{MappedFrame, TranslateResult},
-        OffsetPageTable, Page, PageTable, PageTableFlags, PhysFrame, Translate,
+        OffsetPageTable, Page, PageTable, PageTableFlags, PhysFrame, RecursivePageTable, Translate,
     },
     VirtAddr,
 };
@@ -19,13 +19,14 @@ use crate::{
     memory::paging::{
         builder::PageTableBuilder,
         map::{FRAMEBUFFER_START_PAGE, KERNEL_REMAP_PAGE_RANGE},
-        KernelPage, KernelPhysFrame,
+        KernelPage, KernelPhysFrame, KERNEL_PAGE_TABLE,
     },
     requests::{EXECUTABLE_ADDRESS, FRAMEBUFFER, KERNEL_ELF},
     sprint,
+    util::terminate_requests,
 };
 
-pub fn create_kernel_pagetable() -> KernelPhysFrame {
+pub fn create_kernel_pagetable() -> (KernelPhysFrame, KernelPage) {
     let mut builder = PageTableBuilder::new(KERNEL_REMAP_PAGE_RANGE);
     // First, map the kernel to the same address as right now.
     map_kernel(&mut builder);
@@ -38,8 +39,6 @@ fn map_kernel<T: Iterator<Item = Page>>(builder: &mut PageTableBuilder<T>) {
         .get()
         .expect("Executable address not initialized");
     let kernel_elf = KERNEL_ELF.get().elf();
-        .get()
-        .expect("Executable ELF not initialized");
     let opt = {
         // this is gross and a bad way to do this, but because all of the pagetable mapping functions require the global
         // OffsetPageTable, we have to create a new one here.
@@ -251,7 +250,7 @@ fn remap_ptr(ptr: *const u8, new_page: KernelPage) -> *const u8 {
 }
 
 fn init() -> Result<(), Infallible> {
-    let kernel_frame = create_kernel_pagetable();
+    let (kernel_frame, new_ptr) = create_kernel_pagetable();
     info!(
         "Kernel page table created with root frame: {:#x?}",
         kernel_frame
@@ -261,10 +260,17 @@ fn init() -> Result<(), Infallible> {
         Cr3::write(kernel_frame, Cr3Flags::empty());
     }
 
-    sprint!(
-        "Kernel paging initialized with root frame: {:#x?}\n",
+    info!(
+        "Kernel paging initialized with root frame: {:#x?}! Switching KernelPageTable.\n",
         kernel_frame
     );
+
+    KERNEL_PAGE_TABLE.get().switch(
+        RecursivePageTable::new(unsafe { &mut *new_ptr.start_address().as_mut_ptr::<PageTable>() })
+            .unwrap(),
+    );
+
+    unsafe { terminate_requests() };
 
     Ok(())
 }

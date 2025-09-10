@@ -2,14 +2,14 @@ use alloc::collections::BTreeMap;
 use log::debug;
 use x86_64::{
     structures::paging::{
-        page_table::PageTableEntry, FrameAllocator, Mapper, PageTable, PageTableFlags,
+        page_table::PageTableEntry, FrameAllocator, Mapper, Page, PageTable, PageTableFlags,
         PageTableIndex,
     },
     VirtAddr,
 };
 
 use crate::memory::paging::{
-    phys::FRAME_ALLOCATOR, KernelPage, KernelPhysFrame, OFFSET_PAGE_TABLE,
+    phys::FRAME_ALLOCATOR, KernelPage, KernelPhysFrame, KERNEL_PAGE_TABLE,
 };
 
 pub struct PageTableBuilder<'a, T>
@@ -38,8 +38,10 @@ where
     T: Iterator<Item = KernelPage>,
 {
     const RECURSIVE_ENTRY: usize = 509;
+    const RECURSIVE_ENTRY_INDEX: PageTableIndex = PageTableIndex::new(Self::RECURSIVE_ENTRY as u16);
+
     pub fn new(mut page_range: T) -> Self {
-        let mut pgtbl = OFFSET_PAGE_TABLE.get();
+        let mut pgtbl = KERNEL_PAGE_TABLE.get();
         let mut alc = FRAME_ALLOCATOR.get();
         let root_frame = alc
             .allocate_frame()
@@ -87,7 +89,7 @@ where
 
     fn create_pagetable(&mut self) -> (KernelPhysFrame, &'a mut PageTable) {
         let mut alc = FRAME_ALLOCATOR.get();
-        let mut offset_page_table = OFFSET_PAGE_TABLE.get();
+        let mut offset_page_table = KERNEL_PAGE_TABLE.get();
         let pagetable_frame = alc
             .allocate_frame()
             .expect("Unable to allocate root frame for page table");
@@ -196,8 +198,16 @@ where
         }
     }
 
-    pub fn build(self) -> KernelPhysFrame {
-        self.root
+    pub fn build(self) -> (KernelPhysFrame, KernelPage) {
+        (
+            self.root,
+            Page::from_page_table_indices(
+                Self::RECURSIVE_ENTRY_INDEX,
+                Self::RECURSIVE_ENTRY_INDEX,
+                Self::RECURSIVE_ENTRY_INDEX,
+                Self::RECURSIVE_ENTRY_INDEX,
+            ),
+        )
     }
 }
 

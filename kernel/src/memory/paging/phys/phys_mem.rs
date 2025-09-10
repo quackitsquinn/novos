@@ -5,7 +5,7 @@ use x86_64::{
 
 use crate::memory::paging::{
     vaddr_mapper::{VirtualAddressRange, VIRT_MAPPER},
-    OFFSET_PAGE_TABLE,
+    KERNEL_PAGE_TABLE,
 };
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -70,7 +70,7 @@ pub fn map_address(
 
     let inner_page_offset = addr.as_u64() % 4096;
 
-    let mut offset_page_table = OFFSET_PAGE_TABLE.get();
+    let mut offset_page_table = KERNEL_PAGE_TABLE.get();
     let mut frame_allocator = crate::memory::paging::phys::FRAME_ALLOCATOR.get();
     for (page, frame) in addr_range.as_page_range().zip(&mut range) {
         unsafe {
@@ -93,7 +93,7 @@ pub fn map_address(
 
 pub fn unmap_address(map: PhysicalMemoryMap) {
     let mut vmapper = VIRT_MAPPER.get();
-    let mut offset_page_table = OFFSET_PAGE_TABLE.get();
+    let mut offset_page_table = KERNEL_PAGE_TABLE.get();
     for page in map.virt_range.as_page_range() {
         offset_page_table
             .unmap(page)

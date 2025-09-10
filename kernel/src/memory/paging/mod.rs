@@ -8,8 +8,11 @@ use x86_64::{
 
 use crate::{declare_module, requests::PHYSICAL_MEMORY_OFFSET, util::OnceMutex};
 
+pub use self::page_table::KernelPageTable;
+
 mod builder;
 pub mod kernel;
+mod page_table;
 pub mod phys;
 pub mod vaddr_mapper;
 
@@ -17,7 +20,7 @@ pub type KernelPageSize = Size4KiB;
 pub type KernelPage = Page<KernelPageSize>;
 pub type KernelPhysFrame = PhysFrame<KernelPageSize>;
 
-pub static OFFSET_PAGE_TABLE: OnceMutex<OffsetPageTable> = OnceMutex::uninitialized();
+pub static KERNEL_PAGE_TABLE: OnceMutex<KernelPageTable> = OnceMutex::uninitialized();
 
 declare_module!("paging", init);
 
@@ -27,7 +30,8 @@ fn init() -> Result<(), Infallible> {
         .get()
         .expect("physical memory offset uninitialized");
     let page_table = unsafe { &mut *((cr3.0.start_address().as_u64() + off) as *mut PageTable) };
-    OFFSET_PAGE_TABLE.init(unsafe { OffsetPageTable::new(page_table, VirtAddr::new(off)) });
+    let offset_table = unsafe { OffsetPageTable::new(page_table, VirtAddr::new(off)) };
+    KERNEL_PAGE_TABLE.init(KernelPageTable::new(offset_table));
 
     phys::MODULE.init();
     Ok(())
@@ -76,7 +80,7 @@ pub mod map {
 
     pub const KERNEL_START: u64 = HIGHER_HALF_START + 0x1000_0000;
 
-    define_map!(KERNEL_HEAP, KERNEL_START, 0x10_0000); // 1MB
+    define_map!(KERNEL_HEAP, KERNEL_START, 0x100_0000); // 16MB
     define_map!(KERNEL_PHYS_MAP, KERNEL_HEAP_END.as_u64(), 0x1000_0000); // 256MB
 
     // Area used to remap the kernel onto a new page table. This area will not be used after the pml4 switch
