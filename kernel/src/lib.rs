@@ -25,6 +25,7 @@ use spin::Once;
 
 pub mod context;
 pub mod display;
+pub mod elf;
 mod gdt;
 pub mod interrupts;
 pub mod memory;

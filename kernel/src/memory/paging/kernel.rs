@@ -19,6 +19,7 @@ use x86_64::{
 
 use crate::{
     declare_module,
+    elf::Elf,
     memory::{
         paging::{
             builder::PageTableBuilder,
@@ -27,7 +28,6 @@ use crate::{
         },
         stack,
     },
-    panic::elf::Elf,
     print,
     requests::{EXECUTABLE_ADDRESS, EXECUTABLE_ELF, EXECUTABLE_FILE, FRAMEBUFFER},
     sprint,
