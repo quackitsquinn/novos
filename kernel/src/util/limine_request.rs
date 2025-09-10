@@ -88,3 +88,7 @@ static REQUEST_TERMINATE: AtomicBool = AtomicBool::new(false);
 pub unsafe fn terminate_requests() {
     REQUEST_TERMINATE.store(true, core::sync::atomic::Ordering::SeqCst);
 }
+
+pub fn requests_terminated() -> bool {
+    REQUEST_TERMINATE.load(core::sync::atomic::Ordering::SeqCst)
+}

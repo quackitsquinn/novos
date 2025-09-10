@@ -19,7 +19,7 @@ use crate::memory::{
     req_data::MemoryMap,
 };
 
-pub struct PageFrameAllocator {
+pub(crate) struct PageFrameAllocator {
     map: &'static MemoryMap,
     off: usize,
     current: Entry,
@@ -79,64 +79,6 @@ impl PageFrameAllocator {
         mmr
     }
 
-    ///  Maps a page to the kernel's page table
-    pub unsafe fn map_page(
-        &mut self,
-        page: KernelPage,
-        flags: x86_64::structures::paging::PageTableFlags,
-    ) -> Result<(), MapError> {
-        let mut mapper = memory::paging::OFFSET_PAGE_TABLE.get();
-        unsafe { self.map_page_pagetable(page, flags, &mut *mapper) }
-    }
-
-    /// Maps a page to the kernel's page table using the provided page table
-    pub unsafe fn map_page_pagetable(
-        &mut self,
-        page: KernelPage,
-        flags: x86_64::structures::paging::PageTableFlags,
-        pagetable: &mut OffsetPageTable,
-    ) -> Result<(), MapError> {
-        if let Ok(phys) = pagetable.translate_page(page) {
-            return Err(MapError::MapError(MapToError::PageAlreadyMapped(phys)));
-        }
-        unsafe {
-            pagetable
-                .map_to(
-                    page,
-                    self.allocate_frame().expect("Unable to map frame"),
-                    flags,
-                    &mut *self,
-                )?
-                .flush();
-        }
-        Ok(())
-    }
-
-    /// Maps a page to the kernel's page table using the provided frame
-    pub unsafe fn map_to(
-        &mut self,
-        page: KernelPage,
-        frame: KernelPhysFrame,
-        flags: x86_64::structures::paging::PageTableFlags,
-    ) -> Result<(), MapError> {
-        let mut mapper = memory::paging::OFFSET_PAGE_TABLE.get();
-        unsafe { self.map_to_pagetable(page, frame, flags, &mut *mapper) }
-    }
-
-    /// Maps a page to the given page table using the provided frame
-    pub unsafe fn map_to_pagetable(
-        &mut self,
-        page: KernelPage,
-        frame: KernelPhysFrame,
-        flags: x86_64::structures::paging::PageTableFlags,
-        pagetable: &mut OffsetPageTable,
-    ) -> Result<(), MapError> {
-        unsafe {
-            pagetable.map_to(page, frame, flags, &mut *self)?.flush();
-        }
-        Ok(())
-    }
-
     pub unsafe fn map_range(
         &mut self,
         page_range: PageRangeInclusive<Size4KiB>,
@@ -157,24 +99,6 @@ impl PageFrameAllocator {
             unsafe {
                 pagetable.map_to(page, frame, flags, &mut *self)?.flush();
             }
-        }
-        Ok(())
-    }
-
-    pub unsafe fn unmap_page(&mut self, page: KernelPage) -> Result<(), MapError> {
-        let mut mapper = memory::paging::OFFSET_PAGE_TABLE.get();
-        unsafe { self.unmap_page_pagetable(page, &mut *mapper) }
-    }
-
-    pub unsafe fn unmap_page_pagetable(
-        &mut self,
-        page: KernelPage,
-        pagetable: &mut OffsetPageTable,
-    ) -> Result<(), MapError> {
-        unsafe {
-            let (frame, flush) = pagetable.unmap(page)?;
-            flush.flush();
-            self.deallocate_frame(frame);
         }
         Ok(())
     }
@@ -200,19 +124,6 @@ impl PageFrameAllocator {
             }
         }
         Ok(())
-    }
-
-    pub fn is_mapped_in_pagetable(
-        &mut self,
-        page: KernelPage,
-        pagetable: &mut OffsetPageTable,
-    ) -> Option<KernelPhysFrame> {
-        pagetable.translate_page(page).ok()
-    }
-
-    pub fn is_page_mapped(&mut self, page: KernelPage) -> Option<KernelPhysFrame> {
-        let mut mapper = memory::paging::OFFSET_PAGE_TABLE.get();
-        self.is_mapped_in_pagetable(page, &mut *mapper)
     }
 
     fn fmt_entry_type(entry: &Entry) -> &'static str {

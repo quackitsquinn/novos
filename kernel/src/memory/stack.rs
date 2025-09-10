@@ -8,7 +8,7 @@ use crate::memory::paging::KernelPage;
 
 use super::paging::{
     phys::{mapper::MapError, FRAME_ALLOCATOR},
-    virt::VIRT_MAPPER,
+    vaddr_mapper::VIRT_MAPPER,
 };
 
 /// Represents a stack in the system.
@@ -77,10 +77,11 @@ impl Stack {
     }
 
     pub fn allocate_kernel_stack(size: u64, stack_flags: StackFlags) -> Result<Self, MapError> {
+        assert!(size % 4096 == 0, "Stack size must be a multiple of 4096");
         // Map enough pages for the stack
         let range = VIRT_MAPPER
             .get()
-            .allocate(size)
+            .allocate(size / 4096)
             .ok_or(MapError::NoUsableMemory)?;
         let start_page = Page::containing_address(range.start);
         let end_page: KernelPage = Page::containing_address(range.end());

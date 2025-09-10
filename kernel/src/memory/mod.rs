@@ -24,7 +24,7 @@ fn init() -> Result<(), Infallible> {
         kalloc::enable_logging();
     }
     init_heap();
-    paging::virt::MODULE.init();
+    paging::vaddr_mapper::MODULE.init();
     paging::kernel::MODULE.init();
     Ok(())
 }

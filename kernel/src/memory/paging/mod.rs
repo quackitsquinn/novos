@@ -13,7 +13,7 @@ use crate::{declare_module, requests::PHYSICAL_MEMORY_OFFSET, util::OnceMutex};
 mod builder;
 pub mod kernel;
 pub mod phys;
-pub mod virt;
+pub mod vaddr_mapper;
 
 pub type KernelPageSize = Size4KiB;
 pub type KernelPage = Page<KernelPageSize>;

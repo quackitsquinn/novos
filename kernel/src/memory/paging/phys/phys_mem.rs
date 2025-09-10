@@ -4,7 +4,7 @@ use x86_64::{
 };
 
 use crate::memory::paging::{
-    virt::{VirtualAddressRange, VIRT_MAPPER},
+    vaddr_mapper::{VirtualAddressRange, VIRT_MAPPER},
     OFFSET_PAGE_TABLE,
 };
 
@@ -58,31 +58,21 @@ pub fn map_address(
     size: u64,
     flags: PageTableFlags,
 ) -> Result<PhysicalMemoryMap, MapError> {
-    let aligned_addr = addr.align_down(4096u64);
-    let inner_page_offset = addr.as_u64() - aligned_addr.as_u64();
-
-    let aligned_size = if size % 4096 != 0 {
-        size + 4096 - (size % 4096)
-    } else {
-        size
-    };
-
-    let addr = aligned_addr;
-    let size = aligned_size;
+    let base_frame = PhysFrame::containing_address(addr);
+    let end_frame = PhysFrame::containing_address(PhysAddr::new(addr.as_u64() + size - 1));
+    let mut range = PhysFrame::range_inclusive(base_frame, end_frame);
 
     // It's page aligned, so we can map it directly
     let mut vmapper = VIRT_MAPPER.get();
     let addr_range = vmapper
-        .allocate(size)
+        .allocate(range.len())
         .ok_or(MapError::UnableToAllocateVirtualMemory)?;
+
+    let inner_page_offset = addr.as_u64() % 4096;
 
     let mut offset_page_table = OFFSET_PAGE_TABLE.get();
     let mut frame_allocator = crate::memory::paging::phys::FRAME_ALLOCATOR.get();
-    for (page, frame) in addr_range
-        .as_page_range()
-        .enumerate()
-        .map(|(i, page)| (page, PhysFrame::containing_address(addr + i as u64 * 4096)))
-    {
+    for (page, frame) in addr_range.as_page_range().zip(&mut range) {
         unsafe {
             offset_page_table
                 .map_to(page, frame, flags, &mut *frame_allocator)

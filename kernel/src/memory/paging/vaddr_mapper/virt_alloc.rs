@@ -3,10 +3,12 @@ use x86_64::VirtAddr;
 
 use super::range::VirtualAddressRange;
 
-const MAX_VIRT_ADDR: u64 = 0x0000_7FFF_FFFF_FFFF;
 /// The threshold for when to defragment the virtual address space.
 const DEFRAG_THRESHOLD: usize = 1 << 24;
 
+/// A simple virtual address space allocator.
+/// This is specifically for allocating virtual address space, not physical memory. If you dereference any given address you should get a page fault.
+#[derive(Debug)]
 pub struct VirtualAddressMapper {
     unused_ranges: Vec<VirtualAddressRange>,
 }
@@ -17,6 +19,9 @@ pub struct VirtualAddressMapper {
 // - Creating process page tables
 
 impl VirtualAddressMapper {
+    /// Create a new virtual address space allocator with the given start and end addresses.
+    /// # Safety
+    /// The caller must ensure that the given range is valid and not used by anything else.
     pub unsafe fn new(start: VirtAddr, end: VirtAddr) -> Self {
         Self {
             unused_ranges: vec![VirtualAddressRange::new(
@@ -25,39 +30,11 @@ impl VirtualAddressMapper {
             )],
         }
     }
-    #[deprecated]
-    pub unsafe fn from_used_ranges(ranges: Vec<VirtualAddressRange>) -> Self {
-        let mut unused = Vec::new();
-        let mut last = VirtAddr::new(0);
-        // TODO: Add 0-nth range but make sure it's not overlapping with the page tables.
-        for range in ranges {
-            if range.start != last {
-                unused.push(VirtualAddressRange::new(
-                    last,
-                    range.start.as_u64() - last.as_u64(),
-                ));
-            }
-            last = range.end();
-        }
-        if last.as_u64() < MAX_VIRT_ADDR {
-            unused.push(VirtualAddressRange::new(
-                last,
-                MAX_VIRT_ADDR - last.as_u64(),
-            ));
-        }
-        Self {
-            unused_ranges: unused,
-        }
-    }
-    #[deprecated]
-    pub unsafe fn from_unused_ranges(ranges: Vec<VirtualAddressRange>) -> Self {
-        Self {
-            unused_ranges: ranges,
-        }
-    }
-    // FIXME: Refactor into page_count rather than size.
-    // The current implementation will massively break if the size is not a multiple of 4096, which should probably be a guarantee.
-    pub fn allocate(&mut self, size: u64) -> Option<VirtualAddressRange> {
+
+    /// Allocates the given number of pages, returning the virtual address range.
+    /// Returns None if there is not enough space.
+    pub fn allocate(&mut self, page_count: u64) -> Option<VirtualAddressRange> {
+        let size = page_count * 4096;
         for i in 0..self.unused_ranges.len() {
             if self.unused_ranges[i].size >= size {
                 return self.unused_ranges[i].take(size);
@@ -66,6 +43,8 @@ impl VirtualAddressMapper {
         None
     }
 
+    /// Deallocates the given virtual address range.
+    /// If the range is already free, this is a no-op.
     pub fn deallocate(&mut self, range: VirtualAddressRange) {
         if self.is_free(range) {
             return;
@@ -87,9 +66,13 @@ impl VirtualAddressMapper {
         }
     }
 
+    /// Defragments the virtual address space.
+    /// Returns the number of passes it took to defragment.
+    /// This is a very simple algorithm that just merges adjacent ranges.
     fn defragment(&mut self) -> u64 {
         let mut last_pass = 0;
         while last_pass != 0 {
+            // TODO: This might be able to to moved to before the while loop if the algo doesn't clobber the order of the ranges.
             self.unused_ranges.sort_by_key(|range| range.start);
             let mut last = self.unused_ranges[0];
             self.unused_ranges = self
@@ -119,43 +102,5 @@ impl VirtualAddressMapper {
             }
         }
         false
-    }
-}
-
-//#[cfg(test)]
-mod tests {
-    use alloc::vec;
-    use kproc::test;
-    use x86_64::VirtAddr;
-
-    use crate::memory::paging::virt::VirtualAddressRange;
-
-    #[test("VAM allocate", can_recover = true)]
-    pub fn test_vam_allocate() {
-        let ranges = vec![
-            VirtualAddressRange::new_page(VirtAddr::new(0)),
-            VirtualAddressRange::new_page(VirtAddr::new(4096)),
-            VirtualAddressRange::new_page(VirtAddr::new(8192)),
-        ];
-        let mut vam = unsafe { super::VirtualAddressMapper::from_used_ranges(ranges) };
-        let range = vam.allocate(4096).unwrap();
-        assert_eq!(range.start, VirtAddr::new(12288));
-        assert_eq!(range.size, 4096);
-        assert!(!vam.is_free(range))
-    }
-
-    #[test("VAM deallocate", can_recover = true)]
-    pub fn test_vam_deallocate() {
-        let ranges = vec![
-            VirtualAddressRange::new_page(VirtAddr::new(0)),
-            VirtualAddressRange::new_page(VirtAddr::new(4096)),
-            VirtualAddressRange::new_page(VirtAddr::new(8192)),
-        ];
-
-        let mut vam = unsafe { super::VirtualAddressMapper::from_used_ranges(ranges) };
-
-        let range = VirtualAddressRange::new_page(VirtAddr::new(12288));
-
-        vam.deallocate(range);
     }
 }
