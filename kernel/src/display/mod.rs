@@ -5,16 +5,13 @@ use framebuffer::Framebuffer;
 mod character;
 pub mod color;
 mod framebuffer;
+pub mod req_data;
 mod screen_char;
 pub mod terminal;
 
 pub use character::get_char;
 
-use crate::{
-    declare_module,
-    requests::{FRAMEBUFFER_INFO, FRAMEBUFFER_PTR},
-    util::OnceMutex,
-};
+use crate::{declare_module, requests, util::OnceMutex};
 
 pub static FRAMEBUFFER: OnceMutex<Framebuffer> = OnceMutex::uninitialized();
 pub static TERMINAL: OnceMutex<terminal::Terminal> = OnceMutex::uninitialized();
@@ -22,8 +19,7 @@ pub static TERMINAL: OnceMutex<terminal::Terminal> = OnceMutex::uninitialized();
 declare_module!("display", init);
 
 fn init() -> Result<(), Infallible> {
-    FRAMEBUFFER
-        .init(unsafe { Framebuffer::new(FRAMEBUFFER_INFO.get().unwrap(), *FRAMEBUFFER_PTR.get()) });
+    FRAMEBUFFER.init(unsafe { Framebuffer::new(requests::FRAMEBUFFER.get()) });
     TERMINAL.init(terminal::Terminal::new(1, 2));
     Ok(())
 }

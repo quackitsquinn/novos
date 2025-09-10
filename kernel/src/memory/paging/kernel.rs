@@ -29,9 +29,7 @@ use crate::{
     },
     panic::elf::Elf,
     print,
-    requests::{
-        EXECUTABLE_ADDRESS, EXECUTABLE_ELF, EXECUTABLE_FILE, FRAMEBUFFER_INFO, FRAMEBUFFER_PTR,
-    },
+    requests::{EXECUTABLE_ADDRESS, EXECUTABLE_ELF, EXECUTABLE_FILE, FRAMEBUFFER},
     sprint,
 };
 
@@ -113,12 +111,10 @@ fn map_framebuffer(
     builder: &mut PageTableBuilder<impl Iterator<Item = KernelPage>>,
     opt: &OffsetPageTable,
 ) {
-    let fb = FRAMEBUFFER_INFO
-        .get()
-        .expect("Framebuffer info not initialized");
+    let fb = FRAMEBUFFER.get();
 
-    let size = (fb.height() * fb.pitch()) as u64;
-    let root = VirtAddr::from_ptr(fb.addr());
+    let size = (fb.height * fb.pitch) as u64;
+    let root = VirtAddr::from_ptr(unsafe { fb.ptr_unchecked() });
 
     info!(
         "Mapping framebuffer at {:#x} of size {:#x}",
@@ -149,7 +145,9 @@ fn map_framebuffer(
         start_page.start_address().as_u64()
     );
 
-    FRAMEBUFFER_PTR.init(remap_ptr(fb.addr(), start_page) as *mut u8);
+    unsafe {
+        fb.update_ptr(remap_ptr(fb.ptr_unchecked(), start_page).cast_mut());
+    }
 }
 
 /// A helper struct to copy pages from one page table to another.
@@ -261,16 +259,14 @@ fn init() -> Result<(), Infallible> {
     );
 
     // This is fine since nothing uses the internal reference just yet.
-    let fb = FRAMEBUFFER_INFO
-        .get()
-        .expect("Framebuffer info not initialized");
+    let fb = FRAMEBUFFER.get();
 
     // Framebuffer attempts to dereference it's inner pointer and torpedoes the whole system due to the page fault handler
     // page faulting due to the kernel elf not being mapped in the new pagetable.
     // TODO: copy kernel to new pagetable
-    let total = fb.pitch() * fb.height();
+    let total = fb.pitch * fb.height;
     info!("Framebuffer size: {} bytes", total);
-    unsafe { ptr::write_bytes(*FRAMEBUFFER_PTR.get(), 0xff, total as usize) };
+    unsafe { ptr::write_bytes(fb.ptr(), 0xff, total as usize) };
     loop {}
     Ok(())
 }
