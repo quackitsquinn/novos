@@ -21,7 +21,7 @@ use crate::{
         map::{FRAMEBUFFER_START_PAGE, KERNEL_REMAP_PAGE_RANGE},
         KernelPage, KernelPhysFrame,
     },
-    requests::{EXECUTABLE_ADDRESS, EXECUTABLE_ELF, FRAMEBUFFER},
+    requests::{EXECUTABLE_ADDRESS, FRAMEBUFFER, KERNEL_ELF},
     sprint,
 };
 
@@ -37,7 +37,7 @@ fn map_kernel<T: Iterator<Item = Page>>(builder: &mut PageTableBuilder<T>) {
     let kernel_addr = EXECUTABLE_ADDRESS
         .get()
         .expect("Executable address not initialized");
-    let kernel_elf = EXECUTABLE_ELF
+    let kernel_elf = KERNEL_ELF.get().elf();
         .get()
         .expect("Executable ELF not initialized");
     let opt = {

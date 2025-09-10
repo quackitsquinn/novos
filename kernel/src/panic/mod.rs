@@ -83,6 +83,6 @@ pub fn panic(pi: &PanicInfo) -> ! {
 declare_module!("panic", init);
 
 fn init() -> Result<(), Infallible> {
-    stacktrace::init();
+    // Nothing to initialize yet, but keeping this here in case we need it later
     Ok(())
 }

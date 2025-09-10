@@ -4,7 +4,7 @@ use goblin::elf64::sym;
 use rustc_demangle::demangle;
 use spin::Once;
 
-use crate::{elf::Elf, print, println, requests::EXECUTABLE_FILE};
+use crate::{elf::Elf, print, println, requests::KERNEL_ELF};
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -39,11 +39,7 @@ pub unsafe fn symbol_trace(addr: *const ()) {
 }
 
 unsafe fn sym_trace_inner(addr: *const (), writer: &mut dyn Write) {
-    // TODO: Im not entirely confident that the implementation of this function is correct. I think addr should be offset by the kernel base address.
-    // The current implementation works, so I'm not going to touch it unless it breaks.
-    let kernel_slice = KERNEL_FILE.get().expect("Kernel file not loaded");
-
-    let elf = Elf::new(kernel_slice).expect("Failed to get kernel ELF");
+    let elf = unsafe { KERNEL_ELF.get().elf_unchecked() };
     let strings = elf.strings().expect("Failed to get kernel strings");
     let mut symbols = elf.symbols().expect("Failed to get kernel symbols");
 
@@ -75,16 +71,7 @@ unsafe fn sym_trace_inner(addr: *const (), writer: &mut dyn Write) {
     write!(writer, "{}", demangled).unwrap();
 }
 
-pub fn init() {
-    let kern_file = EXECUTABLE_FILE
-        .get()
-        .expect("Kernel file not loaded")
-        .file();
-    let size = kern_file.size();
-    let ptr = kern_file.addr();
-    let slice = unsafe { slice::from_raw_parts(ptr as *const u8, size as usize) };
-    KERNEL_FILE.call_once(|| slice);
-}
+pub fn init() {}
 
 pub struct FormattableSymbol(*const ());
 

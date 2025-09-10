@@ -7,7 +7,7 @@ use x86_64::{
     VirtAddr,
 };
 
-use crate::{declare_module, memory::paging::KernelPageSize};
+use crate::{declare_module, memory::paging::KernelPageSize, requests::KERNEL_ELF};
 
 pub mod allocator;
 pub mod paging;
@@ -24,6 +24,7 @@ fn init() -> Result<(), Infallible> {
         kalloc::enable_logging();
     }
     init_heap();
+    KERNEL_ELF.get().copy_to_heap();
     paging::vaddr_mapper::MODULE.init();
     paging::kernel::MODULE.init();
     Ok(())

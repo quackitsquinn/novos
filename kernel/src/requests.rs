@@ -11,7 +11,10 @@ use limine::{
 use spin::Once;
 
 use crate::{
-    declare_module, display::req_data::FramebufferInfo, elf::Elf, memory::req_data::MemoryMap,
+    declare_module,
+    display::req_data::FramebufferInfo,
+    elf::{req_data::KernelElf, Elf},
+    memory::req_data::MemoryMap,
     util::LimineRequest,
 };
 
@@ -28,10 +31,8 @@ pub static PAGING_MODE_REQUEST: PagingModeRequest =
     PagingModeRequest::new().with_mode(Mode::FOUR_LEVEL);
 
 #[used]
-pub static EXECUTABLE_FILE_REQUEST: ExecutableFileRequest = ExecutableFileRequest::new();
-pub static EXECUTABLE_FILE: Once<&'static ExecutableFileResponse> = Once::new();
-pub static EXECUTABLE_DATA: Once<&'static [u8]> = Once::new();
-pub static EXECUTABLE_ELF: Once<Elf> = Once::new();
+pub static KERNEL_ELF: LimineRequest<ExecutableFileRequest, KernelElf> =
+    LimineRequest::new(ExecutableFileRequest::new());
 
 pub static FRAMEBUFFER: LimineRequest<FramebufferRequest, FramebufferInfo> =
     LimineRequest::new(FramebufferRequest::new());
@@ -49,19 +50,7 @@ pub fn init() -> Result<(), Infallible> {
 
     MEMORY_MAP.init(MemoryMap::new);
 
-    let exec_file = EXECUTABLE_FILE_REQUEST.get_response().unwrap();
-    EXECUTABLE_FILE.call_once(|| exec_file);
-    EXECUTABLE_DATA.call_once(|| unsafe {
-        slice::from_raw_parts(exec_file.file().addr(), exec_file.file().size() as usize)
-    });
-    EXECUTABLE_ELF.call_once(|| {
-        Elf::new(
-            EXECUTABLE_DATA
-                .get()
-                .expect("Executable data not initialized"),
-        )
-        .expect("Failed to create ELF from executable data")
-    });
+    KERNEL_ELF.init(KernelElf::new);
 
     FRAMEBUFFER.init(FramebufferInfo::new);
 

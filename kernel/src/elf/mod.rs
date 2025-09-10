@@ -5,6 +5,8 @@ use goblin::{
     elf64::{header, program_header::ProgramHeader, section_header, sym},
 };
 
+pub mod req_data;
+
 /// An ELF executable
 pub struct Elf<'a> {
     pub data: &'a [u8],

@@ -160,6 +160,7 @@ impl BlockAllocator {
     /// The returned pointer must be deallocated with `deallocate` to prevent memory leaks.
     #[must_use = "Returned pointer must be deallocated with deallocate"]
     pub unsafe fn allocate(&mut self, layout: Layout) -> *mut u8 {
+        atrace!("Allocating layout {:?}", layout);
         frame_output(unsafe {
             core::slice::from_raw_parts(self.heap_start as *mut u8, self.heap_size)
         });
