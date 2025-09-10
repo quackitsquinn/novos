@@ -16,7 +16,7 @@ pub struct Framebuffer {
 
 impl Framebuffer {
     /// Create a new framebuffer.
-    pub fn new(fb: &LimineFramebuffer) -> Framebuffer {
+    pub unsafe fn new(fb: &LimineFramebuffer, ptr: *mut u8) -> Framebuffer {
         if fb.bpp() % 8 != 0 {
             panic!("Non-byte aligned framebuffers are not supported.");
         } else if fb.bpp() / 8 < 3 {
@@ -37,10 +37,7 @@ impl Framebuffer {
             bpp: (fb.bpp() / 8),
             buffer: unsafe {
                 // Safety: We calculate the buffer size based on the pitch and height of the framebuffer.
-                core::slice::from_raw_parts_mut(
-                    fb.addr() as *mut u8,
-                    fb.pitch() as usize * fb.height() as usize,
-                )
+                core::slice::from_raw_parts_mut(ptr, fb.pitch() as usize * fb.height() as usize)
             },
         }
     }

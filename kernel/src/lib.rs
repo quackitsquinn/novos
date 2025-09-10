@@ -73,6 +73,8 @@ pub extern "sysv64" fn init_kernel(rsp: u64) -> ! {
 ///
 /// The caller must also ensure that [STACK_BASE] has been initialized.
 pub(crate) unsafe fn init_kernel_services() {
+    // Ensure this function is only called once.
+    // This is subject to removal so don't bank on it, hence why it's unsafe.
     static INIT: Once<()> = Once::new();
     if INIT.is_completed() {
         panic!("init_kernel_services called more than once");

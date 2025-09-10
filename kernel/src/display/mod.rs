@@ -10,7 +10,11 @@ pub mod terminal;
 
 pub use character::get_char;
 
-use crate::{declare_module, requests::FRAMEBUFFERS, util::OnceMutex};
+use crate::{
+    declare_module,
+    requests::{FRAMEBUFFER_INFO, FRAMEBUFFER_PTR},
+    util::OnceMutex,
+};
 
 pub static FRAMEBUFFER: OnceMutex<Framebuffer> = OnceMutex::uninitialized();
 pub static TERMINAL: OnceMutex<terminal::Terminal> = OnceMutex::uninitialized();
@@ -18,14 +22,8 @@ pub static TERMINAL: OnceMutex<terminal::Terminal> = OnceMutex::uninitialized();
 declare_module!("display", init);
 
 fn init() -> Result<(), Infallible> {
-    FRAMEBUFFER.init(Framebuffer::new(
-        &FRAMEBUFFERS
-            .get()
-            .expect("framebuffer uninit")
-            .framebuffers()
-            .next()
-            .unwrap(),
-    ));
+    FRAMEBUFFER
+        .init(unsafe { Framebuffer::new(FRAMEBUFFER_INFO.get().unwrap(), *FRAMEBUFFER_PTR.get()) });
     TERMINAL.init(terminal::Terminal::new(1, 2));
     Ok(())
 }

@@ -83,4 +83,7 @@ pub mod map {
 
     // Area used to remap the kernel onto a new page table. This area will not be used after the pml4 switch
     define_map!(KERNEL_REMAP, KERNEL_PHYS_MAP_END.as_u64(), 0x1000_0000); // 256MB
+
+    // Where the framebuffer is mapped in the remapped kernel.
+    define_map!(FRAMEBUFFER, KERNEL_REMAP_START.as_u64(), 0x1000_0000); // 2MB
 }

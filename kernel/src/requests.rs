@@ -1,7 +1,8 @@
-use core::{convert::Infallible, slice};
+use core::{convert::Infallible, ptr, slice};
 
 use limine::{
     file::File,
+    framebuffer::Framebuffer,
     paging::Mode,
     request::{
         ExecutableAddressRequest, ExecutableFileRequest, FramebufferRequest, HhdmRequest,
@@ -11,9 +12,10 @@ use limine::{
         ExecutableAddressResponse, ExecutableFileResponse, FramebufferResponse, MemoryMapResponse,
     },
 };
+use log::info;
 use spin::Once;
 
-use crate::{declare_module, panic::elf::Elf};
+use crate::{declare_module, panic::elf::Elf, util::OnceMutex};
 
 #[used]
 pub static PHYSICAL_MEMORY_OFFSET_REQUEST: HhdmRequest = HhdmRequest::new();
@@ -35,7 +37,8 @@ pub static EXECUTABLE_ELF: Once<Elf> = Once::new();
 
 #[used]
 pub static FRAMEBUFFER_REQUEST: FramebufferRequest = FramebufferRequest::new();
-pub static FRAMEBUFFERS: Once<&'static FramebufferResponse> = Once::new();
+pub static FRAMEBUFFER_INFO: Once<Framebuffer> = Once::new();
+pub(crate) static FRAMEBUFFER_PTR: OnceMutex<*mut u8> = OnceMutex::uninitialized();
 
 #[used]
 pub static EXECUTABLE_ADDRESS_REQUEST: ExecutableAddressRequest = ExecutableAddressRequest::new();
@@ -66,7 +69,7 @@ pub fn init() -> Result<(), Infallible> {
     });
 
     let fb = FRAMEBUFFER_REQUEST.get_response().unwrap();
-    FRAMEBUFFERS.call_once(|| fb);
+    FRAMEBUFFER_INFO.call_once(|| fb.framebuffers().next().expect("No framebuffer found"));
 
     let exec_addr = EXECUTABLE_ADDRESS_REQUEST.get_response().unwrap();
     EXECUTABLE_ADDRESS.call_once(|| exec_addr);
