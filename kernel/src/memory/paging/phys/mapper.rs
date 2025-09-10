@@ -59,13 +59,12 @@ impl PageFrameAllocator {
     }
 
     fn next_usable(&mut self) -> Option<(usize, Entry)> {
-        let mmr = self
-            .map
+        let mmr = self.map[self.off..]
             .iter()
             .enumerate()
-            .skip(self.off)
             .find(|e| e.1.entry_type == EntryType::USABLE)
             .map(|(i, e)| (i, *e));
+
         if let Some((off, entry)) = mmr {
             self.off = off + 1;
             info!(
