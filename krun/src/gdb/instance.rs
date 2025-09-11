@@ -11,6 +11,11 @@ use crate::gdb::{BINARY_PATH, GdbConfig, GdbInvocation};
 
 pub struct Gdb(Child);
 
+const SCRATCHPAD_DEFAULT_CONTENT: &str = "# This is a scratchpad file for GDB commands.
+# It is ignored by git, so you can use it for debugging without worrying about it being committed.
+# Add any GDB commands you want to run on startup here.
+";
+
 impl Gdb {
     pub fn wait_terminate(&mut self) {
         if let Err(e) = self.0.wait() {
@@ -29,6 +34,7 @@ impl Gdb {
 
 fn get_gdb_scripts() -> Vec<String> {
     let mut scripts = vec![];
+    let mut found_scratchpad = false;
     for file in fs::read_dir("gdb_scripts").unwrap() {
         let file = file.unwrap();
         if file.file_type().unwrap().is_file()
@@ -36,7 +42,22 @@ fn get_gdb_scripts() -> Vec<String> {
         {
             scripts.push(file.path().to_str().unwrap().to_string());
         }
+        // Check for scratchpad.gdb (A .gitignore'd file for debugging)
+        if file.file_name() == "scratchpad.gdb" {
+            found_scratchpad = true;
+        }
     }
+
+    if !found_scratchpad {
+        println!(
+            "Creating scratchpad.gdb! This file is ignored by git, so you can use it for debugging without worrying about committing it."
+        );
+        fs::write("gdb_scripts/scratchpad.gdb", SCRATCHPAD_DEFAULT_CONTENT)
+            .expect("Failed to create scratchpad.gdb");
+        // Don't bother adding it to the list, as it will be created empty.
+    }
+
+    scripts.sort();
     scripts
 }
 

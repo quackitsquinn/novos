@@ -11,4 +11,6 @@
 *.bin
 ## Ignore kernel images
 boot_images/
+## Ignore dev specific files
 gdb.toml
+gdb_scripts/scratchpad.gdb
