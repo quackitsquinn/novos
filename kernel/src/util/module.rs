@@ -7,7 +7,7 @@ use spin::Once;
 #[derive(Debug)]
 pub struct KernelModule<T>
 where
-    T: Debug + Display,
+    T: Debug,
 {
     /// The name of the module.s
     pub name: &'static str,
@@ -19,7 +19,7 @@ where
 
 impl<T> KernelModule<T>
 where
-    T: Debug + Display,
+    T: Debug,
 {
     /// Create a new kernel module.
     pub const fn new(name: &'static str, init: fn() -> Result<(), T>) -> Self {
@@ -38,7 +38,7 @@ where
             did_init = true;
             info!("Initializing {}", self.name);
             (self.init)()
-                .unwrap_or_else(|e| panic!("Error initializing {} module: {}", self.name, e));
+                .unwrap_or_else(|e| panic!("Error initializing {} module: {:#?}", self.name, e));
             info!("Initialized {}", self.name);
         });
         did_init
