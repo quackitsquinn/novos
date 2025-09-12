@@ -1,11 +1,16 @@
+use log::{info, trace};
 use x86_64::{
-    structures::paging::{Mapper, PageTableFlags, PhysFrame},
+    structures::paging::{mapper::MapToError, Mapper, PageTableFlags, PhysFrame},
     PhysAddr, VirtAddr,
 };
 
-use crate::memory::paging::{
-    vaddr_mapper::{VirtualAddressRange, VIRT_MAPPER},
-    KERNEL_PAGE_TABLE,
+use crate::{
+    dbg,
+    memory::paging::{
+        map::{KERNEL_PHYS_MAP_END, KERNEL_PHYS_MAP_START},
+        vaddr_mapper::{VirtualAddressRange, VIRT_MAPPER},
+        KernelPageSize, KERNEL_PAGE_TABLE,
+    },
 };
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -14,7 +19,6 @@ pub struct PhysicalMemoryMap {
     phys_addr: PhysAddr,
     virt_addr: VirtAddr,
     size: u64,
-    offset: u64,
     virt_range: VirtualAddressRange,
 }
 
@@ -23,29 +27,22 @@ impl PhysicalMemoryMap {
         phys_addr: PhysAddr,
         virt_addr: VirtAddr,
         size: u64,
-        offset: u64,
         virt_range: VirtualAddressRange,
     ) -> Self {
-        debug_assert!(offset < size, "Offset must be less than size");
         Self {
             phys_addr,
             virt_addr,
             size,
-            offset,
             virt_range,
         }
     }
 
     pub fn ptr(&self) -> *const u8 {
-        (self.virt_addr.as_u64() + self.offset) as *const u8
+        self.virt_addr.as_ptr()
     }
 
     pub fn size(&self) -> u64 {
         self.size
-    }
-
-    pub fn offset(&self) -> u64 {
-        self.offset
     }
 
     pub fn phys_addr(&self) -> PhysAddr {
@@ -68,24 +65,45 @@ pub fn map_address(
         .allocate(range.len())
         .ok_or(MapError::UnableToAllocateVirtualMemory)?;
 
-    let inner_page_offset = addr.as_u64() % 4096;
+    info!(
+        "Mapping physical memory: {:x} - {:x} to virtual {:x} - {:x} ({} frame(s))",
+        addr.as_u64(),
+        addr.as_u64() + size,
+        addr_range.start.as_u64(),
+        addr_range.end().as_u64(),
+        range.len()
+    );
 
     let mut offset_page_table = KERNEL_PAGE_TABLE.get();
     let mut frame_allocator = crate::memory::paging::phys::FRAME_ALLOCATOR.get();
-    for (page, frame) in addr_range.as_page_range().zip(&mut range) {
+    for page in addr_range.as_page_range() {
+        let frame = range
+            .next()
+            .expect("Mapped too many pages, ran out of frames. This is a bug.");
+        trace!(
+            "Mapping page {:x} to frame {:x}",
+            page.start_address().as_u64(),
+            frame.start_address().as_u64()
+        );
+
         unsafe {
             offset_page_table
                 .map_to(page, frame, flags, &mut *frame_allocator)
                 .map(|f| f.flush())
-                .map_err(|_| MapError::MappingError)?;
+                .map_err(|_| {
+                    MapError::MappingError(MapToError::PageAlreadyMapped(
+                        offset_page_table
+                            .translate_page(page)
+                            .expect("just mapped, should translate"),
+                    ))
+                })?;
         }
     }
     return Ok(unsafe {
         PhysicalMemoryMap::new(
             addr,
-            VirtAddr::new(addr.as_u64()),
+            VirtAddr::new(addr_range.as_page().start_address().as_u64() + (addr.as_u64() & 0xFFF)),
             size,
-            inner_page_offset,
             addr_range,
         )
     });
@@ -114,12 +132,12 @@ pub fn remap_address(
     map_address(map.phys_addr, new_size, flags)
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum MapError {
     #[error("Unable to allocate virtual memory")]
     UnableToAllocateVirtualMemory,
     #[error("Mapping error")]
-    MappingError,
+    MappingError(MapToError<KernelPageSize>),
 }
 
 mod tests {

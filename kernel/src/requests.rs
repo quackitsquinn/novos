@@ -4,10 +4,11 @@ use limine::{
     paging::Mode,
     request::{
         ExecutableAddressRequest, ExecutableFileRequest, FramebufferRequest, HhdmRequest,
-        MemoryMapRequest, PagingModeRequest,
+        MemoryMapRequest, PagingModeRequest, RsdpRequest,
     },
     response::{ExecutableAddressResponse, ExecutableFileResponse},
 };
+use log::info;
 use spin::Once;
 
 use crate::{
@@ -21,6 +22,9 @@ use crate::{
 #[used]
 pub static PHYSICAL_MEMORY_OFFSET_REQUEST: HhdmRequest = HhdmRequest::new();
 pub static PHYSICAL_MEMORY_OFFSET: Once<u64> = Once::new();
+
+pub static RSDP_ADDRESS_REQUEST: RsdpRequest = RsdpRequest::new();
+pub static RSDP_ADDRESS: Once<Option<usize>> = Once::new();
 
 #[used]
 pub static MEMORY_MAP: LimineRequest<MemoryMapRequest, MemoryMap> =
@@ -56,6 +60,8 @@ pub fn init() -> Result<(), Infallible> {
 
     let exec_addr = EXECUTABLE_ADDRESS_REQUEST.get_response().unwrap();
     EXECUTABLE_ADDRESS.call_once(|| exec_addr);
+
+    RSDP_ADDRESS.call_once(|| RSDP_ADDRESS_REQUEST.get_response().map(|r| r.address()));
     Ok(())
 }
 

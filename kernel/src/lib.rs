@@ -23,6 +23,7 @@ use limine::BaseRevision;
 use log::info;
 use spin::Once;
 
+pub mod acpi;
 pub mod context;
 pub mod display;
 pub mod elf;
@@ -101,6 +102,7 @@ pub(crate) unsafe fn init_kernel_services() {
     memory::MODULE.init();
     #[cfg(not(test))] // Tests don't have a display
     display::MODULE.init();
+    acpi::MODULE.init();
     pci::MODULE.init();
     proc::MODULE.init();
     info!("Kernel services initialized");
