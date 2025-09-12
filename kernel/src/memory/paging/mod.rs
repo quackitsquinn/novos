@@ -62,9 +62,11 @@ pub mod map {
                 ()
             };
             paste::paste! {
-                pub const [<$name _START>]: ::x86_64::VirtAddr = ::x86_64::VirtAddr::new_truncate($start);
+                pub const [<$name _RAW>]: u64 = $start;
+                pub const [<$name _START>]: ::x86_64::VirtAddr = ::x86_64::VirtAddr::new_truncate([<$name _RAW>]);
                 pub const [<$name _SIZE>]: u64 = $size;
-                pub const [<$name _END>]: ::x86_64::VirtAddr = ::x86_64::VirtAddr::new_truncate($start + $size);
+                pub const [<$name _END_RAW>]: u64 = $start + $size;
+                pub const [<$name _END>]: ::x86_64::VirtAddr = ::x86_64::VirtAddr::new_truncate([<$name _END_RAW>]);
                 pub const [<$name _START_PAGE>]: super::KernelPage = super::KernelPage::containing_address([<$name _START>]);
                 pub const [<$name _END_PAGE>]: super::KernelPage = super::KernelPage::containing_address([<$name _END>]);
                 pub const [<$name _PAGE_RANGE>]: ::x86_64::structures::paging::page::PageRangeInclusive<super::KernelPageSize> =
@@ -81,11 +83,12 @@ pub mod map {
     pub const KERNEL_START: u64 = HIGHER_HALF_START + 0x1000_0000;
 
     define_map!(KERNEL_HEAP, KERNEL_START, 0x100_0000); // 16MB
-    define_map!(KERNEL_PHYS_MAP, KERNEL_HEAP_END.as_u64(), 0x1000_0000); // 256MB
+
+    define_map!(KERNEL_PHYS_MAP, KERNEL_HEAP_END_RAW, 0x1000_0000); // 256MB
 
     // Area used to remap the kernel onto a new page table. This area will not be used after the pml4 switch
-    define_map!(KERNEL_REMAP, KERNEL_PHYS_MAP_END.as_u64(), 0x1000_0000); // 256MB
+    define_map!(KERNEL_REMAP, KERNEL_PHYS_MAP_END_RAW, 0x1000_0000); // 256MB
 
     // Where the framebuffer is mapped in the remapped kernel.
-    define_map!(FRAMEBUFFER, KERNEL_REMAP_START.as_u64(), 0x1000_0000); // 2MB
+    define_map!(FRAMEBUFFER, KERNEL_PHYS_MAP_END_RAW, 0x1000_0000); // 2MB
 }
