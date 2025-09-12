@@ -148,11 +148,11 @@ fn map_heap(
 ) {
     let heap_start = crate::memory::paging::map::KERNEL_HEAP_START_PAGE;
     let heap_end = crate::memory::paging::map::KERNEL_HEAP_END_PAGE;
-    let mut heap_range = KernelPage::range_inclusive(heap_start, heap_end);
+    let mut heap_range = KernelPage::range(heap_start, heap_end);
 
     builder.map_range(
         &mut heap_range,
-        &mut CopyPages::new(heap_start..=heap_end, opt),
+        &mut CopyPages::new(heap_start..heap_end, opt),
         PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
     );
 }

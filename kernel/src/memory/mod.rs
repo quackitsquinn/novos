@@ -51,7 +51,7 @@ fn configure_heap_allocator(
     let heap_start_page = Page::containing_address(heap_start);
     let heap_end_page = Page::containing_address(heap_end);
     let heap_range: PageRangeInclusive<KernelPageSize> =
-        Page::range_inclusive(heap_start_page, heap_end_page);
+        Page::range_inclusive(heap_start_page, heap_end_page - 1);
 
     info!(
         "{} Heap range: 0x{:x} - 0x{:x} ({:?} - {:?}: {} pages)",

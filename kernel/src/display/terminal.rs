@@ -170,3 +170,24 @@ macro_rules! println {
     ($fmt:expr) => ($crate::print!(concat!($fmt, "\n")));
     ($fmt:expr, $($arg:tt)*) => ($crate::print!(concat!($fmt, "\n"), $($arg)*));
 }
+
+// Port of the std dbg! macro, but it works in a no_std environment.
+#[macro_export]
+macro_rules! dbg {
+    () => {
+        $crate::println!("[{}:{}:{}]", core::file!(), core::line!(), core::column!());
+    };
+    ($val:expr $(,)?) => {
+        match $val {
+            tmp => {
+                $crate::println!("[{}:{}:{}] {} = {:#?}",
+                    core::file!(), core::line!(), core::column!(),
+                    core::stringify!($val), &tmp);
+                tmp
+            }
+        }
+    };
+    ($($val:expr),+ $(,)?) => {
+        ($($crate::dbg!($val)),+,)
+    };
+}

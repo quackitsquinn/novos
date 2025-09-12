@@ -5,60 +5,59 @@ macro_rules! interrupt_wrapper {
     ($handler: path, $raw: ident) => {
         #[unsafe(naked)]
         pub extern "x86-interrupt" fn $raw(_: InterruptStackFrame) {
-            unsafe {
-                ::core::arch::naked_asm! {
-                    // Disable interrupts.
-                    "cli",
-                    // Push all registers to the stack. Push the registers in the OPPOSITE order that they are defined in InterruptRegisters.
-                    "push rax",
-                    "push rbx",
-                    "push rcx",
-                    "push rdx",
-                    "push rbp",
-                    "push rdi",
-                    "push rsi",
-                    "push r8",
-                    "push r9",
-                    "push r10",
-                    "push r11",
-                    "push r12",
-                    "push r13",
-                    "push r14",
-                    "push r15",
+            ::core::arch::naked_asm! {
+                // Disable interrupts.
+                "cli",
+                // Push all registers to the stack. Push the registers in the OPPOSITE order that they are defined in InterruptRegisters.
+                "push rax",
+                "push rbx",
+                "push rcx",
+                "push rdx",
+                "push rbp",
+                "push rdi",
+                "push rsi",
+                "push r8",
+                "push r9",
+                "push r10",
+                "push r11",
+                "push r12",
+                "push r13",
+                "push r14",
+                "push r15",
 
-                    // TODO: We don't do any floating point stuff yet, so we don't need to save the floating point registers.
+                // TODO: We don't do any floating point stuff yet, so we don't need to save the floating point registers.
 
-                    // C abi requires that the first parameter is in rdi, so we need to move the stack pointer to rdi.
-                    "mov rdi, rsp",
-                    "call {handler}",
+                // C abi requires that the first parameter is in rdi, so we need to move the stack pointer to rdi.
+                "mov rdi, rsp",
+                "call {handler}",
 
-                    // Pop all registers from the stack. Pop the registers in the SAME order that they are defined in InterruptRegisters.
-                    "pop r15",
-                    "pop r14",
-                    "pop r13",
-                    "pop r12",
-                    "pop r11",
-                    "pop r10",
-                    "pop r9",
-                    "pop r8",
-                    "pop rsi",
-                    "pop rdi",
-                    "pop rbp",
-                    "pop rdx",
-                    "pop rcx",
-                    "pop rbx",
-                    "pop rax",
+                // Pop all registers from the stack. Pop the registers in the SAME order that they are defined in InterruptRegisters.
+                "pop r15",
+                "pop r14",
+                "pop r13",
+                "pop r12",
+                "pop r11",
+                "pop r10",
+                "pop r9",
+                "pop r8",
+                "pop rsi",
+                "pop rdi",
+                "pop rbp",
+                "pop rdx",
+                "pop rcx",
+                "pop rbx",
+                "pop rax",
 
-                    // Re-enable interrupts.
-                    "sti",
-                    // Return from interrupt.
-                    "iretq",
-                    handler = sym $handler,
-                }
+                // Re-enable interrupts.
+                "sti",
+                // Return from interrupt.
+                "iretq",
+                handler = sym $handler,
             }
         }
     };
 }
+
 #[macro_export]
 macro_rules! define_interrupt {
     ($tbl: expr, $inner: path, $name: ident, $code: literal) => {

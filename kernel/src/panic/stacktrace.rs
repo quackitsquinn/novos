@@ -1,11 +1,11 @@
-use core::{arch::asm, fmt::Write, slice};
+use core::{arch::asm, fmt::Write};
 
 use goblin::elf64::sym;
 use rustc_demangle::demangle;
-use spin::Once;
 
-use crate::{elf::Elf, print, println, requests::KERNEL_ELF};
+use crate::{print, println, requests::KERNEL_ELF};
 
+/// A stack frame in the x86_64 architecture.
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct StackFrame {
@@ -31,8 +31,6 @@ pub fn print_trace_raw(rbp: *const StackFrame) {
         rbp = frame.rbp;
     }
 }
-
-static KERNEL_FILE: Once<&[u8]> = Once::new();
 
 pub unsafe fn symbol_trace(addr: *const ()) {
     print!("{}", fmt_symbol(addr));
@@ -71,11 +69,17 @@ unsafe fn sym_trace_inner(addr: *const (), writer: &mut dyn Write) {
     write!(writer, "{}", demangled).unwrap();
 }
 
-pub fn init() {}
-
+/// A struct that implements `core::fmt::Display` and `core::fmt::Debug` for formatting a symbol name.
 pub struct FormattableSymbol(*const ());
 
 impl core::fmt::Display for FormattableSymbol {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        unsafe { sym_trace_inner(self.0, f) };
+        Ok(())
+    }
+}
+
+impl core::fmt::Debug for FormattableSymbol {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         unsafe { sym_trace_inner(self.0, f) };
         Ok(())
