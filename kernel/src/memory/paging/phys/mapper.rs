@@ -59,7 +59,7 @@ impl PageFrameAllocator {
             .map(|(i, e)| (i, *e));
 
         if let Some((off, entry)) = mmr {
-            self.off = off + 1;
+            self.off += off + 1;
             info!(
                 "Found memory chunk {}[{:x}]({:x}): {}",
                 off,
