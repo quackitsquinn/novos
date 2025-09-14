@@ -128,6 +128,7 @@ pub fn remap_address(
     new_size: u64,
     flags: PageTableFlags,
 ) -> Result<PhysicalMemoryMap, MapError> {
+    // TODO: Optimize this to only map/unmap the difference if the new size is smaller/larger
     unmap_address(*map);
     map_address(map.phys_addr, new_size, flags)
 }

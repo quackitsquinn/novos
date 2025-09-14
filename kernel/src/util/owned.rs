@@ -1,4 +1,5 @@
 use core::{
+    fmt,
     ops::{Deref, DerefMut},
     ptr::{drop_in_place, NonNull},
 };
@@ -48,6 +49,15 @@ impl<T> Drop for Owned<T> {
         unsafe {
             drop_in_place(self.val.as_mut());
         }
+    }
+}
+
+impl<T> fmt::Debug for Owned<T>
+where
+    T: core::fmt::Debug,
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "Owned({:?})", unsafe { self.val.as_ref() })
     }
 }
 

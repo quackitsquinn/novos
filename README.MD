@@ -49,7 +49,7 @@ All debugging is done through environment variables. The following environment v
 ### Runtime options
 
 - `DEBUG`: If set, QEMU will wait for a debugger to attach on port 1234.
-- `QEMU_FLAGS`: Additional flags to pass to QEMU.
+- `QEMU_ARGS`: Additional flags to pass to QEMU.
 - `VERBOSE`: Shows QEMU's invocation command.
 - `NO_DISPLAY`: Disables the graphical display in QEMU.
 - `KERNEL_MEM`: Sets the amount of memory to allocate for the kernel in QEMU.
