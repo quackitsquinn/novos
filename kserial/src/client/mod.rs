@@ -8,7 +8,10 @@ use core::fmt;
 use serial::SerialClient;
 pub use serial_adapter::SerialAdapter;
 
-use crate::common::{commands::StringPacket, packet::Packet, PacketContents};
+use crate::{
+    client::serial::AdapterContainer,
+    common::{commands::StringPacket, packet::Packet, PacketContents},
+};
 
 // TODO: This crate assumes there is a serial connection that works 2 way. This is not always true. We should add a way to test this at some point.
 
@@ -24,13 +27,10 @@ pub fn get_serial_client() -> &'static SerialClient<'static> {
 }
 
 pub fn send_string(string: &str) {
-    send_string_with(&SERIAL_ADAPTER, string);
+    send_string_with(&mut SERIAL_ADAPTER.lock().expect("uninit"), string);
 }
 
-pub fn send_string_with<'a>(serial: &'a SerialClient<'a>, string: &str) {
-    let mut lock = serial
-        .lock()
-        .expect("Serial client not initialized, cannot send string.");
+pub fn send_string_with<'a>(lock: &mut AdapterContainer<'a>, string: &str) {
     let serial_adapter = lock
         .get_adapter()
         .as_mut()
@@ -61,13 +61,17 @@ pub fn test_two_way_serial() {
     assert_eq!(echoed_packet.payload().as_str(), "Hello, world!");
 }
 
-pub struct SerialWriter;
+pub struct SerialWriter<'a>(AdapterContainer<'a>);
 
-impl fmt::Write for SerialWriter {
+impl<'a> fmt::Write for SerialWriter<'a> {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        send_string(s);
+        send_string_with(&mut self.0, s);
         Ok(())
     }
+}
+
+pub fn writer() -> SerialWriter<'static> {
+    SerialWriter(SERIAL_ADAPTER.lock().expect("Serial not initialized"))
 }
 
 #[cfg(test)]
@@ -89,7 +93,7 @@ mod tests {
         let adapter = &tester.get_adapter();
 
         cfg::set_packet_mode(true);
-        super::send_string_with(serial, TEST_STRING);
+        super::send_string_with(&mut serial.lock().expect("uninit"), TEST_STRING);
         let output = adapter.get_output();
         let cur = Cursor::new(output[1..].to_vec());
         assert!(
