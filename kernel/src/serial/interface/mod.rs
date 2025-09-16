@@ -8,48 +8,20 @@ use crate::util::OnceMutex;
 
 pub mod serial;
 
-pub static SERIAL_PORT: OnceMutex<Serial> = OnceMutex::uninitialized();
 // TODO: Abstract this and similar things into a Lock type that just has the like is_locked etc.
 pub static PORT_HAS_INIT: Once<()> = Once::new();
 
-impl SerialAdapter for OnceMutex<Serial> {
-    fn send(&self, data: u8) {
-        let mut s = self.get();
-
-        unsafe { s.get_inner().send_raw(data) };
-    }
-
-    fn send_slice(&self, data: &[u8]) {
-        let mut s = self.get();
-        let serial = unsafe { s.get_inner() };
-        for byte in data {
-            serial.send_raw(*byte);
-        }
-    }
-
-    fn read(&self) -> u8 {
-        let mut s = self.get();
-        unsafe { s.get_inner().receive() }
-    }
-
-    fn read_slice(&self, data: &mut [u8]) -> usize {
-        let mut s = self.get();
-        let serial = unsafe { s.get_inner() };
-        let mut i = 0;
-        for byte in data.iter_mut() {
-            // TODO: Implement a timeout
-            *byte = serial.receive();
-            i += 1;
-        }
-        i
-    }
-}
-
 pub fn init() {
-    SERIAL_PORT.init(unsafe { Serial::new(0x3F8) });
+    static mut SERIAL_PORT: Option<Serial> = None;
+    unsafe {
+        if SERIAL_PORT.is_none() {
+            SERIAL_PORT = Some(Serial::new(0x3F8));
+        }
+    }
     PORT_HAS_INIT.call_once(|| ());
-    let serial = SERIAL_PORT.get();
-    kserial::client::init(&SERIAL_PORT);
+    kserial::client::init(unsafe {
+        &mut *SERIAL_PORT.as_mut().expect("Serial port not initialized")
+    });
 }
 
 #[doc(hidden)]

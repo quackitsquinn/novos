@@ -1,6 +1,6 @@
 use core::fmt::Write;
 
-use kserial::client::{get_serial_client, send_string};
+use kserial::client::{get_serial_client, send_string, SerialAdapter};
 
 use crate::serial::raw::SerialPort;
 
@@ -46,6 +46,36 @@ impl Serial {
 
     pub unsafe fn get_inner(&mut self) -> &mut SerialPort {
         &mut self.port
+    }
+}
+
+impl SerialAdapter for Serial {
+    fn send(&mut self, data: u8) {
+        unsafe {
+            self.send_raw(data);
+        };
+    }
+
+    fn send_slice(&mut self, data: &[u8]) {
+        let serial = unsafe { self.get_inner() };
+        for byte in data {
+            serial.send_raw(*byte);
+        }
+    }
+
+    fn read(&mut self) -> u8 {
+        unsafe { self.get_inner().receive() }
+    }
+
+    fn read_slice(&mut self, data: &mut [u8]) -> usize {
+        let serial = unsafe { self.get_inner() };
+        let mut i = 0;
+        for byte in data.iter_mut() {
+            // TODO: Implement a timeout
+            *byte = serial.receive();
+            i += 1;
+        }
+        i
     }
 }
 
