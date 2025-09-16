@@ -18,7 +18,7 @@ pub mod err;
 pub struct File<'a> {
     handle: FileHandle,
     open_mode: FileFlags,
-    client: &'a SerialClient,
+    client: &'a SerialClient<'a>,
 }
 // TODO: Destructor when `CloseFile` is implemented
 
@@ -26,7 +26,11 @@ impl<'a> File<'a> {
     /// Create a new file object.
     /// # Safety
     /// The caller must ensure that both the handle and open mode are valid.
-    pub unsafe fn new(handle: FileHandle, open_mode: FileFlags, client: &'a SerialClient) -> Self {
+    pub unsafe fn new(
+        handle: FileHandle,
+        open_mode: FileFlags,
+        client: &'a SerialClient<'a>,
+    ) -> Self {
         Self {
             handle,
             open_mode,
@@ -34,7 +38,7 @@ impl<'a> File<'a> {
         }
     }
 
-    pub fn create_file_with(serial: &'a SerialClient, name: &str) -> Result<Self, FileError> {
+    pub fn create_file_with(serial: &'a SerialClient<'a>, name: &str) -> Result<Self, FileError> {
         let open_file = OpenFile::create(name).ok_or(FileError::FilenameTooLong)?;
         // Copy the flags so that if the flags for `create` are changed, we don't have to change this function.
         let flags = open_file.flags;
@@ -46,8 +50,12 @@ impl<'a> File<'a> {
             return Err(FileError::NotInPacketMode);
         }
 
-        serial.send_packet(&open_file.into_packet());
-        let response: Packet<FileResponse> = serial.read_packet().ok_or(FileError::ReadError)?;
+        let mut session = serial
+            .lock()
+            .expect("Serial client not initialized, cannot create file.");
+
+        session.send_packet(&open_file.into_packet());
+        let response: Packet<FileResponse> = session.read_packet().ok_or(FileError::ReadError)?;
         let response = response.payload();
 
         if !response.err.is_ok() {
@@ -58,10 +66,6 @@ impl<'a> File<'a> {
 
         let file = unsafe { File::new(handle, flags, serial) };
         Ok(file)
-    }
-
-    pub fn create_file(name: &str) -> Result<Self, FileError> {
-        Self::create_file_with(&super::SERIAL_ADAPTER, name)
     }
 
     pub fn write(&self, data: &[u8]) -> Result<(), FileError> {
@@ -75,9 +79,10 @@ impl<'a> File<'a> {
             let packet = write_file.into_packet();
             // writeln!(SerialWriter, "{:?}", packet).ok();
             // writeln!(SerialWriter, "{:?}", bytemuck::bytes_of(packet.payload())).ok();
-            self.client.send_packet(&packet);
+            let mut session = self.client.lock().expect("Serial not initialized");
+            session.send_packet(&packet);
             let response: Packet<WriteFileResponse> =
-                self.client.read_packet().ok_or(FileError::ReadError)?;
+                session.read_packet().ok_or(FileError::ReadError)?;
             if !response.payload().is_ok() {
                 return Err(FileError::IoError(response.payload().err));
             }
@@ -96,9 +101,10 @@ impl<'a> File<'a> {
             return Err(FileError::NotInPacketMode);
         }
         let close_file = CloseFile::new(self.handle);
-        self.client.send_packet(&close_file.into_packet());
+        let mut session = self.client.lock().expect("Serial not initialized");
+        session.send_packet(&close_file.into_packet());
         let response: Packet<CloseFileResponse> =
-            self.client.read_packet().ok_or(FileError::ReadError)?;
+            session.read_packet().ok_or(FileError::ReadError)?;
         let response = response.payload();
         if !response.is_ok() {
             return Err(FileError::IoError(response.err()));
@@ -112,6 +118,12 @@ impl<'a> File<'a> {
 
     pub fn open_mode(&self) -> &FileFlags {
         &self.open_mode
+    }
+}
+
+impl File<'static> {
+    pub fn create_file(name: &str) -> Result<Self, FileError> {
+        Self::create_file_with(&super::SERIAL_ADAPTER, name)
     }
 }
 

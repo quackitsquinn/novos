@@ -1,29 +1,62 @@
 use core::{mem, slice};
 
 use bytemuck::Zeroable;
-use spin::Once;
+use spin::{Mutex, MutexGuard, Once};
 
 use crate::common::{packet::Packet, PacketContents, PACKET_MODE_ENTRY_SIG};
 
 use super::{cfg, SerialAdapter};
 
-pub struct SerialClient {
-    adapter: Once<&'static dyn SerialAdapter>,
+pub struct SerialClient<'a> {
+    adapter: Mutex<Option<&'a mut dyn SerialAdapter>>,
 }
 
-impl SerialClient {
+impl<'a> SerialClient<'a> {
     pub const fn new() -> Self {
         Self {
-            adapter: Once::new(),
+            adapter: Mutex::new(None),
         }
     }
 
-    pub fn init(&self, adapter: &'static dyn SerialAdapter) {
-        self.adapter.call_once(|| adapter);
+    pub fn init(&self, adapter: &'a mut dyn SerialAdapter) {
+        *self.adapter.lock() = Some(adapter);
+    }
+
+    pub fn lock(&'a self) -> Option<AdapterContainer> {
+        AdapterContainer::new(self.adapter.lock())
+    }
+
+    pub fn enable_packet_support(&'a self) {
+        cfg::set_packet_mode(true);
+        unsafe {
+            self.lock()
+                .expect("uninit")
+                .send_pod(&PACKET_MODE_ENTRY_SIG); // Send a marker to indicate packet mode is enabled.
+        }
+    }
+}
+
+pub struct AdapterContainer<'a> {
+    adapter: MutexGuard<'a, Option<&'a mut dyn SerialAdapter>>,
+}
+
+impl<'a> AdapterContainer<'a> {
+    fn new(
+        guard: MutexGuard<'a, Option<&'a mut dyn SerialAdapter>>,
+    ) -> Option<AdapterContainer<'a>> {
+        if guard.is_some() {
+            Some(Self { adapter: guard })
+        } else {
+            None
+        }
+    }
+
+    fn init(&mut self, adapter: &'a mut dyn SerialAdapter) {
+        self.adapter.replace(adapter);
     }
 
     /// Sends a packet over the serial connection.
-    pub fn send_packet<T>(&self, data: &Packet<T>)
+    pub fn send_packet<T>(&mut self, data: &Packet<T>)
     where
         T: PacketContents,
     {
@@ -44,7 +77,7 @@ impl SerialClient {
     }
 
     /// Reads a packet from the serial connection. Validates the checksum and returns None if it is invalid.
-    pub fn read_packet<T>(&self) -> Option<Packet<T>>
+    pub fn read_packet<T>(&mut self) -> Option<Packet<T>>
     where
         T: PacketContents,
     {
@@ -71,7 +104,7 @@ impl SerialClient {
 
     /// Writes a POD type to the serial connection.
     /// This is *almost certainly* not the function you want to use. Use `send_packet` instead.
-    pub unsafe fn send_pod<T>(&self, data: &T)
+    pub unsafe fn send_pod<T>(&mut self, data: &T)
     where
         T: bytemuck::Pod,
     {
@@ -79,14 +112,17 @@ impl SerialClient {
             return;
         }
         // We allow sending POD types over serial, even if we are not in packet mode.
-        let adapter = self.adapter.get().expect("Serial adapter not initialized");
+        let adapter = self
+            .adapter
+            .as_mut()
+            .expect("Serial adapter not initialized");
         let bytes = bytemuck::bytes_of(data);
         adapter.send_slice(bytes);
     }
 
     /// Reads a POD type from the serial connection.
     /// This is *almost certainly* not the function you want to use. Use `read_packet` instead.
-    pub unsafe fn read_pod<T>(&self, dest: &mut T)
+    pub unsafe fn read_pod<T>(&mut self, dest: &mut T)
     where
         T: bytemuck::Pod,
     {
@@ -94,25 +130,20 @@ impl SerialClient {
         if !cfg::should_input_serial() {
             return Zeroable::zeroed();
         }
-        let adapter = self.adapter.get().expect("Serial adapter not initialized");
+        let adapter = self
+            .adapter
+            .as_mut()
+            .expect("Serial adapter not initialized");
         let mut bytes =
             unsafe { slice::from_raw_parts_mut(dest as *mut T as *mut u8, mem::size_of::<T>()) };
         // TODO: Error type over panic
         assert_eq!(adapter.read_slice(&mut bytes), mem::size_of::<T>());
     }
 
-    pub fn get(&self) -> Option<&'static dyn SerialAdapter> {
-        self.adapter.get().map(|a| *a)
-    }
-
-    pub fn enable_packet_support(&self) {
-        cfg::set_packet_mode(true);
-        unsafe {
-            self.send_pod(&PACKET_MODE_ENTRY_SIG); // Send a marker to indicate packet mode is enabled.
-        }
+    pub fn get_adapter(&mut self) -> &mut MutexGuard<'a, Option<&'a mut dyn SerialAdapter>> {
+        &mut self.adapter
     }
 }
-
 #[cfg(test)]
 pub mod tests {
     use core::{ops::Deref, pin::Pin};
@@ -120,18 +151,21 @@ pub mod tests {
     use super::*;
     use crate::client::serial_adapter::tests::TestSerialAdapter;
 
-    pub struct TestSerialWrapper {
-        pub serial: SerialClient,
+    pub struct TestSerialWrapper<'a> {
+        pub serial: SerialClient<'a>,
         adapter: Pin<Box<TestSerialAdapter>>,
     }
 
-    impl TestSerialWrapper {
+    impl<'a> TestSerialWrapper<'a> {
         pub fn new() -> Self {
-            let adapter = Box::pin(TestSerialAdapter::new());
+            let mut adapter = Box::pin(TestSerialAdapter::new());
             // SAFETY: adapter is pinned and will be dropped after serial.
-            let adapter_ptr = unsafe { &*(adapter.as_ref().get_ref() as *const _) };
             let serial = SerialClient::new();
-            serial.init(&*adapter_ptr);
+            serial.init(unsafe {
+                mem::transmute::<&mut dyn SerialAdapter, &'a mut dyn SerialAdapter>(
+                    &mut *adapter.as_mut() as &mut dyn SerialAdapter,
+                )
+            });
             Self { serial, adapter }
         }
 
@@ -140,8 +174,8 @@ pub mod tests {
         }
     }
 
-    impl Deref for TestSerialWrapper {
-        type Target = SerialClient;
+    impl<'a> Deref for TestSerialWrapper<'a> {
+        type Target = SerialClient<'a>;
 
         fn deref(&self) -> &Self::Target {
             &self.serial

@@ -14,11 +14,11 @@ use crate::common::{commands::StringPacket, packet::Packet, PacketContents};
 
 static SERIAL_ADAPTER: SerialClient = SerialClient::new();
 
-pub fn init(adapter: &'static dyn SerialAdapter) {
+pub fn init(adapter: &'static mut dyn SerialAdapter) {
     SERIAL_ADAPTER.init(adapter);
 }
 
-pub fn get_serial_client() -> &'static SerialClient {
+pub fn get_serial_client() -> &'static SerialClient<'static> {
     // This is used to get the serial client for other modules.
     &SERIAL_ADAPTER
 }
@@ -27,8 +27,15 @@ pub fn send_string(string: &str) {
     send_string_with(&SERIAL_ADAPTER, string);
 }
 
-pub fn send_string_with(serial: &SerialClient, string: &str) {
-    let serial_adapter = serial.get().expect("Serial adapter not initialized");
+pub fn send_string_with<'a>(serial: &'a SerialClient<'a>, string: &str) {
+    let mut lock = serial
+        .lock()
+        .expect("Serial client not initialized, cannot send string.");
+    let serial_adapter = lock
+        .get_adapter()
+        .as_mut()
+        .expect("Serial adapter not initialized, cannot send string.");
+
     if !cfg::is_packet_mode() {
         serial_adapter.send_slice(string.as_bytes());
         return;
@@ -38,7 +45,7 @@ pub fn send_string_with(serial: &SerialClient, string: &str) {
         let pk = unsafe { StringPacket::from_bytes_unchecked(chunk) };
 
         let packet = pk.into_packet();
-        serial.send_packet(&packet);
+        lock.send_packet(&packet);
     }
 }
 
@@ -46,8 +53,9 @@ pub fn test_two_way_serial() {
     let serial = &SERIAL_ADAPTER;
     let packet = StringPacket::new("Hello, world!").unwrap();
     let echo_packet = unsafe { Packet::new(0xFE, packet) };
-    serial.send_packet(&echo_packet);
-    let echoed_packet: Packet<StringPacket> = serial.read_packet().expect("Failed to read packet");
+    let mut session = serial.lock().expect("Serial not initialized");
+    session.send_packet(&echo_packet);
+    let echoed_packet: Packet<StringPacket> = session.read_packet().expect("Failed to read packet");
     assert_eq!(echoed_packet.command(), 0xFE);
     assert_eq!(echoed_packet.checksum(), 0);
     assert_eq!(echoed_packet.payload().as_str(), "Hello, world!");

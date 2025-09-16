@@ -4,13 +4,13 @@ where
     Self: Send + Sync,
 {
     /// Send a byte over the serial port. Returns Some if sending the byte would block, None otherwise.
-    fn send(&self, data: u8);
+    fn send(&mut self, data: u8);
     /// Send a slice of bytes over the serial port. Returns Some if sending the slice would block, None otherwise.
-    fn send_slice(&self, data: &[u8]);
+    fn send_slice(&mut self, data: &[u8]);
     /// Read a byte from the serial port. Returns Some if reading the byte would block, None otherwise.
-    fn read(&self) -> u8;
+    fn read(&mut self) -> u8;
     /// Read a slice of bytes from the serial port. Returns Some if reading the slice would block, None otherwise.
-    fn read_slice(&self, data: &mut [u8]) -> usize;
+    fn read_slice(&mut self, data: &mut [u8]) -> usize;
 }
 
 #[cfg(test)]
@@ -67,15 +67,15 @@ pub(crate) mod tests {
     }
 
     impl SerialAdapter for TestSerialAdapter {
-        fn send(&self, data: u8) {
+        fn send(&mut self, data: u8) {
             self.output.lock().unwrap().push(data);
         }
 
-        fn send_slice(&self, data: &[u8]) {
+        fn send_slice(&mut self, data: &[u8]) {
             self.output.lock().unwrap().extend_from_slice(data);
         }
 
-        fn read(&self) -> u8 {
+        fn read(&mut self) -> u8 {
             let (index, input) = &mut *self.input.lock().unwrap();
             if *index >= input.len() {
                 return 0;
@@ -86,7 +86,7 @@ pub(crate) mod tests {
             byte
         }
 
-        fn read_slice(&self, data: &mut [u8]) -> usize {
+        fn read_slice(&mut self, data: &mut [u8]) -> usize {
             let (index, input) = &mut *self.input.lock().unwrap();
             let len = data.len().min(input.len() - *index);
             data[..len].copy_from_slice(&input[*index..*index + len]);
@@ -97,7 +97,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_test_serial_adapter() {
-        let adapter = TestSerialAdapter::new();
+        let mut adapter = TestSerialAdapter::new();
         adapter.set_input(&[1, 2, 3, 4, 5]);
         assert_eq!(adapter.read(), 1);
         assert_eq!(adapter.read(), 2);
@@ -109,7 +109,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_test_serial_adapter_slice() {
-        let adapter = TestSerialAdapter::new();
+        let mut adapter = TestSerialAdapter::new();
         adapter.set_input(&[1, 2, 3, 4, 5]);
         let mut data = [0; 3];
         assert_eq!(adapter.read_slice(&mut data), 3);
@@ -122,7 +122,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_test_serial_adapter_send() {
-        let adapter = TestSerialAdapter::new();
+        let mut adapter = TestSerialAdapter::new();
         adapter.send(1);
         adapter.send(2);
         adapter.send(3);
@@ -133,7 +133,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_test_serial_adapter_send_slice() {
-        let adapter = TestSerialAdapter::new();
+        let mut adapter = TestSerialAdapter::new();
         adapter.send_slice(&[1, 2, 3]);
         adapter.send_slice(&[4, 5]);
         assert_eq!(adapter.get_output(), vec![1, 2, 3, 4, 5]);
