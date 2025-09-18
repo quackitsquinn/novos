@@ -1,7 +1,7 @@
 use core::ops::Deref;
 
 use arrayvec::ArrayVec;
-use limine::{memory_map::Entry, response::MemoryMapResponse};
+use cake::limine::{memory_map::Entry, response::MemoryMapResponse};
 
 // FIXME: Somehow account for Entry not implementing Debug for totally sane reasons.
 #[allow(missing_debug_implementations)]

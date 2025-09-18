@@ -7,15 +7,13 @@ use acpi::{
     AcpiError,
 };
 use alloc::collections::btree_map::BTreeMap;
+use cake::Owned;
 use log::{info, warn};
 pub use mapped_table::MappedTable;
 use spin::{Mutex, MutexGuard, Once};
 use x86_64::{structures::paging::PageTableFlags, PhysAddr};
 
-use crate::{
-    acpi::sdt::TableHeader, declare_module, memory::paging::phys::phys_mem::map_address,
-    util::Owned,
-};
+use crate::{acpi::sdt::TableHeader, declare_module, memory::paging::phys::phys_mem::map_address};
 
 mod sdt;
 

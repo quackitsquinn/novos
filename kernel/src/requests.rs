@@ -1,6 +1,6 @@
 use core::{convert::Infallible, slice};
 
-use limine::{
+use cake::limine::{
     paging::Mode,
     request::{
         ExecutableAddressRequest, ExecutableFileRequest, FramebufferRequest, HhdmRequest,
@@ -8,6 +8,7 @@ use limine::{
     },
     response::{ExecutableAddressResponse, ExecutableFileResponse},
 };
+use cake::LimineRequest;
 use log::info;
 use spin::Once;
 
@@ -16,7 +17,6 @@ use crate::{
     display::req_data::FramebufferInfo,
     elf::{req_data::KernelElf, Elf},
     memory::req_data::MemoryMap,
-    util::LimineRequest,
 };
 
 #[used]

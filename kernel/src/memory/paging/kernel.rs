@@ -2,6 +2,7 @@
 //! In the future, this will almost certainly be converted into it's own module.
 use core::convert::Infallible;
 
+use cake::terminate_requests;
 use goblin::elf64::program_header::ProgramHeader;
 use log::{debug, info};
 use x86_64::{
@@ -23,7 +24,6 @@ use crate::{
     },
     requests::{EXECUTABLE_ADDRESS, FRAMEBUFFER, KERNEL_ELF},
     sprint,
-    util::terminate_requests,
 };
 
 pub fn create_kernel_pagetable() -> (KernelPhysFrame, KernelPage) {

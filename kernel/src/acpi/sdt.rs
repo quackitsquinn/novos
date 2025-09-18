@@ -4,14 +4,12 @@ use acpi::{
     sdt::{SdtHeader, Signature},
     AcpiError, AcpiTable,
 };
+use cake::Owned;
 use x86_64::{structures::paging::PageTableFlags, PhysAddr};
 
-use crate::{
-    memory::paging::{
-        map,
-        phys::phys_mem::{map_address, remap_address, unmap_address, PhysicalMemoryMap},
-    },
-    util::Owned,
+use crate::memory::paging::{
+    map,
+    phys::phys_mem::{map_address, remap_address, unmap_address, PhysicalMemoryMap},
 };
 
 #[derive(Debug)]

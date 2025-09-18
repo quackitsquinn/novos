@@ -2,11 +2,12 @@
 //! This is used to allocate virtual address space for mapping physical memory.
 use core::convert::Infallible;
 
-use crate::{declare_module, util::OnceMutex};
+use crate::declare_module;
 
 pub mod range;
 pub mod virt_alloc;
 
+use cake::OnceMutex;
 pub use range::VirtualAddressRange;
 use virt_alloc::VirtualAddressMapper;
 

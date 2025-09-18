@@ -17,9 +17,11 @@ extern crate alloc;
 
 use core::arch::asm;
 
+use cake::declare_module;
+
+use cake::limine::BaseRevision;
 use interrupts::hardware;
 use kserial::client::{fs::File, get_serial_client, test_two_way_serial};
-use limine::BaseRevision;
 use log::info;
 use spin::Once;
 
@@ -36,7 +38,6 @@ pub mod proc;
 mod requests;
 pub mod serial;
 pub mod testing;
-pub mod util;
 
 pub const STACK_SIZE: u64 = 1 << 16; // Limine defaults to 16KiB
 

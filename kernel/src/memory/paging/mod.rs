@@ -1,12 +1,13 @@
 use core::convert::Infallible;
 
+use cake::OnceMutex;
 use x86_64::{
     registers::control::Cr3,
     structures::paging::{OffsetPageTable, Page, PageTable, PhysFrame, Size4KiB},
     VirtAddr,
 };
 
-use crate::{declare_module, requests::PHYSICAL_MEMORY_OFFSET, util::OnceMutex};
+use crate::{declare_module, requests::PHYSICAL_MEMORY_OFFSET};
 
 pub use self::page_table::KernelPageTable;
 

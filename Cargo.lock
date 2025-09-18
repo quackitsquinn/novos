@@ -186,6 +186,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d71b6127be86fdcfddb610f7182ac57211d4b18a3e9c82eb2d17662f2227ad6a"
 
 [[package]]
+name = "cake"
+version = "0.1.0"
+dependencies = [
+ "limine",
+ "log",
+ "spin 0.10.0",
+]
+
+[[package]]
 name = "cc"
 version = "1.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -511,7 +520,7 @@ dependencies = [
  "ctor",
  "env_logger",
  "log",
- "spin",
+ "spin 0.9.8",
 ]
 
 [[package]]
@@ -525,17 +534,17 @@ dependencies = [
  "acpi",
  "arrayvec",
  "bitflags 2.9.0",
+ "cake",
  "goblin",
  "kalloc",
  "kproc",
  "kserial",
  "lazy_static",
- "limine",
  "log",
  "paste",
  "pic8259",
  "rustc-demangle",
- "spin",
+ "spin 0.9.8",
  "thiserror",
  "uart_16550",
  "x86_64",
@@ -572,7 +581,7 @@ dependencies = [
  "lazy_static",
  "log",
  "pastey",
- "spin",
+ "spin 0.9.8",
  "thiserror",
 ]
 
@@ -591,7 +600,7 @@ version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 dependencies = [
- "spin",
+ "spin 0.9.8",
 ]
 
 [[package]]
@@ -613,8 +622,9 @@ dependencies = [
 
 [[package]]
 name = "limine"
-version = "0.3.1"
-source = "git+https://github.com/jasondyoungberg/limine-rs.git?branch=master#e7c2359682fa3a663036e4b5f44b5395376760ab"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "af6d2ee42712e7bd2c787365cd1dab06ef59a61becbf87bec7b32b970bd2594b"
 dependencies = [
  "bitflags 2.9.0",
 ]
@@ -643,9 +653,9 @@ dependencies = [
 
 [[package]]
 name = "log"
-version = "0.4.27"
+version = "0.4.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "13dc2df351e3202783a1fe0d44375f7295ffb4049267b0f3018346dc122a1d94"
+checksum = "34080505efa8e45a4b816c349525ebe327ceaa8559756f0356cba97ef3bf7432"
 
 [[package]]
 name = "lzma-rs"
@@ -1007,6 +1017,15 @@ name = "spin"
 version = "0.9.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6980e8d7511241f8acf4aebddbb1ff938df5eebe98691418c4468d0b72a96a67"
+dependencies = [
+ "lock_api",
+]
+
+[[package]]
+name = "spin"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d5fe4ccb98d9c292d56fec89a5e07da7fc4cf0dc11e156b41793132775d3e591"
 dependencies = [
  "lock_api",
 ]

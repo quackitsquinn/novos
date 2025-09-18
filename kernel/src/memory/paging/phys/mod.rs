@@ -1,6 +1,7 @@
+use cake::OnceMutex;
 use mapper::PageFrameAllocator;
 
-use crate::{declare_module, requests::MEMORY_MAP, util::OnceMutex};
+use crate::{declare_module, requests::MEMORY_MAP};
 
 pub(crate) mod mapper;
 pub mod phys_mem;

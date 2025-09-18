@@ -1,5 +1,5 @@
 use alloc::vec::Vec;
-use limine::memory_map::{Entry, EntryType};
+use cake::limine::memory_map::{Entry, EntryType};
 use log::{debug, error, info};
 use x86_64::{
     structures::paging::{

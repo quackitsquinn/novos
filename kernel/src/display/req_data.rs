@@ -1,4 +1,4 @@
-use limine::response::FramebufferResponse;
+use cake::limine::response::FramebufferResponse;
 use spin::Mutex;
 
 pub struct FramebufferInfo {

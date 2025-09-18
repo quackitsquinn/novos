@@ -1,12 +1,12 @@
 use core::{convert::Infallible, mem, sync::atomic::AtomicU32};
 
+use cake::OnceMutex;
 use sched::KernelThreadScheduler;
 
 use crate::{
     context::{InterruptContext, InterruptContextValue},
     declare_module,
     memory::stack::Stack,
-    util::OnceMutex,
 };
 
 pub mod sched;

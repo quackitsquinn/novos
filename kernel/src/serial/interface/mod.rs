@@ -4,8 +4,6 @@ use kserial::client::SerialAdapter;
 use serial::Serial;
 use spin::Once;
 
-use crate::util::OnceMutex;
-
 pub mod serial;
 
 // TODO: Abstract this and similar things into a Lock type that just has the like is_locked etc.

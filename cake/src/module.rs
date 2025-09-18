@@ -53,8 +53,8 @@ where
 #[macro_export]
 macro_rules! declare_module {
     ($name: literal, $func: ident, $error_type: ty) => {
-        pub static MODULE: $crate::util::KernelModule<$error_type> =
-            $crate::util::KernelModule::new($name, $func);
+        pub static MODULE: $crate::KernelModule<$error_type> =
+            $crate::KernelModule::new($name, $func);
 
         #[allow(dead_code)]
         pub fn is_initialized() -> bool {

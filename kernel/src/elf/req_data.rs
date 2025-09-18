@@ -4,13 +4,13 @@ use alloc::{
     alloc::alloc,
     vec::{self, Vec},
 };
-use limine::{
+use cake::limine::{
     request::ExecutableFileRequest,
     response::{ExecutableAddressResponse, ExecutableFileResponse},
 };
 use spin::{Mutex, Once};
 
-use crate::{elf::Elf, util::requests_terminated};
+use crate::elf::Elf;
 
 /// The kernel's ELF executable, stored in a way that allows moving it to the heap later.
 pub struct KernelElf {

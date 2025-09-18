@@ -1,12 +1,10 @@
 use core::fmt;
 
 use acpi::{sdt::SdtHeader, AcpiError, AcpiTable};
+use cake::Owned;
 use x86_64::{structures::paging::PageTableFlags, PhysAddr};
 
-use crate::{
-    memory::paging::phys::phys_mem::{map_address, unmap_address, PhysicalMemoryMap},
-    util::Owned,
-};
+use crate::memory::paging::phys::phys_mem::{map_address, unmap_address, PhysicalMemoryMap};
 
 pub struct MappedTable<'a, T: AcpiTable> {
     table: Owned<T>,
