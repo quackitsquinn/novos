@@ -4,7 +4,7 @@ use cake::limine::{
     paging::Mode,
     request::{
         ExecutableAddressRequest, ExecutableFileRequest, FramebufferRequest, HhdmRequest,
-        MemoryMapRequest, PagingModeRequest, RsdpRequest,
+        MemoryMapRequest, MpRequest, PagingModeRequest, RsdpRequest,
     },
     response::{ExecutableAddressResponse, ExecutableFileResponse},
 };
@@ -17,6 +17,7 @@ use crate::{
     display::req_data::FramebufferInfo,
     elf::{req_data::KernelElf, Elf},
     memory::req_data::MemoryMap,
+    mp::ApplicationCores,
 };
 
 #[used]
@@ -41,6 +42,9 @@ pub static KERNEL_ELF: LimineRequest<ExecutableFileRequest, KernelElf> =
 pub static FRAMEBUFFER: LimineRequest<FramebufferRequest, FramebufferInfo> =
     LimineRequest::new(FramebufferRequest::new());
 
+pub static MP_INFO: LimineRequest<MpRequest, ApplicationCores> =
+    LimineRequest::new(MpRequest::new());
+
 #[used]
 pub static EXECUTABLE_ADDRESS_REQUEST: ExecutableAddressRequest = ExecutableAddressRequest::new();
 pub static EXECUTABLE_ADDRESS: Once<&'static ExecutableAddressResponse> = Once::new();
@@ -57,6 +61,8 @@ pub fn init() -> Result<(), Infallible> {
     KERNEL_ELF.init(KernelElf::new);
 
     FRAMEBUFFER.init(FramebufferInfo::new);
+
+    MP_INFO.init(ApplicationCores::new);
 
     let exec_addr = EXECUTABLE_ADDRESS_REQUEST.get_response().unwrap();
     EXECUTABLE_ADDRESS.call_once(|| exec_addr);

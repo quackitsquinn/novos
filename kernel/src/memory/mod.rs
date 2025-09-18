@@ -26,7 +26,6 @@ fn init() -> Result<(), Infallible> {
     init_heap();
     KERNEL_ELF.get().copy_to_heap();
     paging::vaddr_mapper::MODULE.init();
-    paging::kernel::MODULE.init();
     Ok(())
 }
 

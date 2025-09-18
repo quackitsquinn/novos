@@ -27,6 +27,7 @@ paste = "1.0.15"
 arrayvec = { version = "0.7.6", default-features = false }
 acpi = "6.0.1"
 cake = {path = "../cake"}
+raw-cpuid = "11.6.0"
 
 [profile.release]
 panic = "abort"

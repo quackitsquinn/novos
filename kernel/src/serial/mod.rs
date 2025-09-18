@@ -4,7 +4,7 @@
 
 use core::convert::Infallible;
 
-use crate::{declare_module, println};
+use crate::{declare_module, mp, println};
 
 pub mod interface;
 pub mod raw; // Things to interact with the serial port directly
@@ -22,7 +22,15 @@ impl log::Log for SerialLog {
         if self.enabled(record.metadata()) {
             let file = record.file().unwrap_or("?");
             let line = record.line().unwrap_or(0);
-            println!("[{}] {}:{} {}", record.level(), file, line, record.args());
+            let core = mp::current_core_id();
+            println!(
+                "[{}:{}] {}:{} {}",
+                record.level(),
+                core,
+                file,
+                line,
+                record.args()
+            );
             return;
         }
     }

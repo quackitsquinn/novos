@@ -32,6 +32,7 @@ pub mod elf;
 mod gdt;
 pub mod interrupts;
 pub mod memory;
+pub mod mp;
 pub mod panic;
 pub mod pci;
 pub mod proc;
@@ -91,16 +92,18 @@ pub(crate) unsafe fn init_kernel_services() {
     interrupts::MODULE.init();
     hardware::MODULE.init();
     get_serial_client().enable_packet_support();
-    {
-        let e = File::create_file("test.txt").unwrap();
-        e.write(b"Hello, world!").unwrap();
-        unsafe {
-            e.close();
-        }
-    }
+    // {
+    //     let e = File::create_file("test.txt").unwrap();
+    //     e.write(b"Hello, world!").unwrap();
+    //     unsafe {
+    //         e.close();
+    //     }
+    // }
 
-    test_two_way_serial();
+    // test_two_way_serial();
     memory::MODULE.init();
+    mp::MODULE.init();
+    memory::paging::kernel::MODULE.init();
     #[cfg(not(test))] // Tests don't have a display
     display::MODULE.init();
     acpi::MODULE.init();

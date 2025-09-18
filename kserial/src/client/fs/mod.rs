@@ -1,4 +1,5 @@
 use err::FileError;
+use spin::Mutex;
 
 use crate::common::{
     commands::{
@@ -100,6 +101,7 @@ impl<'a> File<'a> {
             send_string("Packet mode is not enabled, cannot close file.");
             return Err(FileError::NotInPacketMode);
         }
+        let mut client = self.client.lock();
         let close_file = CloseFile::new(self.handle);
         let mut session = self.client.lock().expect("Serial not initialized");
         session.send_packet(&close_file.into_packet());
@@ -151,7 +153,7 @@ impl<'a> Write for File<'a> {
 mod tests {
 
     use crate::{
-        client::{cfg::set_packet_mode, serial::tests::TestSerialWrapper},
+        client::{cfg::set_packet_mode, serial::tests::TestSerialWrapper, SerialAdapter},
         common::{
             commands::{
                 FileFlags, FileHandle, FileResponse, OpenFile, WriteFile, WriteFileResponse,
@@ -165,16 +167,17 @@ mod tests {
     #[test]
     fn test_create_file() {
         set_packet_mode(true);
-        let serial = TestSerialWrapper::new();
+        let wrapper = TestSerialWrapper::new();
         let file_resp = FileResponse::new(0x1234).into_packet();
-        serial.get_adapter().set_input(&file_resp.as_bytes());
+        let serial = &wrapper.serial;
+        wrapper.get_adapter().set_input(&file_resp.as_bytes());
         let file = File::create_file_with(&serial, "test.txt");
         assert!(file.is_ok());
         let file = file.unwrap();
         assert_eq!(file.handle(), &FileHandle::new(0x1234));
         assert_eq!(file.open_mode(), &FileFlags::CREATE_OVERWRITE);
-        serial.get_adapter().assert_send(OpenFile::PACKET_SIZE);
-        serial.get_adapter().assert_read(FileResponse::PACKET_SIZE);
+        wrapper.get_adapter().assert_send(OpenFile::PACKET_SIZE);
+        wrapper.get_adapter().assert_read(FileResponse::PACKET_SIZE);
     }
 
     #[test]
