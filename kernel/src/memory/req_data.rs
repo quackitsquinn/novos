@@ -1,7 +1,10 @@
 use core::ops::Deref;
 
 use arrayvec::ArrayVec;
-use cake::limine::{memory_map::Entry, response::MemoryMapResponse};
+use cake::{
+    limine::{memory_map::Entry, response::MemoryMapResponse},
+    LimineData,
+};
 
 // FIXME: Somehow account for Entry not implementing Debug for totally sane reasons.
 #[allow(missing_debug_implementations)]
@@ -10,7 +13,7 @@ pub struct MemoryMap {
 }
 
 impl MemoryMap {
-    pub fn new(response: &MemoryMapResponse) -> Self {
+    pub fn new(response: LimineData<'_, MemoryMapResponse>) -> Self {
         let mut array = ArrayVec::<Entry, 256>::new();
         for entry in response.entries() {
             array.push(**entry);

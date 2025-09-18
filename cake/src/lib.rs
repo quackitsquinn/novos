@@ -9,7 +9,7 @@ mod resource;
 use core::fmt::Display;
 
 pub use self::limine_request::{
-    LimineRequest, RawLimineRequest, requests_terminated, terminate_requests,
+    LimineData, LimineRequest, RawLimineRequest, requests_terminated, terminate_requests,
 };
 use log::info;
 pub use module::KernelModule;
@@ -21,6 +21,7 @@ use spin::Once;
 pub use limine;
 pub use log;
 pub use spin;
+
 static CALLER_INSTRUCTION_POINTER_FN: Once<fn() -> usize> = Once::new();
 static CALLER_INSTRUCTION_POINTER_NAME_RESOLVER: Once<fn(usize) -> Option<&'static str>> =
     Once::new();

@@ -1,4 +1,4 @@
-use cake::limine::response::FramebufferResponse;
+use cake::{limine::response::FramebufferResponse, LimineData};
 use spin::Mutex;
 
 pub struct FramebufferInfo {
@@ -10,7 +10,7 @@ pub struct FramebufferInfo {
 }
 
 impl FramebufferInfo {
-    pub fn new(resp: &FramebufferResponse) -> Self {
+    pub fn new(resp: LimineData<'_, FramebufferResponse>) -> Self {
         let framebuffer = resp.framebuffers().nth(0).expect("No framebuffer found");
         Self {
             width: framebuffer.width(),

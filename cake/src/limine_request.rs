@@ -1,24 +1,36 @@
-use core::sync::atomic::AtomicBool;
+use core::{
+    fmt::Debug,
+    mem::{MaybeUninit, offset_of},
+    sync::atomic::AtomicBool,
+};
 
-use spin::Once;
+use limine::response::MpResponse;
+use spin::{Mutex, MutexGuard, Once};
 
-pub trait RawLimineRequest {
+use crate::{ResourceGuard, resource::ResourceMutex};
+
+pub trait RawLimineRequest<'a> {
     type Response;
-    fn is_present(&'static self) -> bool;
-    fn get_response<'a>(&'static self) -> Option<&'a Self::Response>;
+    fn is_present(&self) -> bool;
+    fn get_response(&'a self) -> Option<&'a Self::Response>;
+    fn get_response_mut(&'a mut self) -> Option<&'a mut Self::Response>;
 }
 
 macro_rules! impl_lim_req {
     ($request_type:ident => $response_type:ident) => {
-        impl RawLimineRequest for limine::request::$request_type {
+        impl<'a> RawLimineRequest<'a> for limine::request::$request_type {
             type Response = limine::response::$response_type;
 
-            fn is_present(&'static self) -> bool {
+            fn is_present(&self) -> bool {
                 self.get_response().is_some()
             }
 
-            fn get_response<'a>(&'static self) -> Option<&'a Self::Response> {
+            fn get_response(&'a self) -> Option<&'a Self::Response> {
                 self.get_response()
+            }
+
+            fn get_response_mut(&'a mut self) -> Option<&'a mut Self::Response> {
+                (self as &mut limine::request::$request_type).get_response_mut()
             }
         }
     };
@@ -34,46 +46,57 @@ impl_lim_req! {
     FramebufferRequest => FramebufferResponse,
     MemoryMapRequest => MemoryMapResponse,
     ExecutableFileRequest => ExecutableFileResponse,
+    MpRequest => MpResponse,
 }
 
-pub struct LimineRequest<LimineType: RawLimineRequest, KernelType: 'static> {
-    limine_request: Option<LimineType>,
+/// A Limine request paired with kernel data initialized from the Limine response.
+pub struct LimineRequest<'a, LimineType: RawLimineRequest<'a>, KernelType: 'static> {
+    limine_request: ResourceMutex<LimineType>,
     pub kernel_data: Once<KernelType>,
+    _phantom: core::marker::PhantomData<&'a ()>,
 }
 
-impl<L, K> LimineRequest<L, K>
+/// A guard that provides access to the Limine response data.
+pub type LimineData<'a, L> = ResourceGuard<'a, L>;
+
+impl<'a, L, K> LimineRequest<'a, L, K>
 where
-    L: RawLimineRequest,
+    L: RawLimineRequest<'a>,
 {
     pub const fn new(new: L) -> Self {
         Self {
-            limine_request: Some(new),
+            limine_request: ResourceMutex::new(new).with_validator(requests_active),
             kernel_data: Once::new(),
+            _phantom: core::marker::PhantomData,
         }
     }
 
-    pub fn init(&'static self, data: impl FnOnce(&L::Response) -> K) {
+    /// Initializes the kernel data using the provided function, which is given access to the Limine response data.
+    pub fn init(&'static self, data: impl FnOnce(ResourceGuard<'_, L::Response>) -> K) {
         if REQUEST_TERMINATE.load(core::sync::atomic::Ordering::SeqCst) {
             panic!("LimineRequest init called after requests terminated");
         }
-        if !self.limine_request.as_ref().unwrap().is_present() {
+
+        let request = self.limine_request.lock();
+        if !request.is_present() {
             panic!("Limine request not present");
         }
 
-        let response = self
-            .limine_request
-            .as_ref()
-            .unwrap()
-            .get_response()
-            .expect("Limine response not present");
-
-        self.kernel_data.call_once(|| data(response));
+        drop(request);
+        self.kernel_data.call_once(|| data(self.get_limine()));
     }
 
+    /// Returns a reference to the kernel data. This will panic if the data has not been initialized yet.
     pub fn get(&'static self) -> &'static K {
         self.kernel_data
             .get()
             .expect("LimineRequest kernel data not initialized")
+    }
+
+    /// Returns a lock guard to the Limine response data.
+    pub fn get_limine(&'a self) -> ResourceGuard<'a, L::Response> {
+        self.limine_request
+            .lock_map(|t| t.get_response_mut().expect("response not present"))
     }
 }
 
@@ -86,6 +109,12 @@ pub unsafe fn terminate_requests() {
     REQUEST_TERMINATE.store(true, core::sync::atomic::Ordering::SeqCst);
 }
 
+/// Returns true if limine requests have been terminated.
 pub fn requests_terminated() -> bool {
     REQUEST_TERMINATE.load(core::sync::atomic::Ordering::SeqCst)
+}
+
+/// Returns true if limine requests are still active (i.e., have not been terminated).
+pub fn requests_active() -> bool {
+    !requests_terminated()
 }

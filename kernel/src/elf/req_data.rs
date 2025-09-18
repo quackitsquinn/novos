@@ -4,9 +4,12 @@ use alloc::{
     alloc::alloc,
     vec::{self, Vec},
 };
-use cake::limine::{
-    request::ExecutableFileRequest,
-    response::{ExecutableAddressResponse, ExecutableFileResponse},
+use cake::{
+    limine::{
+        request::ExecutableFileRequest,
+        response::{ExecutableAddressResponse, ExecutableFileResponse},
+    },
+    LimineData,
 };
 use spin::{Mutex, Once};
 
@@ -21,7 +24,7 @@ pub struct KernelElf {
 
 impl KernelElf {
     /// Creates a new `KernelElf` from the given Limine executable file request.
-    pub fn new(limine_data: &ExecutableFileResponse) -> Self {
+    pub fn new(limine_data: LimineData<'_, ExecutableFileResponse>) -> Self {
         let limine_data = unsafe {
             core::slice::from_raw_parts(
                 limine_data.file().addr(),

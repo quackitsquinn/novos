@@ -22,7 +22,7 @@ impl<T> ResourceMutex<T> {
 
     /// Sets a validator function that will be called whenever the mutex is accessed. If the validator returns false, the mutex will panic.
     /// This is useful for ensuring that certain conditions are met before accessing the mutex, such as if limine requests have not terminated.
-    pub fn with_validator(mut self, validator: fn() -> bool) -> Self {
+    pub const fn with_validator(mut self, validator: fn() -> bool) -> Self {
         self.validator = Some(validator);
         self
     }
@@ -91,6 +91,9 @@ impl<T> ResourceMutex<T> {
     }
 }
 
+unsafe impl<T: Send> Send for ResourceMutex<T> {}
+unsafe impl<T: Send> Sync for ResourceMutex<T> {}
+
 /// A guard that allows access to the inner data of a `ResourceMutex`. The mutex is released when the guard is dropped.
 pub struct ResourceGuard<'a, T> {
     data: &'a mut T,
@@ -114,3 +117,15 @@ impl<T> core::ops::Deref for ResourceGuard<'_, T> {
         self.data
     }
 }
+
+impl<T> core::ops::DerefMut for ResourceGuard<'_, T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        if self.validator.is_some() && !(self.validator.unwrap())() {
+            panic!("ResourceMutex validator failed");
+        }
+        self.data
+    }
+}
+
+unsafe impl<T: Send> Send for ResourceGuard<'_, T> {}
+unsafe impl<T: Sync> Sync for ResourceGuard<'_, T> {}

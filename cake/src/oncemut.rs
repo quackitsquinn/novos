@@ -10,6 +10,8 @@ pub struct OnceMutex<T> {
     caller: Mutex<Option<*const ()>>,
 }
 
+static SINGLE_CORE: Once<bool> = Once::new();
+
 impl<'a, T> OnceMutex<T> {
     pub const fn uninitialized() -> Self {
         Self {
@@ -99,6 +101,26 @@ impl<'a, T> OnceMutex<T> {
         *self.caller.lock() = get_caller_rip_1_up();
         t
     }
+}
+
+// Returns true if the system is single core (e.g. running on a single core CPU or in QEMU).
+// This is used to catch overlapping locks in a single core environment.
+// In a multi core environment, waiting for resources is expected and common, so we don't do this check.
+fn is_single_core() -> bool {
+    if SINGLE_CORE.is_completed() {
+        return *SINGLE_CORE.get().unwrap();
+    }
+    true
+}
+
+/// Sets the system to multi core mode. In this mode, concurrent locks will not cause a panic.
+pub fn multi_core() {
+    SINGLE_CORE.call_once(|| false);
+}
+
+/// Sets the system to single core mode. In this mode, concurrent locks will cause a panic. This is the default state.
+pub fn single_core() {
+    SINGLE_CORE.call_once(|| true);
 }
 
 unsafe impl<T> Sync for OnceMutex<T> {}
