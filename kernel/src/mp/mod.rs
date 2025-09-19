@@ -8,10 +8,11 @@ use core::{
 use alloc::{alloc::alloc, collections::btree_map::BTreeMap, vec::Vec};
 use cake::{
     limine::{mp::Cpu, request::MpRequest, response::MpResponse},
-    spin::{Mutex, RwLock},
+    spin::{once::Once, Mutex, RwLock},
 };
 use log::info;
 use raw_cpuid::CpuId;
+use x86_64::VirtAddr;
 
 use crate::{declare_module, println, requests::MP_INFO};
 
@@ -23,12 +24,18 @@ pub use req_data::{ApplicationCore, ApplicationCores};
 pub static CORES: RwLock<BTreeMap<u32, &'static CoreContext>> = RwLock::new(BTreeMap::new());
 
 pub struct CoreContext {
-    todo: u32,
+    stack_start: Once<u64>,
 }
 
 impl CoreContext {
     const fn new(cpu: &Cpu) -> Self {
-        Self { todo: 0 }
+        Self {
+            stack_start: Once::new(),
+        }
+    }
+
+    pub fn get_stack_start(&self) -> u64 {
+        *self.stack_start.wait()
     }
 }
 

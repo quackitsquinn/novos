@@ -22,6 +22,7 @@ use crate::{
         map::{FRAMEBUFFER_START_PAGE, KERNEL_REMAP_PAGE_RANGE},
         KernelPage, KernelPhysFrame, KERNEL_PAGE_TABLE,
     },
+    mp::CORES,
     requests::{EXECUTABLE_ADDRESS, FRAMEBUFFER, KERNEL_ELF},
     sprint,
 };
@@ -57,7 +58,17 @@ fn map_kernel<T: Iterator<Item = Page>>(builder: &mut PageTableBuilder<T>) {
         map_segment(builder, segment, &opt);
     }
 
-    map_stack(builder, &opt);
+    map_stack(
+        builder,
+        &opt,
+        *crate::STACK_BASE.get().expect("Stack base uninitialized"),
+    );
+
+    for (i, base) in CORES.read().iter() {
+        info!("Mapping stack for CPU with APIC ID {}...", i);
+        map_stack(builder, &opt, base.get_stack_start());
+    }
+
     map_framebuffer(builder, &opt);
     map_heap(builder, &opt);
 }
@@ -82,13 +93,12 @@ fn map_segment(
 fn map_stack(
     builder: &mut PageTableBuilder<impl Iterator<Item = KernelPage>>,
     opt: &OffsetPageTable,
+    base: u64,
 ) {
-    let stack_base = KernelPage::containing_address(VirtAddr::new(
-        *crate::STACK_BASE.get().expect("Stack base not initialized"),
-    ));
+    let stack_base = KernelPage::containing_address(VirtAddr::new(base));
     let stack_end = KernelPage::containing_address(VirtAddr::new(
         // x86_64 stacks grow downwards
-        *crate::STACK_BASE.get().expect("Stack base not initialized") - (crate::STACK_SIZE - 1),
+        base - (crate::STACK_SIZE - 1),
     ));
     let mut stack_range = KernelPage::range_inclusive(stack_end, stack_base);
 

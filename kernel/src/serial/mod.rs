@@ -4,6 +4,8 @@
 
 use core::convert::Infallible;
 
+use kproc::log_filter;
+
 use crate::{declare_module, mp, println};
 
 pub mod interface;
@@ -20,17 +22,33 @@ impl log::Log for SerialLog {
 
     fn log(&self, record: &log::Record) {
         if self.enabled(record.metadata()) {
-            let file = record.file().unwrap_or("?");
+            let mut target = record.metadata().target();
+            if let Some((i, _)) = target.rmatch_indices("::").skip(1).next() {
+                target = &target[i + 2..];
+            }
+
+            if !log_filter!(target) {
+                return;
+            }
+
+            let mut file = record.file().unwrap_or("unknown");
+            if let Some((i, _)) = file.rmatch_indices("/").skip(1).next() {
+                file = &file[i + 1..];
+            }
+
             let line = record.line().unwrap_or(0);
             let core = mp::current_core_id();
+            // [level] target[core] file:line message
             println!(
-                "[{}:{}] {}:{} {}",
+                "[{}] {}[{}] {}:{} {}",
                 record.level(),
+                target,
                 core,
                 file,
                 line,
                 record.args()
             );
+
             return;
         }
     }
