@@ -1,9 +1,14 @@
-use core::arch::{asm, naked_asm};
+use alloc::{alloc::alloc, collections::btree_map::BTreeMap, vec::Vec};
+use core::{
+    alloc::Layout,
+    arch::{asm, naked_asm},
+    sync::atomic::Ordering,
+};
 
 use cake::limine::mp::Cpu;
 use log::info;
 
-use crate::mp::CoreContext;
+use crate::mp::mp_setup::{CoreContext, CORES};
 
 #[unsafe(naked)]
 pub unsafe extern "C" fn _ap_trampoline(a: &Cpu) -> ! {
@@ -29,4 +34,18 @@ extern "C" fn ap_trampoline(cpu: &Cpu, stack_base: u64) -> ! {
         }
         core::hint::spin_loop();
     }
+}
+
+pub(super) fn prepare_cpu(cpu: &Cpu) {
+    // First, allocate a context for the CPU.
+    let context = unsafe { alloc(Layout::new::<CoreContext>()) } as *mut CoreContext;
+    unsafe {
+        context.write(CoreContext::new(cpu));
+    }
+
+    // Set it to the CPU's extra field and insert it into the global map.
+    cpu.extra.store(context as u64, Ordering::SeqCst);
+    CORES.write().insert(cpu.lapic_id, unsafe { &*context });
+
+    cpu.goto_address.write(_ap_trampoline);
 }

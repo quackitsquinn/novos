@@ -18,62 +18,13 @@ use crate::{declare_module, mp::lapic::Lapic, println, requests::MP_INFO};
 
 mod lapic;
 mod req_data;
-mod trampoline;
+
+pub mod mp_setup;
 
 pub use req_data::{ApplicationCore, ApplicationCores};
 
-pub static CORES: RwLock<BTreeMap<u32, &'static CoreContext>> = RwLock::new(BTreeMap::new());
-
-pub struct CoreContext {
-    stack_start: Once<u64>,
-}
-
-impl CoreContext {
-    const fn new(cpu: &Cpu) -> Self {
-        Self {
-            stack_start: Once::new(),
-        }
-    }
-
-    pub fn get_stack_start(&self) -> u64 {
-        *self.stack_start.wait()
-    }
-}
-
 pub fn init() -> Result<(), Infallible> {
-    let mp = MP_INFO.get_limine();
-
-    let cpus = mp.cpus();
-
-    let ap_cpus = cpus.len() - 1;
-    info!("Found {} apCPUs", ap_cpus);
-
-    cake::set_multithreaded(ap_cpus > 0);
-
-    for cpu in cpus {
-        info!("Initializing  CPU {} (APIC ID {})", cpu.id, cpu.lapic_id);
-        if cpu.id == 0 {
-            continue; // Skip BSP
-        }
-        prepare_cpu(cpu);
-        info!("Prepared CPU {} (APIC ID {})", cpu.id, cpu.lapic_id);
-    }
-
     Ok(())
-}
-
-fn prepare_cpu(cpu: &Cpu) {
-    // First, allocate a context for the CPU.
-    let context = unsafe { alloc(Layout::new::<CoreContext>()) } as *mut CoreContext;
-    unsafe {
-        context.write(CoreContext::new(cpu));
-    }
-
-    // Set it to the CPU's extra field and insert it into the global map.
-    cpu.extra.store(context as u64, Ordering::SeqCst);
-    CORES.write().insert(cpu.lapic_id, unsafe { &*context });
-
-    cpu.goto_address.write(trampoline::_ap_trampoline);
 }
 
 declare_module!("MP", init);

@@ -22,7 +22,7 @@ use crate::{
         map::{FRAMEBUFFER_START_PAGE, KERNEL_REMAP_PAGE_RANGE},
         KernelPage, KernelPhysFrame, KERNEL_PAGE_TABLE,
     },
-    mp::CORES,
+    mp::mp_setup::CORES,
     requests::{EXECUTABLE_ADDRESS, FRAMEBUFFER, KERNEL_ELF},
     sprint,
 };

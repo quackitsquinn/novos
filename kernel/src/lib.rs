@@ -25,6 +25,8 @@ use kserial::client::{fs::File, get_serial_client, test_two_way_serial};
 use log::info;
 use spin::Once;
 
+use crate::mp::mp_setup;
+
 pub mod acpi;
 pub mod context;
 pub mod display;
@@ -102,11 +104,12 @@ pub(crate) unsafe fn init_kernel_services() {
 
     // test_two_way_serial();
     memory::MODULE.init();
-    mp::MODULE.init();
+    mp_setup::MODULE.init();
     memory::paging::kernel::MODULE.init();
     #[cfg(not(test))] // Tests don't have a display
     display::MODULE.init();
     acpi::MODULE.init();
+    mp::MODULE.init();
     pci::MODULE.init();
     proc::MODULE.init();
     info!("Kernel services initialized");
