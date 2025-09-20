@@ -4,13 +4,16 @@ pub mod trampoline;
 use core::convert::Infallible;
 
 use alloc::collections::btree_map::BTreeMap;
-use cake::{declare_module, spin::RwLock};
+use cake::{
+    declare_module,
+    spin::{Once, RwLock},
+};
 pub use context::CoreContext;
 use log::info;
 
 use crate::{mp::mp_setup::trampoline::prepare_cpu, requests::MP_INFO};
 
-pub static CORES: RwLock<BTreeMap<u32, &'static CoreContext>> = RwLock::new(BTreeMap::new());
+pub static CORES: Once<BTreeMap<u32, &'static RwLock<CoreContext>>> = Once::new();
 
 pub fn init() -> Result<(), Infallible> {
     let mp = MP_INFO.get_limine();
@@ -22,16 +25,39 @@ pub fn init() -> Result<(), Infallible> {
 
     cake::set_multithreaded(ap_cpus > 0);
 
+    let mut cores = BTreeMap::new();
+
     for cpu in cpus {
         info!("Initializing  CPU {} (APIC ID {})", cpu.id, cpu.lapic_id);
         if cpu.id == 0 {
             continue; // Skip BSP
         }
-        prepare_cpu(cpu);
+        let context = unsafe { &*prepare_cpu(cpu) };
+        cores.insert(cpu.lapic_id, context);
         info!("Prepared CPU {} (APIC ID {})", cpu.id, cpu.lapic_id);
     }
 
+    CORES.call_once(|| cores);
+
     Ok(())
+}
+
+pub fn cores() -> &'static BTreeMap<u32, &'static RwLock<CoreContext>> {
+    CORES.wait()
+}
+
+pub fn dispatch_to(cpu_id: u32, f: fn() -> ()) -> Result<(), &'static str> {
+    let cores = cores();
+    let mut core = cores.get(&cpu_id).ok_or("No such core")?.write();
+    core.add_task(f);
+    Ok(())
+}
+
+pub fn dispatch_all(f: fn() -> ()) {
+    let cores = cores();
+    for mut core in cores.values().map(|c| c.write()) {
+        core.add_task(f);
+    }
 }
 
 declare_module!("MP Preinit", init);

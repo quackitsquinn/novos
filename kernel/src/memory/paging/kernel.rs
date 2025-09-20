@@ -64,9 +64,21 @@ fn map_kernel<T: Iterator<Item = Page>>(builder: &mut PageTableBuilder<T>) {
         *crate::STACK_BASE.get().expect("Stack base uninitialized"),
     );
 
-    for (i, base) in CORES.read().iter() {
+    for (i, base) in CORES.get().expect("cores uninit").iter() {
         info!("Mapping stack for CPU with APIC ID {}...", i);
-        map_stack(builder, &opt, base.get_stack_start());
+        while !base.read().get_stack_start().is_completed() {
+            core::hint::spin_loop();
+        }
+
+        map_stack(
+            builder,
+            &opt,
+            *base
+                .read()
+                .get_stack_start()
+                .get()
+                .expect("Stack start uninit"),
+        );
     }
 
     map_framebuffer(builder, &opt);

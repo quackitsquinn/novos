@@ -14,7 +14,12 @@ use log::info;
 use raw_cpuid::CpuId;
 use x86_64::VirtAddr;
 
-use crate::{declare_module, mp::lapic::Lapic, println, requests::MP_INFO};
+use crate::{
+    declare_module,
+    mp::{lapic::Lapic, mp_setup::dispatch_all},
+    println,
+    requests::MP_INFO,
+};
 
 mod lapic;
 mod req_data;
@@ -24,6 +29,10 @@ pub mod mp_setup;
 pub use req_data::{ApplicationCore, ApplicationCores};
 
 pub fn init() -> Result<(), Infallible> {
+    fn core_hi() {
+        println!("Hello from core {}", current_core_id());
+    }
+    dispatch_all(core_hi);
     Ok(())
 }
 
