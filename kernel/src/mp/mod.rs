@@ -14,8 +14,9 @@ use log::info;
 use raw_cpuid::CpuId;
 use x86_64::VirtAddr;
 
-use crate::{declare_module, println, requests::MP_INFO};
+use crate::{declare_module, mp::lapic::Lapic, println, requests::MP_INFO};
 
+mod lapic;
 mod req_data;
 mod trampoline;
 
