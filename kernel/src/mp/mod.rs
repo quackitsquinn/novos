@@ -35,14 +35,12 @@ pub static LAPIC: Lapic = Lapic::new();
 
 pub fn init() -> Result<(), Infallible> {
     LAPIC.init();
-    fn core_hi() {
-        println!("Hello from core {}", current_core_id());
-
-        println!("LAPIC Version: {:?}", LAPIC.version());
-        println!("LAPIC SVR: {:?}", LAPIC.read_svr());
-    }
-    dispatch_all(core_hi);
+    dispatch_all(apic_init);
     Ok(())
+}
+
+pub fn apic_init() {
+    info!("Initializing LAPIC on core {}", current_core_id());
 }
 
 declare_module!("MP", init);

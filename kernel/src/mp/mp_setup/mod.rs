@@ -46,6 +46,7 @@ pub fn cores() -> &'static BTreeMap<u32, &'static RwLock<CoreContext>> {
     CORES.wait()
 }
 
+/// Dispatches a function to a specific CPU by its APIC ID.
 pub fn dispatch_to(cpu_id: u32, f: fn() -> ()) -> Result<(), &'static str> {
     let cores = cores();
     let mut core = cores.get(&cpu_id).ok_or("No such core")?.write();
@@ -53,11 +54,13 @@ pub fn dispatch_to(cpu_id: u32, f: fn() -> ()) -> Result<(), &'static str> {
     Ok(())
 }
 
+/// Dispatches a function to all application processors and also runs it on the current processor.
 pub fn dispatch_all(f: fn() -> ()) {
     let cores = cores();
     for mut core in cores.values().map(|c| c.write()) {
         core.add_task(f);
     }
+    f();
 }
 
 declare_module!("MP Preinit", init);
