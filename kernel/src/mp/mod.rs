@@ -39,6 +39,7 @@ pub fn init() -> Result<(), Infallible> {
         println!("Hello from core {}", current_core_id());
 
         println!("LAPIC Version: {:?}", LAPIC.version());
+        println!("LAPIC SVR: {:?}", LAPIC.read_svr());
     }
     dispatch_all(core_hi);
     Ok(())
