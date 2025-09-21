@@ -77,6 +77,16 @@ impl InterruptTable {
         old
     }
 
+    pub unsafe fn load(&'static self) {
+        let table = self.table.try_lock().expect("Interrupt table is locked");
+        unsafe {
+            mem::transmute::<&InterruptDescriptorTable, &'static InterruptDescriptorTable>(
+                &*table as &InterruptDescriptorTable,
+            )
+            .load();
+        }
+    }
+
     /// Return a guard to the interrupt table.
     /// Modifications to this table *will not* take effect until `commit` is called,
     /// and this table may not be a complete representation of the loaded interrupt table.

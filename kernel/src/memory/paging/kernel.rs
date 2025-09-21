@@ -2,7 +2,7 @@
 //! In the future, this will almost certainly be converted into it's own module.
 use core::convert::Infallible;
 
-use cake::terminate_requests;
+use cake::{spin::Once, terminate_requests};
 use goblin::elf64::program_header::ProgramHeader;
 use log::{debug, info};
 use x86_64::{
@@ -260,12 +260,15 @@ fn remap_ptr(ptr: *const u8, new_page: KernelPage) -> *const u8 {
     (new_page.start_address().as_u64() + offset) as *const u8
 }
 
+pub static KERNEL_CR3: Once<KernelPhysFrame> = Once::new();
+
 fn init() -> Result<(), Infallible> {
     let (kernel_frame, new_ptr) = create_kernel_pagetable();
     info!(
         "Kernel page table created with root frame: {:#x?}",
         kernel_frame
     );
+    KERNEL_CR3.call_once(|| kernel_frame);
 
     unsafe {
         Cr3::write(kernel_frame, Cr3Flags::empty());

@@ -12,7 +12,10 @@ use cake::{
 };
 use log::info;
 use raw_cpuid::CpuId;
-use x86_64::VirtAddr;
+use x86_64::{
+    registers::control::{Cr3, Cr3Flags},
+    VirtAddr,
+};
 
 use crate::{
     declare_module,
@@ -28,9 +31,14 @@ pub mod mp_setup;
 
 pub use req_data::{ApplicationCore, ApplicationCores};
 
+pub static LAPIC: Lapic = Lapic::new();
+
 pub fn init() -> Result<(), Infallible> {
+    LAPIC.init();
     fn core_hi() {
         println!("Hello from core {}", current_core_id());
+
+        println!("LAPIC Version: {:?}", LAPIC.version());
     }
     dispatch_all(core_hi);
     Ok(())

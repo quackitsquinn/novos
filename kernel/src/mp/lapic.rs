@@ -1,5 +1,8 @@
+use core::fmt::Debug;
+
 use cake::{spin::Once, OnceMutex};
 use log::info;
+use modular_bitfield::prelude::*;
 use x86_64::{registers::model_specific::Msr, structures::paging::PageTableFlags};
 
 use crate::memory::paging::phys::{
@@ -68,6 +71,36 @@ impl Lapic {
     {
         let ptr = unsafe { self.base_ptr().add(byte_off) } as *mut T;
         unsafe { ptr.write_volatile(value) }
+    }
+
+    /// Reads the LAPIC version register.
+    pub fn version(&self) -> LapicVersion {
+        unsafe { self.read_offset(0x30) }
+    }
+}
+
+#[derive(Clone, Copy)]
+#[bitfield(bytes = 4)]
+pub struct LapicVersion {
+    version: u8,
+    #[skip]
+    __: B8,
+    max_lvt_entry: B7,
+    supports_eoi_broadcast_suppression: bool,
+    #[skip]
+    __: B8,
+}
+
+impl Debug for LapicVersion {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("LapicVersion")
+            .field("version", &self.version())
+            .field("max_lvt_entry", &self.max_lvt_entry())
+            .field(
+                "supports_eoi_broadcast_suppression",
+                &self.supports_eoi_broadcast_suppression(),
+            )
+            .finish()
     }
 }
 

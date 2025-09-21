@@ -5,11 +5,16 @@ use core::{
     hint,
     sync::atomic::Ordering,
 };
+use x86_64::registers::control::{Cr3, Cr3Flags};
 
 use cake::{limine::mp::Cpu, spin::RwLock};
 use log::info;
 
-use crate::mp::mp_setup::{CoreContext, CORES};
+use crate::{
+    interrupts::IDT,
+    memory::paging::kernel::KERNEL_CR3,
+    mp::mp_setup::{CoreContext, CORES},
+};
 
 #[unsafe(naked)]
 pub unsafe extern "C" fn _ap_trampoline(a: &Cpu) -> ! {
@@ -26,16 +31,31 @@ extern "C" fn ap_trampoline(cpu: &Cpu, stack_base: u64) -> ! {
         &*(cpu.extra.load(core::sync::atomic::Ordering::SeqCst) as *const RwLock<CoreContext>)
     };
 
-    let mut context_lock = context.write();
+    unsafe { IDT.load() };
+
+    let context_lock = context.write();
 
     context_lock.stack_start.call_once(|| stack_base);
 
     info!("CPU {} (APIC ID {}) started", cpu.id, cpu.lapic_id);
     info!("Stack base: {:#x}", stack_base);
     drop(context_lock);
+
+    // Switch into the kernel page table as soon as possible.
+    info!("Waiting for kernel page table...");
+    let cr3 = KERNEL_CR3.wait();
+    info!(
+        "Switching to kernel page table with root frame: {:#x?}",
+        cr3
+    );
+    // Switch to the kernel page table.
+    unsafe {
+        Cr3::write(*cr3, Cr3Flags::empty());
+    }
     loop {
         let context_lock = context.upgradeable_read();
         if context_lock.tasks.is_empty() {
+            drop(context_lock);
             hint::spin_loop();
             continue;
         }
