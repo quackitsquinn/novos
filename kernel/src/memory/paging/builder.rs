@@ -187,13 +187,13 @@ where
         P: Iterator<Item = KernelPage>,
         F: Iterator<Item = KernelPhysFrame>,
     {
-        for page in pages {
+        for (i, page) in pages.enumerate() {
             if let Some(frame) = frames.next() {
                 self.map_page(page, frame, flags);
             } else {
                 // TODO: Panic is probably the right thing to do here, but we could also do a try_map_range
                 // methods to return a Result instead.
-                panic!("Not enough frames to map the range");
+                panic!("Not enough frames to map the range: offset {} pages", i);
             }
         }
     }

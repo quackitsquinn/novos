@@ -4,7 +4,7 @@ use core::convert::Infallible;
 
 use cake::{spin::Once, terminate_requests};
 use goblin::elf64::program_header::ProgramHeader;
-use log::{debug, info};
+use log::{debug, info, trace, warn};
 use x86_64::{
     registers::control::{Cr3, Cr3Flags},
     structures::paging::{
@@ -177,6 +177,9 @@ struct CopyPages<'a, T: Iterator<Item = KernelPage>> {
     curr: Option<PhysFrameRangeInclusive>,
 }
 
+const FRAMES_PER_2MIB: u64 = 512;
+const FRAMES_PER_1GIB: u64 = 512 * 512;
+
 impl<'a, T: Iterator<Item = KernelPage>> CopyPages<'a, T> {
     fn new(iter: T, pt: &'a OffsetPageTable) -> Self {
         Self {
@@ -197,6 +200,37 @@ impl<'a, T: Iterator<Item = KernelPage>> CopyPages<'a, T> {
         }
         None
     }
+
+    /// Expands a large frame (2MiB or 1GiB) into 4KiB frames.
+    /// This updates the internal state of the iterator to yield the remaining frames
+    /// in subsequent calls to `next()`.
+    fn explode_frame(&mut self, frame: MappedFrame) -> KernelPhysFrame {
+        match frame {
+            MappedFrame::Size4KiB(f) => {
+                // nothing to do here, just return the frame
+                return f;
+            }
+            MappedFrame::Size2MiB(f) => {
+                trace!("Expanding 2MiB frame {:#x?}", f);
+                let f = KernelPhysFrame::from_start_address(f.start_address()).unwrap();
+                self.curr = Some(PhysFrame::range_inclusive(f + 1, f + FRAMES_PER_2MIB));
+                self.iter
+                    .nth((FRAMES_PER_2MIB - 1) as usize)
+                    .expect("Iterator ended early");
+                f
+            }
+
+            MappedFrame::Size1GiB(f) => {
+                trace!("Expanding 1GiB frame {:#x?}", f);
+                let f = KernelPhysFrame::from_start_address(f.start_address()).unwrap();
+                self.curr = Some(PhysFrame::range_inclusive(f + 1, f + FRAMES_PER_1GIB - 1));
+                self.iter
+                    .nth((FRAMES_PER_1GIB - 1) as usize)
+                    .expect("Iterator ended early");
+                f
+            }
+        }
+    }
 }
 
 impl<'a, T: Iterator<Item = KernelPage>> Iterator for CopyPages<'a, T> {
@@ -209,7 +243,8 @@ impl<'a, T: Iterator<Item = KernelPage>> Iterator for CopyPages<'a, T> {
         }
 
         // otherwise, get the next page from the iterator and translate it.
-        let next = self.pt.translate(self.iter.next()?.start_address());
+        let next_page = self.iter.next()?;
+        let next = self.pt.translate(next_page.start_address());
 
         let frame = match next {
             TranslateResult::Mapped { frame, .. } => frame,
@@ -219,23 +254,7 @@ impl<'a, T: Iterator<Item = KernelPage>> Iterator for CopyPages<'a, T> {
             }
         };
 
-        match frame {
-            // If it's a 4KiB frame, just return it
-            MappedFrame::Size4KiB(f) => {
-                return Some(f);
-            }
-            // If it's bigger, set the current range and recurse to get the next frame
-            MappedFrame::Size2MiB(f) => {
-                let f = KernelPhysFrame::from_start_address(f.start_address()).unwrap();
-                self.curr = Some(PhysFrame::range_inclusive(f, f + 511));
-            }
-            MappedFrame::Size1GiB(f) => {
-                let f = KernelPhysFrame::from_start_address(f.start_address()).unwrap();
-                self.curr = Some(PhysFrame::range_inclusive(f, f + 511 * 512));
-            }
-        }
-
-        self.next()
+        Some(self.explode_frame(frame))
     }
 }
 
