@@ -1,4 +1,4 @@
-use core::{ffi::CStr, mem::transmute, str};
+use core::{ffi::CStr, fmt::Debug, mem::transmute, str};
 
 use goblin::{
     elf::section_header::SHT_SYMTAB,
@@ -75,6 +75,16 @@ impl<'a> Elf<'a> {
     }
 }
 
+impl Debug for Elf<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Elf")
+            .field("data_len", &self.data.len())
+            .field("header", &self.header)
+            .finish()
+    }
+}
+
+#[allow(missing_debug_implementations)]
 pub struct ElfSections<'a> {
     data: &'a [u8],
     header: &'a header::Header,
@@ -105,6 +115,7 @@ impl<'a> Iterator for ElfSections<'a> {
     }
 }
 
+#[allow(missing_debug_implementations)]
 pub struct ElfSymbols<'a> {
     data: &'a [u8],
     symbol_table: &'a section_header::SectionHeader,
@@ -145,6 +156,7 @@ impl<'a> Iterator for ElfSymbols<'a> {
     }
 }
 
+#[allow(missing_debug_implementations)]
 pub struct ElfStrings<'a> {
     data: &'a [u8],
     string_table: &'a section_header::SectionHeader,
@@ -172,6 +184,7 @@ impl ElfStrings<'_> {
     }
 }
 
+#[allow(missing_debug_implementations)]
 pub struct ElfSegments<'a> {
     header: &'a header::Header,
     phdr: *const ProgramHeader,

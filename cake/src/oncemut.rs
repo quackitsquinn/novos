@@ -1,6 +1,5 @@
 use core::panic;
 
-use log::debug;
 use spin::{Mutex, MutexGuard, Once};
 
 use crate::{get_caller_rip_1_up, get_caller_rip_2_up, is_multithreaded};

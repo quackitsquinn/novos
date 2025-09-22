@@ -10,6 +10,6 @@ pub unsafe fn init(heap_start: *mut u8, heap_end: *mut u8) {
     ALLOCATOR.init(|| unsafe { BlockAllocator::init(heap_start.cast(), heap_end.cast(), false) });
 }
 
-pub fn frame_output(data: &[u8]) {
+pub fn frame_output(_data: &[u8]) {
     //Command::SendIncrementalData("alloc", data).send();
 }

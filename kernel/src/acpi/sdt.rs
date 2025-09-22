@@ -7,14 +7,11 @@ use acpi::{
 use cake::Owned;
 use x86_64::{structures::paging::PageTableFlags, PhysAddr};
 
-use crate::memory::paging::{
-    map,
-    phys::phys_mem::{map_address, remap_address, unmap_address, PhysicalMemoryMap},
-};
+use crate::memory::paging::phys::phys_mem::{map_address, remap_address, PhysicalMemoryMap};
 
 #[derive(Debug)]
 pub struct TableHeader<'a> {
-    map: PhysicalMemoryMap,
+    _map: PhysicalMemoryMap,
     sdt: Owned<SdtHeader>,
     _phantom: core::marker::PhantomData<&'a ()>,
 }
@@ -47,7 +44,7 @@ impl<'a> TableHeader<'a> {
 
     pub unsafe fn from_raw_parts(map: PhysicalMemoryMap, sdt: Owned<SdtHeader>) -> Self {
         Self {
-            map,
+            _map: map,
             sdt,
             _phantom: core::marker::PhantomData,
         }

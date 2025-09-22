@@ -1,11 +1,8 @@
 use alloc::collections::BTreeMap;
 use log::debug;
-use x86_64::{
-    structures::paging::{
-        page_table::PageTableEntry, FrameAllocator, Mapper, Page, PageTable, PageTableFlags,
-        PageTableIndex,
-    },
-    VirtAddr,
+use x86_64::structures::paging::{
+    page_table::PageTableEntry, FrameAllocator, Mapper, Page, PageTable, PageTableFlags,
+    PageTableIndex,
 };
 
 use crate::memory::paging::{
@@ -209,14 +206,6 @@ where
             ),
         )
     }
-}
-
-fn address_to_indices(address: VirtAddr) -> [PageTableIndex; 4] {
-    let pml4 = address.p4_index();
-    let pdpt = address.p3_index();
-    let pd = address.p2_index();
-    let pt = address.p1_index();
-    [pml4, pdpt, pd, pt]
 }
 
 fn new_pte(frame: KernelPhysFrame, flags: PageTableFlags) -> PageTableEntry {

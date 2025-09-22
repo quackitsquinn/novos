@@ -15,6 +15,7 @@ use crate::{
 pub static IDT: InterruptTable = InterruptTable::uninitialized();
 
 /// The interrupt table for the kernel.
+#[derive(Debug)]
 pub struct InterruptTable {
     table: Mutex<InterruptDescriptorTable>,
     exchange: Mutex<InterruptDescriptorTable>,
@@ -90,7 +91,7 @@ impl InterruptTable {
     /// Return a guard to the interrupt table.
     /// Modifications to this table *will not* take effect until `commit` is called,
     /// and this table may not be a complete representation of the loaded interrupt table.
-    pub fn modify(&self) -> MutexGuard<InterruptDescriptorTable> {
+    pub fn modify(&self) -> MutexGuard<'_, InterruptDescriptorTable> {
         self.exchange
             .try_lock()
             .expect("Interrupt exchange table is locked")

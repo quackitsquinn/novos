@@ -48,6 +48,7 @@ pub fn sleep(time: Duration) {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
 pub struct Timer {
     pub ticks: u64,
     pub end: u64,

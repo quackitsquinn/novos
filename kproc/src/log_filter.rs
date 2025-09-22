@@ -1,7 +1,7 @@
 use proc_macro::TokenStream;
-use proc_macro2::{Span, TokenStream as TokenStream2};
+use proc_macro2::Span;
 use quote::quote;
-use syn::{Expr, Lit, LitStr};
+use syn::{Expr, LitStr};
 
 pub fn derive_log_filter(metadata: Expr) -> TokenStream {
     let log_filters = log_filters();

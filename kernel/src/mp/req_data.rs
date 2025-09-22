@@ -1,19 +1,14 @@
-use core::{mem::transmute, ops::Deref, sync::atomic::AtomicU64};
+use core::ops::Deref;
 
-use alloc::vec::Vec;
 use arrayvec::ArrayVec;
-use spin::{Mutex, MutexGuard};
 
 use cake::{
-    limine::{
-        mp::{Cpu, GotoAddress},
-        response::{self, MpResponse},
-    },
-    requests_terminated, LimineData,
+    limine::{mp::Cpu, response::MpResponse},
+    LimineData,
 };
 
 /// A single application core, with its APIC ID and LAPIC address.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ApplicationCore {
     pub apic_id: u32,
     pub lapic: u32,
@@ -36,6 +31,7 @@ impl From<&Cpu> for ApplicationCore {
 }
 
 /// A collection of application cores, along with the original Limine data for advanced use cases.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ApplicationCores {
     cores: ArrayVec<ApplicationCore, 256>,
 }

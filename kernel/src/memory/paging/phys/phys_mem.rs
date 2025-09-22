@@ -4,14 +4,10 @@ use x86_64::{
     PhysAddr, VirtAddr,
 };
 
-use crate::{
-    dbg,
-    memory::paging::{
-        map::{KERNEL_PHYS_MAP_END, KERNEL_PHYS_MAP_START},
+use crate::memory::paging::{
         vaddr_mapper::{VirtualAddressRange, VIRT_MAPPER},
         KernelPageSize, KERNEL_PAGE_TABLE,
-    },
-};
+    };
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[must_use = "The memory map must be unmapped when it is no longer needed"]

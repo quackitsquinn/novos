@@ -1,16 +1,7 @@
-use core::{alloc::Layout, pin::Pin};
+use core::{alloc::Layout, fmt::Debug};
 
-use alloc::{
-    alloc::alloc,
-    vec::{self, Vec},
-};
-use cake::{
-    limine::{
-        request::ExecutableFileRequest,
-        response::{ExecutableAddressResponse, ExecutableFileResponse},
-    },
-    LimineData,
-};
+use alloc::alloc::alloc;
+use cake::{limine::response::ExecutableFileResponse, LimineData};
 use spin::{Mutex, Once};
 
 use crate::elf::Elf;
@@ -71,5 +62,11 @@ impl KernelElf {
             let elf = Elf::new(slice).expect("Heap ELF is not a valid ELF file");
             *self.elf.lock() = elf;
         }
+    }
+}
+
+impl Debug for KernelElf {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("KernelElf").field("elf", &self.elf).finish()
     }
 }

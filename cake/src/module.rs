@@ -1,4 +1,4 @@
-use core::fmt::{Debug, Display};
+use core::fmt::Debug;
 
 use log::info;
 use spin::Once;

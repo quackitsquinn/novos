@@ -1,16 +1,9 @@
-use core::fmt::Debug;
-
-use cake::{spin::Once, OnceMutex};
+use cake::spin::Once;
 use log::{debug, info};
-use modular_bitfield::prelude::*;
 use x86_64::{registers::model_specific::Msr, structures::paging::PageTableFlags};
 
 use crate::{
-    dbg,
-    memory::paging::phys::{
-        self, mapper,
-        phys_mem::{self, PhysicalMemoryMap},
-    },
+    memory::paging::phys::phys_mem::{self, PhysicalMemoryMap},
     mp::lapic::{icr::InterruptCommandRegister, svr::SpuriousInterruptVector},
 };
 
@@ -28,6 +21,10 @@ pub const LAPIC_SVR_OFFSET: usize = 0xF0;
 pub const LAPIC_ICR_OFFSET: usize = 0x300;
 pub const LAPIC_LVT_TIMER_OFFSET: usize = 0x320;
 
+/// Represents the Local APIC (LAPIC) of the CPU.
+/// Provides methods to read and write LAPIC registers, send interrupts, and manage LAPIC state
+/// such as enabling/disabling the LAPIC and handling End Of Interrupt (EOI) signals.
+#[derive(Debug)]
 pub struct Lapic {
     base: Once<u64>,
     table: Once<PhysicalMemoryMap>,

@@ -5,7 +5,6 @@
 #![feature(custom_test_frameworks)]
 #![feature(allocator_api)]
 #![feature(pointer_is_aligned_to)]
-#![feature(naked_functions)]
 /* LINT OPTS */
 #![forbid(unsafe_op_in_unsafe_fn)]
 #![warn(missing_debug_implementations)]
@@ -21,7 +20,7 @@ use cake::declare_module;
 
 use cake::limine::BaseRevision;
 use interrupts::hardware;
-use kserial::client::{fs::File, get_serial_client, test_two_way_serial};
+use kserial::client::get_serial_client;
 use log::info;
 use spin::Once;
 
@@ -113,16 +112,6 @@ pub(crate) unsafe fn init_kernel_services() {
     pci::MODULE.init();
     proc::MODULE.init();
     info!("Kernel services initialized");
-}
-
-extern "C" fn thread_one() -> ! {
-    let mut i = 0;
-    loop {
-        i += 1;
-        x86_64::instructions::interrupts::disable();
-        sprintln!("{}", i);
-        x86_64::instructions::interrupts::enable();
-    }
 }
 
 #[macro_export]

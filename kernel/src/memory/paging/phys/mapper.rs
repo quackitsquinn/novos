@@ -5,7 +5,7 @@ use x86_64::{
     structures::paging::{
         mapper::{MapToError, UnmapError},
         page::PageRangeInclusive,
-        FrameAllocator, FrameDeallocator, Mapper, OffsetPageTable, PhysFrame, Size4KiB,
+        FrameAllocator, FrameDeallocator, Mapper, PhysFrame, Size4KiB,
     },
     PhysAddr,
 };

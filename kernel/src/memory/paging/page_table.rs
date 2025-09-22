@@ -1,10 +1,11 @@
+use core::fmt::Debug;
+
 use x86_64::structures::paging::{
     mapper::{
         FlagUpdateError, MapToError, MapperFlush, MapperFlushAll, TranslateError, TranslateResult,
         UnmapError,
     },
-    Mapper, OffsetPageTable, Page, PageSize, PageTableFlags, PhysFrame, RecursivePageTable,
-    Size4KiB, Translate,
+    Mapper, OffsetPageTable, PageTableFlags, PhysFrame, RecursivePageTable, Translate,
 };
 
 use crate::memory::paging::{KernelPage, KernelPageSize, KernelPhysFrame};
@@ -132,5 +133,14 @@ impl Mapper<KernelPageSize> for KernelPageTable<'_> {
 impl Translate for KernelPageTable<'_> {
     fn translate(&self, addr: x86_64::VirtAddr) -> TranslateResult {
         active_pt!(self.translate(addr))
+    }
+}
+
+impl Debug for KernelPageTable<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("KernelPageTable")
+            .field("limine", &self.limine.is_some())
+            .field("remapped", &self.remapped.is_some())
+            .finish()
     }
 }

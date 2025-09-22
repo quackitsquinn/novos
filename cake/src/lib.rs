@@ -6,16 +6,13 @@ mod oncemut;
 mod owned;
 mod resource;
 
-use core::fmt::Display;
-
 pub use self::limine_request::{
     LimineData, LimineRequest, RawLimineRequest, requests_terminated, terminate_requests,
 };
-use log::info;
 pub use module::KernelModule;
 pub use oncemut::OnceMutex;
 pub use owned::Owned;
-pub use resource::ResourceGuard;
+pub use resource::{ResourceGuard, ResourceMutex};
 use spin::Once;
 
 pub use limine;

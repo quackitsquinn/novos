@@ -1,7 +1,7 @@
-use alloc::{alloc::alloc, collections::btree_map::BTreeMap, vec::Vec};
+use alloc::alloc::alloc;
 use core::{
     alloc::Layout,
-    arch::{asm, naked_asm},
+    arch::naked_asm,
     hint,
     sync::atomic::Ordering,
 };
@@ -13,7 +13,7 @@ use log::info;
 use crate::{
     interrupts::IDT,
     memory::paging::kernel::KERNEL_CR3,
-    mp::mp_setup::{CoreContext, CORES},
+    mp::mp_setup::CoreContext,
 };
 
 #[unsafe(naked)]

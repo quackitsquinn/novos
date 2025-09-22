@@ -4,6 +4,7 @@ use kserial::client::{get_serial_client, send_string, SerialAdapter};
 
 use crate::serial::raw::SerialPort;
 
+#[derive(Debug)]
 pub struct Serial {
     port: SerialPort,
 }

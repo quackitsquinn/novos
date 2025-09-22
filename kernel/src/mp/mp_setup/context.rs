@@ -1,16 +1,14 @@
 use alloc::vec::Vec;
-use cake::{
-    limine::mp::Cpu,
-    spin::{Once, RwLock},
-};
+use cake::{limine::mp::Cpu, spin::Once};
 
+#[derive(Debug)]
 pub struct CoreContext {
     pub(super) stack_start: Once<u64>,
     pub(super) tasks: Vec<fn() -> ()>,
 }
 
 impl CoreContext {
-    pub(super) fn new(cpu: &Cpu) -> Self {
+    pub(super) fn new(_cpu: &Cpu) -> Self {
         Self {
             stack_start: Once::new(),
             tasks: Vec::with_capacity(5),

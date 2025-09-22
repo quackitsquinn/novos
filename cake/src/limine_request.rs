@@ -1,11 +1,6 @@
-use core::{
-    fmt::Debug,
-    mem::{MaybeUninit, offset_of},
-    sync::atomic::AtomicBool,
-};
+use core::sync::atomic::AtomicBool;
 
-use limine::response::MpResponse;
-use spin::{Mutex, MutexGuard, Once};
+use spin::Once;
 
 use crate::{ResourceGuard, resource::ResourceMutex};
 

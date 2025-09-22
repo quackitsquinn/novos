@@ -4,7 +4,7 @@ use core::convert::Infallible;
 
 use cake::{spin::Once, terminate_requests};
 use goblin::elf64::program_header::ProgramHeader;
-use log::{debug, info, trace, warn};
+use log::{debug, info, trace};
 use x86_64::{
     registers::control::{Cr3, Cr3Flags},
     structures::paging::{
@@ -23,8 +23,7 @@ use crate::{
         KernelPage, KernelPhysFrame, KERNEL_PAGE_TABLE,
     },
     mp::mp_setup::CORES,
-    requests::{EXECUTABLE_ADDRESS, FRAMEBUFFER, KERNEL_ELF},
-    sprint,
+    requests::{FRAMEBUFFER, KERNEL_ELF},
 };
 
 pub fn create_kernel_pagetable() -> (KernelPhysFrame, KernelPage) {
@@ -36,9 +35,6 @@ pub fn create_kernel_pagetable() -> (KernelPhysFrame, KernelPage) {
 }
 
 fn map_kernel<T: Iterator<Item = Page>>(builder: &mut PageTableBuilder<T>) {
-    let kernel_addr = EXECUTABLE_ADDRESS
-        .get()
-        .expect("Executable address not initialized");
     let kernel_elf = KERNEL_ELF.get().elf();
     let opt = {
         // this is gross and a bad way to do this, but because all of the pagetable mapping functions require the global

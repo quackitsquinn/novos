@@ -4,7 +4,7 @@ use cake::KernelModule;
 use lazy_static::lazy_static;
 use x86_64::{
     instructions::tables::load_tss,
-    registers::segmentation::{Segment, CS, DS, ES, SS},
+    registers::segmentation::{Segment, CS},
     structures::{
         gdt::{Descriptor, GlobalDescriptorTable, SegmentSelector},
         tss::TaskStateSegment,
@@ -66,10 +66,12 @@ impl Selectors {
         self.code_selector
     }
 
+    #[allow(dead_code)] // Might be useful later
     pub fn data_selector(&self) -> SegmentSelector {
         self.data_selector
     }
 
+    #[allow(dead_code)] // Might be useful later
     pub fn tss_selector(&self) -> SegmentSelector {
         self.tss_selector
     }

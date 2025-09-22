@@ -1,5 +1,6 @@
 use core::fmt::Write;
 
+use cake::spin::{Mutex, MutexGuard};
 use kserial::client::SerialAdapter;
 use serial::Serial;
 use spin::Once;
@@ -9,17 +10,19 @@ pub mod serial;
 // TODO: Abstract this and similar things into a Lock type that just has the like is_locked etc.
 pub static PORT_HAS_INIT: Once<()> = Once::new();
 
+pub static SERIAL_PORT_NUM: u16 = 0x3F8; // COM1
+
 pub fn init() {
-    static mut SERIAL_PORT: Option<Serial> = None;
-    unsafe {
-        if SERIAL_PORT.is_none() {
-            SERIAL_PORT = Some(Serial::new(0x3F8));
-        }
-    }
+    static SERIAL_PORT: Mutex<Option<Serial>> = Mutex::new(None);
+    SERIAL_PORT
+        .lock()
+        .replace(unsafe { Serial::new(SERIAL_PORT_NUM) });
     PORT_HAS_INIT.call_once(|| ());
-    kserial::client::init(unsafe {
-        &mut *SERIAL_PORT.as_mut().expect("Serial port not initialized")
-    });
+    kserial::client::init(
+        MutexGuard::leak(SERIAL_PORT.lock())
+            .as_mut()
+            .expect("infaliable") as &mut dyn SerialAdapter,
+    );
 }
 
 #[doc(hidden)]

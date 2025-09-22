@@ -1,6 +1,9 @@
+use core::fmt::Debug;
+
 use cake::{limine::response::FramebufferResponse, LimineData};
 use spin::Mutex;
 
+#[derive(Debug)]
 pub struct FramebufferInfo {
     pub width: u64,
     pub height: u64,

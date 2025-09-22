@@ -1,27 +1,11 @@
-use core::{
-    alloc::Layout,
-    convert::Infallible,
-    pin::Pin,
-    sync::atomic::{AtomicU64, Ordering},
-};
+use core::convert::Infallible;
 
-use alloc::{alloc::alloc, collections::btree_map::BTreeMap, vec::Vec};
-use cake::{
-    limine::{mp::Cpu, request::MpRequest, response::MpResponse},
-    spin::{once::Once, Mutex, RwLock},
-};
 use log::info;
 use raw_cpuid::CpuId;
-use x86_64::{
-    registers::control::{Cr3, Cr3Flags},
-    VirtAddr,
-};
 
 use crate::{
     declare_module,
     mp::{lapic::Lapic, mp_setup::dispatch_all},
-    println,
-    requests::MP_INFO,
 };
 
 mod lapic;

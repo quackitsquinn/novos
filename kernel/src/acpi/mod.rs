@@ -1,9 +1,9 @@
 mod mapped_table;
-use core::{mem, ops::Deref, pin::Pin, ptr::read_unaligned};
+use core::{mem, ops::Deref, ptr::read_unaligned};
 
 use acpi::{
     rsdp::Rsdp,
-    sdt::{madt::Madt, Signature},
+    sdt::Signature,
     AcpiError,
 };
 use alloc::collections::btree_map::BTreeMap;

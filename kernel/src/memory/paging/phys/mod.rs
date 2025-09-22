@@ -6,7 +6,7 @@ use crate::{declare_module, requests::MEMORY_MAP};
 pub(crate) mod mapper;
 pub mod phys_mem;
 
-pub static FRAME_ALLOCATOR: OnceMutex<PageFrameAllocator> = OnceMutex::uninitialized();
+pub(crate) static FRAME_ALLOCATOR: OnceMutex<PageFrameAllocator> = OnceMutex::uninitialized();
 
 declare_module!("physical memory mapping", init, &'static str);
 

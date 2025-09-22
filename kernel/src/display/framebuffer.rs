@@ -1,3 +1,5 @@
+use core::fmt::Debug;
+
 use log::info;
 
 use crate::display::req_data::FramebufferInfo;
@@ -107,5 +109,16 @@ impl Framebuffer {
     /// Gets the size of the framebuffer.
     pub fn size(&self) -> (usize, usize) {
         (self.width, self.height)
+    }
+}
+
+impl Debug for Framebuffer {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Framebuffer")
+            .field("width", &self.width)
+            .field("height", &self.height)
+            .field("pitch", &self.pitch)
+            .field("bpp", &self.bpp)
+            .finish()
     }
 }
