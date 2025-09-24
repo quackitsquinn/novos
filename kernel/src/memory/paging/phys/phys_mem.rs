@@ -5,9 +5,9 @@ use x86_64::{
 };
 
 use crate::memory::paging::{
-        vaddr_mapper::{VirtualAddressRange, VIRT_MAPPER},
-        KernelPageSize, KERNEL_PAGE_TABLE,
-    };
+    vaddr_mapper::{VirtualAddressRange, VIRT_MAPPER},
+    KernelPageSize, KERNEL_PAGE_TABLE,
+};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[must_use = "The memory map must be unmapped when it is no longer needed"]
@@ -63,8 +63,8 @@ pub fn map_address(
 
     info!(
         "Mapping physical memory: {:x} - {:x} to virtual {:x} - {:x} ({} frame(s))",
-        addr.as_u64(),
-        addr.as_u64() + size,
+        base_frame.start_address().as_u64(),
+        end_frame.start_address().as_u64() + 0x1000,
         addr_range.start.as_u64(),
         addr_range.end().as_u64(),
         range.len()

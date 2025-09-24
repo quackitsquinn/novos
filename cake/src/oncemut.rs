@@ -125,3 +125,12 @@ pub fn single_core() {
 unsafe impl<T> Sync for OnceMutex<T> {}
 
 unsafe impl<T> Send for OnceMutex<T> {}
+
+impl<T> core::fmt::Debug for OnceMutex<T> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("OnceMutex")
+            .field("is_initialized", &self.is_initialized())
+            .field("is_locked", &self.is_locked())
+            .finish()
+    }
+}

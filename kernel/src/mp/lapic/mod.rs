@@ -4,13 +4,15 @@ use x86_64::{registers::model_specific::Msr, structures::paging::PageTableFlags}
 
 use crate::{
     memory::paging::phys::phys_mem::{self, PhysicalMemoryMap},
-    mp::lapic::{icr::InterruptCommandRegister, svr::SpuriousInterruptVector},
+    mp::apic_page_flags,
 };
 
 mod icr;
 mod svr;
 mod version;
 
+pub use icr::{DeliverMode, DestinationShorthand, InterruptCommandRegister};
+pub use svr::SpuriousInterruptVector;
 pub use version::LapicVersion;
 
 pub const LAPIC_BASE_MSR: Msr = Msr::new(0x1B);
@@ -48,12 +50,8 @@ impl Lapic {
         self.base.call_once(|| base);
         info!("LAPIC base address: {:#x}", base);
         let phys_addr = x86_64::PhysAddr::new(base);
-        let map = phys_mem::map_address(
-            phys_addr,
-            1,
-            PageTableFlags::PRESENT | PageTableFlags::NO_CACHE | PageTableFlags::WRITABLE,
-        )
-        .expect("Failed to map LAPIC");
+        let map =
+            phys_mem::map_address(phys_addr, 1, apic_page_flags()).expect("Failed to map LAPIC");
 
         self.table.call_once(|| map);
         self.mapped.call_once(|| map.ptr().cast_mut());
@@ -140,11 +138,12 @@ impl Lapic {
     /// The caller must ensure that the LAPIC is in a valid state to be enabled.
     /// The caller must also ensure that the current IDT is valid for the current LAPIC configuration.
     pub unsafe fn enable(&self, vector: u8) {
-        let mut svr = self.read_svr();
-        svr.set_vector(vector);
-        svr.set_apic_enable(true);
-        unsafe { self.write_svr(svr) };
-        debug!("LAPIC enabled with SVR: {:#?}", svr);
+        unsafe {
+            self.update_svr(|svr| {
+                svr.set_vector(vector);
+                svr.set_apic_enable(true);
+            });
+        }
     }
 
     /// Reads the Interrupt Command Register (ICR).
