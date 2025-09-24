@@ -8,6 +8,7 @@ use crate::{
 };
 
 mod icr;
+mod lvt;
 mod svr;
 mod version;
 
@@ -174,6 +175,36 @@ impl Lapic {
         let mut icr = self.read_icr();
         f(&mut icr);
         unsafe { self.write_icr(icr) };
+    }
+
+    /// Reads the Local Vector Table (LVT) Timer Register.
+    pub fn read_lvt_timer(&self) -> InterruptCommandRegister {
+        unsafe {
+            InterruptCommandRegister::from_bytes(
+                self.read_offset::<[u8; 8]>(LAPIC_LVT_TIMER_OFFSET),
+            )
+        }
+    }
+
+    /// Writes to the Local Vector Table (LVT) Timer Register.
+    /// # Safety
+    /// The caller must ensure that the given LVT Timer value is valid and does not conflict with other LVT entries.
+    pub unsafe fn write_lvt_timer(&self, lvt: InterruptCommandRegister) {
+        unsafe {
+            self.write_offset::<[u8; 8]>(LAPIC_LVT_TIMER_OFFSET, lvt.into_bytes());
+        }
+    }
+
+    /// Updates the Local Vector Table (LVT) Timer Register by applying the given function to the current value.
+    /// # Safety
+    /// The caller must ensure that the given LVT Timer closure will keep the LVT entry valid and does not conflict with other LVT entries.
+    pub unsafe fn update_lvt_timer<F>(&self, f: F)
+    where
+        F: FnOnce(&mut InterruptCommandRegister),
+    {
+        let mut lvt = self.read_lvt_timer();
+        f(&mut lvt);
+        unsafe { self.write_lvt_timer(lvt) };
     }
 }
 

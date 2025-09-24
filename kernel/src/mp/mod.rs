@@ -1,13 +1,15 @@
-use core::convert::Infallible;
+use core::{convert::Infallible, sync::atomic::AtomicU32};
 
 use log::info;
 use raw_cpuid::{CpuId, CpuIdResult};
 
 use crate::{
     declare_module,
+    interrupts::hardware,
     mp::{ioapic::IoApic, lapic::Lapic, mp_setup::dispatch_all},
 };
 
+mod interrupts;
 mod ioapic;
 mod lapic;
 mod req_data;
@@ -28,6 +30,11 @@ pub fn init() -> Result<(), Infallible> {
         "Max Redirection Entries: {}",
         version.max_redirection_entries()
     );
+
+    // Disable the PICs
+    unsafe {
+        hardware::disable();
+    }
     dispatch_all(apic_init);
     Ok(())
 }

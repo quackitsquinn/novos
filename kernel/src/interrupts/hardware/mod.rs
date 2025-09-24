@@ -55,3 +55,10 @@ fn init() -> Result<(), Infallible> {
     }
     Ok(())
 }
+
+pub unsafe fn disable() {
+    let mut pics = PICS.lock();
+    unsafe {
+        pics.disable();
+    }
+}
