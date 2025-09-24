@@ -9,7 +9,6 @@ use crate::{
     mp::{ioapic::IoApic, lapic::Lapic, mp_setup::dispatch_all},
 };
 
-mod interrupts;
 mod ioapic;
 mod lapic;
 mod req_data;

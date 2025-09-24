@@ -1,6 +1,6 @@
 use core::{arch::asm, fmt::Write};
 
-use goblin::elf64::sym;
+use kelp::goblin::elf64::sym;
 use rustc_demangle::demangle;
 
 use crate::{print, println, requests::KERNEL_ELF};

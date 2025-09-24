@@ -29,7 +29,6 @@ use crate::mp::mp_setup;
 pub mod acpi;
 pub mod context;
 pub mod display;
-pub mod elf;
 mod gdt;
 pub mod interrupts;
 pub mod memory;

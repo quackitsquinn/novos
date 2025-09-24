@@ -1,21 +1,13 @@
 use core::convert::Infallible;
 
-use cake::limine::{
-    paging::Mode,
-    request::{
-        ExecutableAddressRequest, ExecutableFileRequest, FramebufferRequest, HhdmRequest,
-        MemoryMapRequest, MpRequest, PagingModeRequest, RsdpRequest,
-    },
-    response::ExecutableAddressResponse,
-};
+use cake::limine::{paging::Mode, request::*, response::ExecutableAddressResponse};
 use cake::LimineRequest;
 use spin::Once;
 
 use crate::{
     declare_module,
     display::req_data::FramebufferInfo,
-    elf::req_data::KernelElf,
-    memory::req_data::MemoryMap,
+    memory::{elf_req_data::KernelElf, req_data::MemoryMap},
     mp::ApplicationCores,
 };
 

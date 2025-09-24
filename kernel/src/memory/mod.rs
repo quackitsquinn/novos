@@ -10,6 +10,7 @@ use x86_64::{
 use crate::{declare_module, memory::paging::KernelPageSize, requests::KERNEL_ELF};
 
 pub mod allocator;
+pub mod elf_req_data;
 pub mod paging;
 pub mod req_data;
 pub mod stack;

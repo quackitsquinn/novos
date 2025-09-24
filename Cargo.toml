@@ -6,7 +6,7 @@ default-run = "boot"
 
 
 [workspace]
-members = [ "cake", "kalloc", "kbuild","kernel", "kproc", "krun", "kserial", "kserial/kserial_derive"]
+members = [ "cake", "kalloc", "kbuild","kernel", "kproc", "krun", "kserial", "kserial/kserial_derive", "kelp"]
 
 [build-dependencies]
 kernel = {path = "kernel", artifact = "bin", target = "x86_64-unknown-none"}
