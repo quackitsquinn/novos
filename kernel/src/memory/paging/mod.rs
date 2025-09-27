@@ -17,6 +17,7 @@ pub use self::page_table::ActivePageTable;
 mod builder;
 pub mod kernel;
 mod page_table;
+pub mod page_tree;
 pub mod phys;
 pub mod vaddr_mapper;
 

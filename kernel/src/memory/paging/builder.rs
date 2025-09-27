@@ -30,12 +30,15 @@ where
     >,
 }
 
+pub const RECURSIVE_ENTRY: usize = 509;
+pub const RECURSIVE_ENTRY_INDEX: PageTableIndex = PageTableIndex::new(RECURSIVE_ENTRY as u16);
+
 impl<'a, T> PageTableBuilder<'a, T>
 where
     T: Iterator<Item = KernelPage>,
 {
-    const RECURSIVE_ENTRY: usize = 509;
-    const RECURSIVE_ENTRY_INDEX: PageTableIndex = PageTableIndex::new(Self::RECURSIVE_ENTRY as u16);
+    pub const RECURSIVE_ENTRY: usize = RECURSIVE_ENTRY;
+    pub const RECURSIVE_ENTRY_INDEX: PageTableIndex = RECURSIVE_ENTRY_INDEX;
 
     pub fn new(mut page_range: T) -> Self {
         let mut pgtbl = KERNEL_PAGE_TABLE.write();
@@ -193,6 +196,14 @@ where
                 panic!("Not enough frames to map the range: offset {} pages", i);
             }
         }
+    }
+
+    pub fn pml4(&self) -> &PageTable {
+        self.pml4
+    }
+
+    pub fn pml4_mut(&mut self) -> &mut PageTable {
+        self.pml4
     }
 
     pub fn build(self) -> (KernelPhysFrame, KernelPage) {
