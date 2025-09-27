@@ -294,7 +294,7 @@ fn init() -> Result<(), Infallible> {
         kernel_frame
     );
 
-    KERNEL_PAGE_TABLE.get().switch(
+    KERNEL_PAGE_TABLE.write().switch(
         RecursivePageTable::new(unsafe { &mut *new_ptr.start_address().as_mut_ptr::<PageTable>() })
             .unwrap(),
     );

@@ -1,6 +1,9 @@
 use core::convert::Infallible;
 
-use cake::OnceMutex;
+use cake::{
+    spin::{lock_api::RwLock, Once},
+    OnceMutex, OnceRwLock,
+};
 use x86_64::{
     registers::control::Cr3,
     structures::paging::{OffsetPageTable, Page, PageTable, PhysFrame, Size4KiB},
@@ -9,7 +12,7 @@ use x86_64::{
 
 use crate::{declare_module, requests::PHYSICAL_MEMORY_OFFSET};
 
-pub use self::page_table::KernelPageTable;
+pub use self::page_table::ActivePageTable;
 
 mod builder;
 pub mod kernel;
@@ -21,7 +24,7 @@ pub type KernelPageSize = Size4KiB;
 pub type KernelPage = Page<KernelPageSize>;
 pub type KernelPhysFrame = PhysFrame<KernelPageSize>;
 
-pub static KERNEL_PAGE_TABLE: OnceMutex<KernelPageTable> = OnceMutex::uninitialized();
+pub static KERNEL_PAGE_TABLE: OnceRwLock<ActivePageTable> = OnceRwLock::new();
 
 declare_module!("paging", init);
 
@@ -32,7 +35,7 @@ fn init() -> Result<(), Infallible> {
         .expect("physical memory offset uninitialized");
     let page_table = unsafe { &mut *((cr3.0.start_address().as_u64() + off) as *mut PageTable) };
     let offset_table = unsafe { OffsetPageTable::new(page_table, VirtAddr::new(off)) };
-    KERNEL_PAGE_TABLE.init(KernelPageTable::new(offset_table));
+    KERNEL_PAGE_TABLE.init(|| ActivePageTable::new(offset_table));
 
     phys::MODULE.init();
     Ok(())

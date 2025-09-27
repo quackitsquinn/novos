@@ -76,7 +76,7 @@ impl PageFrameAllocator {
         page_range: PageRangeInclusive<Size4KiB>,
         flags: x86_64::structures::paging::PageTableFlags,
     ) -> Result<(), MapError> {
-        let mut mapper = memory::paging::KERNEL_PAGE_TABLE.get();
+        let mut mapper = memory::paging::KERNEL_PAGE_TABLE.write();
         unsafe { self.map_range_pagetable(page_range, flags, &mut *mapper) }
     }
 
@@ -99,7 +99,7 @@ impl PageFrameAllocator {
         &mut self,
         page_range: PageRangeInclusive<Size4KiB>,
     ) -> Result<(), MapError> {
-        let mut mapper = memory::paging::KERNEL_PAGE_TABLE.get();
+        let mut mapper = memory::paging::KERNEL_PAGE_TABLE.write();
         unsafe { self.unmap_range_pagetable(page_range, &mut *mapper) }
     }
 

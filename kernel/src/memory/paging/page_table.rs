@@ -10,12 +10,15 @@ use x86_64::structures::paging::{
 
 use crate::memory::paging::{KernelPage, KernelPageSize, KernelPhysFrame};
 
-pub struct KernelPageTable<'a> {
+/// Represents the currently active page table, which can be either the
+/// limine page table that is an offset page table or a remapped recursive page table.
+pub struct ActivePageTable<'a> {
     limine: Option<OffsetPageTable<'a>>,
+    // This will always exist after the switch due to process page tables sharing the same recursive mapping
     remapped: Option<RecursivePageTable<'a>>,
 }
 
-impl<'a> KernelPageTable<'a> {
+impl<'a> ActivePageTable<'a> {
     pub(super) fn new(limine: OffsetPageTable<'a>) -> Self {
         Self {
             limine: Some(limine),
@@ -59,7 +62,7 @@ macro_rules! active_pt {
     }};
 }
 
-impl Mapper<KernelPageSize> for KernelPageTable<'_> {
+impl Mapper<KernelPageSize> for ActivePageTable<'_> {
     fn unmap(
         &mut self,
         page: KernelPage,
@@ -130,13 +133,13 @@ impl Mapper<KernelPageSize> for KernelPageTable<'_> {
     }
 }
 
-impl Translate for KernelPageTable<'_> {
+impl Translate for ActivePageTable<'_> {
     fn translate(&self, addr: x86_64::VirtAddr) -> TranslateResult {
         active_pt!(self.translate(addr))
     }
 }
 
-impl Debug for KernelPageTable<'_> {
+impl Debug for ActivePageTable<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("KernelPageTable")
             .field("limine", &self.limine.is_some())

@@ -189,8 +189,11 @@ checksum = "d71b6127be86fdcfddb610f7182ac57211d4b18a3e9c82eb2d17662f2227ad6a"
 name = "cake"
 version = "0.1.0"
 dependencies = [
+ "ctor",
+ "env_logger",
  "limine",
  "log",
+ "raw-cpuid 11.6.0",
  "spin 0.10.0",
 ]
 

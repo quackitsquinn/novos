@@ -38,7 +38,7 @@ where
     const RECURSIVE_ENTRY_INDEX: PageTableIndex = PageTableIndex::new(Self::RECURSIVE_ENTRY as u16);
 
     pub fn new(mut page_range: T) -> Self {
-        let mut pgtbl = KERNEL_PAGE_TABLE.get();
+        let mut pgtbl = KERNEL_PAGE_TABLE.write();
         let mut alc = FRAME_ALLOCATOR.get();
         let root_frame = alc
             .allocate_frame()
@@ -86,7 +86,7 @@ where
 
     fn create_pagetable(&mut self) -> (KernelPhysFrame, &'a mut PageTable) {
         let mut alc = FRAME_ALLOCATOR.get();
-        let mut offset_page_table = KERNEL_PAGE_TABLE.get();
+        let mut offset_page_table = KERNEL_PAGE_TABLE.write();
         let pagetable_frame = alc
             .allocate_frame()
             .expect("Unable to allocate root frame for page table");
