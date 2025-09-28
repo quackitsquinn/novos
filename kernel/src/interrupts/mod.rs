@@ -5,6 +5,7 @@ use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
 
 mod exception;
 pub mod hardware;
+mod lock;
 mod macros;
 
 use crate::{
@@ -157,6 +158,10 @@ pub fn disable() {
 
 pub fn enable() {
     x86_64::instructions::interrupts::enable();
+}
+
+pub fn are_enabled() -> bool {
+    x86_64::instructions::interrupts::are_enabled()
 }
 
 pub fn without_interrupts<F, R>(f: F) -> R
