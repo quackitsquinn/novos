@@ -50,3 +50,6 @@ impl<T> InterruptMutex<T> {
         InterruptMutexGuard { guard, reenable }
     }
 }
+
+unsafe impl<T: Send> Sync for InterruptMutex<T> {}
+unsafe impl<T: Send> Send for InterruptMutex<T> {}
