@@ -31,6 +31,11 @@ cake = {path = "../cake"}
 raw-cpuid = "11.6.0"
 modular-bitfield = "0.12.0"
 kelp = { path = "../kelp" }
+rhai = { version = "1.23.0", features = ["no_std", "sync"], default-features = false }
+
+[build-dependencies]
+# Not directly used but fixes a weird cargo panic with rhai and libc
+libc = "0.2"
 
 
 
