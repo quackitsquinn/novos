@@ -637,6 +637,7 @@ dependencies = [
  "log",
  "modular-bitfield",
  "paste",
+ "pc-keyboard",
  "pic8259",
  "raw-cpuid 11.6.0",
  "rhai",
@@ -895,6 +896,12 @@ name = "pastey"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "35fb2e5f958ec131621fdd531e9fc186ed768cbe395337403ae56c17a74c68ec"
+
+[[package]]
+name = "pc-keyboard"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f0ca629cbb3f0d5b699c338f0129ff78c9bfd7ea8b1258ad529bff490dc8ed5a"
 
 [[package]]
 name = "pci_types"

@@ -4,7 +4,7 @@
 macro_rules! interrupt_wrapper {
     ($handler: path, $raw: ident) => {
         #[unsafe(naked)]
-        pub extern "x86-interrupt" fn $raw(_: InterruptStackFrame) {
+        pub extern "x86-interrupt" fn $raw(_: x86_64::structures::idt::InterruptStackFrame) {
             ::core::arch::naked_asm! {
                 // Disable interrupts.
                 "cli",

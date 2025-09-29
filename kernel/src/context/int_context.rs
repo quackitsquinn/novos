@@ -1,3 +1,5 @@
+use core::fmt::Display;
+
 use x86_64::{
     registers::rflags::RFlags,
     structures::{
@@ -79,5 +81,31 @@ impl InterruptCodeContextValue {
             core::ptr::copy_nonoverlapping(to, self, 1);
         }
         old
+    }
+}
+
+impl Display for InterruptCodeContextValue {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        // f.write_str("\n")?;
+        // macro_rules! p {
+        //     ($($arg:tt)*) => {
+        //         f.write_fmt(format_args!($($arg)*))
+        //     };
+        // }
+        //writeln!(f, "{}", self.context)?;
+        // p!(
+        //     "RIP: {:#018x} RSP: {:#018x}\n\n",
+        //     self.int_frame.instruction_pointer,
+        //     self.int_frame.stack_pointer
+        // )?;
+
+        // p!(
+        //     "RFLAGS: {:#018x} CS: {:?} SS: {:?}\n",
+        //     self.int_frame.cpu_flags,
+        //     self.int_frame.code_segment,
+        //     self.int_frame.stack_segment
+        // )?;
+
+        Ok(())
     }
 }

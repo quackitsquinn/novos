@@ -18,18 +18,21 @@ use core::arch::asm;
 
 use cake::declare_module;
 
+use cake::limine::request::StackSizeRequest;
 use cake::limine::BaseRevision;
 use interrupts::hardware;
 use kserial::client::get_serial_client;
 use log::info;
 use spin::Once;
 
+use crate::memory::stack::Stack;
 use crate::mp::mp_setup;
 
 pub mod acpi;
 pub mod context;
 pub mod display;
 mod gdt;
+mod interpreter;
 pub mod interrupts;
 pub mod memory;
 pub mod mp;
@@ -40,7 +43,8 @@ mod requests;
 pub mod serial;
 pub mod testing;
 
-pub const STACK_SIZE: u64 = 1 << 16; // Limine defaults to 16KiB
+pub const STACK_SIZE: u64 = 1 << 17;
+static STACK_SIZE_REQUEST: StackSizeRequest = StackSizeRequest::new().with_size(STACK_SIZE);
 
 pub static STACK_BASE: Once<u64> = Once::new();
 
@@ -67,6 +71,7 @@ pub extern "sysv64" fn init_kernel(rsp: u64) -> ! {
     }
     info!("Kernel initialized! Entering hlt loop");
     x86_64::instructions::interrupts::disable();
+    interpreter::run();
     loop {}
 }
 
@@ -85,9 +90,15 @@ pub(crate) unsafe fn init_kernel_services() {
         panic!("init_kernel_services called more than once");
     }
     INIT.call_once(|| ());
+
     serial::MODULE.init();
     requests::MODULE.init();
     panic::MODULE.init();
+
+    if !STACK_SIZE_REQUEST.get_response().is_some() {
+        panic!("Failed to get stack size from Limine");
+    }
+
     gdt::MODULE.init();
     interrupts::MODULE.init();
     hardware::MODULE.init();

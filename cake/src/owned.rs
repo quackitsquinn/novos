@@ -1,18 +1,18 @@
 use core::{
     fmt,
     ops::{Deref, DerefMut},
-    ptr::{drop_in_place, NonNull},
+    ptr::{NonNull, drop_in_place},
 };
 
 /// A pointer type that provides ownership semantics.
 #[repr(transparent)]
-pub struct Owned<T> {
+pub struct Owned<T: ?Sized> {
     val: NonNull<T>,
 }
 
-impl<T> Owned<T> {
+impl<T: ?Sized> Owned<T> {
     /// Creates a new `Owned` instance from a raw pointer.
-    pub unsafe fn new(val: *mut T) -> Self {
+    pub const unsafe fn new(val: *mut T) -> Self {
         Owned {
             val: NonNull::new(val).expect("Owned::new called with null pointer"),
         }
@@ -20,14 +20,14 @@ impl<T> Owned<T> {
 
     /// Converts the `Owned` instance into a raw pointer.
     #[must_use = "Returned value must be used to avoid memory leaks"]
-    pub unsafe fn into_raw(self) -> *mut T {
+    pub const unsafe fn into_raw(self) -> *mut T {
         let ptr = self.val.as_ptr();
         core::mem::forget(self); // Prevents the destructor from being called
         ptr
     }
 }
 
-impl<T> Deref for Owned<T> {
+impl<T: ?Sized> Deref for Owned<T> {
     type Target = T;
 
     /// Dereferences the `Owned` pointer to access the underlying value.
@@ -36,14 +36,14 @@ impl<T> Deref for Owned<T> {
     }
 }
 
-impl<T> DerefMut for Owned<T> {
+impl<T: ?Sized> DerefMut for Owned<T> {
     /// Mutably dereferences the `Owned` pointer to access the underlying value.
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { self.val.as_mut() }
     }
 }
 
-impl<T> Drop for Owned<T> {
+impl<T: ?Sized> Drop for Owned<T> {
     /// Drops the `Owned` instance, deallocating the memory if necessary.
     fn drop(&mut self) {
         unsafe {

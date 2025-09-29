@@ -30,11 +30,11 @@ pub fn init() -> Result<(), Infallible> {
         version.max_redirection_entries()
     );
 
-    // Disable the PICs
-    unsafe {
-        hardware::disable();
-    }
-    dispatch_all(apic_init);
+    // // Disable the PICs
+    // unsafe {
+    //     hardware::disable();
+    // }
+    //dispatch_all(apic_init);
     Ok(())
 }
 

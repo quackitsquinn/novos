@@ -152,12 +152,17 @@ const BASIC_HANDLERS: [&'static str; 32] = [
     "RESERVED",
 ];
 
-pub fn disable() {
+/// Disables interrupts and returns the previous interrupt state.
+pub fn disable() -> bool {
+    let state = are_enabled();
     x86_64::instructions::interrupts::disable();
+    state
 }
 
-pub fn enable() {
+pub fn enable() -> bool {
+    let state = are_enabled();
     x86_64::instructions::interrupts::enable();
+    state
 }
 
 pub fn are_enabled() -> bool {

@@ -87,7 +87,9 @@ pub mod map {
 
     pub const KERNEL_START: u64 = HIGHER_HALF_START + 0x1000_0000;
 
-    define_map!(KERNEL_HEAP, KERNEL_START, 0x100_0000); // 16MB
+    // Adding rhai single-handedly tripled the size of the kernel so including the kernel elf (a massive 38MB) + whatever it needs for
+    // its internal bytecode representation we need a bigger heap. 256Mb Heap here we come!
+    define_map!(KERNEL_HEAP, KERNEL_START, 0x10_000_000);
 
     define_map!(KERNEL_PHYS_MAP, KERNEL_HEAP_END_RAW, 0x1000_0000); // 256MB
 

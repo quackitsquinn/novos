@@ -20,7 +20,7 @@ pub struct BlockAllocator {
 }
 
 /// Count of blocks that can be allocated in the initial block table.
-pub const INIT_BLOCK_SIZE: usize = 512;
+pub const INIT_BLOCK_SIZE: usize = 4096;
 /// The minimum heap size required for the block allocator.
 pub const MIN_HEAP_SIZE: usize = INIT_BLOCK_SIZE * mem::size_of::<Block>();
 

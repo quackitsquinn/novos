@@ -5,6 +5,7 @@ use spin::Mutex;
 
 use crate::declare_module;
 
+pub mod keyboard;
 pub mod timer;
 
 // TODO: APIC check
@@ -38,6 +39,8 @@ pub(super) fn define_hardware() {
     let mut idt = super::IDT.modify();
     idt[InterruptIndex::Timer as u8]
         .set_handler_fn(unsafe { transmute(timer::timer_handler_raw as *mut ()) });
+    idt[InterruptIndex::Keyboard as u8]
+        .set_handler_fn(unsafe { transmute(keyboard::keyboard_interrupt_raw as *mut ()) });
     drop(idt);
     unsafe {
         super::IDT.commit();
@@ -50,7 +53,7 @@ fn init() -> Result<(), Infallible> {
     unsafe {
         let mut p = PICS.lock();
         // Unmask interrupts (afaik it's lsb first? idk)
-        p.write_masks(0b11111110, 0b11111111);
+        p.write_masks(0b11111100, 0b11111111);
         p.initialize();
     }
     Ok(())
