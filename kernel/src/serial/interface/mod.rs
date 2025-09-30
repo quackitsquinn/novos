@@ -51,3 +51,24 @@ macro_rules! sprintln {
     };
 
 }
+
+// Port of the std dbg! macro, but it works in a no_std environment.
+#[macro_export]
+macro_rules! sdbg {
+    () => {
+        $crate::sprintln!("[{}:{}:{}]", core::file!(), core::line!(), core::column!());
+    };
+    ($val:expr $(,)?) => {
+        match $val {
+            tmp => {
+                $crate::sprintln!("[{}:{}:{}] {} = {:#?}",
+                    core::file!(), core::line!(), core::column!(),
+                    core::stringify!($val), &tmp);
+                tmp
+            }
+        }
+    };
+    ($($val:expr),+ $(,)?) => {
+        ($($crate::sdbg!($val)),+,)
+    };
+}

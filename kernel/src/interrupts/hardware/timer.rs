@@ -2,7 +2,9 @@ use core::{hint::spin_loop, time::Duration};
 
 use x86_64::{instructions::interrupts::without_interrupts, structures::idt::InterruptStackFrame};
 
-use crate::{context::InterruptContext, interrupt_wrapper, proc::sched_next};
+use crate::{
+    context::InterruptContext, display::TERMINAL, interrupt_wrapper, proc::sched_next, terminal,
+};
 
 use super::InterruptIndex;
 
@@ -14,6 +16,12 @@ pub const TIMER_FREQUENCY: f32 = 18.2065; // stolen from https://wiki.osdev.org/
 pub(super) extern "C" fn timer_handler(frame: InterruptContext) {
     unsafe {
         TICKS += 1;
+
+        // if TICKS % 2 == 0 {
+        //     if let Some(mut terminal) = TERMINAL.try_get() {
+        //         terminal.blink_cursor('█', TICKS % 2 <= 1);
+        //     }
+        // }
 
         sched_next(frame);
 

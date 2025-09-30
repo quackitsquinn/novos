@@ -45,6 +45,11 @@ impl KeyboardDriver {
     }
 
     pub(super) unsafe fn input(&mut self, chr: u8) {
+        if chr == 0x08 || chr == 0x7f {
+            self.backspaces += 1;
+            self.line.pop();
+            return;
+        }
         if !self.line.is_full() {
             self.line.push(chr);
         }
@@ -53,12 +58,6 @@ impl KeyboardDriver {
             self.raw.push(chr);
             self.new_chars += 1;
         }
-    }
-
-    pub(super) unsafe fn backspace(&mut self) {
-        self.new_chars = self.new_chars.saturating_sub(1);
-        self.backspaces += 1;
-        self.line.pop();
     }
 
     pub(super) unsafe fn scancode(&mut self, code: u8) {
@@ -73,9 +72,6 @@ impl KeyboardDriver {
                 match chr {
                     DecodedKey::RawKey(KeyCode::Return) => {
                         unsafe { self.input(b'\n') };
-                    }
-                    DecodedKey::RawKey(KeyCode::Backspace) => {
-                        unsafe { self.backspace() };
                     }
                     DecodedKey::Unicode(c) => {
                         if !c.is_ascii() {

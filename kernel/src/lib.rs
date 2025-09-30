@@ -102,7 +102,11 @@ pub(crate) unsafe fn init_kernel_services() {
     gdt::MODULE.init();
     interrupts::MODULE.init();
     hardware::MODULE.init();
-    get_serial_client().enable_packet_support();
+
+    if option_env!("NO_SERIAL").is_none() {
+        get_serial_client().enable_packet_support();
+    }
+
     // {
     //     let e = File::create_file("test.txt").unwrap();
     //     e.write(b"Hello, world!").unwrap();

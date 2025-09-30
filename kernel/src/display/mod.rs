@@ -11,6 +11,8 @@ mod screen_char;
 pub mod terminal;
 
 pub use character::get_char;
+pub use color::Color;
+pub use screen_char::ScreenChar;
 
 use crate::{declare_module, requests};
 

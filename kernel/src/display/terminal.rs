@@ -2,7 +2,7 @@ use core::{f32, fmt::Write};
 
 use alloc::{vec, vec::Vec};
 
-use crate::{interrupts::without_interrupts, sprintln, terminal};
+use crate::{interrupts::without_interrupts, sdbg, sprintln, terminal};
 
 use super::{color::Color, get_char, screen_char::ScreenChar, FRAMEBUFFER, TERMINAL};
 
@@ -25,7 +25,7 @@ impl Terminal {
     pub fn new(scale: usize, line_spacing: usize) -> Self {
         let (term_size, glyph_size) = Self::calculate_dimensions(line_spacing, scale);
         sprintln!("Creating front buffer with size: {:?}", term_size);
-        let front = vec![vec![ScreenChar::default(); term_size.0 as usize]; term_size.1 as usize];
+        let front = vec![vec![ScreenChar::default(); term_size.1 as usize]; term_size.0 as usize];
         sprintln!("Creating back buffer with size: {:?}", term_size);
         let back = front.clone();
         Self {
@@ -60,6 +60,7 @@ impl Terminal {
 
     fn advance_cursor(&mut self) -> (usize, usize) {
         self.position.0 += 1;
+
         if self.position.0 >= self.size.0 {
             self.newline();
         }
@@ -92,9 +93,9 @@ impl Terminal {
         }
 
         let (x, y) = self.advance_cursor();
-        self.front[y][x] = ScreenChar::new(c, self.current_fg, self.current_bg);
+        self.back[x][y] = ScreenChar::new(c, self.current_fg, self.current_bg);
         if flush {
-            self.flush_character((x, y));
+            self.blit_flush_char(x, y);
         }
     }
 
@@ -105,17 +106,25 @@ impl Terminal {
 
     #[inline]
     fn flush_character(&self, pos: (usize, usize)) {
-        let c = self.front[pos.1][pos.0];
+        let c = self.front[pos.0][pos.1];
         let (x, y) = self.offset(pos);
         let mut fb = FRAMEBUFFER.get();
         fb.draw_sprite(
             x,
             y,
             self.character_scale,
-            &get_char(c.character()),
-            c.foreground(),
-            c.background(),
+            &get_char(c.character),
+            c.foreground,
+            c.background,
         );
+    }
+
+    fn force_flush(&self) {
+        for y in 0..self.size.1 {
+            for x in 0..self.size.0 {
+                self.flush_character((x, y));
+            }
+        }
     }
 
     #[inline]
@@ -131,11 +140,70 @@ impl Terminal {
         }
     }
 
+    fn blit_flush_char(&mut self, x: usize, y: usize) {
+        if self.front[x][y] == self.back[x][y] {
+            return;
+        }
+        self.front[x][y] = self.back[x][y];
+        self.flush_character((x, y));
+    }
+
+    pub fn backspace(&mut self) {
+        if self.position.0 == 0 && self.position.1 == 0 {
+            return;
+        }
+
+        if self.position.0 <= 1 {
+            self.position.1 -= 1;
+            self.position.0 = self.front[self.position.1]
+                .iter()
+                .filter(|c| *c != &ScreenChar::default())
+                .count();
+        } else {
+            self.position.0 -= 1;
+        }
+
+        self.front[self.position.1][self.position.0 + 1] = ScreenChar::default();
+        self.flush_character((self.position.0 + 1, self.position.1));
+    }
+
+    pub fn clear(&mut self) {
+        self.front
+            .iter_mut()
+            .for_each(|v| v.fill(ScreenChar::default()));
+        self.back
+            .iter_mut()
+            .for_each(|v| v.fill(ScreenChar::default()));
+
+        self.force_flush();
+        self.position = (0, 0);
+    }
+
     pub fn push_str(&mut self, s: &str) {
         //sprintln!("Pushing string: {}", s);
         for c in s.chars() {
             self.push_char(c, true);
         }
+    }
+
+    pub fn set_char_at(&mut self, x: usize, y: usize, c: ScreenChar) {
+        self.back[y][x] = c;
+        self.blit_flush_char(x, y);
+    }
+
+    pub fn set_cursor(&mut self, x: usize, y: usize) {
+        self.position = (x, y);
+    }
+
+    pub fn blink_cursor(&mut self, c: char, fill: bool) {
+        let (x, y) = self.position;
+        if fill {
+            let mut screen_char = ScreenChar::default();
+            screen_char.character = c;
+            self.set_char_at(x, y, screen_char);
+            return;
+        }
+        self.set_char_at(x, y, ScreenChar::default());
     }
 }
 

@@ -1,9 +1,9 @@
 use super::color::Color;
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ScreenChar {
-    character: char,
-    foreground: Color,
-    background: Color,
+    pub character: char,
+    pub foreground: Color,
+    pub background: Color,
 }
 
 impl ScreenChar {
@@ -13,18 +13,6 @@ impl ScreenChar {
             foreground: fg,
             background: bg,
         }
-    }
-
-    pub fn character(&self) -> char {
-        self.character
-    }
-
-    pub fn foreground(&self) -> Color {
-        self.foreground
-    }
-
-    pub fn background(&self) -> Color {
-        self.background
     }
 }
 
