@@ -108,7 +108,7 @@ impl KeyboardDriver {
     }
 
     pub fn has_new_input(&self) -> bool {
-        self.new_chars > 0
+        self.new_chars > 0 || self.backspaces > 0
     }
 
     /// Reads the new input from the keyboard buffer as a string slice. If there is no new input, returns an empty string.

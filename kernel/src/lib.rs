@@ -5,6 +5,7 @@
 #![feature(custom_test_frameworks)]
 #![feature(allocator_api)]
 #![feature(pointer_is_aligned_to)]
+#![feature(optimize_attribute)]
 /* LINT OPTS */
 #![forbid(unsafe_op_in_unsafe_fn)]
 #![warn(missing_debug_implementations)]

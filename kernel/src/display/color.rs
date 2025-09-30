@@ -7,6 +7,8 @@ pub struct Color {
 }
 
 impl Color {
+    pub const BLACK: Color = Color::new(0, 0, 0);
+
     /// Create a new color.
     #[inline]
     pub const fn new(r: u8, g: u8, b: u8) -> Self {

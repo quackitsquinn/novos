@@ -17,11 +17,9 @@ pub(super) extern "C" fn timer_handler(frame: InterruptContext) {
     unsafe {
         TICKS += 1;
 
-        // if TICKS % 2 == 0 {
-        //     if let Some(mut terminal) = TERMINAL.try_get() {
-        //         terminal.blink_cursor('█', TICKS % 2 <= 1);
-        //     }
-        // }
+        if let Some(mut terminal) = TERMINAL.try_get() {
+            terminal.blink_cursor(TICKS % 16 <= 8);
+        }
 
         sched_next(frame);
 

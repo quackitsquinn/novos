@@ -19,9 +19,14 @@ pub struct Terminal {
     character_scale: usize,
     current_fg: Color,
     current_bg: Color,
+    last_cursor: (usize, usize),
 }
 
 impl Terminal {
+    pub const BLINK_CHAR: char = '_';
+    pub const BLINK_CHAR_SCREEN_CHAR: ScreenChar =
+        ScreenChar::new(Self::BLINK_CHAR, Color::new(230, 230, 230), Color::BLACK);
+
     pub fn new(scale: usize, line_spacing: usize) -> Self {
         let (term_size, glyph_size) = Self::calculate_dimensions(line_spacing, scale);
         sprintln!("Creating front buffer with size: {:?}", term_size);
@@ -32,6 +37,7 @@ impl Terminal {
             front,
             back,
             position: (0, 0),
+            last_cursor: (0, 0),
             size: term_size,
             character_size: glyph_size,
             character_scale: scale,
@@ -67,21 +73,43 @@ impl Terminal {
         self.position
     }
 
+    fn peak_advance(&self) -> (usize, usize) {
+        let position = self.position.0 + 1;
+
+        if self.position.0 >= self.size.0 {
+            // Would scroll up, stay on the same line.
+            if self.position.1 + 1 >= self.size.1 {
+                return (0, self.position.1);
+            }
+            return (0, self.position.1 + 1);
+        }
+
+        (position, self.position.1)
+    }
+
     fn newline(&mut self) {
         self.position.0 = 0;
         self.position.1 += 1;
+
+        // Clear the last cursor if it exists.
+        let (last_x, last_y) = self.last_cursor;
+        if self.back[last_x][last_y] == Self::BLINK_CHAR_SCREEN_CHAR {
+            self.set_char_at(last_x, last_y, ScreenChar::default());
+        }
+
         if self.position.1 >= self.size.1 {
             self.scroll_up();
         }
     }
 
+    #[optimize(speed)]
     fn scroll_up(&mut self) {
-        // Copy the screen to the back buffer
-        self.back.clone_from_slice(&self.front);
         // Scroll up by one line
-        self.front.remove(0);
-        self.front
-            .push(vec![ScreenChar::default(); self.size.0 as usize]);
+        for col in &mut self.back {
+            col.remove(0);
+            col.push(ScreenChar::default())
+        }
+
         self.position.1 -= 1;
         self.blit_update();
     }
@@ -128,12 +156,11 @@ impl Terminal {
     }
 
     #[inline]
-    fn blit_update(&self) {
-        for y in 0..self.size.1 {
-            let front = &self.front[y];
-            let back = &self.back[y];
-            for x in 0..self.size.0 {
-                if front[x] != back[x] {
+    fn blit_update(&mut self) {
+        for x in 0..self.size.0 {
+            for y in 0..self.size.1 {
+                if self.front[x][y] != self.back[x][y] {
+                    self.front[x][y] = self.back[x][y];
                     self.flush_character((x, y));
                 }
             }
@@ -141,7 +168,7 @@ impl Terminal {
     }
 
     fn blit_flush_char(&mut self, x: usize, y: usize) {
-        if self.front[x][y] == self.back[x][y] {
+        if self.back[x][y] == self.front[x][y] {
             return;
         }
         self.front[x][y] = self.back[x][y];
@@ -149,33 +176,22 @@ impl Terminal {
     }
 
     pub fn backspace(&mut self) {
-        if self.position.0 == 0 && self.position.1 == 0 {
+        if self.position.0 == 0 {
             return;
         }
 
-        if self.position.0 <= 1 {
-            self.position.1 -= 1;
-            self.position.0 = self.front[self.position.1]
-                .iter()
-                .filter(|c| *c != &ScreenChar::default())
-                .count();
-        } else {
-            self.position.0 -= 1;
-        }
+        self.back[self.position.0][self.position.1] = ScreenChar::default();
+        self.blit_flush_char(self.position.0, self.position.1);
 
-        self.front[self.position.1][self.position.0 + 1] = ScreenChar::default();
-        self.flush_character((self.position.0 + 1, self.position.1));
+        self.position.0 -= 1;
     }
 
     pub fn clear(&mut self) {
-        self.front
-            .iter_mut()
-            .for_each(|v| v.fill(ScreenChar::default()));
         self.back
             .iter_mut()
             .for_each(|v| v.fill(ScreenChar::default()));
 
-        self.force_flush();
+        self.blit_update();
         self.position = (0, 0);
     }
 
@@ -187,7 +203,7 @@ impl Terminal {
     }
 
     pub fn set_char_at(&mut self, x: usize, y: usize, c: ScreenChar) {
-        self.back[y][x] = c;
+        self.back[x][y] = c;
         self.blit_flush_char(x, y);
     }
 
@@ -195,12 +211,21 @@ impl Terminal {
         self.position = (x, y);
     }
 
-    pub fn blink_cursor(&mut self, c: char, fill: bool) {
-        let (x, y) = self.position;
+    pub fn blink_cursor(&mut self, fill: bool) {
+        let (x, y) = self.peak_advance();
+
+        // Clear the last cursor if it exists.
+        if (x, y) != self.last_cursor {
+            let (last_x, last_y) = self.last_cursor;
+            if !(self.back[last_x][last_y] != Self::BLINK_CHAR_SCREEN_CHAR) {
+                self.set_char_at(last_x, last_y, ScreenChar::default());
+            }
+        }
+
+        self.last_cursor = (x, y);
+
         if fill {
-            let mut screen_char = ScreenChar::default();
-            screen_char.character = c;
-            self.set_char_at(x, y, screen_char);
+            self.set_char_at(x, y, Self::BLINK_CHAR_SCREEN_CHAR);
             return;
         }
         self.set_char_at(x, y, ScreenChar::default());
