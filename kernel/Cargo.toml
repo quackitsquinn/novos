@@ -33,6 +33,8 @@ modular-bitfield = "0.12.0"
 kelp = { path = "../kelp" }
 rhai = { version = "1.23.0", features = ["no_std", "sync"], default-features = false }
 pc-keyboard = "0.8.0"
+libm = "0.2.15"
+palette = { version = "0.7.6", default-features = false, features = ["alloc", "libm"] }
 
 [build-dependencies]
 # Not directly used but fixes a weird cargo panic with rhai and libc

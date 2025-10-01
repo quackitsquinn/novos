@@ -1,8 +1,9 @@
-use core::{cmp::min, f32::consts::E, num::TryFromIntError, str::FromStr};
+use core::{cmp::min, f32::consts::E, fmt::Display, num::TryFromIntError, str::FromStr};
 
 use alloc::{boxed::Box, format, string::String, vec::Vec};
 use cake::spin::MutexGuard;
 use core::fmt::Write;
+use palette::{Hsv, IntoColor, Srgb, rgb::Rgb};
 use rhai::{Dynamic, Engine, EvalAltResult, ParseError, ParseErrorType, Position};
 
 use crate::{
@@ -18,10 +19,9 @@ use crate::{
 };
 
 const WELCOME: &str = "
-Welcome to Novos, a poorly named operating system. (I'm planning to rename it soon)
-Currently the kernel is in development (and will remain in development for a while) so right now it's pretty bare-bones.
+Welcome to the Novos interpreter! This is a REPL (Read-Eval-Print Loop) environment that has various built-in functions
+and types you can use to interact with the system. Type 'help()' for more information.
 
-Right now you are seeing a Rhai-based interpreter.
 ";
 
 const HELP: &str = "
@@ -31,10 +31,14 @@ If you want documentation for the language, visit https://rhai.rs/book/
 
 Implemented items:
 
-new_color(int r, int g, int b) -> Color: 
+rgb(int r, int g, int b) -> Color: 
     Creates a new color from the given inputs. Throws a RuntimeError
     if r, g, or b > 255 || < 0
     Color has the setters set_(r, g, b) for input validation.
+
+hsv(float h, float s, float v) -> Color:
+    Creates a new color from the given inputs. Throws a RuntimeError
+    if h is not in [0, 360) or s or v are not in [0, 1].
 
 new_screenchar(char character, Color fg, Color bg) -> ScreenChar:
     Creates a new ScreenChar for the given character, foreground, and background.
@@ -42,8 +46,17 @@ new_screenchar(char character, Color fg, Color bg) -> ScreenChar:
 terminal() -> Terminal:
     Returns a handle to the current terminal.
 
-Terminal::set_char_at(x: int, y: int, c: ScreenChar):
+Terminal.set_char_at(x: int, y: int, c: ScreenChar):
     Sets a character at the given input. Will error if x/y are out of range for the terminal.
+
+Terminal.set_char_at_raw(x: int, y: int, c: char):
+    Sets a character at the given input with white foreground and black background. Will error if x/y are out of range for the terminal.
+
+Terminal.x_size() -> int:
+    Returns the width of the terminal.
+
+Terminal.y_size() -> int:
+    Returns the height of the terminal.
 ";
 
 struct Context<'a> {
@@ -88,6 +101,28 @@ pub fn run() {
         terminal.clear();
         terminal.push_str(WELCOME);
     }
+
+    let code = r#"let t = terminal();
+let x = t.x_size();
+let y = t.y_size();
+for x in 0..x {
+    for y in 0..y {
+        t.set_char_at(x, y, new_screenchar("O", hsv(to_float((x + y) % 359), 0.5, 0.7), rgb(0, 0, 0)));
+    }
+}"#;
+    match context.rhai.compile(code) {
+        Ok(ast) => {
+            if let Err(e) = context
+                .rhai
+                .eval_ast_with_scope::<Dynamic>(&mut context.scope, &ast)
+            {
+                println!("Error running startup code: {}", e);
+            }
+        }
+        Err(e) => {
+            println!("Error compiling startup code: {}", e);
+        }
+    }
     loop {
         let mut keyboard = KEYBOARD.lock();
         update_display(&mut context, &mut keyboard);
@@ -105,6 +140,7 @@ fn update_display(context: &mut Context, driver: &mut KeyboardDriver) {
         let mut terminal = terminal!();
 
         update_history(&mut terminal, context, driver);
+        update_cursor(&mut terminal, context, driver);
 
         for _ in 0..driver.backspaces() {
             terminal.backspace();
@@ -139,7 +175,21 @@ fn update_history(terminal: &mut Terminal, context: &mut Context, driver: &mut K
     }
 }
 
-fn create_invalid_error(fail_value: i64, expected_type: &str) -> Box<EvalAltResult> {
+fn update_cursor(terminal: &mut Terminal, context: &mut Context, driver: &mut KeyboardDriver) {
+    let lefts = driver.lefts() as isize;
+    let rights = driver.rights() as isize;
+
+    if lefts == 0 && rights == 0 {
+        return;
+    }
+
+    let current_col = terminal.cursor().0 as isize;
+    let new_col = current_col - (lefts + rights);
+    terminal.set_col(new_col.max(0) as usize);
+    terminal.update_row();
+}
+
+fn create_invalid_error<T: Display>(fail_value: T, expected_type: &str) -> Box<EvalAltResult> {
     return Box::new(EvalAltResult::ErrorRuntime(
         Dynamic::from_str(&format!(
             "Value out of range for {}: {}",
@@ -158,13 +208,6 @@ fn try_into_u8(value: i64) -> Result<u8, Box<EvalAltResult>> {
     Ok(res.unwrap())
 }
 
-fn screenchar_to_string(sc: &mut ScreenChar) -> String {
-    format!(
-        "Screenchar('{}', fg: {}, bg: {})",
-        sc.character, sc.foreground, sc.background
-    )
-}
-
 fn create_engine() -> Engine {
     let mut engine = Engine::new();
 
@@ -180,7 +223,7 @@ fn create_engine() -> Engine {
     engine.register_fn("screenchar_new", ScreenChar::new);
     engine.register_fn("screenchar", ScreenChar::default);
     engine.register_fn(
-        "new_color",
+        "rgb",
         |r: i64, g: i64, b: i64| -> Result<Color, Box<EvalAltResult>> {
             let r = try_into_u8(r)?;
             let g = try_into_u8(g)?;
@@ -188,6 +231,8 @@ fn create_engine() -> Engine {
             Ok(Color::new(r, g, b))
         },
     );
+
+    engine.register_fn("hsv", color_from_hsv);
 
     // ScreenChar::*
     engine.register_get("char", |c: &mut ScreenChar| c.character);
@@ -200,7 +245,16 @@ fn create_engine() -> Engine {
     engine.register_set("background", |c: &mut ScreenChar, val: Color| {
         c.background = val
     });
-    engine.register_fn("to_string", screenchar_to_string);
+    engine.register_fn("to_string", |c: &mut ScreenChar| {
+        format!(
+            "Screenchar('{}', fg: {}, bg: {})",
+            c.character, c.foreground, c.background
+        )
+    });
+
+    engine.register_fn("to_string", |c: &mut Color| {
+        format!("Color(r: {}, g: {}, b: {})", c.r, c.g, c.b)
+    });
 
     // Color::*
     engine.register_get("r", |c: &mut Color| c.r as i64);
@@ -232,10 +286,33 @@ fn create_engine() -> Engine {
     // Terminal::*
     engine.register_fn("terminal", || RhaiTerminal);
     engine.register_fn("set_char_at", RhaiTerminal::set_char_at);
+    engine.register_fn("set_char_at_raw", RhaiTerminal::set_char_at_raw);
     engine.register_fn("x_size", RhaiTerminal::x_size);
     engine.register_fn("y_size", RhaiTerminal::y_size);
 
     engine
+}
+
+fn color_from_hsv(h: f64, s: f64, v: f64) -> Result<Color, Box<EvalAltResult>> {
+    if !(0.0..360.0).contains(&h) {
+        return Err(create_invalid_error(h as i64, "hue [0, 360)"));
+    }
+    if !(0.0..=1.0).contains(&s) {
+        return Err(create_invalid_error(
+            (s * 100.0) as i64,
+            "saturation [0, 1]",
+        ));
+    }
+
+    if !(0.0..=1.0).contains(&v) {
+        return Err(create_invalid_error((v * 100.0) as i64, "value [0, 1]"));
+    }
+    let h = h as f32;
+    let s = s as f32;
+    let v = v as f32;
+    let col: Rgb = Hsv::new(h, s, v).into_color();
+    let u8_col = col.into_format::<u8>();
+    Ok(Color::new(u8_col.red, u8_col.green, u8_col.blue))
 }
 
 fn update_rhai(driver: &mut KeyboardDriver, context: &mut Context) {
@@ -350,13 +427,17 @@ impl RhaiTerminal {
         Ok(())
     }
 
+    fn set_char_at_raw(&mut self, x: i64, y: i64, c: char) -> Result<(), Box<EvalAltResult>> {
+        self.set_char_at(x, y, ScreenChar::new(c, Color::WHITE, Color::BLACK))
+    }
+
     fn x_size(&mut self) -> i64 {
-        let mut terminal = Self::_lock_term();
+        let terminal = Self::_lock_term();
         terminal.get_size().0 as i64
     }
 
     fn y_size(&mut self) -> i64 {
-        let mut terminal = Self::_lock_term();
+        let terminal = Self::_lock_term();
         terminal.get_size().1 as i64
     }
 }

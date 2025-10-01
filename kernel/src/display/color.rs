@@ -10,6 +10,10 @@ pub struct Color {
 
 impl Color {
     pub const BLACK: Color = Color::new(0, 0, 0);
+    pub const WHITE: Color = Color::new(255, 255, 255);
+    pub const RED: Color = Color::new(255, 0, 0);
+    pub const GREEN: Color = Color::new(0, 255, 0);
+    pub const BLUE: Color = Color::new(0, 0, 255);
 
     /// Create a new color.
     #[inline]

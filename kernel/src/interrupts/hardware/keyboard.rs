@@ -7,7 +7,7 @@ use alloc::{boxed::Box, string::String};
 use arrayvec::ArrayVec;
 use cake::Owned;
 use pc_keyboard::{
-    layouts::Us104Key, DecodedKey, HandleControl, KeyCode, KeyState, Keyboard, ScancodeSet1,
+    DecodedKey, HandleControl, KeyCode, KeyState, Keyboard, ScancodeSet1, layouts::Us104Key,
 };
 
 use x86_64::instructions::port::Port;
@@ -32,6 +32,8 @@ pub struct KeyboardDriver {
     repr: Keyboard<Us104Key, ScancodeSet1>,
     up_presses: usize,
     down_presses: usize,
+    lefts: usize,
+    rights: usize,
 }
 
 impl KeyboardDriver {
@@ -44,6 +46,8 @@ impl KeyboardDriver {
             backspaces: 0,
             up_presses: 0,
             down_presses: 0,
+            lefts: 0,
+            rights: 0,
             repr: Keyboard::new(ScancodeSet1::new(), Us104Key, HandleControl::Ignore),
         }
     }
@@ -82,6 +86,12 @@ impl KeyboardDriver {
                     }
                     DecodedKey::RawKey(KeyCode::ArrowDown) => {
                         self.down_presses += 1;
+                    }
+                    DecodedKey::RawKey(KeyCode::ArrowLeft) => {
+                        self.lefts += 1;
+                    }
+                    DecodedKey::RawKey(KeyCode::ArrowRight) => {
+                        self.rights += 1;
                     }
                     DecodedKey::Unicode(c) => {
                         if !c.is_ascii() {
@@ -125,7 +135,12 @@ impl KeyboardDriver {
     }
 
     pub fn has_new_input(&self) -> bool {
-        self.new_chars > 0 || self.backspaces > 0 || self.up_presses > 0 || self.down_presses > 0
+        self.new_chars > 0
+            || self.backspaces > 0
+            || self.up_presses > 0
+            || self.down_presses > 0
+            || self.lefts > 0
+            || self.rights > 0
     }
 
     /// Reads the new input from the keyboard buffer as a string slice. If there is no new input, returns an empty string.
@@ -151,6 +166,14 @@ impl KeyboardDriver {
 
     pub fn down_presses(&mut self) -> usize {
         mem::replace(&mut self.down_presses, 0)
+    }
+
+    pub fn lefts(&mut self) -> usize {
+        mem::replace(&mut self.lefts, 0)
+    }
+
+    pub fn rights(&mut self) -> usize {
+        mem::replace(&mut self.rights, 0)
     }
 }
 

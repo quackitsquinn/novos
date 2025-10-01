@@ -8,7 +8,7 @@ use core::{
 
 use alloc::{vec, vec::Vec};
 
-use crate::{interrupts::without_interrupts, sdbg, sprintln, terminal};
+use crate::{display::CURSOR_SPRITE, interrupts::without_interrupts, sdbg, sprintln, terminal};
 
 use super::{FRAMEBUFFER, TERMINAL, color::Color, get_char, screen_char::ScreenChar};
 
@@ -153,6 +153,12 @@ impl Terminal {
             c.background,
         );
     }
+    #[optimize(speed)]
+    fn draw_over_character(&self, pos: (usize, usize), c: [u8; 8], color: Color) {
+        let (x, y) = self.offset(pos);
+        let mut fb = FRAMEBUFFER.get();
+        fb.draw_sprite_transparent(x, y, self.character_scale, &c, color);
+    }
 
     pub fn force_flush(&self) {
         for y in 0..self.size.1 {
@@ -228,16 +234,18 @@ impl Terminal {
             let (last_x, last_y) = self.last_cursor;
             if !(self.back[self.last_cursor] != Self::BLINK_CHAR_SCREEN_CHAR) {
                 self.set_char_at(last_x, last_y, ScreenChar::default());
+            } else {
+                self.flush_character((last_x, last_y));
             }
         }
 
         self.last_cursor = (x, y);
 
         if fill {
-            self.set_char_at(x, y, Self::BLINK_CHAR_SCREEN_CHAR);
+            self.draw_over_character((x, y), CURSOR_SPRITE, Color::new(200, 200, 200));
             return;
         }
-        self.set_char_at(x, y, ScreenChar::default());
+        self.flush_character((x, y));
     }
 
     pub fn get_size(&self) -> (usize, usize) {
@@ -256,6 +264,10 @@ impl Terminal {
         for x in 0..self.size.0 {
             self.blit_flush_char((x, self.position.1));
         }
+    }
+
+    pub fn cursor(&self) -> (usize, usize) {
+        self.position
     }
 }
 

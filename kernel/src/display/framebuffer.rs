@@ -103,6 +103,27 @@ impl Framebuffer {
         }
     }
 
+    /// Draws a scaled 8xn sprite at a specific location.
+    /// The origin is the top left corner.
+    #[inline]
+    #[optimize(speed)]
+    pub fn draw_sprite_transparent(
+        &mut self,
+        x: usize,
+        y: usize,
+        scale: usize,
+        sprite: &[u8],
+        foreground: Color,
+    ) {
+        for (i, byte) in sprite.iter().enumerate() {
+            for bit in 0..8 {
+                if byte & (1 << bit) != 0 {
+                    self.draw_scaled_px(x + bit * scale, y + (i % 8) * scale, scale, foreground);
+                }
+            }
+        }
+    }
+
     /// Clears the framebuffer with a specific color.
     pub fn clear(&mut self) {
         self.buffer.fill(0);
