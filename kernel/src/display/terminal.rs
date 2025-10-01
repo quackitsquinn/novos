@@ -251,6 +251,12 @@ impl Terminal {
         });
         self.position.0 = col;
     }
+
+    pub fn update_row(&mut self) {
+        for x in 0..self.size.0 {
+            self.blit_flush_char((x, self.position.1));
+        }
+    }
 }
 
 impl Write for Terminal {

@@ -51,7 +51,26 @@ struct Context<'a> {
     scope: rhai::Scope<'a>,
     newline: bool,
     history: Vec<String>,
+    index: Option<usize>,
     lines: Vec<String>,
+}
+
+impl Context<'_> {
+    fn set_index_clamped(&mut self, new_index: isize) {
+        if new_index < 0 || self.history.len() == 0 {
+            self.index = None;
+            return;
+        }
+
+        let new_index = new_index as usize;
+
+        if new_index >= self.history.len() {
+            self.index = Some(self.history.len() - 1);
+            return;
+        }
+
+        self.index = Some(new_index);
+    }
 }
 
 pub fn run() {
@@ -61,6 +80,7 @@ pub fn run() {
         scope: rhai::Scope::new(),
         newline: true,
         lines: Vec::new(),
+        index: None,
         history: Vec::with_capacity(100),
     };
     {
@@ -84,6 +104,8 @@ fn update_display(context: &mut Context, driver: &mut KeyboardDriver) {
     if driver.has_new_input() {
         let mut terminal = terminal!();
 
+        update_history(&mut terminal, context, driver);
+
         for _ in 0..driver.backspaces() {
             terminal.backspace();
         }
@@ -94,6 +116,26 @@ fn update_display(context: &mut Context, driver: &mut KeyboardDriver) {
         }
 
         terminal.push_str(&new_input);
+    }
+}
+
+fn update_history(terminal: &mut Terminal, context: &mut Context, driver: &mut KeyboardDriver) {
+    let ups = driver.up_presses() as isize;
+    let downs = driver.down_presses() as isize;
+
+    if ups == 0 && downs == 0 {
+        return;
+    }
+
+    let current_index = context.index.unwrap_or(context.history.len()) as isize;
+    let new_index = current_index - (ups - downs);
+    context.set_index_clamped(new_index);
+    if let Some(index) = context.index {
+        let history_line = &context.history[index];
+        terminal.set_col(3);
+        terminal.push_str(history_line);
+        terminal.update_row();
+        driver.set_from_history(history_line);
     }
 }
 
@@ -210,6 +252,8 @@ fn update_rhai(driver: &mut KeyboardDriver, context: &mut Context) {
     if history_line.len() > 0 {
         context.history.push(history_line);
     }
+
+    context.index = None;
 
     sprintln!("Line: {}", line);
 
