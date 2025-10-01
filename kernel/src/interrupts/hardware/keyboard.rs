@@ -30,6 +30,8 @@ pub struct KeyboardDriver {
     new_chars: usize,
     backspaces: usize,
     repr: Keyboard<Us104Key, ScancodeSet1>,
+    up_presses: usize,
+    down_presses: usize,
 }
 
 impl KeyboardDriver {
@@ -40,6 +42,8 @@ impl KeyboardDriver {
             raw: ArrayVec::new_const(),
             new_chars: 0,
             backspaces: 0,
+            up_presses: 0,
+            down_presses: 0,
             repr: Keyboard::new(ScancodeSet1::new(), Us104Key, HandleControl::Ignore),
         }
     }
@@ -73,12 +77,19 @@ impl KeyboardDriver {
                     DecodedKey::RawKey(KeyCode::Return) => {
                         unsafe { self.input(b'\n') };
                     }
+                    DecodedKey::RawKey(KeyCode::ArrowUp) => {
+                        self.up_presses += 1;
+                    }
+                    DecodedKey::RawKey(KeyCode::ArrowDown) => {
+                        self.down_presses += 1;
+                    }
                     DecodedKey::Unicode(c) => {
                         if !c.is_ascii() {
                             panic!("Non-ASCII character received");
                         }
                         unsafe { self.input(c as u8) };
                     }
+
                     _ => {}
                 }
             }
@@ -107,8 +118,14 @@ impl KeyboardDriver {
         Some(line)
     }
 
+    // Clears the active line and replaces it with the given history string
+    pub fn set_from_history(&mut self, base: &str) {
+        self.line.clear();
+        self.line.extend(base.bytes());
+    }
+
     pub fn has_new_input(&self) -> bool {
-        self.new_chars > 0 || self.backspaces > 0
+        self.new_chars > 0 || self.backspaces > 0 || self.up_presses > 0 || self.down_presses > 0
     }
 
     /// Reads the new input from the keyboard buffer as a string slice. If there is no new input, returns an empty string.
@@ -126,6 +143,14 @@ impl KeyboardDriver {
 
     pub fn backspaces(&mut self) -> usize {
         mem::replace(&mut self.backspaces, 0)
+    }
+
+    pub fn up_presses(&mut self) -> usize {
+        mem::replace(&mut self.up_presses, 0)
+    }
+
+    pub fn down_presses(&mut self) -> usize {
+        mem::replace(&mut self.down_presses, 0)
     }
 }
 

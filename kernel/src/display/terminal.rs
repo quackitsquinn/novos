@@ -1,18 +1,24 @@
-use core::{f32, fmt::Write};
+use core::{
+    f32,
+    fmt::{Debug, Write},
+    mem,
+    ops::{Index, IndexMut},
+    ptr,
+};
 
 use alloc::{vec, vec::Vec};
 
 use crate::{interrupts::without_interrupts, sdbg, sprintln, terminal};
 
-use super::{color::Color, get_char, screen_char::ScreenChar, FRAMEBUFFER, TERMINAL};
+use super::{FRAMEBUFFER, TERMINAL, color::Color, get_char, screen_char::ScreenChar};
 
 const CHARACTER_BASE_SIZE: usize = 8;
 // TODO: Replace derive(Debug) with a custom implementation that doesn't print the whole buffer
 #[derive(Debug, Clone)]
 pub struct Terminal {
     // x, y -> row, column
-    front: Vec<Vec<ScreenChar>>,
-    back: Vec<Vec<ScreenChar>>,
+    front: CharacterVec,
+    back: CharacterVec,
     position: (usize, usize),
     size: (usize, usize),
     character_size: (usize, usize),
@@ -30,12 +36,12 @@ impl Terminal {
     pub fn new(scale: usize, line_spacing: usize) -> Self {
         let (term_size, glyph_size) = Self::calculate_dimensions(line_spacing, scale);
         sprintln!("Creating front buffer with size: {:?}", term_size);
-        let front = vec![vec![ScreenChar::default(); term_size.1 as usize]; term_size.0 as usize];
+        let front = vec![vec![ScreenChar::default(); term_size.0 as usize]; term_size.1 as usize];
         sprintln!("Creating back buffer with size: {:?}", term_size);
         let back = front.clone();
         Self {
-            front,
-            back,
+            front: CharacterVec(front),
+            back: CharacterVec(back),
             position: (0, 0),
             last_cursor: (0, 0),
             size: term_size,
@@ -93,7 +99,7 @@ impl Terminal {
 
         // Clear the last cursor if it exists.
         let (last_x, last_y) = self.last_cursor;
-        if self.back[last_x][last_y] == Self::BLINK_CHAR_SCREEN_CHAR {
+        if self.back[(last_x, last_y)] == Self::BLINK_CHAR_SCREEN_CHAR {
             self.set_char_at(last_x, last_y, ScreenChar::default());
         }
 
@@ -104,13 +110,13 @@ impl Terminal {
 
     #[optimize(speed)]
     fn scroll_up(&mut self) {
-        // Scroll up by one line
-        for col in &mut self.back {
-            col.remove(0);
-            col.push(ScreenChar::default())
-        }
-
         self.position.1 -= 1;
+        // Scroll up by one line
+        self.back.0.remove(0);
+        self.back
+            .0
+            .push(vec![ScreenChar::default(); self.size.0 as usize]);
+
         self.blit_update();
     }
 
@@ -120,10 +126,10 @@ impl Terminal {
             return;
         }
 
-        let (x, y) = self.advance_cursor();
-        self.back[x][y] = ScreenChar::new(c, self.current_fg, self.current_bg);
+        let pos = self.advance_cursor();
+        self.back[pos] = ScreenChar::new(c, self.current_fg, self.current_bg);
         if flush {
-            self.blit_flush_char(x, y);
+            self.blit_flush_char(pos);
         }
     }
 
@@ -133,8 +139,9 @@ impl Terminal {
     }
 
     #[inline]
+    #[optimize(speed)]
     fn flush_character(&self, pos: (usize, usize)) {
-        let c = self.front[pos.0][pos.1];
+        let c = self.front[pos];
         let (x, y) = self.offset(pos);
         let mut fb = FRAMEBUFFER.get();
         fb.draw_sprite(
@@ -147,7 +154,7 @@ impl Terminal {
         );
     }
 
-    fn force_flush(&self) {
+    pub fn force_flush(&self) {
         for y in 0..self.size.1 {
             for x in 0..self.size.0 {
                 self.flush_character((x, y));
@@ -156,23 +163,24 @@ impl Terminal {
     }
 
     #[inline]
+    #[optimize(speed)]
     fn blit_update(&mut self) {
         for x in 0..self.size.0 {
             for y in 0..self.size.1 {
-                if self.front[x][y] != self.back[x][y] {
-                    self.front[x][y] = self.back[x][y];
+                if self.front[(x, y)] != self.back[(x, y)] {
+                    self.front[(x, y)] = self.back[(x, y)];
                     self.flush_character((x, y));
                 }
             }
         }
     }
 
-    fn blit_flush_char(&mut self, x: usize, y: usize) {
-        if self.back[x][y] == self.front[x][y] {
+    fn blit_flush_char(&mut self, pos: (usize, usize)) {
+        if self.back[pos] == self.front[pos] {
             return;
         }
-        self.front[x][y] = self.back[x][y];
-        self.flush_character((x, y));
+        self.front[pos] = self.back[pos];
+        self.flush_character(pos);
     }
 
     pub fn backspace(&mut self) {
@@ -180,14 +188,15 @@ impl Terminal {
             return;
         }
 
-        self.back[self.position.0][self.position.1] = ScreenChar::default();
-        self.blit_flush_char(self.position.0, self.position.1);
+        self.back[self.position] = ScreenChar::default();
+        self.blit_flush_char(self.position);
 
         self.position.0 -= 1;
     }
 
     pub fn clear(&mut self) {
         self.back
+            .0
             .iter_mut()
             .for_each(|v| v.fill(ScreenChar::default()));
 
@@ -203,8 +212,8 @@ impl Terminal {
     }
 
     pub fn set_char_at(&mut self, x: usize, y: usize, c: ScreenChar) {
-        self.back[x][y] = c;
-        self.blit_flush_char(x, y);
+        self.back[(x, y)] = c;
+        self.blit_flush_char((x, y));
     }
 
     pub fn set_cursor(&mut self, x: usize, y: usize) {
@@ -217,7 +226,7 @@ impl Terminal {
         // Clear the last cursor if it exists.
         if (x, y) != self.last_cursor {
             let (last_x, last_y) = self.last_cursor;
-            if !(self.back[last_x][last_y] != Self::BLINK_CHAR_SCREEN_CHAR) {
+            if !(self.back[self.last_cursor] != Self::BLINK_CHAR_SCREEN_CHAR) {
                 self.set_char_at(last_x, last_y, ScreenChar::default());
             }
         }
@@ -230,12 +239,50 @@ impl Terminal {
         }
         self.set_char_at(x, y, ScreenChar::default());
     }
+
+    pub fn get_size(&self) -> (usize, usize) {
+        self.size
+    }
+
+    pub fn set_col(&mut self, col: usize) {
+        (col..self.size.0).for_each(|c| {
+            self.back[(c, self.position.1)] = ScreenChar::default();
+            self.blit_flush_char((c, self.position.1));
+        });
+        self.position.0 = col;
+    }
 }
 
 impl Write for Terminal {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
         self.push_str(s);
         Ok(())
+    }
+}
+
+/// A Vector that swaps it's indices.
+/// This struct provides a massive speedup when shifting the display up by swapping the order of x and y.
+/// This can make the code more difficult to read because of the swapped (y, x)
+#[derive(Clone)]
+struct CharacterVec(Vec<Vec<ScreenChar>>);
+
+impl Index<(usize, usize)> for CharacterVec {
+    type Output = ScreenChar;
+
+    fn index(&self, index: (usize, usize)) -> &Self::Output {
+        &self.0[index.1][index.0]
+    }
+}
+
+impl IndexMut<(usize, usize)> for CharacterVec {
+    fn index_mut(&mut self, index: (usize, usize)) -> &mut Self::Output {
+        &mut self.0[index.1][index.0]
+    }
+}
+
+impl Debug for CharacterVec {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_tuple("CharacterVec").finish()
     }
 }
 

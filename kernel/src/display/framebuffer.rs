@@ -70,6 +70,7 @@ impl Framebuffer {
     /// Draws a scaled pixel at a specific location.
     /// The origin is the top left corner.
     #[inline]
+    #[optimize(speed)]
     pub fn draw_scaled_px(&mut self, x: usize, y: usize, scale: usize, color: Color) {
         for i in 0..scale {
             for j in 0..scale {
@@ -81,6 +82,7 @@ impl Framebuffer {
     /// Draws a scaled 8xn sprite at a specific location.
     /// The origin is the top left corner.
     #[inline]
+    #[optimize(speed)]
     pub fn draw_sprite(
         &mut self,
         x: usize,

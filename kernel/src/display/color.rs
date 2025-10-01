@@ -1,3 +1,5 @@
+use core::fmt::Display;
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[repr(C)]
 pub struct Color {
@@ -22,5 +24,11 @@ impl Color {
         slice[0] = self.r;
         slice[1] = self.g;
         slice[2] = self.b;
+    }
+}
+
+impl Display for Color {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "Rgb({},{},{})", self.r, self.g, self.b)
     }
 }
