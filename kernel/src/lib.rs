@@ -19,8 +19,8 @@ use core::arch::asm;
 
 use cake::declare_module;
 
-use cake::limine::request::StackSizeRequest;
 use cake::limine::BaseRevision;
+use cake::limine::request::StackSizeRequest;
 use interrupts::hardware;
 use kserial::client::get_serial_client;
 use log::info;
@@ -44,7 +44,7 @@ mod requests;
 pub mod serial;
 pub mod testing;
 
-pub const STACK_SIZE: u64 = 1 << 17;
+pub const STACK_SIZE: u64 = 1 << 18;
 static STACK_SIZE_REQUEST: StackSizeRequest = StackSizeRequest::new().with_size(STACK_SIZE);
 
 pub static STACK_BASE: Once<u64> = Once::new();

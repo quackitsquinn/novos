@@ -8,7 +8,7 @@ use core::{
 
 use alloc::{vec, vec::Vec};
 
-use crate::{display::CURSOR_SPRITE, interrupts::without_interrupts, sdbg, sprintln, terminal};
+use crate::{interrupts::without_interrupts, sdbg, sprintln, terminal};
 
 use super::{FRAMEBUFFER, TERMINAL, color::Color, get_char, screen_char::ScreenChar};
 
@@ -23,13 +23,13 @@ pub struct Terminal {
     size: (usize, usize),
     character_size: (usize, usize),
     character_scale: usize,
-    current_fg: Color,
-    current_bg: Color,
+    pub current_fg: Color,
+    pub current_bg: Color,
     last_cursor: (usize, usize),
 }
 
 impl Terminal {
-    pub const BLINK_CHAR: char = '_';
+    pub const BLINK_CHAR: char = '█';
     pub const BLINK_CHAR_SCREEN_CHAR: ScreenChar =
         ScreenChar::new(Self::BLINK_CHAR, Color::new(230, 230, 230), Color::BLACK);
 
@@ -232,6 +232,7 @@ impl Terminal {
         // Clear the last cursor if it exists.
         if (x, y) != self.last_cursor {
             let (last_x, last_y) = self.last_cursor;
+
             if !(self.back[self.last_cursor] != Self::BLINK_CHAR_SCREEN_CHAR) {
                 self.set_char_at(last_x, last_y, ScreenChar::default());
             } else {
@@ -242,10 +243,10 @@ impl Terminal {
         self.last_cursor = (x, y);
 
         if fill {
-            self.draw_over_character((x, y), CURSOR_SPRITE, Color::new(200, 200, 200));
+            self.set_char_at(x, y, Self::BLINK_CHAR_SCREEN_CHAR);
             return;
         }
-        self.flush_character((x, y));
+        self.set_char_at(x, y, ScreenChar::default());
     }
 
     pub fn get_size(&self) -> (usize, usize) {
@@ -268,6 +269,14 @@ impl Terminal {
 
     pub fn cursor(&self) -> (usize, usize) {
         self.position
+    }
+
+    pub fn clear_line(&mut self, start: usize) {
+        for x in start..self.size.0 {
+            self.back[(x, self.position.1)] = ScreenChar::default();
+            self.blit_flush_char((x, self.position.1));
+        }
+        self.position.0 = start;
     }
 }
 

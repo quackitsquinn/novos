@@ -16,10 +16,6 @@ pub use screen_char::ScreenChar;
 
 use crate::{declare_module, requests};
 
-pub const CURSOR_SPRITE: [u8; 8] = [
-    0b00000011, 0b00000011, 0b00000011, 0b00000011, 0b00000011, 0b00000011, 0b00000011, 0b00000011,
-]; //
-
 pub static FRAMEBUFFER: OnceMutex<Framebuffer> = OnceMutex::uninitialized();
 pub static TERMINAL: OnceMutex<terminal::Terminal> = OnceMutex::uninitialized();
 

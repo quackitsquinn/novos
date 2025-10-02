@@ -34,6 +34,7 @@ pub struct KeyboardDriver {
     down_presses: usize,
     lefts: usize,
     rights: usize,
+    esc: bool,
 }
 
 impl KeyboardDriver {
@@ -49,6 +50,7 @@ impl KeyboardDriver {
             lefts: 0,
             rights: 0,
             repr: Keyboard::new(ScancodeSet1::new(), Us104Key, HandleControl::Ignore),
+            esc: false,
         }
     }
 
@@ -58,6 +60,12 @@ impl KeyboardDriver {
             self.line.pop();
             return;
         }
+
+        if chr == 0x1b {
+            self.esc = true;
+            return;
+        }
+
         if !self.line.is_full() {
             self.line.push(chr);
         }
@@ -139,8 +147,7 @@ impl KeyboardDriver {
             || self.backspaces > 0
             || self.up_presses > 0
             || self.down_presses > 0
-            || self.lefts > 0
-            || self.rights > 0
+            || self.esc
     }
 
     /// Reads the new input from the keyboard buffer as a string slice. If there is no new input, returns an empty string.
@@ -174,6 +181,10 @@ impl KeyboardDriver {
 
     pub fn rights(&mut self) -> usize {
         mem::replace(&mut self.rights, 0)
+    }
+
+    pub fn escaped(&mut self) -> bool {
+        mem::replace(&mut self.esc, false)
     }
 }
 

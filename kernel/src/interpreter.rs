@@ -1,7 +1,10 @@
 use core::{cmp::min, f32::consts::E, fmt::Display, num::TryFromIntError, str::FromStr};
 
 use alloc::{boxed::Box, format, string::String, vec::Vec};
-use cake::spin::MutexGuard;
+use cake::{
+    OnceMutex,
+    spin::{Mutex, MutexGuard},
+};
 use core::fmt::Write;
 use palette::{Hsv, IntoColor, Srgb, rgb::Rgb};
 use rhai::{Dynamic, Engine, EvalAltResult, ParseError, ParseErrorType, Position};
@@ -22,6 +25,8 @@ const WELCOME: &str = "
 Welcome to the Novos interpreter! This is a REPL (Read-Eval-Print Loop) environment that has various built-in functions
 and types you can use to interact with the system. Type 'help()' for more information.
 
+Press ESC to clear the current input line.
+
 ";
 
 const HELP: &str = "
@@ -31,38 +36,49 @@ If you want documentation for the language, visit https://rhai.rs/book/
 
 Implemented items:
 
-rgb(int r, int g, int b) -> Color: 
+rgb(r, g, b: int) -> Color: 
     Creates a new color from the given inputs. Throws a RuntimeError
     if r, g, or b > 255 || < 0
     Color has the setters set_(r, g, b) for input validation.
 
-hsv(float h, float s, float v) -> Color:
+hsv(h, s, v: float) -> Color:
     Creates a new color from the given inputs. Throws a RuntimeError
     if h is not in [0, 360) or s or v are not in [0, 1].
 
-new_screenchar(char character, Color fg, Color bg) -> ScreenChar:
+screenchar(character: char, fg, bg: Color) -> ScreenChar:
     Creates a new ScreenChar for the given character, foreground, and background.
 
-terminal() -> Terminal:
-    Returns a handle to the current terminal.
-
-Terminal.set_char_at(x: int, y: int, c: ScreenChar):
+set_char_at(x, y: int, c: ScreenChar):
     Sets a character at the given input. Will error if x/y are out of range for the terminal.
 
-Terminal.set_char_at_raw(x: int, y: int, c: char):
+set_char_at_raw(x, y: int, c: char):
     Sets a character at the given input with white foreground and black background. Will error if x/y are out of range for the terminal.
 
-Terminal.x_size() -> int:
+set_cursor(x, y: int):
+    Sets the cursor to the given position. Will error if x/y are out of range for the terminal.
+
+set_foreground(c: Color):
+    Sets the current foreground color for the terminal.
+
+set_background(c: Color):
+    Sets the current background color for the terminal.
+
+x_size() -> int:
     Returns the width of the terminal.
 
-Terminal.y_size() -> int:
+y_size() -> int:
     Returns the height of the terminal.
+
+input(prompt: string) -> string:
+    Prints the prompt and waits for user input. Returns the input string.
 ";
 
 struct Context<'a> {
-    rhai: rhai::Engine,
-    scope: rhai::Scope<'a>,
+    // Option so we can take it out to mutate it
+    rhai: Option<rhai::Engine>,
+    scope: Option<rhai::Scope<'a>>,
     newline: bool,
+    in_input: bool,
     history: Vec<String>,
     index: Option<usize>,
     lines: Vec<String>,
@@ -86,61 +102,55 @@ impl Context<'_> {
     }
 }
 
+static CONTEXT: OnceMutex<Context> = OnceMutex::uninitialized();
+
 pub fn run() {
     interrupts::enable();
     let mut context = Context {
-        rhai: create_engine(),
-        scope: rhai::Scope::new(),
+        rhai: Some(create_engine()),
+        scope: Some(rhai::Scope::new()),
         newline: true,
+        in_input: false,
         lines: Vec::new(),
         index: None,
         history: Vec::with_capacity(100),
     };
+    CONTEXT.init(context);
+
     {
         let mut terminal = terminal!();
         terminal.clear();
         terminal.push_str(WELCOME);
     }
 
-    let code = r#"let t = terminal();
-let x = t.x_size();
-let y = t.y_size();
-for x in 0..x {
-    for y in 0..y {
-        t.set_char_at(x, y, new_screenchar("O", hsv(to_float((x + y) % 359), 0.5, 0.7), rgb(0, 0, 0)));
-    }
-}"#;
-    match context.rhai.compile(code) {
-        Ok(ast) => {
-            if let Err(e) = context
-                .rhai
-                .eval_ast_with_scope::<Dynamic>(&mut context.scope, &ast)
-            {
-                println!("Error running startup code: {}", e);
-            }
-        }
-        Err(e) => {
-            println!("Error compiling startup code: {}", e);
-        }
-    }
     loop {
-        let mut keyboard = KEYBOARD.lock();
-        update_display(&mut context, &mut keyboard);
-        update_rhai(&mut keyboard, &mut context)
+        update_display();
+        update_rhai();
     }
 }
 
-fn update_display(context: &mut Context, driver: &mut KeyboardDriver) {
-    if context.newline {
+fn update_display() {
+    let mut context = CONTEXT.get();
+    let mut driver = KEYBOARD.lock();
+    if context.newline && !context.in_input {
         let mut terminal = terminal!();
-        prompt(&mut terminal, context);
+        prompt(&mut terminal, &mut *context);
         context.newline = false;
     }
+    context.in_input = false;
     if driver.has_new_input() {
         let mut terminal = terminal!();
 
-        update_history(&mut terminal, context, driver);
-        update_cursor(&mut terminal, context, driver);
+        if driver.escaped() {
+            context.lines.clear();
+            terminal.clear_line(0);
+            terminal.set_col(0);
+            prompt(&mut terminal, &mut context);
+            driver.set_from_history("");
+        }
+
+        update_history(&mut terminal, &mut *context, &mut *driver);
+        //update_cursor(&mut terminal, &mut *context, &mut *driver);
 
         for _ in 0..driver.backspaces() {
             terminal.backspace();
@@ -175,20 +185,6 @@ fn update_history(terminal: &mut Terminal, context: &mut Context, driver: &mut K
     }
 }
 
-fn update_cursor(terminal: &mut Terminal, context: &mut Context, driver: &mut KeyboardDriver) {
-    let lefts = driver.lefts() as isize;
-    let rights = driver.rights() as isize;
-
-    if lefts == 0 && rights == 0 {
-        return;
-    }
-
-    let current_col = terminal.cursor().0 as isize;
-    let new_col = current_col - (lefts + rights);
-    terminal.set_col(new_col.max(0) as usize);
-    terminal.update_row();
-}
-
 fn create_invalid_error<T: Display>(fail_value: T, expected_type: &str) -> Box<EvalAltResult> {
     return Box::new(EvalAltResult::ErrorRuntime(
         Dynamic::from_str(&format!(
@@ -212,16 +208,14 @@ fn create_engine() -> Engine {
     let mut engine = Engine::new();
 
     // Register functions, variables, etc. here
-    engine.on_print(|s| print!("{}", s));
+    engine.on_print(|s| println!("{}", s));
 
     engine.register_fn("help", help);
 
     engine.register_type::<ScreenChar>();
     engine.register_type::<Color>();
-    engine.register_type_with_name::<RhaiTerminal>("Terminal");
 
-    engine.register_fn("screenchar_new", ScreenChar::new);
-    engine.register_fn("screenchar", ScreenChar::default);
+    engine.register_fn("screenchar", ScreenChar::new);
     engine.register_fn(
         "rgb",
         |r: i64, g: i64, b: i64| -> Result<Color, Box<EvalAltResult>> {
@@ -284,13 +278,34 @@ fn create_engine() -> Engine {
     );
 
     // Terminal::*
-    engine.register_fn("terminal", || RhaiTerminal);
-    engine.register_fn("set_char_at", RhaiTerminal::set_char_at);
-    engine.register_fn("set_char_at_raw", RhaiTerminal::set_char_at_raw);
-    engine.register_fn("x_size", RhaiTerminal::x_size);
-    engine.register_fn("y_size", RhaiTerminal::y_size);
+
+    engine.register_fn("set_char_at", set_char_at);
+    engine.register_fn("set_char_at_raw", set_char_at_raw);
+    engine.register_fn("x_size", x_size);
+    engine.register_fn("y_size", y_size);
+    engine.register_fn("set_foreground", set_foreground);
+    engine.register_fn("set_background", set_background);
+    engine.register_fn("set_cursor", set_cursor);
+
+    engine.register_fn("input", rhai_read);
 
     engine
+}
+
+fn rhai_read(base: String) -> String {
+    print!("\n{}", base);
+    loop {
+        {
+            let mut driver = KEYBOARD.lock();
+            let mut ctx = CONTEXT.get();
+            if let Some(line) = driver.read_line() {
+                ctx.in_input = false;
+                return line;
+            }
+            ctx.in_input = true;
+        }
+        update_display();
+    }
 }
 
 fn color_from_hsv(h: f64, s: f64, v: f64) -> Result<Color, Box<EvalAltResult>> {
@@ -315,12 +330,15 @@ fn color_from_hsv(h: f64, s: f64, v: f64) -> Result<Color, Box<EvalAltResult>> {
     Ok(Color::new(u8_col.red, u8_col.green, u8_col.blue))
 }
 
-fn update_rhai(driver: &mut KeyboardDriver, context: &mut Context) {
+fn update_rhai() {
+    let mut driver = KEYBOARD.lock();
     let line = driver.read_line();
 
     if line.is_none() {
         return;
     }
+
+    let mut context = CONTEXT.get();
 
     let line = line.unwrap();
 
@@ -340,7 +358,12 @@ fn update_rhai(driver: &mut KeyboardDriver, context: &mut Context) {
             return;
         }
         "scope" => {
-            println!("Current scope: {}", context.scope);
+            println!("Current scope: {}", context.scope.as_ref().unwrap());
+            return;
+        }
+        "clear" => {
+            let mut terminal = terminal!();
+            terminal.clear();
             return;
         }
         _ => {}
@@ -350,7 +373,7 @@ fn update_rhai(driver: &mut KeyboardDriver, context: &mut Context) {
 
     write!(full, "\n{}", line).expect(":(");
 
-    let rhai = &mut context.rhai;
+    let rhai = context.rhai.take().unwrap();
 
     let ast = rhai.compile(&full);
 
@@ -359,6 +382,7 @@ fn update_rhai(driver: &mut KeyboardDriver, context: &mut Context) {
             ParseErrorType::UnexpectedEOF => {
                 // Need more, push to lines
                 context.lines.push(line);
+                context.rhai = Some(rhai);
                 return;
             }
             ParseErrorType::MissingToken(token, _)
@@ -366,22 +390,33 @@ fn update_rhai(driver: &mut KeyboardDriver, context: &mut Context) {
             {
                 // Need more, push to lines
                 context.lines.push(line);
+                context.rhai = Some(rhai);
                 return;
             }
 
             _ => {
                 println!("Compilation error! {}", e);
+                context.lines.clear();
             }
         }
+        context.rhai = Some(rhai);
         return;
     }
 
     let ast = ast.unwrap();
+    // In case the ast calls `rhai_input`, we need to drop the lock on the keyboard
+    drop(driver);
+    let mut scope = context.scope.take().unwrap();
+    drop(context);
 
-    let res = rhai.eval_ast_with_scope::<Dynamic>(&mut context.scope, &ast);
+    let res = rhai.eval_ast_with_scope::<Dynamic>(&mut scope, &ast);
+
+    let mut context = CONTEXT.get();
 
     if let Err(e) = res {
-        println!("Error! {}", e);
+        println!("\nError! {}", e);
+        context.rhai = Some(rhai);
+        context.scope = Some(scope);
         return;
     }
 
@@ -389,55 +424,79 @@ fn update_rhai(driver: &mut KeyboardDriver, context: &mut Context) {
     if !res.is::<()>() {
         println!("=> {}", res)
     }
+    context.lines.clear();
+    context.rhai = Some(rhai);
+    context.scope = Some(scope);
 }
 
 fn prompt(terminal: &mut Terminal, context: &mut Context) {
-    terminal.push_str(">> ");
+    if context.lines.len() == 0 {
+        terminal.push_str(">> ");
+    } else {
+        // Indent slightly for multi-line input
+        terminal.push_str("..   ");
+    }
 }
 
 fn help() {
     println!("{}", HELP);
 }
 
-#[derive(Debug, Clone)]
-struct RhaiTerminal;
-
-impl RhaiTerminal {
-    fn _lock_term() -> MutexGuard<'static, Terminal> {
-        terminal!()
+fn n(val: i64, max: usize, err: &str) -> Result<usize, Box<EvalAltResult>> {
+    if val < 0 {
+        return Err(create_invalid_error(val, "usize"));
     }
-
-    fn set_char_at(&mut self, x: i64, y: i64, c: ScreenChar) -> Result<(), Box<EvalAltResult>> {
-        let mut terminal = Self::_lock_term();
-
-        let x_usize = usize::try_from(x).map_err(|_| create_invalid_error(x, "usize"))?;
-        let y_usize = usize::try_from(y).map_err(|_| create_invalid_error(y, "usize"))?;
-
-        let term_size = terminal.get_size();
-
-        if x_usize >= term_size.0 {
-            return Err(create_invalid_error(x, "terminal x"));
-        }
-
-        if y_usize >= term_size.1 {
-            return Err(create_invalid_error(x, "terminal y"));
-        }
-
-        terminal.set_char_at(x_usize, y_usize, c);
-        Ok(())
+    let val = usize::try_from(val).map_err(|_| create_invalid_error(val, "usize"))?;
+    if val >= max {
+        return Err(create_invalid_error(val, err));
     }
+    Ok(val)
+}
 
-    fn set_char_at_raw(&mut self, x: i64, y: i64, c: char) -> Result<(), Box<EvalAltResult>> {
-        self.set_char_at(x, y, ScreenChar::new(c, Color::WHITE, Color::BLACK))
-    }
+fn set_char_at(x: i64, y: i64, c: ScreenChar) -> Result<(), Box<EvalAltResult>> {
+    let mut terminal = terminal!();
 
-    fn x_size(&mut self) -> i64 {
-        let terminal = Self::_lock_term();
-        terminal.get_size().0 as i64
-    }
+    let term_size = terminal.get_size();
 
-    fn y_size(&mut self) -> i64 {
-        let terminal = Self::_lock_term();
-        terminal.get_size().1 as i64
-    }
+    let x_usize = n(x, term_size.0, "x")?;
+    let y_usize = n(y, term_size.1, "y")?;
+
+    terminal.set_char_at(x_usize, y_usize, c);
+    Ok(())
+}
+
+fn set_cursor(x: i64, y: i64) -> Result<(), Box<EvalAltResult>> {
+    let mut terminal = terminal!();
+
+    let term_size = terminal.get_size();
+
+    let x_usize = n(x, term_size.0, "x")?;
+    let y_usize = n(y, term_size.1, "y")?;
+
+    terminal.set_cursor(x_usize, y_usize);
+    Ok(())
+}
+
+fn set_foreground(c: Color) {
+    let mut terminal = terminal!();
+    terminal.current_fg = c;
+}
+
+fn set_background(c: Color) {
+    let mut terminal = terminal!();
+    terminal.current_bg = c;
+}
+
+fn set_char_at_raw(x: i64, y: i64, c: char) -> Result<(), Box<EvalAltResult>> {
+    set_char_at(x, y, ScreenChar::new(c, Color::WHITE, Color::BLACK))
+}
+
+fn x_size() -> i64 {
+    let terminal = terminal!();
+    terminal.get_size().0 as i64
+}
+
+fn y_size() -> i64 {
+    let terminal = terminal!();
+    terminal.get_size().1 as i64
 }
