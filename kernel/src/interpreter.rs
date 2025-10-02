@@ -1,4 +1,7 @@
-use core::{cmp::min, f32::consts::E, fmt::Display, num::TryFromIntError, str::FromStr};
+use core::{
+    arch::asm, cmp::min, f32::consts::E, fmt::Display, num::TryFromIntError, str::FromStr,
+    time::Duration,
+};
 
 use alloc::{boxed::Box, format, string::String, vec::Vec};
 use cake::{
@@ -17,7 +20,10 @@ use crate::{
     framebuffer,
     interrupts::{
         self,
-        hardware::keyboard::{KEYBOARD, KeyboardDriver},
+        hardware::{
+            keyboard::{KEYBOARD, KeyboardDriver},
+            timer::Timer,
+        },
     },
     print, println, sprintln, terminal,
 };
@@ -79,8 +85,17 @@ y_size() -> int:
 input(prompt: string) -> string:
     Prints the prompt and waits for user input. Returns the input string.
 
-demo():
+help():
+    Prints this help message.
+
+demo:
     A small little visual demo.
+
+clear:
+    Clears the terminal.
+
+scope:
+    Prints the current scope.
 ";
 
 struct Context<'a> {
@@ -300,7 +315,6 @@ fn create_engine() -> Engine {
     engine.register_fn("set_cursor", set_cursor);
 
     engine.register_fn("input", rhai_read);
-    engine.register_fn("demo", demo);
 
     engine.register_fn("set_px_at", set_px_at);
     engine.register_fn("draw_scaled_px", draw_scaled_px);
@@ -308,7 +322,7 @@ fn create_engine() -> Engine {
     engine
 }
 
-fn rhai_read(base: String) -> String {
+fn rhai_read(base: &str) -> String {
     print!("\n{}", base);
     loop {
         {
@@ -380,6 +394,12 @@ fn update_rhai() {
         "clear" => {
             let mut terminal = terminal!();
             terminal.clear();
+            return;
+        }
+        "demo" => {
+            drop(driver);
+            drop(context);
+            demo();
             return;
         }
         _ => {}
@@ -553,7 +573,9 @@ fn draw_scaled_px(x: i64, y: i64, scale: i64, c: Color) -> Result<(), Box<EvalAl
     Ok(())
 }
 
+// It does feel a little bit like cheating to just write the demo in Rust, but you can very much do this in Rhai too.
 fn demo() {
+    demo_text_chain();
     let term = terminal!();
     let mut fb = framebuffer!();
     let (x_size, y_size) = fb.size();
@@ -581,7 +603,70 @@ fn demo() {
     drop(fb);
     term.force_flush();
     drop(term);
-    println!("Cool, right?");
+    println!(
+        "Cool, right? If you want to see it again, just type 'demo'! If you want documentation, type 'help()'."
+    );
+}
+
+fn timer_wait(secs: f32) {
+    let timer = Timer::new(Duration::from_secs_f32(secs));
+    while !timer.is_done() {
+        unsafe { asm!("hlt") };
+    }
+}
+
+fn demo_text_chain() {
+    const WAIT: f32 = 3.0;
+    println!("\nHi! What's your name?");
+    let name = rhai_read("Name: ");
+    println!("\nHello, {}!", name);
+    let ctx = CONTEXT.get();
+    timer_wait(WAIT / 2.0);
+    println!("Theres all sorts of stuff you can do here.");
+    timer_wait(WAIT / 2.0);
+    println!("For example, you can do math:\n");
+    println!(
+        "2 + 2 = {}\n",
+        ctx.rhai.as_ref().unwrap().eval::<i64>("2 + 2").unwrap()
+    );
+    timer_wait(WAIT);
+    println!("You can create variables:\n");
+    println!(
+        "let x = 5; x * x = {}\n",
+        ctx.rhai
+            .as_ref()
+            .unwrap()
+            .eval::<i64>("let x = 5; x * x")
+            .unwrap()
+    );
+    timer_wait(WAIT);
+    println!("You can use logic:\n");
+    println!(
+        "if 1 < 2 {{ 3 }} else {{ 4 }} = {}\n",
+        ctx.rhai
+            .as_ref()
+            .unwrap()
+            .eval::<i64>("if 1 < 2 { 3 } else { 4 }")
+            .unwrap()
+    );
+    timer_wait(WAIT);
+    println!("You can define functions:\n");
+    println!(
+        "fn add(a, b) {{ a + b }}; add(3, 4) = {}\n",
+        ctx.rhai
+            .as_ref()
+            .unwrap()
+            .eval::<i64>("fn add(a, b) { a + b }; add(3, 4)")
+            .unwrap()
+    );
+    println!(
+        "You can even write to the screen directly! Tying everything together can get you something like this!\n"
+    );
+    timer_wait(WAIT);
+    println!("Watch this...");
+    timer_wait(WAIT);
+    println!("Go!");
+    drop(ctx);
 }
 
 fn rand() -> usize {
