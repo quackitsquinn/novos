@@ -1,6 +1,7 @@
 use core::{arch::asm, fmt::Write};
 
 use kelp::goblin::elf64::sym;
+use log::error;
 use rustc_demangle::demangle;
 
 use crate::{print, println, requests::KERNEL_ELF};
@@ -34,6 +35,29 @@ pub fn print_trace_raw(rbp: *const StackFrame) {
 
 pub unsafe fn symbol_trace(addr: *const ()) {
     print!("{}", fmt_symbol(addr));
+}
+
+pub fn get_symbol_name(addr: usize) -> Option<&'static str> {
+    let addr = addr as *const ();
+    let elf = unsafe { KERNEL_ELF.get().elf_unchecked() };
+    let strings = elf.strings().expect("Failed to get kernel strings");
+    let mut symbols = elf.symbols().expect("Failed to get kernel symbols");
+
+    let sym = symbols.find(|sym| {
+        let sym_addr = sym.st_value as *const ();
+        sym_addr <= addr
+            && addr < (sym.st_value as usize + sym.st_size as usize) as *mut ()
+            && sym::st_type(sym.st_info) == sym::STT_FUNC
+    })?;
+
+    let name = unsafe { strings.get_str(sym.st_name as usize) };
+
+    if let Err(err) = name {
+        error!("Unable to get symbol name: {:?}", err);
+        return None;
+    }
+    let name = name.unwrap();
+    Some(name)
 }
 
 unsafe fn sym_trace_inner(addr: *const (), writer: &mut dyn Write) {
@@ -102,4 +126,17 @@ pub fn get_caller_rip() -> *const () {
     let last_frame = frame.rbp;
     let frame = unsafe { *last_frame };
     frame.rip
+}
+
+pub fn get_caller_rip_2_up() -> usize {
+    let mut rbp: *const StackFrame;
+    unsafe {
+        asm!("mov {}, rbp", out(reg) rbp);
+    }
+    let frame = unsafe { *rbp };
+    let last_frame = frame.rbp;
+    let frame = unsafe { *last_frame };
+    let last_frame = frame.rbp;
+    let frame = unsafe { *last_frame };
+    frame.rip as usize
 }

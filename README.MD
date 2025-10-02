@@ -1,9 +1,39 @@
 # novos: A little kernel written in rust. (so I can learn osdev)
 
+The kernel currently boots to a Rhai REPL which you can use to run scripts. Rhai is a small embedded scripting language written in rust. You can read more about it [here](https://rhai.rs/book/). There is also the following APIs available in the interpreter:
+
+`rgb(r, g, b: int) -> Color`: reates a new color from the given inputs. Throws a RuntimeError if r, g, or b are not in the valid range ([0, 255])
+
+`hsv(h, s, v: float) -> Color`: Creates a new color from the given inputs. Throws a RuntimeError if h is not in [0, 360) or s or v are not in [0, 1].
+
+`screenchar(character: char, fg, bg: Color) -> ScreenChar`: Creates a new ScreenChar for the given character, foreground, and background.
+
+`set_char_at(x, y: int, c: ScreenChar)`: Sets a character at the given input. Will error if x/y are out of range for the terminal.
+
+`set_char_at_raw(x, y: int, c: char)`: Sets a character at the given input with white foreground and black background. Will error if x/y are out of range for the terminal.
+
+`set_px_at(x, y: int, c: Color)`: Sets a pixel at the given input. Will error if x/y are out of range for the framebuffer.
+
+`draw_scaled_px(x, y: int, scale: int, c: Color)`: Draws a square of size scale x scale at the given input. Will error if x/y are out of range for the framebuffer.
+
+`set_cursor(x, y: int)`: Sets the cursor to the given position. Will error if x/y are out of range for the terminal.
+
+`set_foreground(c: Color)`: Sets the current foreground color for the terminal.
+
+`set_background(c: Color)`: Sets the current background color for the terminal.
+
+`x_size() -> int`: Returns the width of the terminal.
+
+`y_size() -> int`: Returns the height of the terminal.
+
+`input(prompt: string) -> string`: Prints the prompt and waits for user input. Returns the input string.
+
+`demo()`:  A small little visual demo.
+
 
 ## Running the kernel
 
-To run the kernel, you need to have the following dependencies installed:
+To build/run the kernel, you need to have the following dependencies installed:
 
 - `qemu`
 - `xorriso`

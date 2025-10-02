@@ -14,6 +14,7 @@ use crate::{
         Color, ScreenChar,
         terminal::{self, Terminal},
     },
+    framebuffer,
     interrupts::{
         self,
         hardware::keyboard::{KEYBOARD, KeyboardDriver},
@@ -63,6 +64,12 @@ set_foreground(c: Color):
 set_background(c: Color):
     Sets the current background color for the terminal.
 
+set_px_at(x, y: int, c: Color):
+    Sets a pixel at the given input. Will error if x/y are out of range for the framebuffer.
+
+draw_scaled_px(x, y: int, scale: int, c: Color):
+    Draws a square of size scale x scale at the given input. Will error if x/y are out of range for the framebuffer.
+
 x_size() -> int:
     Returns the width of the terminal.
 
@@ -71,6 +78,9 @@ y_size() -> int:
 
 input(prompt: string) -> string:
     Prints the prompt and waits for user input. Returns the input string.
+
+demo():
+    A small little visual demo.
 ";
 
 struct Context<'a> {
@@ -82,6 +92,7 @@ struct Context<'a> {
     history: Vec<String>,
     index: Option<usize>,
     lines: Vec<String>,
+    unclosed_braces: usize,
 }
 
 impl Context<'_> {
@@ -113,6 +124,7 @@ pub fn run() {
         in_input: false,
         lines: Vec::new(),
         index: None,
+        unclosed_braces: 0,
         history: Vec::with_capacity(100),
     };
     CONTEXT.init(context);
@@ -288,6 +300,10 @@ fn create_engine() -> Engine {
     engine.register_fn("set_cursor", set_cursor);
 
     engine.register_fn("input", rhai_read);
+    engine.register_fn("demo", demo);
+
+    engine.register_fn("set_px_at", set_px_at);
+    engine.register_fn("draw_scaled_px", draw_scaled_px);
 
     engine
 }
@@ -354,11 +370,11 @@ fn update_rhai() {
 
     match line.trim() {
         "help" => {
-            println!("Type help() for help!");
+            println!("\nType help() for help!");
             return;
         }
         "scope" => {
-            println!("Current scope: {}", context.scope.as_ref().unwrap());
+            println!("\nCurrent scope: {}", context.scope.as_ref().unwrap());
             return;
         }
         "clear" => {
@@ -376,6 +392,11 @@ fn update_rhai() {
     let rhai = context.rhai.take().unwrap();
 
     let ast = rhai.compile(&full);
+
+    context.unclosed_braces = full
+        .matches('{')
+        .count()
+        .saturating_sub(full.matches('}').count());
 
     if let Err(e) = ast {
         match e.err_type() {
@@ -434,7 +455,10 @@ fn prompt(terminal: &mut Terminal, context: &mut Context) {
         terminal.push_str(">> ");
     } else {
         // Indent slightly for multi-line input
-        terminal.push_str("..   ");
+        terminal.push_str(".. ");
+        for _ in 0..context.unclosed_braces {
+            terminal.push_str("  ");
+        }
     }
 }
 
@@ -499,4 +523,74 @@ fn x_size() -> i64 {
 fn y_size() -> i64 {
     let terminal = terminal!();
     terminal.get_size().1 as i64
+}
+
+fn set_px_at(x: i64, y: i64, c: Color) -> Result<(), Box<EvalAltResult>> {
+    let _terminal = terminal!();
+    let mut fb = framebuffer!();
+    let (x_size, y_size) = fb.size();
+
+    let x_usize = n(x, x_size, "x")?;
+    let y_usize = n(y, y_size, "y")?;
+
+    fb.set_px(x_usize, y_usize, c);
+    Ok(())
+}
+
+fn draw_scaled_px(x: i64, y: i64, scale: i64, c: Color) -> Result<(), Box<EvalAltResult>> {
+    if scale <= 0 {
+        return Err(create_invalid_error(scale, "scale > 0"));
+    }
+    let _terminal = terminal!();
+    let mut fb = framebuffer!();
+    let (x_size, y_size) = fb.size();
+
+    let x_usize = n(x, x_size - (scale as usize * 2), "x")?;
+    let y_usize = n(y, y_size - (scale as usize * 2), "y")?;
+    let scale = n(scale, min(x_size, y_size), "scale")?;
+
+    fb.draw_scaled_px(x_usize, y_usize, scale, c);
+    Ok(())
+}
+
+fn demo() {
+    let term = terminal!();
+    let mut fb = framebuffer!();
+    let (x_size, y_size) = fb.size();
+    for x in 0..x_size {
+        for y in 0..y_size / 2 {
+            let rx = (rand() % (x_size - 6));
+            let ry = (rand() % (y_size - 6));
+            let hue = ((rx + ry + x) % 361) as f32;
+            let col: Rgb = Hsv::new(hue, 1.0, 1.0).into_color();
+            let u8_col = col.into_format::<u8>();
+            fb.draw_scaled_px(rx, ry, 4, Color::new(u8_col.red, u8_col.green, u8_col.blue));
+        }
+    }
+    for x in 0..x_size {
+        for y in 0..y_size / 2 {
+            let rx = (rand() % (x_size - 6));
+            let ry = (rand() % (y_size - 6));
+            let hue = ((rx + ry + x_size + x) % 361) as f32;
+            let col: Rgb = Hsv::new(hue, 1.0, 1.0 - (x as f32 / x_size as f32)).into_color();
+            let u8_col = col.into_format::<u8>();
+            fb.draw_scaled_px(rx, ry, 4, Color::new(u8_col.red, u8_col.green, u8_col.blue));
+        }
+    }
+    fb.clear();
+    drop(fb);
+    term.force_flush();
+    drop(term);
+    println!("Cool, right?");
+}
+
+fn rand() -> usize {
+    // A very simple xorshift rng
+    static mut STATE: u32 = 0x12345678;
+    unsafe {
+        STATE ^= STATE << 13;
+        STATE ^= STATE >> 17;
+        STATE ^= STATE << 5;
+        STATE as usize
+    }
 }

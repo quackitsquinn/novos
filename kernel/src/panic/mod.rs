@@ -1,4 +1,4 @@
-use core::{convert::Infallible, fmt::Write, panic::PanicInfo};
+use core::{convert::Infallible, fmt::Write, panic::PanicInfo, slice};
 
 use spin::Once;
 
@@ -84,5 +84,7 @@ declare_module!("panic", init);
 
 fn init() -> Result<(), Infallible> {
     // Nothing to initialize yet, but keeping this here in case we need it later
+    cake::set_caller_instruction_pointer_fn(stacktrace::get_caller_rip_2_up);
+    cake::set_caller_instruction_pointer_name_resolver(stacktrace::get_symbol_name);
     Ok(())
 }
