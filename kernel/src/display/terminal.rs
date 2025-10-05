@@ -1,4 +1,10 @@
-use core::{f32, fmt::Write};
+use core::{
+    f32,
+    fmt::{Debug, Write},
+    mem,
+    ops::{Index, IndexMut},
+    ptr,
+};
 
 use alloc::{vec, vec::Vec};
 
@@ -7,18 +13,17 @@ use crate::{interrupts::without_interrupts, sprintln, terminal};
 use super::{color::Color, get_char, screen_char::ScreenChar, FRAMEBUFFER, TERMINAL};
 
 const CHARACTER_BASE_SIZE: usize = 8;
-// TODO: Replace derive(Debug) with a custom implementation that doesn't print the whole buffer
 #[derive(Debug, Clone)]
 pub struct Terminal {
     // x, y -> row, column
-    front: Vec<Vec<ScreenChar>>,
-    back: Vec<Vec<ScreenChar>>,
-    position: (usize, usize),
+    front: CharacterVec,
+    back: CharacterVec,
+    cursor: (usize, usize),
     size: (usize, usize),
     character_size: (usize, usize),
     character_scale: usize,
-    current_fg: Color,
-    current_bg: Color,
+    pub current_fg: Color,
+    pub current_bg: Color,
 }
 
 impl Terminal {
@@ -29,9 +34,9 @@ impl Terminal {
         sprintln!("Creating back buffer with size: {:?}", term_size);
         let back = front.clone();
         Self {
-            front,
-            back,
-            position: (0, 0),
+            front: CharacterVec(front),
+            back: CharacterVec(back),
+            cursor: (0, 0),
             size: term_size,
             character_size: glyph_size,
             character_scale: scale,
@@ -59,30 +64,32 @@ impl Terminal {
     }
 
     fn advance_cursor(&mut self) -> (usize, usize) {
-        self.position.0 += 1;
-        if self.position.0 >= self.size.0 {
+        if self.cursor.0 >= self.size.0 - 1 {
             self.newline();
+            return self.cursor;
         }
-        self.position
+        self.cursor.0 += 1;
+        self.cursor
     }
 
     fn newline(&mut self) {
-        self.position.0 = 0;
-        self.position.1 += 1;
-        if self.position.1 >= self.size.1 {
+        self.cursor.0 = 0;
+        self.cursor.1 += 1;
+
+        if self.cursor.1 >= self.size.1 {
             self.scroll_up();
         }
     }
 
     fn scroll_up(&mut self) {
-        // Copy the screen to the back buffer
-        self.back.clone_from_slice(&self.front);
+        self.cursor.1 -= 1;
         // Scroll up by one line
-        self.front.remove(0);
-        self.front
+        self.back.0.remove(0);
+        self.back
+            .0
             .push(vec![ScreenChar::default(); self.size.0 as usize]);
-        self.position.1 -= 1;
-        self.blit_update();
+
+        self.flush();
     }
 
     pub fn push_char(&mut self, c: char, flush: bool) {
@@ -91,10 +98,10 @@ impl Terminal {
             return;
         }
 
-        let (x, y) = self.advance_cursor();
-        self.front[y][x] = ScreenChar::new(c, self.current_fg, self.current_bg);
+        let pos = self.advance_cursor();
+        self.back[pos] = ScreenChar::new(c, self.current_fg, self.current_bg);
         if flush {
-            self.flush_character((x, y));
+            self.flush_char(pos);
         }
     }
 
@@ -105,30 +112,66 @@ impl Terminal {
 
     #[inline]
     fn flush_character(&self, pos: (usize, usize)) {
-        let c = self.front[pos.1][pos.0];
+        let c = self.front[pos];
         let (x, y) = self.offset(pos);
         let mut fb = FRAMEBUFFER.get();
         fb.draw_sprite(
             x,
             y,
             self.character_scale,
-            &get_char(c.character()),
-            c.foreground(),
-            c.background(),
+            &get_char(c.character),
+            c.foreground,
+            c.background,
         );
     }
 
-    #[inline]
-    fn blit_update(&self) {
+    pub fn force_flush(&self) {
         for y in 0..self.size.1 {
-            let front = &self.front[y];
-            let back = &self.back[y];
             for x in 0..self.size.0 {
-                if front[x] != back[x] {
+                self.flush_character((x, y));
+            }
+        }
+    }
+
+    #[inline]
+    fn flush(&mut self) {
+        for x in 0..self.size.0 {
+            for y in 0..self.size.1 {
+                if self.front[(x, y)] != self.back[(x, y)] {
+                    self.front[(x, y)] = self.back[(x, y)];
                     self.flush_character((x, y));
                 }
             }
         }
+    }
+
+    fn flush_char(&mut self, pos: (usize, usize)) {
+        if self.back[pos] == self.front[pos] {
+            return;
+        }
+        self.front[pos] = self.back[pos];
+        self.flush_character(pos);
+    }
+
+    pub fn backspace(&mut self) {
+        if self.cursor.0 == 0 {
+            return;
+        }
+
+        self.back[self.cursor] = ScreenChar::default();
+        self.flush_char(self.cursor);
+
+        self.cursor.0 -= 1;
+    }
+
+    pub fn clear(&mut self) {
+        self.back
+            .0
+            .iter_mut()
+            .for_each(|v| v.fill(ScreenChar::default()));
+
+        self.flush();
+        self.cursor = (0, 0);
     }
 
     pub fn push_str(&mut self, s: &str) {
@@ -137,12 +180,52 @@ impl Terminal {
             self.push_char(c, true);
         }
     }
+
+    pub fn set_col(&mut self, col: usize) {
+        (col..self.size.0).for_each(|c| {
+            self.back[(c, self.cursor.1)] = ScreenChar::default();
+            self.flush_char((c, self.cursor.1));
+        });
+        self.cursor.0 = col;
+    }
+
+    pub fn update_row(&mut self) {
+        for x in 0..self.size.0 {
+            self.flush_char((x, self.cursor.1));
+        }
+    }
 }
 
 impl Write for Terminal {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
         self.push_str(s);
         Ok(())
+    }
+}
+
+/// A Vector that swaps it's indices.
+/// This struct provides a massive speedup when shifting the display up by swapping the order of x and y.
+/// This can make the code more difficult to read because of the swapped (y, x)
+#[derive(Clone)]
+struct CharacterVec(Vec<Vec<ScreenChar>>);
+
+impl Index<(usize, usize)> for CharacterVec {
+    type Output = ScreenChar;
+
+    fn index(&self, index: (usize, usize)) -> &Self::Output {
+        &self.0[index.1][index.0]
+    }
+}
+
+impl IndexMut<(usize, usize)> for CharacterVec {
+    fn index_mut(&mut self, index: (usize, usize)) -> &mut Self::Output {
+        &mut self.0[index.1][index.0]
+    }
+}
+
+impl Debug for CharacterVec {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_tuple("CharacterVec").finish()
     }
 }
 
