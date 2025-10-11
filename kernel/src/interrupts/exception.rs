@@ -7,7 +7,7 @@ use crate::{
 };
 
 #[inline(never)]
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn exception_brk() {}
 
 pub fn general_handler(ctx: InterruptContext, _: u8, name: &'static str) {

@@ -1,3 +1,5 @@
+//! A standard RGB color.
+
 /// A standard RGB color.
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[repr(C)]

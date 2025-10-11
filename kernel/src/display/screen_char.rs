@@ -1,4 +1,6 @@
+//! A character on the screen, including its foreground and background colors.
 use super::color::Color;
+/// A character on the screen, including its foreground and background colors.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ScreenChar {
     /// The character to display.
@@ -10,10 +12,6 @@ pub struct ScreenChar {
 }
 
 impl ScreenChar {
-    /// An empty character (null character).
-    /// This is used to represent an uninitialized character in the terminal buffer.
-    pub const EMPTY_CHARACTER: char = '\0';
-
     /// Create a new screen character.
     pub const fn new(character: char, fg: Color, bg: Color) -> Self {
         Self {

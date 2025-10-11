@@ -1,18 +1,19 @@
+//! Terminal module for handling text output to the screen.
 use core::{
     f32,
     fmt::{Debug, Write},
-    mem,
     ops::{Index, IndexMut},
-    ptr,
 };
 
 use alloc::{vec, vec::Vec};
 
-use crate::{interrupts::without_interrupts, sprintln, terminal};
+use crate::{interrupts::without_interrupts, sprintln};
 
-use super::{color::Color, get_char, screen_char::ScreenChar, FRAMEBUFFER, TERMINAL};
+use super::{FRAMEBUFFER, TERMINAL, color::Color, get_char, screen_char::ScreenChar};
 
 const CHARACTER_BASE_SIZE: usize = 8;
+
+/// A terminal for displaying text.
 #[derive(Debug, Clone)]
 pub struct Terminal {
     // x, y -> row, column
@@ -22,12 +23,14 @@ pub struct Terminal {
     size: (usize, usize),
     character_size: (usize, usize),
     character_scale: usize,
+    /// The current foreground color.
     pub current_fg: Color,
+    /// The current background color.
     pub current_bg: Color,
 }
 
 impl Terminal {
-    pub fn new(scale: usize, line_spacing: usize) -> Self {
+    pub(super) fn new(scale: usize, line_spacing: usize) -> Self {
         let (term_size, glyph_size) = Self::calculate_dimensions(line_spacing, scale);
         sprintln!("Creating front buffer with size: {:?}", term_size);
         let front = vec![vec![ScreenChar::default(); term_size.0 as usize]; term_size.1 as usize];
@@ -92,6 +95,7 @@ impl Terminal {
         self.flush();
     }
 
+    /// Push a character to the terminal.
     pub fn push_char(&mut self, c: char, flush: bool) {
         if c == '\n' {
             self.newline();
@@ -111,7 +115,7 @@ impl Terminal {
     }
 
     #[inline]
-    fn flush_character(&self, pos: (usize, usize)) {
+    fn draw_character(&self, pos: (usize, usize)) {
         let c = self.front[pos];
         let (x, y) = self.offset(pos);
         let mut fb = FRAMEBUFFER.get();
@@ -125,21 +129,23 @@ impl Terminal {
         );
     }
 
+    /// Flushes the whole screen, ignoring any optimizations.
     pub fn force_flush(&self) {
         for y in 0..self.size.1 {
             for x in 0..self.size.0 {
-                self.flush_character((x, y));
+                self.draw_character((x, y));
             }
         }
     }
 
+    /// Flushes the whole screen, only updating changed characters.
     #[inline]
-    fn flush(&mut self) {
+    pub fn flush(&mut self) {
         for x in 0..self.size.0 {
             for y in 0..self.size.1 {
                 if self.front[(x, y)] != self.back[(x, y)] {
                     self.front[(x, y)] = self.back[(x, y)];
-                    self.flush_character((x, y));
+                    self.draw_character((x, y));
                 }
             }
         }
@@ -150,9 +156,10 @@ impl Terminal {
             return;
         }
         self.front[pos] = self.back[pos];
-        self.flush_character(pos);
+        self.draw_character(pos);
     }
 
+    /// Removes the last character from the terminal.
     pub fn backspace(&mut self) {
         if self.cursor.0 == 0 {
             return;
@@ -164,6 +171,7 @@ impl Terminal {
         self.cursor.0 -= 1;
     }
 
+    /// Clears the terminal.
     pub fn clear(&mut self) {
         self.back
             .0
@@ -174,6 +182,7 @@ impl Terminal {
         self.cursor = (0, 0);
     }
 
+    /// Push a string to the terminal.
     pub fn push_str(&mut self, s: &str) {
         //sprintln!("Pushing string: {}", s);
         for c in s.chars() {
@@ -181,6 +190,7 @@ impl Terminal {
         }
     }
 
+    /// Sets the current column.
     pub fn set_col(&mut self, col: usize) {
         (col..self.size.0).for_each(|c| {
             self.back[(c, self.cursor.1)] = ScreenChar::default();
@@ -189,6 +199,7 @@ impl Terminal {
         self.cursor.0 = col;
     }
 
+    /// Updates the current row.
     pub fn update_row(&mut self) {
         for x in 0..self.size.0 {
             self.flush_char((x, self.cursor.1));
@@ -229,24 +240,26 @@ impl Debug for CharacterVec {
     }
 }
 
-// TODO: This whole section should be refactored
-
 #[doc(hidden)]
 pub fn _print(args: core::fmt::Arguments) {
     use core::fmt::Write;
     without_interrupts(|| {
         crate::serial::interface::_print(args);
-        if super::is_initialized() && !TERMINAL.is_locked() {
-            write!(*terminal!(), "{}", args).unwrap();
+        if super::is_initialized()
+            && let Some(mut terminal) = TERMINAL.try_get()
+        {
+            write!(*terminal, "{}", args).unwrap();
         }
     });
 }
 
+/// Prints to the terminal. Same functionality as the standard print! macro.
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => ($crate::display::terminal::_print(format_args!($($arg)*)));
 }
 
+/// Prints to the terminal, appending a newline.
 #[macro_export]
 macro_rules! println {
     () => ($crate::print!("\n"));
@@ -254,7 +267,7 @@ macro_rules! println {
     ($fmt:expr, $($arg:tt)*) => ($crate::print!(concat!($fmt, "\n"), $($arg)*));
 }
 
-// Port of the std dbg! macro, but it works in a no_std environment.
+/// Prints the given value and its source location then returns the value.
 #[macro_export]
 macro_rules! dbg {
     () => {

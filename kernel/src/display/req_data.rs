@@ -1,18 +1,25 @@
+//! Persistent framebuffer information.
 use core::fmt::Debug;
 
 use cake::spin::Mutex;
 use cake::{limine::response::FramebufferResponse, LimineData};
 
+/// Information about the framebuffer.
 #[derive(Debug)]
 pub struct FramebufferInfo {
+    /// The width of the framebuffer.
     pub width: u64,
+    /// The height of the framebuffer.
     pub height: u64,
+    /// The pitch (e.g. the number of bytes in a row) of the framebuffer.
     pub pitch: u64,
+    /// The number of **bits** (*not bytes*) per pixel.
     pub bpp: u16,
     ptr: Mutex<(bool, *mut u8)>,
 }
 
 impl FramebufferInfo {
+    /// Creates a new `FramebufferInfo` from the given Limine framebuffer response.
     pub fn new(resp: LimineData<'_, FramebufferResponse>) -> Self {
         let framebuffer = resp.framebuffers().nth(0).expect("No framebuffer found");
         Self {
@@ -24,6 +31,7 @@ impl FramebufferInfo {
         }
     }
 
+    /// Update the inner pointer with a new value.
     pub unsafe fn update_ptr(&self, ptr: *mut u8) {
         *self.ptr.lock() = (true, ptr);
     }

@@ -7,14 +7,16 @@ mod character;
 pub mod color;
 mod framebuffer;
 pub mod req_data;
-mod screen_char;
+pub mod screen_char;
 pub mod terminal;
 
 pub use character::get_char;
 
 use crate::{declare_module, requests};
 
+/// The global framebuffer instance.
 pub static FRAMEBUFFER: OnceMutex<Framebuffer> = OnceMutex::uninitialized();
+/// The global terminal instance.
 pub static TERMINAL: OnceMutex<terminal::Terminal> = OnceMutex::uninitialized();
 
 declare_module!("display", init);
@@ -25,7 +27,7 @@ fn init() -> Result<(), Infallible> {
     Ok(())
 }
 
-// Gets the global terminal instance.
+/// Gets the global terminal instance.
 #[macro_export]
 macro_rules! terminal {
     () => {
@@ -33,7 +35,7 @@ macro_rules! terminal {
     };
 }
 
-// Gets the global framebuffer instance.
+/// Gets the global framebuffer instance.
 #[macro_export]
 macro_rules! framebuffer {
     () => {
