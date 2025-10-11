@@ -14,8 +14,7 @@ lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 log = "0.4.22"
 pic8259 = "0.11.0"
 spin = "0.9.8"
-# HACK: This is unused but for some ungodly reason it makes rust-analyzer fail silently on non x86_64 targets.
-# I will file an issue with rust-analyzer about this later, when it's not what i depend on.
+uart_16550 = "0.4.0"
 uart_16550 = "0.3.1"
 x86_64 = "0.15.2"
 kproc = { path = "../kproc" }

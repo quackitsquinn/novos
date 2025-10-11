@@ -1,0 +1,3 @@
+{
+    "rust-analyzer.check.overrideCommand": ["python3","./tools/smart_check.py"],
+}
