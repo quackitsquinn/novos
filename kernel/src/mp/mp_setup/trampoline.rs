@@ -8,7 +8,7 @@ use core::{
 use x86_64::registers::control::{Cr3, Cr3Flags};
 
 use cake::{limine::mp::Cpu, spin::RwLock};
-use log::info;
+use cake::log::info;
 
 use crate::{
     interrupts::IDT,

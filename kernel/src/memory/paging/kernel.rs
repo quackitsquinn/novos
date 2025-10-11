@@ -4,7 +4,7 @@ use core::convert::Infallible;
 
 use cake::{spin::Once, terminate_requests};
 use kelp::goblin::elf64::program_header::ProgramHeader;
-use log::{debug, info, trace};
+use cake::log::{debug, info, trace};
 use x86_64::{
     registers::control::{Cr3, Cr3Flags},
     structures::paging::{

@@ -19,10 +19,10 @@ use core::arch::asm;
 use cake::declare_module;
 
 use cake::limine::BaseRevision;
+use cake::log::info;
+use cake::spin::Once;
 use interrupts::hardware;
 use kserial::client::get_serial_client;
-use log::info;
-use spin::Once;
 
 use crate::mp::mp_setup;
 

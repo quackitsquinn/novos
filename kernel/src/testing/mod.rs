@@ -1,6 +1,6 @@
 use core::mem::transmute;
 
-use spin::{Mutex, RwLock};
+use cake::spin::{Mutex, RwLock};
 
 use crate::sprintln;
 

@@ -521,10 +521,9 @@ checksum = "17ab85f84ca42c5ec520e6f3c9966ba1fd62909ce260f8837e248857d2560509"
 name = "kalloc"
 version = "0.1.0"
 dependencies = [
+ "cake",
  "ctor",
  "env_logger",
- "log",
- "spin 0.9.8",
 ]
 
 [[package]]
@@ -552,13 +551,11 @@ dependencies = [
  "kproc",
  "kserial",
  "lazy_static",
- "log",
  "modular-bitfield",
  "paste",
  "pic8259",
  "raw-cpuid 11.6.0",
  "rustc-demangle",
- "spin 0.9.8",
  "thiserror",
  "uart_16550",
  "x86_64",
@@ -1200,9 +1197,9 @@ checksum = "1dccffe3ce07af9386bfd29e80c0ab1a8205a2fc34e4bcd40364df902cfa8f3f"
 
 [[package]]
 name = "uart_16550"
-version = "0.3.1"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4922792855b1bce30997fbaa5418597902c278a92d20dfe348e6f062c3bd861d"
+checksum = "94d293f51425981fdb1b766beae254dbb711a17e8c4b549dc69b9b7ee0d478d5"
 dependencies = [
  "bitflags 2.9.0",
  "rustversion",

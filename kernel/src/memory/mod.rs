@@ -1,6 +1,6 @@
 use core::convert::Infallible;
 
-use log::info;
+use cake::log::info;
 use paging::map::{KERNEL_HEAP_SIZE, KERNEL_HEAP_START};
 use x86_64::{
     structures::paging::{page::PageRangeInclusive, Page, PageTableFlags},

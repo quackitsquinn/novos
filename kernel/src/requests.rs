@@ -1,8 +1,7 @@
 use core::convert::Infallible;
 
 use cake::limine::{paging::Mode, request::*, response::ExecutableAddressResponse};
-use cake::LimineRequest;
-use spin::Once;
+use cake::{spin::Once, LimineRequest};
 
 use crate::{
     declare_module,

@@ -4,8 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-log = "0.4.26"
-spin = "0.9.8"
+cake = { path = "../cake" }
 
 [profile.test]
 debug = true

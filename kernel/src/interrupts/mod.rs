@@ -1,6 +1,6 @@
 use core::{convert::Infallible, mem};
 
-use spin::{Mutex, MutexGuard, Once};
+use cake::spin::{Mutex, MutexGuard, Once};
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
 
 mod exception;

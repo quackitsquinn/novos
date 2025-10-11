@@ -18,7 +18,7 @@ pub mod locked_vec;
 pub mod mut_alloc;
 
 pub use alloc_wrap::GlobalAllocatorWrapper;
-use spin::Once;
+use cake::spin::Once;
 
 pub(crate) static ALLOC_LOG: AtomicBool = AtomicBool::new(false);
 pub(crate) static FRAME_OUTPUT_FN: Once<fn(&[u8])> = Once::new();

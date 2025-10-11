@@ -4,6 +4,7 @@
 
 use core::convert::Infallible;
 
+use cake::log::{self, Level, Log, Metadata, Record};
 use kproc::log_filter;
 
 use crate::{declare_module, mp, println};
@@ -11,16 +12,16 @@ use crate::{declare_module, mp, println};
 pub mod interface;
 pub mod raw; // Things to interact with the serial port directly
 
-pub const LOG_LEVEL: log::Level = log::Level::Trace;
+pub const LOG_LEVEL: Level = Level::Trace;
 pub const SERIAL_PORT_NUM: u16 = 0x3F8;
 struct SerialLog;
 
-impl log::Log for SerialLog {
-    fn enabled(&self, metadata: &log::Metadata) -> bool {
+impl Log for SerialLog {
+    fn enabled(&self, metadata: &Metadata) -> bool {
         metadata.level() <= LOG_LEVEL
     }
 
-    fn log(&self, record: &log::Record) {
+    fn log(&self, record: &Record) {
         if self.enabled(record.metadata()) {
             let mut target = record.metadata().target();
             if let Some((i, _)) = target.rmatch_indices("::").skip(1).next() {

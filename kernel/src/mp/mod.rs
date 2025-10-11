@@ -1,6 +1,6 @@
 use core::{convert::Infallible, sync::atomic::AtomicU32};
 
-use log::info;
+use cake::log::info;
 use raw_cpuid::{CpuId, CpuIdResult};
 
 use crate::{

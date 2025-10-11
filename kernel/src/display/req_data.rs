@@ -1,7 +1,7 @@
 use core::fmt::Debug;
 
+use cake::spin::Mutex;
 use cake::{limine::response::FramebufferResponse, LimineData};
-use spin::Mutex;
 
 #[derive(Debug)]
 pub struct FramebufferInfo {

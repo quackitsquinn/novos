@@ -1,7 +1,7 @@
 macro_rules! aerror {
     ($($arg:tt)*) => {
         if $crate::should_log() {
-            log::error!($($arg)*);
+            cake::log::error!($($arg)*);
         }
     };
 }
@@ -9,7 +9,7 @@ macro_rules! aerror {
 macro_rules! awarn {
     ($($arg:tt)*) => {
         if $crate::should_log() {
-            log::warn!($($arg)*);
+            cake::log::warn!($($arg)*);
         }
     };
 }
@@ -17,7 +17,7 @@ macro_rules! awarn {
 macro_rules! ainfo {
     ($($arg:tt)*) => {
         if $crate::should_log() {
-            log::info!($($arg)*);
+            cake::log::info!($($arg)*);
         }
     };
 }
@@ -25,7 +25,7 @@ macro_rules! ainfo {
 macro_rules! adebug {
     ($($arg:tt)*) => {
         if $crate::should_log() {
-            log::debug!($($arg)*);
+            cake::log::debug!($($arg)*);
         }
     };
 }
@@ -33,7 +33,7 @@ macro_rules! adebug {
 macro_rules! atrace {
     ($($arg:tt)*) => {
         if $crate::should_log() {
-            log::trace!($($arg)*);
+            cake::log::trace!($($arg)*);
         }
     };
 }

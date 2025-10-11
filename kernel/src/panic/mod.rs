@@ -1,6 +1,6 @@
 use core::{convert::Infallible, fmt::Write, panic::PanicInfo};
 
-use spin::Once;
+use cake::spin::Once;
 
 use crate::{
     declare_module, hlt_loop,

@@ -9,7 +9,7 @@ use cake::{
     spin::{Once, RwLock},
 };
 pub use context::CoreContext;
-use log::info;
+use cake::log::info;
 
 use crate::{mp::mp_setup::trampoline::prepare_cpu, requests::MP_INFO};
 

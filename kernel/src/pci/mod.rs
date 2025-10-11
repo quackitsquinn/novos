@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 use device::{pci_get_device, PCIDevice};
-use spin::Mutex;
+use cake::spin::Mutex;
 use x86_64::instructions::port::Port;
 
 use crate::declare_module;

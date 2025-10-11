@@ -1,4 +1,4 @@
-use spin::Mutex;
+use cake::spin::Mutex;
 use x86_64::instructions::port::Port;
 
 const QEMU_EXIT_PORT: u16 = 0xf4;

@@ -1,7 +1,7 @@
 use core::{convert::Infallible, mem::transmute};
 
 use pic8259::ChainedPics;
-use spin::Mutex;
+use cake::spin::Mutex;
 
 use crate::declare_module;
 

@@ -1,5 +1,5 @@
 use alloc::collections::BTreeMap;
-use log::debug;
+use cake::log::debug;
 use x86_64::structures::paging::{
     page_table::PageTableEntry, FrameAllocator, Mapper, Page, PageTable, PageTableFlags,
     PageTableIndex,

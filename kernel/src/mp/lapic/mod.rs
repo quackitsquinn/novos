@@ -1,5 +1,5 @@
 use cake::spin::Once;
-use log::{debug, info};
+use cake::log::{debug, info};
 use x86_64::{registers::model_specific::Msr, structures::paging::PageTableFlags};
 
 use crate::{

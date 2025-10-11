@@ -1,9 +1,9 @@
 use core::{alloc::Layout, fmt::Debug};
 
 use alloc::alloc::alloc;
-use cake::{limine::response::ExecutableFileResponse, LimineData};
+use cake::spin::{Mutex, Once};
+use cake::{limine::response::ExecutableFileResponse, spin, LimineData};
 use kelp::Elf;
-use spin::{Mutex, Once};
 
 /// The kernel's ELF executable, stored in a way that allows moving it to the heap later.
 pub struct KernelElf {

@@ -1,4 +1,4 @@
-use log::info;
+use cake::log::info;
 use x86_64::{
     structures::paging::{mapper::MapToError, OffsetPageTable, Page, PageTableFlags},
     VirtAddr,

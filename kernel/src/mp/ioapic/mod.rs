@@ -5,7 +5,7 @@ use ::acpi::{
     AcpiTable,
 };
 use cake::{spin::Once, OnceMutex};
-use log::info;
+use cake::log::info;
 use modular_bitfield::prelude::*;
 use x86_64::registers::model_specific::Msr;
 

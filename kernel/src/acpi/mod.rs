@@ -1,16 +1,12 @@
 mod mapped_table;
 use core::{mem, ops::Deref, ptr::read_unaligned};
 
-use acpi::{
-    rsdp::Rsdp,
-    sdt::Signature,
-    AcpiError,
-};
+use acpi::{rsdp::Rsdp, sdt::Signature, AcpiError};
 use alloc::collections::btree_map::BTreeMap;
+use cake::log::{info, warn};
+use cake::spin::{Mutex, MutexGuard, Once};
 use cake::Owned;
-use log::{info, warn};
 pub use mapped_table::MappedTable;
-use spin::{Mutex, MutexGuard, Once};
 use x86_64::{structures::paging::PageTableFlags, PhysAddr};
 
 use crate::{acpi::sdt::TableHeader, declare_module, memory::paging::phys::phys_mem::map_address};

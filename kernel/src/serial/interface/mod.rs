@@ -1,9 +1,9 @@
 use core::fmt::Write;
 
+use cake::spin::Once;
 use cake::spin::{Mutex, MutexGuard};
 use kserial::client::SerialAdapter;
 use serial::Serial;
-use spin::Once;
 
 pub mod serial;
 
