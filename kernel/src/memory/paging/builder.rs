@@ -89,13 +89,13 @@ where
 
     fn create_pagetable(&mut self) -> (KernelPhysFrame, &'a mut PageTable) {
         let mut alc = FRAME_ALLOCATOR.get();
-        let mut offset_page_table = KERNEL_PAGE_TABLE.write();
+        let mut active_pagetable = KERNEL_PAGE_TABLE.write();
         let pagetable_frame = alc
             .allocate_frame()
             .expect("Unable to allocate root frame for page table");
         let pagetable_page = self.curr_page_range.next().expect("out of pages");
         unsafe {
-            offset_page_table
+            active_pagetable
                 .map_to(
                     pagetable_page,
                     pagetable_frame,

@@ -70,7 +70,7 @@ pub fn map_address(
         range.len()
     );
 
-    let mut offset_page_table = KERNEL_PAGE_TABLE.write();
+    let mut active_page_table = KERNEL_PAGE_TABLE.write();
     let mut frame_allocator = crate::memory::paging::phys::FRAME_ALLOCATOR.get();
     for page in addr_range.as_page_range() {
         let frame = range
@@ -83,12 +83,12 @@ pub fn map_address(
         );
 
         unsafe {
-            offset_page_table
+            active_page_table
                 .map_to(page, frame, flags, &mut *frame_allocator)
                 .map(|f| f.flush())
                 .map_err(|_| {
                     MapError::MappingError(MapToError::PageAlreadyMapped(
-                        offset_page_table
+                        active_page_table
                             .translate_page(page)
                             .expect("just mapped, should translate"),
                     ))
@@ -107,9 +107,9 @@ pub fn map_address(
 
 pub fn unmap_address(map: PhysicalMemoryMap) {
     let mut vmapper = VIRT_MAPPER.get();
-    let mut offset_page_table = KERNEL_PAGE_TABLE.write();
+    let mut active_page_table = KERNEL_PAGE_TABLE.write();
     for page in map.virt_range.as_page_range() {
-        offset_page_table
+        active_page_table
             .unmap(page)
             .expect("Unable to unmap page")
             .1

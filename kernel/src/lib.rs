@@ -1,3 +1,5 @@
+//! The core kernel module post bootloader handoff.
+//! Contains scheduling and process management.
 #![no_std]
 #![no_main]
 /* FEATURES */
@@ -8,6 +10,7 @@
 /* LINT OPTS */
 #![forbid(unsafe_op_in_unsafe_fn)]
 #![warn(missing_debug_implementations)]
+#![warn(missing_docs)]
 /* TEST RUNNER */
 #![test_runner(crate::testing::test_runner)]
 #![reexport_test_harness_main = "test_main"]
@@ -36,12 +39,14 @@ pub mod mp;
 pub mod panic;
 pub mod pci;
 pub mod proc;
-mod requests;
+pub mod requests;
 pub mod serial;
 pub mod testing;
 
+/// The size of the kernel stack in bytes.
 pub const STACK_SIZE: u64 = 1 << 16; // Limine defaults to 16KiB
 
+/// The base address of the kernel stack. Set by the function that calls [init_kernel].
 pub static STACK_BASE: Once<u64> = Once::new();
 
 #[used]

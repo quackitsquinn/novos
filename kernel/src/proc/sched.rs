@@ -50,7 +50,7 @@ impl KernelThreadScheduler {
         let thread = Thread::from_stack_context(stack, context);
         self.add_thread(thread);
     }
-    pub fn switch(&mut self, ctx: InterruptContext) {
+    pub fn switch(&mut self, mut ctx: InterruptContext) {
         if self.threads.is_empty() {
             // No threads to schedule, just return and continue execution.
             return;

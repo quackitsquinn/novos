@@ -1,9 +1,13 @@
+//! General context structs for interrupts/context switching.
 use core::fmt::Display;
 
 use x86_64::structures::idt::{InterruptStackFrameValue, PageFaultErrorCode};
 
+/// Represents the CPU context during an interrupt.
+/// Contains the values of all general-purpose registers.
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
+#[allow(missing_docs)]
 pub struct ContextValue {
     pub r15: u64,
     pub r14: u64,
@@ -20,9 +24,11 @@ pub struct ContextValue {
     pub rcx: u64,
     pub rbx: u64,
     pub rax: u64,
+    // TODO float regs
 }
 
 impl ContextValue {
+    /// Returns a zeroed context value.
     pub const fn zero() -> ContextValue {
         unsafe { core::mem::zeroed() }
     }
@@ -75,15 +81,20 @@ impl Display for ContextValue {
     }
 }
 
+/// Represents the CPU context during a page fault interrupt.
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct PageFaultInterruptContextValue {
+    /// The general CPU context at the time of the page fault.
     pub context: ContextValue,
+    /// The interrupt stack frame at the time of the page fault.
     pub int_frame: InterruptStackFrameValue,
+    /// The page fault error code associated with the page fault.
     pub error_code: PageFaultErrorCode,
 }
 
 impl PageFaultInterruptContextValue {
+    /// Returns a zeroed page fault interrupt context value.
     pub const fn zero() -> PageFaultInterruptContextValue {
         unsafe { core::mem::zeroed() }
     }

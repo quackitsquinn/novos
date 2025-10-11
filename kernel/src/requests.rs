@@ -1,5 +1,7 @@
+//! Various bootloader requests and their corresponding responses. Contains most of the bootloader interface.
 use core::convert::Infallible;
 
+use cake::limine::BaseRevision;
 use cake::limine::{paging::Mode, request::*, response::ExecutableAddressResponse};
 use cake::{spin::Once, LimineRequest};
 
@@ -11,35 +13,45 @@ use crate::{
 };
 
 #[used]
-pub static PHYSICAL_MEMORY_OFFSET_REQUEST: HhdmRequest = HhdmRequest::new();
+static PHYSICAL_MEMORY_OFFSET_REQUEST: HhdmRequest = HhdmRequest::new();
+#[used]
+static RSDP_ADDRESS_REQUEST: RsdpRequest = RsdpRequest::new();
+#[used]
+static PAGING_MODE_REQUEST: PagingModeRequest =
+    PagingModeRequest::new().with_mode(Mode::FOUR_LEVEL);
+#[used]
+static EXECUTABLE_ADDRESS_REQUEST: ExecutableAddressRequest = ExecutableAddressRequest::new();
+#[used]
+static BASE_REVISION: BaseRevision = BaseRevision::with_revision(3);
+
+/// Physical memory offset provided by the bootloader
 pub static PHYSICAL_MEMORY_OFFSET: Once<u64> = Once::new();
 
-pub static RSDP_ADDRESS_REQUEST: RsdpRequest = RsdpRequest::new();
+/// Root System Description Pointer provided by the bootloader
 pub static RSDP_ADDRESS: Once<Option<usize>> = Once::new();
 
+/// Memory map provided by the bootloader
 #[used]
 pub static MEMORY_MAP: LimineRequest<MemoryMapRequest, MemoryMap> =
     LimineRequest::new(MemoryMapRequest::new());
 
-#[used]
-pub static PAGING_MODE_REQUEST: PagingModeRequest =
-    PagingModeRequest::new().with_mode(Mode::FOUR_LEVEL);
-
+/// Kernel ELF provided by the bootloader
 #[used]
 pub static KERNEL_ELF: LimineRequest<ExecutableFileRequest, KernelElf> =
     LimineRequest::new(ExecutableFileRequest::new());
 
+/// Framebuffer provided by the bootloader
 pub static FRAMEBUFFER: LimineRequest<FramebufferRequest, FramebufferInfo> =
     LimineRequest::new(FramebufferRequest::new());
 
+/// MP info provided by the bootloader
 pub static MP_INFO: LimineRequest<MpRequest, ApplicationCores> =
     LimineRequest::new(MpRequest::new());
 
-#[used]
-pub static EXECUTABLE_ADDRESS_REQUEST: ExecutableAddressRequest = ExecutableAddressRequest::new();
+/// Executable address provided by the bootloader
 pub static EXECUTABLE_ADDRESS: Once<&'static ExecutableAddressResponse> = Once::new();
 
-pub fn init() -> Result<(), Infallible> {
+fn init() -> Result<(), Infallible> {
     let offset = PHYSICAL_MEMORY_OFFSET_REQUEST
         .get_response()
         .unwrap()

@@ -1,8 +1,12 @@
+/// A standard RGB color.
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[repr(C)]
 pub struct Color {
+    /// The red component of the color.
     pub r: u8,
+    /// The green component of the color.
     pub g: u8,
+    /// The blue component of the color.
     pub b: u8,
 }
 

@@ -1,3 +1,4 @@
+//! SDT (System Description Table) support. Provides abstractions for safely accessing ACPI SDT headers.
 use core::{mem, pin::Pin};
 
 use acpi::{
@@ -9,6 +10,7 @@ use x86_64::{structures::paging::PageTableFlags, PhysAddr};
 
 use crate::memory::paging::phys::phys_mem::{map_address, remap_address, PhysicalMemoryMap};
 
+/// A header for an ACPI SDT (System Description Table).
 #[derive(Debug)]
 pub struct TableHeader<'a> {
     _map: PhysicalMemoryMap,
@@ -17,6 +19,9 @@ pub struct TableHeader<'a> {
 }
 
 impl<'a> TableHeader<'a> {
+    /// Creates a new `TableHeader` from a physical address.
+    /// # Safety
+    /// The caller must ensure that the physical address is valid and that the table is not already mapped.
     pub unsafe fn new(p_address: PhysAddr) -> Self {
         let map = map_address(
             p_address,
@@ -42,6 +47,10 @@ impl<'a> TableHeader<'a> {
         unsafe { Self::from_raw_parts(map, inner) }
     }
 
+    /// Creates a new `TableHeader` from raw parts.
+    ///
+    /// # Safety
+    /// The caller must ensure that the physical memory map and SDT header are valid.
     pub unsafe fn from_raw_parts(map: PhysicalMemoryMap, sdt: Owned<SdtHeader>) -> Self {
         Self {
             _map: map,
@@ -82,6 +91,7 @@ impl<'a> TableHeader<'a> {
         Ok(unsafe { Pin::new_unchecked(&mut *ptr) })
     }
 
+    /// Validates the table signature with the given `sig`.
     pub fn validate(&self, sig: Signature) -> Result<(), AcpiError> {
         unsafe { self.sdt.validate(sig) }
     }

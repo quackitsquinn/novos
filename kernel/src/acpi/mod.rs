@@ -1,4 +1,5 @@
-mod mapped_table;
+//! ACPI (Advanced Configuration and Power Interface) support. Contains logic for parsing and interacting with ACPI tables.
+//! This includes methods for accessing various ACPI tables and their entries (see the [mapped_table] module).
 use core::{mem, ops::Deref, ptr::read_unaligned};
 
 use acpi::{rsdp::Rsdp, sdt::Signature, AcpiError};
@@ -11,13 +12,18 @@ use x86_64::{structures::paging::PageTableFlags, PhysAddr};
 
 use crate::{acpi::sdt::TableHeader, declare_module, memory::paging::phys::phys_mem::map_address};
 
-mod sdt;
+pub mod mapped_table;
+pub mod sdt;
 
+/// The Root System Description Pointer (RSDP) structure.
 pub static RSDP: Once<Owned<Rsdp>> = Once::new();
+
+/// A locked ACPI table. This prevents any concurrent access.
+pub type AcpiTableLock = MutexGuard<'static, TableHeader<'static>>;
 
 static ACPI_TABLES: Once<BTreeMap<u32, Mutex<TableHeader<'static>>>> = Once::new();
 
-pub fn init() -> Result<(), AcpiError> {
+fn init() -> Result<(), AcpiError> {
     let rsdp_addr = *crate::requests::RSDP_ADDRESS
         .get()
         .expect("RSDP address not set")
@@ -100,7 +106,8 @@ fn table_key(sig: Signature) -> u32 {
     unsafe { read_unaligned(&sig as *const _ as *const u32) }
 }
 
-pub fn get_table(signature: Signature) -> Option<MutexGuard<'static, TableHeader<'static>>> {
+/// Returns a locked ACPI table with the given signature.
+pub fn get_table(signature: Signature) -> Option<AcpiTableLock> {
     let tables = ACPI_TABLES.get().expect("ACPI tables not initialized");
     let key = table_key(signature);
     tables.get(&key).map(|t| t.try_lock()).flatten()

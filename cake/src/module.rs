@@ -53,9 +53,11 @@ where
 #[macro_export]
 macro_rules! declare_module {
     ($name: literal, $func: ident, $error_type: ty) => {
+        #[doc = concat!("The ", $name, " module. This contains logic to protect its internal state and ensure it is only initialized once.")]
         pub static MODULE: $crate::KernelModule<$error_type> =
             $crate::KernelModule::new($name, $func);
 
+        #[doc = concat!("Returns true if the ", $name, " module has been initialized.")]
         #[allow(dead_code)]
         pub fn is_initialized() -> bool {
             MODULE.is_initialized()

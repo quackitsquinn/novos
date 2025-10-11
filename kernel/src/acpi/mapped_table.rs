@@ -1,3 +1,4 @@
+//! Support for mapping dynamically sized ACPI tables from physical memory.
 use core::fmt;
 
 use acpi::{sdt::SdtHeader, AcpiError, AcpiTable};
@@ -5,7 +6,7 @@ use cake::Owned;
 use x86_64::{structures::paging::PageTableFlags, PhysAddr};
 
 use crate::memory::paging::phys::phys_mem::{map_address, unmap_address, PhysicalMemoryMap};
-
+/// A mapped ACPI table.
 pub struct MappedTable<'a, T: AcpiTable> {
     table: Owned<T>,
     sdt: &'a SdtHeader,
@@ -14,7 +15,10 @@ pub struct MappedTable<'a, T: AcpiTable> {
 }
 
 impl<'a, T: AcpiTable> MappedTable<'a, T> {
-    pub fn new(addr: PhysAddr) -> Result<Self, AcpiError> {
+    /// Creates a new mapped ACPI table from the given physical address.
+    /// # Safety
+    /// The caller must ensure that the physical address is valid and that the table is not already mapped.
+    pub unsafe fn new(addr: PhysAddr) -> Result<Self, AcpiError> {
         let mut phys_map = map_address(
             addr,
             core::mem::size_of::<T>() as u64,
@@ -54,6 +58,7 @@ impl<'a, T: AcpiTable> MappedTable<'a, T> {
         })
     }
 
+    /// Returns a reference to the mapped ACPI table.
     pub fn table(&self) -> &T {
         &self.table
     }

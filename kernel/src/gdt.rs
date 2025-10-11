@@ -1,3 +1,4 @@
+//! GDT setup.
 use core::convert::Infallible;
 
 use cake::KernelModule;
