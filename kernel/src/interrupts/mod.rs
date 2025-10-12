@@ -1,3 +1,4 @@
+//! Rust abstractions for handling interrupts and IRQs.
 use core::{convert::Infallible, mem};
 
 use cake::spin::{Mutex, MutexGuard, Once};
@@ -13,6 +14,7 @@ use crate::{
     declare_module, init_interrupt_table, interrupt_wrapper,
 };
 
+/// The global Interrupt Descriptor Table.
 pub static IDT: InterruptTable = InterruptTable::uninitialized();
 
 /// The interrupt table for the kernel.
@@ -23,8 +25,11 @@ pub struct InterruptTable {
     init: Once<()>,
 }
 
+/// A handler for interrupts with an error code.
 pub type CodeHandler = fn(ctx: InterruptCodeContext, index: u8, name: &'static str);
+/// A basic interrupt handler.
 pub type InterruptHandler = fn(ctx: InterruptContext, index: u8, name: &'static str);
+/// A handler for page fault interrupts.
 pub type PageFaultHandler = fn(ctx: PageFaultInterruptContext);
 
 impl InterruptTable {
@@ -79,6 +84,10 @@ impl InterruptTable {
         old
     }
 
+    /// Loads the interrupt descriptor table using `lidt`.
+    ///
+    /// # Safety
+    /// The caller must ensure that anything referenced in the table is valid.
     pub unsafe fn load(&'static self) {
         let table = self.table.try_lock().expect("Interrupt table is locked");
         unsafe {
@@ -101,7 +110,7 @@ impl InterruptTable {
 
 declare_module!("interrupts", init);
 
-pub fn init() -> Result<(), Infallible> {
+fn init() -> Result<(), Infallible> {
     x86_64::instructions::interrupts::disable();
     init_interrupt_table!(
         exception::general_code_handler,
@@ -152,18 +161,22 @@ const BASIC_HANDLERS: [&'static str; 32] = [
     "RESERVED",
 ];
 
+/// Disables interrupts.
 pub fn disable() {
     x86_64::instructions::interrupts::disable();
 }
 
+/// Enables Interrupts
 pub fn enable() {
     x86_64::instructions::interrupts::enable();
 }
 
+/// Returns `true` if interrupts are enabled.
 pub fn are_enabled() -> bool {
     x86_64::instructions::interrupts::are_enabled()
 }
 
+/// Executes a closure without interrupts.
 pub fn without_interrupts<F, R>(f: F) -> R
 where
     F: FnOnce() -> R,

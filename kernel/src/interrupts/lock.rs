@@ -4,11 +4,12 @@ use cake::spin::Mutex;
 
 use crate::interrupts;
 
-// A mutex that disables interrupts while locked.
+/// A mutex that disables interrupts while locked.
 pub struct InterruptMutex<T> {
     data: Mutex<T>,
 }
 
+/// A guard that releases the interrupt mutex when dropped.
 pub struct InterruptMutexGuard<'a, T> {
     guard: cake::spin::MutexGuard<'a, T>,
     reenable: bool,
@@ -37,12 +38,14 @@ impl<T> DerefMut for InterruptMutexGuard<'_, T> {
 }
 
 impl<T> InterruptMutex<T> {
+    /// Creates a new `InterruptMutex`.
     pub const fn new(data: T) -> Self {
         InterruptMutex {
             data: Mutex::new(data),
         }
     }
 
+    /// Locks the mutex, disabling interrupts.
     pub fn lock(&self) -> InterruptMutexGuard<'_, T> {
         let reenable = interrupts::are_enabled();
         interrupts::disable();

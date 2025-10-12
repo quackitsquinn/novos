@@ -4,6 +4,7 @@
 macro_rules! interrupt_wrapper {
     ($handler: path, $raw: ident) => {
         #[unsafe(naked)]
+        #[allow(missing_docs)]
         pub extern "x86-interrupt" fn $raw(_: InterruptStackFrame) {
             ::core::arch::naked_asm! {
                 // Disable interrupts.
@@ -58,6 +59,7 @@ macro_rules! interrupt_wrapper {
     };
 }
 
+/// Defines an interrupt handler that can be used with the IDT.
 #[macro_export]
 macro_rules! define_interrupt {
     ($tbl: expr, $inner: path, $name: ident, $code: literal) => {
@@ -71,6 +73,7 @@ macro_rules! define_interrupt {
     };
 }
 
+/// Initializes the interrupt table with the given handlers.
 #[macro_export]
 macro_rules! init_interrupt_table {
     ($code_handler: path, $page_fault_handler: path, $normal_handler: path, $table: expr) => {

@@ -1,24 +1,31 @@
+//! Rust abstractions for working with hardware interrupts
 use core::{convert::Infallible, mem::transmute};
 
-use pic8259::ChainedPics;
 use cake::spin::Mutex;
+use pic8259::ChainedPics;
 
 use crate::declare_module;
 
+// TODO: This module should be kept for legacy PIC8259 support, but should only be initialized if no APIC is present.
+
 pub mod timer;
 
-// TODO: APIC check
-
+/// The IRQ offset for the primary PIC.
 pub const PIC_1_OFFSET: u8 = 32;
+/// The IRQ offset for the secondary PIC.
 pub const PIC_2_OFFSET: u8 = PIC_1_OFFSET + 8;
 
+/// The chained PICs.
 pub static PICS: Mutex<ChainedPics> =
     Mutex::new(unsafe { ChainedPics::new(PIC_1_OFFSET, PIC_2_OFFSET) });
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
+/// Interrupt indices for hardware interrupts.
 pub enum InterruptIndex {
+    /// Timer interrupt.
     Timer = PIC_1_OFFSET,
+    /// Keyboard interrupt.
     Keyboard,
 }
 
@@ -56,6 +63,7 @@ fn init() -> Result<(), Infallible> {
     Ok(())
 }
 
+/// Fully disables hardware interrupts.
 pub unsafe fn disable() {
     let mut pics = PICS.lock();
     unsafe {
