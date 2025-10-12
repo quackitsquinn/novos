@@ -8,9 +8,6 @@ use serial::Serial;
 
 pub mod serial;
 
-// TODO: Abstract this and similar things into a Lock type that just has the like is_locked etc.
-pub static PORT_HAS_INIT: Once<()> = Once::new();
-
 /// The I/O port number for the primary serial port (COM1).
 pub const SERIAL_PORT_NUM: u16 = 0x3F8; // COM1
 
@@ -19,7 +16,6 @@ pub fn init() {
     SERIAL_PORT
         .lock()
         .replace(unsafe { Serial::new(SERIAL_PORT_NUM) });
-    PORT_HAS_INIT.call_once(|| ());
     kserial::client::init(
         MutexGuard::leak(SERIAL_PORT.lock())
             .as_mut()

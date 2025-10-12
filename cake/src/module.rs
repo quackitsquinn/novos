@@ -3,6 +3,8 @@ use core::fmt::Debug;
 use log::info;
 use spin::Once;
 
+use crate::Fuse;
+
 /// A kernel module that can be initialized once. If the initialization fails, the kernel will panic.
 #[derive(Debug)]
 pub struct KernelModule<T>
@@ -14,7 +16,7 @@ where
     /// The initialization function.
     pub init: fn() -> Result<(), T>,
     // The state of the module.
-    state: Once<()>,
+    state: Fuse,
 }
 
 impl<T> KernelModule<T>
@@ -26,7 +28,7 @@ where
         Self {
             name,
             init,
-            state: Once::new(),
+            state: Fuse::new(),
         }
     }
     /// Initialize the module if it has not been initialized yet. Returns true if the module was initialized.
@@ -34,7 +36,7 @@ where
     #[track_caller]
     pub fn init(&self) -> bool {
         let mut did_init = false;
-        self.state.call_once(|| {
+        self.state.blow_once(|| {
             did_init = true;
             info!("Initializing {}", self.name);
             (self.init)()
@@ -46,7 +48,7 @@ where
 
     /// Returns true if the module has been initialized.
     pub fn is_initialized(&self) -> bool {
-        self.state.is_completed()
+        self.state.is_blown()
     }
 }
 

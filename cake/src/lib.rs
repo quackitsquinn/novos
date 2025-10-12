@@ -1,6 +1,8 @@
 #![cfg_attr(not(test), no_std)]
 #![cfg_attr(test, feature(thread_id_value))]
+#![feature(debug_closure_helpers)]
 
+mod fuse;
 mod limine_request;
 mod module;
 mod oncemut;
@@ -8,9 +10,11 @@ mod oncerw;
 mod owned;
 mod resource;
 
+/* Crate Exports */
 pub use self::limine_request::{
     LimineData, LimineRequest, RawLimineRequest, requests_terminated, terminate_requests,
 };
+pub use fuse::Fuse;
 pub use module::KernelModule;
 pub use oncemut::OnceMutex;
 pub use oncerw::{OnceRwLock, OnceRwReadGuard, OnceRwWriteGuard};

@@ -18,7 +18,7 @@ pub mod stacktrace;
 pub fn panic_basic(pi: &PanicInfo) {
     // Write the raw panic message to the serial port.
     let mut panic_writer = unsafe { SerialPort::new(serial::SERIAL_PORT_NUM) };
-    if !serial::interface::PORT_HAS_INIT.is_completed() {
+    if !serial::is_initialized() {
         // If the code crashed before the serial port was initialized, we need to initialize it now.
         panic_writer.init();
     }
