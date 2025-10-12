@@ -58,13 +58,12 @@ impl Log for SerialLog {
     fn flush(&self) {}
 }
 
-const LOGGER: SerialLog = SerialLog;
-
 declare_module!("serial", init);
 
 fn init() -> Result<(), Infallible> {
     interface::init();
-    log::set_logger(&LOGGER).unwrap();
+    // ZSTs are weird so this is fine.
+    log::set_logger(&SerialLog).unwrap();
     log::set_max_level(LOG_LEVEL.to_level_filter());
     Ok(())
 }

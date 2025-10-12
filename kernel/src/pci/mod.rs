@@ -1,6 +1,8 @@
+#![allow(dead_code, missing_docs)]
+//! This whole module is deprecated and is pending a rewrite.
 use alloc::vec::Vec;
-use device::{pci_get_device, PCIDevice};
 use cake::spin::Mutex;
+use device::{PCIDevice, pci_get_device};
 use x86_64::instructions::port::Port;
 
 use crate::declare_module;
@@ -12,7 +14,7 @@ mod vendor_device;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum PCIInitError {}
 
-pub static PCI_DEVICES: Mutex<Vec<PCIDevice>> = Mutex::new(Vec::new());
+static PCI_DEVICES: Mutex<Vec<PCIDevice>> = Mutex::new(Vec::new());
 
 fn init() -> Result<(), PCIInitError> {
     let mut pci_devices = PCI_DEVICES.lock();

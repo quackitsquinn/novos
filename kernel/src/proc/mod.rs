@@ -1,3 +1,5 @@
+#![allow(dead_code, missing_docs)]
+//! This whole module is deprecated and is pending a rewrite.
 use core::{convert::Infallible, mem, sync::atomic::AtomicU32};
 
 use cake::OnceMutex;
