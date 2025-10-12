@@ -1,9 +1,11 @@
+//! Test function declaration
 use cake::log::{self, info};
 
 use crate::{serial, sprintln};
 
 use super::IN_TEST_FRAMEWORK;
 
+/// A test function.
 #[derive(Debug, Clone, Copy)]
 pub struct TestFunction {
     /// The function to run.
@@ -29,6 +31,7 @@ impl Default for TestFunction {
 }
 
 impl TestFunction {
+    /// Creates a new test function.
     pub const fn const_default() -> Self {
         Self {
             function: || {},
@@ -39,6 +42,7 @@ impl TestFunction {
             should_panic: false,
         }
     }
+    /// Runs the test function.
     pub fn run(&self) {
         if let Some(count) = self.bench_count {
             self.do_bench(count);

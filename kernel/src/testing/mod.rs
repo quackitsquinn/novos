@@ -1,18 +1,19 @@
-use core::mem::transmute;
+//! Testing tools.
 
-use cake::spin::{Mutex, RwLock};
-
-use crate::sprintln;
+use cake::spin::Mutex;
 
 mod qemu_exit;
 pub mod test_fn;
 pub use test_fn::TestFunction;
 
+#[cfg(test)]
 static TESTS: RwLock<&'static [&'static TestFunction]> = RwLock::new(&[]);
+#[cfg(test)]
 static CURRENT: Mutex<usize> = Mutex::new(0);
 static IN_TEST_FRAMEWORK: Mutex<bool> = Mutex::new(true);
 
-//#[cfg(test)]
+/// Runs the given tests.
+#[cfg(test)]
 pub fn test_runner(tests: &[&TestFunction]) /*-> ! */
 {
     // SAFETY: transmute converts &'a [&'a TestFunction] to &'static [&'static TestFunction]
@@ -91,6 +92,7 @@ pub extern "C" fn _start() -> ! {
     qemu_exit::exit(true)
 }
 
+/// Attempts to shut down QEMU with the given exit code.
 pub fn try_shutdown_qemu(non_zero: bool) {
     qemu_exit::exit(non_zero);
 }

@@ -1,3 +1,5 @@
+//! Panic handling and stack tracing.
+
 use core::{convert::Infallible, fmt::Write, panic::PanicInfo};
 
 use cake::spin::Once;
@@ -12,8 +14,9 @@ use crate::{
 
 pub mod stacktrace;
 
+/// A basic panic handler that just prints the panic message to the serial port.
 pub fn panic_basic(pi: &PanicInfo) {
-    // Write the raw panic message to the serial port. This is just a debug tool because somewhere in my serial implementation its just.. exploding.
+    // Write the raw panic message to the serial port.
     let mut panic_writer = unsafe { SerialPort::new(serial::SERIAL_PORT_NUM) };
     if !serial::interface::PORT_HAS_INIT.is_completed() {
         // If the code crashed before the serial port was initialized, we need to initialize it now.
@@ -66,6 +69,8 @@ fn write_location(pi: &PanicInfo) {
 
 static PANIC_CHECK: Once<()> = Once::new();
 
+// Default method for handling panics.
+// This will defer to [panic_basic] if a double panic occurs (e.g. a panic within `panic_extended_info`)
 pub fn panic(pi: &PanicInfo) -> ! {
     if PANIC_CHECK.is_completed() {
         //println!("Double panic!");

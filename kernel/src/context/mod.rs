@@ -1,3 +1,4 @@
+//! Various processor context representations. Used for context switching and interrupt handling.
 #![allow(private_bounds)] // Don't let implementations on arbitrary types
 mod contexts;
 mod int_context;

@@ -1,4 +1,8 @@
-use core::{arch::asm, fmt::Write};
+//! Kernel stacktracing and symbolication.
+use core::{
+    arch::asm,
+    fmt::{Debug, Display, Write},
+};
 
 use kelp::goblin::elf64::sym;
 use rustc_demangle::demangle;
@@ -9,29 +13,32 @@ use crate::{print, println, requests::KERNEL_ELF};
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct StackFrame {
+    /// The base pointer of the previous stack frame.
     pub rbp: *const StackFrame,
+    /// The instruction pointer for this stack frame.
     pub rip: *const (),
 }
 
+/// Prints a stack trace of the current call stack.
 pub fn print_trace() {
     let mut rbp: *const StackFrame;
     unsafe {
         asm!("mov {}, rbp", out(reg) rbp);
     }
-    print_trace_raw(rbp);
+    unsafe { print_trace_raw(rbp) };
 }
 
-pub fn print_trace_raw(rbp: *const StackFrame) {
+/// Prints a stack trace of the given base pointer.
+pub unsafe fn print_trace_raw(rbp: *const StackFrame) {
     let mut rbp = rbp;
     while !rbp.is_null() {
         let frame = unsafe { *rbp };
-        print!("{:p}:{:p} = ", frame.rbp, frame.rip);
-        unsafe { symbol_trace(frame.rip) };
-        println!();
+        println!("{:p}: {}", frame.rip, fmt_symbol(frame.rip));
         rbp = frame.rbp;
     }
 }
 
+/// Prints the symbolicated demangled name of the given address.
 pub unsafe fn symbol_trace(addr: *const ()) {
     print!("{}", fmt_symbol(addr));
 }

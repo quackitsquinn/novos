@@ -1,3 +1,4 @@
+//! Display output.
 use core::convert::Infallible;
 
 use cake::OnceMutex;

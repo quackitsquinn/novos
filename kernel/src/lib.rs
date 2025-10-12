@@ -49,9 +49,6 @@ pub const STACK_SIZE: u64 = 1 << 16; // Limine defaults to 16KiB
 /// The base address of the kernel stack. Set by the function that calls [init_kernel].
 pub static STACK_BASE: Once<u64> = Once::new();
 
-#[used]
-static BASE_REVISION: BaseRevision = BaseRevision::with_revision(3);
-
 /// Halts the CPU indefinitely.
 pub fn hlt_loop() -> ! {
     // SAFETY: We only call cli and hlt, which are safe to call.

@@ -1,6 +1,6 @@
 use core::fmt::Write;
 
-use kserial::client::{get_serial_client, send_string, SerialAdapter};
+use kserial::client::{SerialAdapter, get_serial_client, send_string};
 
 use crate::serial::raw::SerialPort;
 
@@ -20,60 +20,27 @@ impl Serial {
 
         Serial { port }
     }
-
-    pub fn enable_packet_support(&mut self) {
-        // writeln!(self, "Enabling packet support").unwrap();
-        get_serial_client().enable_packet_support();
-    }
-
-    pub fn disable_packet_support(&mut self) {
-        // writeln!(self, "Disabling packet support").unwrap();
-        todo!("disable_packet_support is not implemented yet");
-    }
-
-    pub unsafe fn send_raw(&mut self, data: u8) {
-        self.port.send_raw(data);
-    }
-
-    pub unsafe fn send_slice_raw(&mut self, data: &[u8]) {
-        for byte in data {
-            unsafe { self.send_raw(*byte) };
-        }
-    }
-
-    pub fn has_packet_support(&self) -> bool {
-        true
-    }
-
-    pub unsafe fn get_inner(&mut self) -> &mut SerialPort {
-        &mut self.port
-    }
 }
 
 impl SerialAdapter for Serial {
     fn send(&mut self, data: u8) {
-        unsafe {
-            self.send_raw(data);
-        };
+        self.port.send_raw(data);
     }
 
     fn send_slice(&mut self, data: &[u8]) {
-        let serial = unsafe { self.get_inner() };
         for byte in data {
-            serial.send_raw(*byte);
+            self.port.send(*byte);
         }
     }
 
     fn read(&mut self) -> u8 {
-        unsafe { self.get_inner().receive() }
+        self.port.receive()
     }
 
     fn read_slice(&mut self, data: &mut [u8]) -> usize {
-        let serial = unsafe { self.get_inner() };
         let mut i = 0;
         for byte in data.iter_mut() {
-            // TODO: Implement a timeout
-            *byte = serial.receive();
+            *byte = self.port.receive();
             i += 1;
         }
         i
