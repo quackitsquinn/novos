@@ -1,16 +1,15 @@
+//! This is a module that wraps the uart_16550 crate for serial use.
+//! The point of this module is to allow rls to work with the uart_16550 crate on non-x86_64 targets.
+//! Because of how the uart_16550 crate is implemented, rls can't see the functions in the crate directly, so we have to wrap them in this module.
 #![allow(
     dead_code,
     reason = "This is a stub module that is only used on non-x86_64 targets"
 )]
 use core::{fmt, panic};
 
-///! This is a module that wraps the uart_16550 crate for serial use.
-///! The point of this module is to allow rls to work with the uart_16550 crate on non-x86_64 targets.
-///! Because of how the uart_16550 crate is implemented, rls can't see the functions in the crate directly, so we have to wrap them in this module.
-
+/// A type alias for the serial port.
 #[cfg(target_arch = "x86_64")]
 pub type SerialPort = uart_16550::SerialPort;
-
 #[cfg(not(target_arch = "x86_64"))]
 pub type SerialPort = NoOpSerialPort;
 

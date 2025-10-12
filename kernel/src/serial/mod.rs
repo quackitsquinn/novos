@@ -12,8 +12,9 @@ use crate::{declare_module, mp, println};
 pub mod interface;
 pub mod raw; // Things to interact with the serial port directly
 
-pub const LOG_LEVEL: Level = Level::Trace;
-pub const SERIAL_PORT_NUM: u16 = 0x3F8;
+/// The log level for the serial port.
+pub const LOG_LEVEL: Level = log_level();
+
 struct SerialLog;
 
 impl Log for SerialLog {
@@ -66,4 +67,9 @@ fn init() -> Result<(), Infallible> {
     log::set_logger(&LOGGER).unwrap();
     log::set_max_level(LOG_LEVEL.to_level_filter());
     Ok(())
+}
+
+const fn log_level() -> Level {
+    // TODO: option_env!("LOG_LEVEL")
+    Level::Trace
 }

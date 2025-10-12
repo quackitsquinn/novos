@@ -1,4 +1,4 @@
-//! Serial output. Handles connecting to kserial.
+//! Sets up the kernel serial interface.
 use core::fmt::Write;
 
 use cake::spin::Once;
@@ -11,15 +11,12 @@ pub mod serial;
 /// The I/O port number for the primary serial port (COM1).
 pub const SERIAL_PORT_NUM: u16 = 0x3F8; // COM1
 
-pub fn init() {
-    static SERIAL_PORT: Mutex<Option<Serial>> = Mutex::new(None);
-    SERIAL_PORT
-        .lock()
-        .replace(unsafe { Serial::new(SERIAL_PORT_NUM) });
+static SERIAL_PORT: Once<Mutex<Serial>> = Once::new();
+
+pub(super) fn init() {
+    SERIAL_PORT.call_once(|| Mutex::new(unsafe { Serial::new(SERIAL_PORT_NUM) }));
     kserial::client::init(
-        MutexGuard::leak(SERIAL_PORT.lock())
-            .as_mut()
-            .expect("infaliable") as &mut dyn SerialAdapter,
+        MutexGuard::leak(unsafe { SERIAL_PORT.get_unchecked().lock() }) as &mut dyn SerialAdapter,
     );
 }
 
@@ -28,6 +25,7 @@ pub fn _print(args: core::fmt::Arguments) {
     let mut writer = kserial::client::writer();
     write!(writer, "{}", args).unwrap();
 }
+
 /// Serial print
 #[macro_export]
 macro_rules! sprint {

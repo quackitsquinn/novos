@@ -8,7 +8,7 @@ use crate::{
     declare_module, hlt_loop,
     memory::{self, allocator},
     print, println,
-    serial::{self, raw::SerialPort},
+    serial::{self, interface::SERIAL_PORT_NUM, raw::SerialPort},
     testing,
 };
 
@@ -17,7 +17,7 @@ pub mod stacktrace;
 /// A basic panic handler that just prints the panic message to the serial port.
 pub fn panic_basic(pi: &PanicInfo) {
     // Write the raw panic message to the serial port.
-    let mut panic_writer = unsafe { SerialPort::new(serial::SERIAL_PORT_NUM) };
+    let mut panic_writer = unsafe { SerialPort::new(SERIAL_PORT_NUM) };
     if !serial::is_initialized() {
         // If the code crashed before the serial port was initialized, we need to initialize it now.
         panic_writer.init();

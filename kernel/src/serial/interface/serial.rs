@@ -1,9 +1,11 @@
+//! A kserial interface for serial communication.
 use core::fmt::Write;
 
-use kserial::client::{SerialAdapter, get_serial_client, send_string};
+use kserial::client::{SerialAdapter, send_string};
 
 use crate::serial::raw::SerialPort;
 
+/// A serial interface used to connect to kserial.
 #[derive(Debug)]
 pub struct Serial {
     port: SerialPort,
