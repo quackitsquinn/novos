@@ -69,8 +69,8 @@ fn write_location(pi: &PanicInfo) {
 
 static PANIC_CHECK: Once<()> = Once::new();
 
-// Default method for handling panics.
-// This will defer to [panic_basic] if a double panic occurs (e.g. a panic within `panic_extended_info`)
+/// Default method for handling panics.
+/// This will defer to [panic_basic] if a double panic occurs (e.g. a panic within `panic_extended_info`)
 pub fn panic(pi: &PanicInfo) -> ! {
     if PANIC_CHECK.is_completed() {
         //println!("Double panic!");

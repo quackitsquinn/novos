@@ -1,7 +1,7 @@
 //! Kernel stacktracing and symbolication.
 use core::{
     arch::asm,
-    fmt::{Debug, Display, Write},
+    fmt::{Debug, Write},
 };
 
 use kelp::goblin::elf64::sym;

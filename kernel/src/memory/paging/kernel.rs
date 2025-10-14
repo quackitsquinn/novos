@@ -2,27 +2,27 @@
 //! In the future, this will almost certainly be converted into it's own module.
 use core::convert::Infallible;
 
+use cake::log::{debug, info, trace};
 use cake::{spin::Once, terminate_requests};
 use kelp::goblin::elf64::program_header::ProgramHeader;
-use cake::log::{debug, info, trace};
 use x86_64::{
+    VirtAddr,
     registers::control::{Cr3, Cr3Flags},
     structures::paging::{
+        OffsetPageTable, Page, PageTable, PageTableFlags, PhysFrame, RecursivePageTable, Translate,
         frame::PhysFrameRangeInclusive,
         mapper::{MappedFrame, TranslateResult},
-        OffsetPageTable, Page, PageTable, PageTableFlags, PhysFrame, RecursivePageTable, Translate,
     },
-    VirtAddr,
 };
 
 use crate::{
     declare_module,
     memory::paging::{
+        KERNEL_PAGE_TABLE, KernelPage, KernelPhysFrame,
         builder::PageTableBuilder,
         map::{FRAMEBUFFER_START_PAGE, KERNEL_REMAP_PAGE_RANGE},
-        KernelPage, KernelPhysFrame, KERNEL_PAGE_TABLE,
     },
-    mp::mp_setup::CORES,
+    mp::cores,
     requests::{FRAMEBUFFER, KERNEL_ELF},
 };
 
@@ -60,7 +60,7 @@ fn map_kernel<T: Iterator<Item = Page>>(builder: &mut PageTableBuilder<T>) {
         *crate::STACK_BASE.get().expect("Stack base uninitialized"),
     );
 
-    for (i, base) in CORES.get().expect("cores uninit").iter() {
+    for (i, base) in cores().iter() {
         info!("Mapping stack for CPU with APIC ID {}...", i);
 
         map_stack(builder, &opt, *base.read().get_stack_start().wait());

@@ -1,7 +1,5 @@
 use modular_bitfield::prelude::*;
 
-use crate::mp::lapic::DeliverMode;
-
 #[bitfield(bytes = 4)]
 pub struct TimerLvt {
     pub vector: B8,

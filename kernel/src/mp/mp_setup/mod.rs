@@ -4,18 +4,18 @@ pub mod trampoline;
 use core::convert::Infallible;
 
 use alloc::collections::btree_map::BTreeMap;
+use cake::log::info;
 use cake::{
     declare_module,
     spin::{Once, RwLock},
 };
 pub use context::CoreContext;
-use cake::log::info;
 
 use crate::{mp::mp_setup::trampoline::prepare_cpu, requests::MP_INFO};
 
-pub static CORES: Once<BTreeMap<u32, &'static RwLock<CoreContext>>> = Once::new();
+static CORES: Once<BTreeMap<u32, &'static RwLock<CoreContext>>> = Once::new();
 
-pub fn init() -> Result<(), Infallible> {
+pub(super) fn init() -> Result<(), Infallible> {
     let mp = MP_INFO.get_limine();
 
     let cpus = mp.cpus();
@@ -42,6 +42,7 @@ pub fn init() -> Result<(), Infallible> {
     Ok(())
 }
 
+/// Returns a reference to the map of all core contexts.
 pub fn cores() -> &'static BTreeMap<u32, &'static RwLock<CoreContext>> {
     CORES.wait()
 }

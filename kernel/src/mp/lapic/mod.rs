@@ -1,5 +1,9 @@
-use cake::spin::Once;
+//! Various rust abstractions for Local APIC (LAPIC) management.
+//!
+//! Most of the documentation for individual types are taken directly from section 3A of
+//! the Intel® 64 and IA-32 Architectures Software Developer’s Manual
 use cake::log::{debug, info};
+use cake::spin::Once;
 use x86_64::{registers::model_specific::Msr, structures::paging::PageTableFlags};
 
 use crate::{

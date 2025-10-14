@@ -1,7 +1,8 @@
-use core::{convert::Infallible, sync::atomic::AtomicU32};
+//! Multiprocessor setup and processor local APIC management.
+use core::convert::Infallible;
 
 use cake::log::info;
-use raw_cpuid::{CpuId, CpuIdResult};
+use raw_cpuid::CpuId;
 
 use crate::{
     declare_module,
@@ -9,18 +10,25 @@ use crate::{
     mp::{ioapic::IoApic, lapic::Lapic, mp_setup::dispatch_all},
 };
 
-mod ioapic;
-mod lapic;
-mod req_data;
+pub mod ioapic;
+pub mod lapic;
+pub mod req_data;
 
-pub mod mp_setup;
+mod mp_setup;
+
+pub use mp_setup::{
+    CoreContext, MODULE as PREINIT_MODULE, cores, dispatch_to, is_initialized as has_init_mp,
+};
 
 pub use req_data::{ApplicationCore, ApplicationCores};
 
+/// The local APIC for the current core.
 pub static LAPIC: Lapic = Lapic::new();
+
+/// The IO APIC for the current system.
 pub static IOAPIC: IoApic = IoApic::new();
 
-pub fn init() -> Result<(), Infallible> {
+fn init() -> Result<(), Infallible> {
     LAPIC.init();
     IOAPIC.init();
     info!("IO APIC Version: {:?}", IOAPIC.version());
@@ -38,12 +46,14 @@ pub fn init() -> Result<(), Infallible> {
     Ok(())
 }
 
-pub fn apic_init() {
+fn apic_init() {
     info!("Initializing LAPIC on core {}", current_core_id());
 }
 
 declare_module!("MP", init);
 
+/// Returns the current core's APIC ID.
+#[inline]
 pub fn current_core_id() -> u64 {
     // INFO: We don't use `CpuId::new()` because
     CpuId::with_cpuid_reader(raw_cpuid::CpuIdReaderNative)

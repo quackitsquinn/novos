@@ -27,8 +27,6 @@ use cake::spin::Once;
 use interrupts::hardware;
 use kserial::client::get_serial_client;
 
-use crate::mp::mp_setup;
-
 pub mod acpi;
 pub mod context;
 pub mod display;
@@ -104,7 +102,7 @@ pub(crate) unsafe fn init_kernel_services() {
 
     // test_two_way_serial();
     memory::MODULE.init();
-    mp_setup::MODULE.init();
+    mp::PREINIT_MODULE.init();
     memory::paging::kernel::MODULE.init();
     #[cfg(not(test))] // Tests don't have a display
     display::MODULE.init();

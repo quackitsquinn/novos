@@ -1,6 +1,7 @@
 use core::fmt::Debug;
 use modular_bitfield::prelude::*;
 
+/// Interrupt Command Register (ICR) register.
 #[derive(Clone, Copy)]
 #[bitfield(bytes = 8)]
 pub struct InterruptCommandRegister {

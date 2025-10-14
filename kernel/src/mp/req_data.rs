@@ -3,14 +3,16 @@ use core::ops::Deref;
 use arrayvec::ArrayVec;
 
 use cake::{
-    limine::{mp::Cpu, response::MpResponse},
     LimineData,
+    limine::{mp::Cpu, response::MpResponse},
 };
 
 /// A single application core, with its APIC ID and LAPIC address.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ApplicationCore {
+    /// The APIC ID of the core.
     pub apic_id: u32,
+    /// The LAPIC ID of the core.
     pub lapic: u32,
 }
 
