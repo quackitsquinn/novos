@@ -2,7 +2,7 @@
 
 use core::{convert::Infallible, fmt::Write, panic::PanicInfo};
 
-use cake::{Fuse, spin::Once};
+use cake::Fuse;
 
 use crate::{
     declare_module, hlt_loop,

@@ -6,6 +6,7 @@ use cake::log::{debug, info};
 use cake::spin::Once;
 use x86_64::{registers::model_specific::Msr, structures::paging::PageTableFlags};
 
+use crate::mp::lapic::lvt::TimerLvt;
 use crate::{
     memory::paging::phys::phys_mem::{self, PhysicalMemoryMap},
     mp::apic_page_flags,
@@ -187,20 +188,16 @@ impl Lapic {
     }
 
     /// Reads the Local Vector Table (LVT) Timer Register.
-    pub fn read_lvt_timer(&self) -> InterruptCommandRegister {
-        unsafe {
-            InterruptCommandRegister::from_bytes(
-                self.read_offset::<[u8; 8]>(InterruptCommandRegister::REGISTER),
-            )
-        }
+    pub fn read_lvt_timer(&self) -> TimerLvt {
+        unsafe { TimerLvt::from_bytes(self.read_offset::<[u8; 4]>(TimerLvt::REGISTER)) }
     }
 
     /// Writes to the Local Vector Table (LVT) Timer Register.
     /// # Safety
     /// The caller must ensure that the given LVT Timer value is valid and does not conflict with other LVT entries.
-    pub unsafe fn write_lvt_timer(&self, lvt: InterruptCommandRegister) {
+    pub unsafe fn write_lvt_timer(&self, lvt: TimerLvt) {
         unsafe {
-            self.write_offset::<[u8; 8]>(InterruptCommandRegister::REGISTER, lvt.into_bytes());
+            self.write_offset::<[u8; 4]>(TimerLvt::REGISTER, lvt.into_bytes());
         }
     }
 
@@ -209,7 +206,7 @@ impl Lapic {
     /// The caller must ensure that the given LVT Timer closure will keep the LVT entry valid and does not conflict with other LVT entries.
     pub unsafe fn update_lvt_timer<F>(&self, f: F)
     where
-        F: FnOnce(&mut InterruptCommandRegister),
+        F: FnOnce(&mut TimerLvt),
     {
         let mut lvt = self.read_lvt_timer();
         f(&mut lvt);
