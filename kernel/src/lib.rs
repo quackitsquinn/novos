@@ -19,7 +19,7 @@ extern crate alloc;
 
 use core::arch::asm;
 
-use cake::declare_module;
+use cake::{Fuse, declare_module};
 
 use cake::limine::BaseRevision;
 use cake::log::info;
@@ -80,11 +80,12 @@ pub extern "sysv64" fn init_kernel(rsp: u64) -> ! {
 pub(crate) unsafe fn init_kernel_services() {
     // Ensure this function is only called once.
     // This is subject to removal so don't bank on it, hence why it's unsafe.
-    static INIT: Once<()> = Once::new();
-    if INIT.is_completed() {
+    static INIT: Fuse = Fuse::new();
+    if INIT.is_blown() {
         panic!("init_kernel_services called more than once");
     }
-    INIT.call_once(|| ());
+    INIT.blow();
+
     serial::MODULE.init();
     requests::MODULE.init();
     panic::MODULE.init();

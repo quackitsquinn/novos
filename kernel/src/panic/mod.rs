@@ -2,7 +2,7 @@
 
 use core::{convert::Infallible, fmt::Write, panic::PanicInfo};
 
-use cake::spin::Once;
+use cake::{Fuse, spin::Once};
 
 use crate::{
     declare_module, hlt_loop,
@@ -67,17 +67,17 @@ fn write_location(pi: &PanicInfo) {
     }
 }
 
-static PANIC_CHECK: Once<()> = Once::new();
+static PANICKED: Fuse = Fuse::new();
 
 /// Default method for handling panics.
 /// This will defer to [panic_basic] if a double panic occurs (e.g. a panic within `panic_extended_info`)
 pub fn panic(pi: &PanicInfo) -> ! {
-    if PANIC_CHECK.is_completed() {
+    if PANICKED.is_blown() {
         //println!("Double panic!");
         panic_basic(pi);
         hlt_loop();
     }
-    PANIC_CHECK.call_once(|| ());
+    PANICKED.blow();
     panic_extended_info(pi);
     println!("Done; attempting QEMU exit");
     testing::try_shutdown_qemu(true);
