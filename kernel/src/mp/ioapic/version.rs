@@ -16,6 +16,7 @@ pub struct IoApicVersion {
 }
 
 impl IoApicVersion {
+    /// The IOAPIC version register address.
     pub const REGISTER: u8 = 0x01;
 }
 

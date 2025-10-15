@@ -1,13 +1,13 @@
+//! Various Rust abstractions for IOAPIC support.
 use core::fmt::Debug;
 
 use ::acpi::{
-    sdt::madt::{Madt, MadtEntry},
     AcpiTable,
+    sdt::madt::{Madt, MadtEntry},
 };
-use cake::{spin::Once, OnceMutex};
 use cake::log::info;
+use cake::{OnceMutex, spin::Once};
 use modular_bitfield::prelude::*;
-use x86_64::registers::model_specific::Msr;
 
 use crate::{
     acpi,
@@ -21,6 +21,7 @@ mod version;
 pub use redirection::RedirectionEntry;
 pub use version::IoApicVersion;
 
+/// Represents an I/O Advanced Programmable Interrupt Controller (IOAPIC).
 #[derive(Debug)]
 pub struct IoApic {
     base: Once<u64>,
@@ -29,6 +30,7 @@ pub struct IoApic {
 }
 
 impl IoApic {
+    /// Creates an empty IOAPIC instance.
     pub const fn new() -> Self {
         Self {
             base: Once::new(),
@@ -37,6 +39,7 @@ impl IoApic {
         }
     }
 
+    /// Initializes the IOAPIC by reading the MADT and mapping the IOAPIC's physical address into the kernel's address space.
     pub fn init(&self) {
         let madt_raw = acpi::get_table(Madt::SIGNATURE).expect("Failed to get MADT");
         let madt = madt_raw.try_as::<Madt>().expect("MADT is not a MADT");
@@ -151,6 +154,7 @@ impl IoApic {
     }
 }
 
+/// Represents the ID register of the IOAPIC.
 #[bitfield(bytes = 4)]
 pub struct IoApicId {
     #[skip]
@@ -162,6 +166,7 @@ pub struct IoApicId {
 }
 
 impl IoApicId {
+    /// The IOAPIC ID register.
     pub const REGISTER: u8 = 0x00;
 }
 
