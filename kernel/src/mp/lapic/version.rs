@@ -1,6 +1,8 @@
 use core::fmt::Debug;
 use modular_bitfield::prelude::*;
 
+use crate::mp::id;
+
 /// Represents the LAPIC version register.
 #[derive(Clone, Copy)]
 #[bitfield(bytes = 4)]
@@ -13,6 +15,8 @@ pub struct LapicVersion {
     #[skip]
     __: B8,
 }
+
+id!(LapicVersion, REGISTER, 0x30);
 
 impl Debug for LapicVersion {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {

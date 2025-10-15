@@ -1,3 +1,4 @@
+//! Post page table switch data structures and abstractions.
 use core::ops::Deref;
 
 use arrayvec::ArrayVec;

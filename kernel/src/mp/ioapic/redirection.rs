@@ -1,3 +1,4 @@
+//! Redirection entry.
 use core::fmt::Debug;
 use modular_bitfield::prelude::*;
 
@@ -9,9 +10,8 @@ pub struct RedirectionEntry {
     /// The delivery mode of the interrupt
     #[bits = 3]
     delivery_mode: DeliveryMode,
-
     /// This field determines the interpretation of the Destination field.
-    ///When DESTMOD=0 (physical mode), a destination APIC is identified by its ID.
+    /// When DESTMOD=0 (physical mode), a destination APIC is identified by its ID.
     /// Bits 56 through 59 of the Destination field specify the 4 bit APIC ID. When DESTMOD=1 (logical
     /// mode), destinations are identified by matching on the logical destination under the control of the
     /// Destination Format Register and Logical Destination Register in each Local APIC.
@@ -37,10 +37,10 @@ pub struct RedirectionEntry {
     mask: bool,
     #[skip]
     __: B39,
-    /// the Destination Mode of this entry is Physical Mode (bit 11=0), bits
-    // [59:56] contain an APIC ID. If Logical Mode is selected (bit 11=1), the Destination Field
-    // potentially defines a set of processors. Bits [63:56] of the Destination Field specify the logical
-    // destination address.
+    /// The Destination Mode of this entry is Physical Mode (bit 11=0), bits
+    /// [59:56] contain an APIC ID. If Logical Mode is selected (bit 11=1), the Destination Field
+    /// potentially defines a set of processors. Bits [63:56] of the Destination Field specify the logical
+    /// destination address.
     destination: B8,
 }
 

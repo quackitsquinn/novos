@@ -1,6 +1,8 @@
 use core::fmt::Debug;
 use modular_bitfield::prelude::*;
 
+use crate::mp::id;
+
 /// Interrupt Command Register (ICR) register.
 #[derive(Clone, Copy)]
 #[bitfield(bytes = 8)]
@@ -28,23 +30,55 @@ pub struct InterruptCommandRegister {
     pub destination: B8,
 }
 
+id!(InterruptCommandRegister, REGISTER, 0x300);
+
+/// Delivery mode of the interrupt.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Specifier)]
 pub enum DeliverMode {
+    /// Delivers the interrupt specified in the vector field to the target processor
+    /// or processors.
     Fixed = 0b000,
+    /// Same as fixed mode, except that the interrupt is delivered to the proces-
+    /// sor executing at the lowest priority among the set of processors specified
+    /// in the destination field. The ability for a processor to send a lowest priority
+    /// IPI is model specific and should be avoided by BIOS and operating system
+    /// software
     LowestPriority = 0b001,
+    /// Delivers an SMI interrupt to the target processor or processors. The vector
+    /// field must be programmed to 00H for future compatibility.
     Smi = 0b010,
+    /// Delivers an NMI interrupt to the target processor or processors. The vector
+    /// information is ignored.
     Nmi = 0b100,
+    /// Delivers an INIT request to the target processor or processors, which
+    /// causes them to perform an INIT. As a result of this IPI message, all the
+    /// target processors perform an INIT. The vector field must be programmed
+    /// to 00H for future compatibility.
     Init = 0b101,
+    /// Sends a special “start-up” IPI (called a SIPI) to the target processor or
+    /// processors. The vector typically points to a start-up routine that is part of
+    /// the BIOS boot-strap code (see Section 8.4, “Multiple-Processor (MP) Ini-
+    /// tialization”). IPIs sent with this delivery mode are not automatically retried
+    /// if the source APIC is unable to deliver it. It is up to the software to deter-
+    /// mine if the SIPI was not successfully delivered and to reissue the SIPI if
+    /// necessary.
     Startup = 0b110,
-    Invalid1 = 0b011,
-    Invalid2 = 0b111,
+    #[doc(hidden)]
+    _Invalid1 = 0b011,
+    #[doc(hidden)]
+    _Invalid2 = 0b111,
 }
 
+/// An optional shorthand notation for the destination field.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Specifier)]
 pub enum DestinationShorthand {
+    /// No shorthand notation. The destination field contains the destination
     NoShorthand = 0b00,
+    /// The issuer is the sole recipient of the interrupt.
     SelfOnly = 0b01,
+    /// All processors including the issuer are the recipients of the interrupt.
     AllIncludingSelf = 0b10,
+    /// All processors excluding the issuer are the recipients of the interrupt.
     AllExcludingSelf = 0b11,
 }
 

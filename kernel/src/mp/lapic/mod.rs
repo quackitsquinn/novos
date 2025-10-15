@@ -20,13 +20,11 @@ pub use icr::{DeliverMode, DestinationShorthand, InterruptCommandRegister};
 pub use svr::SpuriousInterruptVector;
 pub use version::LapicVersion;
 
+/// The Model Specific Register (MSR) used to determine the base address of the Local APIC.
 pub const LAPIC_BASE_MSR: Msr = Msr::new(0x1B);
 
-pub const LAPIC_VERSION_OFFSET: usize = 0x30;
+/// The offset for the End Of Interrupt (EOI) register.
 pub const LAPIC_EOI_OFFSET: usize = 0xB0;
-pub const LAPIC_SVR_OFFSET: usize = 0xF0;
-pub const LAPIC_ICR_OFFSET: usize = 0x300;
-pub const LAPIC_LVT_TIMER_OFFSET: usize = 0x320;
 
 /// Represents the Local APIC (LAPIC) of the CPU.
 /// Provides methods to read and write LAPIC registers, send interrupts, and manage LAPIC state
@@ -95,7 +93,8 @@ impl Lapic {
     /// Reads the LAPIC version register.
     pub fn version(&self) -> LapicVersion {
         LapicVersion::from_bytes(unsafe {
-            self.read_offset::<u32>(LAPIC_VERSION_OFFSET).to_ne_bytes()
+            self.read_offset::<u32>(LapicVersion::REGISTER)
+                .to_ne_bytes()
         })
     }
 
@@ -112,7 +111,8 @@ impl Lapic {
     /// Reads the Spurious Interrupt Vector Register (SVR).
     pub fn read_svr(&self) -> SpuriousInterruptVector {
         SpuriousInterruptVector::from_bytes(unsafe {
-            self.read_offset::<u32>(LAPIC_SVR_OFFSET).to_ne_bytes()
+            self.read_offset::<u32>(SpuriousInterruptVector::REGISTER)
+                .to_ne_bytes()
         })
     }
 
@@ -122,7 +122,10 @@ impl Lapic {
     /// The caller must also ensure that the value being written is valid.
     pub unsafe fn write_svr(&self, svr: SpuriousInterruptVector) {
         unsafe {
-            self.write_offset::<u32>(LAPIC_SVR_OFFSET, u32::from_ne_bytes(svr.into_bytes()));
+            self.write_offset::<u32>(
+                SpuriousInterruptVector::REGISTER,
+                u32::from_ne_bytes(svr.into_bytes()),
+            );
         }
     }
 
@@ -154,7 +157,9 @@ impl Lapic {
     /// Reads the Interrupt Command Register (ICR).
     pub fn read_icr(&self) -> InterruptCommandRegister {
         unsafe {
-            InterruptCommandRegister::from_bytes(self.read_offset::<[u8; 8]>(LAPIC_ICR_OFFSET))
+            InterruptCommandRegister::from_bytes(
+                self.read_offset::<[u8; 8]>(InterruptCommandRegister::REGISTER),
+            )
         }
     }
 
@@ -165,7 +170,7 @@ impl Lapic {
     /// The caller must also ensure that the deliver status is not modified.
     pub unsafe fn write_icr(&self, icr: InterruptCommandRegister) {
         unsafe {
-            self.write_offset::<[u8; 8]>(LAPIC_ICR_OFFSET, icr.into_bytes());
+            self.write_offset::<[u8; 8]>(InterruptCommandRegister::REGISTER, icr.into_bytes());
         }
     }
 
@@ -185,7 +190,7 @@ impl Lapic {
     pub fn read_lvt_timer(&self) -> InterruptCommandRegister {
         unsafe {
             InterruptCommandRegister::from_bytes(
-                self.read_offset::<[u8; 8]>(LAPIC_LVT_TIMER_OFFSET),
+                self.read_offset::<[u8; 8]>(InterruptCommandRegister::REGISTER),
             )
         }
     }
@@ -195,7 +200,7 @@ impl Lapic {
     /// The caller must ensure that the given LVT Timer value is valid and does not conflict with other LVT entries.
     pub unsafe fn write_lvt_timer(&self, lvt: InterruptCommandRegister) {
         unsafe {
-            self.write_offset::<[u8; 8]>(LAPIC_LVT_TIMER_OFFSET, lvt.into_bytes());
+            self.write_offset::<[u8; 8]>(InterruptCommandRegister::REGISTER, lvt.into_bytes());
         }
     }
 

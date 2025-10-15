@@ -12,7 +12,7 @@ use modular_bitfield::prelude::*;
 use crate::{
     acpi,
     memory::paging::phys::phys_mem::{self, PhysicalMemoryMap},
-    mp::apic_page_flags,
+    mp::{apic_page_flags, id},
 };
 
 mod redirection;
@@ -134,14 +134,19 @@ impl IoApic {
 
     /// Reads the IOAPIC ID register.
     pub fn id(&self) -> IoApicId {
-        IoApicId::from_bytes(unsafe { self.read_register(IoApicId::REGISTER).to_ne_bytes() })
+        IoApicId::from_bytes(unsafe { self.read_register(IoApicId::REGISTER as u8).to_ne_bytes() })
     }
 
     /// Updates the IOAPIC ID register.
     /// # Safety
     /// The caller must ensure that the new ID is valid and does not conflict with other IOAPIC IDs in the system.
     pub unsafe fn update_id(&self, new: IoApicId) {
-        unsafe { self.write_register(IoApicId::REGISTER, u32::from_ne_bytes(new.into_bytes())) };
+        unsafe {
+            self.write_register(
+                IoApicId::REGISTER as u8,
+                u32::from_ne_bytes(new.into_bytes()),
+            )
+        };
     }
 
     /// Reads the redirection entry at the given index.
@@ -165,10 +170,7 @@ pub struct IoApicId {
     __: B4,
 }
 
-impl IoApicId {
-    /// The IOAPIC ID register.
-    pub const REGISTER: u8 = 0x00;
-}
+id!(IoApicId, REGISTER, 0x00);
 
 impl Debug for IoApicId {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {

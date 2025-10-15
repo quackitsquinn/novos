@@ -1,6 +1,8 @@
 use core::fmt::Debug;
 use modular_bitfield::prelude::*;
 
+use crate::mp::id;
+
 /// Spurious Interrupt Vector Register (SVR).
 #[derive(Clone, Copy)]
 #[bitfield(bytes = 4)]
@@ -17,6 +19,8 @@ pub struct SpuriousInterruptVector {
     #[skip]
     __: B15,
 }
+
+id!(SpuriousInterruptVector, REGISTER, 0xF0);
 
 impl Debug for SpuriousInterruptVector {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {

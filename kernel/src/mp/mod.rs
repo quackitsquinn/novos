@@ -65,3 +65,19 @@ fn apic_page_flags() -> x86_64::structures::paging::PageTableFlags {
     use x86_64::structures::paging::PageTableFlags as Flags;
     Flags::PRESENT | Flags::NO_CACHE | Flags::WRITABLE | Flags::NO_EXECUTE
 }
+
+mod _macro {
+    /// Defines a constant identifier for a given type.
+    macro_rules! id {
+        ($typ: ident, $name: ident, $value: expr) => {
+            impl $typ {
+                /// The register offset for this type.
+                pub const $name: usize = $value;
+            }
+        };
+    }
+
+    pub(super) use id;
+}
+
+pub(self) use _macro::*;
