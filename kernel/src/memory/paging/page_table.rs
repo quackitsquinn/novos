@@ -52,10 +52,12 @@ impl<'a> ActivePageTable<'a> {
         }
     }
 
+    /// Initializes the limine page table with the given OffsetPageTable.
     pub fn init_limine(&mut self, opt: OffsetPageTable<'a>) {
         self.limine = Some(opt);
     }
 
+    /// Switches the active page table to the given RecursivePageTable.
     pub fn switch(&mut self, rpt: RecursivePageTable<'a>) {
         self.limine.take();
         self.remapped = Some(rpt);
@@ -89,6 +91,7 @@ impl<'a> ActivePageTable<'a> {
         }
     }
 
+    /// Reclaims the lower half of the page table by deallocating frames.
     pub unsafe fn reclaim_lower_half(&mut self) {
         for i in 0..256 {
             let pml4 = self.get_pml4_mut();
@@ -136,7 +139,7 @@ impl Mapper<KernelPageSize> for ActivePageTable<'_> {
     fn unmap(
         &mut self,
         page: KernelPage,
-    ) -> Result<(PhysFrame<KernelPageSize>, MapperFlush<KernelPageSize>), UnmapError> {
+    ) -> Result<(PhysFrame<KernelPageSize>, MapperFlush<KernelPageSize>), UnmapError> { 
         active_pt!(mut self.unmap(page))
     }
 

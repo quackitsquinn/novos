@@ -2,13 +2,13 @@
 //! This includes methods for accessing various ACPI tables and their entries (see the [mapped_table] module).
 use core::{mem, ops::Deref, ptr::read_unaligned};
 
-use acpi::{rsdp::Rsdp, sdt::Signature, AcpiError};
+use acpi::{AcpiError, rsdp::Rsdp, sdt::Signature};
 use alloc::collections::btree_map::BTreeMap;
+use cake::Owned;
 use cake::log::{info, warn};
 use cake::spin::{Mutex, MutexGuard, Once};
-use cake::Owned;
 pub use mapped_table::MappedTable;
-use x86_64::{structures::paging::PageTableFlags, PhysAddr};
+use x86_64::{PhysAddr, structures::paging::PageTableFlags};
 
 use crate::{acpi::sdt::TableHeader, declare_module, memory::paging::phys::phys_mem::map_address};
 
@@ -30,12 +30,14 @@ fn init() -> Result<(), AcpiError> {
         .as_ref()
         .ok_or(AcpiError::NoValidRsdp)?;
 
-    let rsdp_table = map_address(
-        PhysAddr::new(rsdp_addr as u64),
-        size_of::<Rsdp>() as u64,
-        PageTableFlags::PRESENT,
-    )
-    .expect("Failed to map RSDP");
+    let rsdp_table = unsafe {
+        map_address(
+            PhysAddr::new(rsdp_addr as u64),
+            size_of::<Rsdp>() as u64,
+            PageTableFlags::PRESENT,
+        )
+        .expect("Failed to map RSDP")
+    };
 
     let rdsp = unsafe { Owned::new(&mut *(rsdp_table.ptr() as *mut Rsdp)) };
     rdsp.validate()?;

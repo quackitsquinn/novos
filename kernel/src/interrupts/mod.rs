@@ -14,6 +14,8 @@ use crate::{
     declare_module, init_interrupt_table, interrupt_wrapper,
 };
 
+pub use lock::{InterruptMutex, InterruptMutexGuard};
+
 /// The global Interrupt Descriptor Table.
 pub static IDT: InterruptTable = InterruptTable::uninitialized();
 

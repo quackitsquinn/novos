@@ -53,8 +53,9 @@ impl IoApic {
         let base = *self.base.get().expect("No IOAPIC found in MADT");
         info!("IO APIC base address: {:#x}", base);
         let phys_addr = x86_64::PhysAddr::new(base);
-        let map =
-            phys_mem::map_address(phys_addr, 1, apic_page_flags()).expect("Failed to map IOAPIC");
+        let map = unsafe {
+            phys_mem::map_address(phys_addr, 1, apic_page_flags()).expect("Failed to map IOAPIC")
+        };
 
         info!("Mapped IO APIC at {:p}", map.ptr());
 

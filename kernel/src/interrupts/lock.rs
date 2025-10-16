@@ -1,4 +1,7 @@
-use core::ops::{Deref, DerefMut};
+use core::{
+    fmt::Debug,
+    ops::{Deref, DerefMut},
+};
 
 use cake::spin::Mutex;
 
@@ -56,3 +59,23 @@ impl<T> InterruptMutex<T> {
 
 unsafe impl<T: Send> Sync for InterruptMutex<T> {}
 unsafe impl<T: Send> Send for InterruptMutex<T> {}
+
+impl<T> Debug for InterruptMutex<T> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("InterruptMutex")
+            .field("is_locked", &self.data.is_locked())
+            .finish()
+    }
+}
+
+impl<T> Debug for InterruptMutexGuard<'_, T>
+where
+    T: Debug,
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("InterruptMutexGuard")
+            .field("data", &*self.guard)
+            .field("reenable", &self.reenable)
+            .finish()
+    }
+}

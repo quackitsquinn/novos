@@ -1,3 +1,4 @@
+//! Virtual memory page allocator
 use alloc::{vec, vec::Vec};
 use x86_64::VirtAddr;
 

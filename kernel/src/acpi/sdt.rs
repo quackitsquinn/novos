@@ -2,13 +2,13 @@
 use core::{mem, pin::Pin};
 
 use acpi::{
-    sdt::{SdtHeader, Signature},
     AcpiError, AcpiTable,
+    sdt::{SdtHeader, Signature},
 };
 use cake::Owned;
-use x86_64::{structures::paging::PageTableFlags, PhysAddr};
+use x86_64::{PhysAddr, structures::paging::PageTableFlags};
 
-use crate::memory::paging::phys::phys_mem::{map_address, remap_address, PhysicalMemoryMap};
+use crate::memory::paging::phys::phys_mem::{PhysicalMemoryMap, map_address, remap_address};
 
 /// A header for an ACPI SDT (System Description Table).
 #[derive(Debug)]
@@ -23,11 +23,13 @@ impl<'a> TableHeader<'a> {
     /// # Safety
     /// The caller must ensure that the physical address is valid and that the table is not already mapped.
     pub unsafe fn new(p_address: PhysAddr) -> Self {
-        let map = map_address(
-            p_address,
-            size_of::<SdtHeader>() as u64,
-            PageTableFlags::PRESENT,
-        )
+        let map = unsafe {
+            map_address(
+                p_address,
+                size_of::<SdtHeader>() as u64,
+                PageTableFlags::PRESENT,
+            )
+        }
         .expect("Failed to map ACPI table header");
 
         let inner = unsafe { Owned::new(&mut *(map.ptr() as *mut acpi::sdt::SdtHeader)) };

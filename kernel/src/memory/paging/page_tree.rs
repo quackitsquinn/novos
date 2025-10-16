@@ -1,3 +1,4 @@
+//! Provides abstractions for working with the hierarchical page table structure.
 use x86_64::{
     VirtAddr,
     structures::paging::{
@@ -6,27 +7,46 @@ use x86_64::{
     },
 };
 
-use crate::memory::paging::builder::{PageTableBuilder, RECURSIVE_ENTRY_INDEX};
+use crate::memory::paging::builder::RECURSIVE_ENTRY_INDEX;
 
 /// This trait provides an interface for accessing different levels of the page table hierarchy.
 /// It allows for retrieving immutable and mutable references to page tables at various levels.
 pub trait PageTree {
+    /// Returns an immutable reference to the PML4 table.
     fn get_pml4(&self) -> &PageTable;
 
+    /// Returns a mutable reference to the PML4 table.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that any modifications to this page table are safe and won't cause undefined behavior.
     fn get_pml4_mut(&mut self) -> &mut PageTable;
 
+    /// Returns an immutable reference to a level 3 page table (PDPT) given a PML4 index.
     fn get_l3(&self, pml4_index: PageTableIndex) -> Option<&PageTable>;
 
+    /// Returns a mutable reference to a level 3 page table (PDPT) given a PML4 index.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that any modifications to this page table are safe and won't cause undefined behavior.
     unsafe fn get_l3_mut(&mut self, pml4_index: PageTableIndex) -> Option<&mut PageTable>;
 
+    /// Returns an immutable reference to a level 2 page table (PD) given a PML4 and PDPT index.
     fn get_l2(&self, pml4_index: PageTableIndex, pdpt_index: PageTableIndex) -> Option<&PageTable>;
 
+    /// Returns a mutable reference to a level 2 page table (PD) given a PML4 and PDPT index.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that any modifications to this page table are safe and won't cause undefined behavior.
     unsafe fn get_l2_mut(
         &mut self,
         pml4_index: PageTableIndex,
         pdpt_index: PageTableIndex,
     ) -> Option<&mut PageTable>;
 
+    /// Returns an immutable reference to a level 1 page table (PT) given a PML4, PDPT, and PD index.
     fn get_l1(
         &self,
         pml4_index: PageTableIndex,
@@ -34,6 +54,11 @@ pub trait PageTree {
         pd_index: PageTableIndex,
     ) -> Option<&PageTable>;
 
+    /// Returns a mutable reference to a level 1 page table (PT) given a PML4, PDPT, and PD index.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that any modifications to this page table are safe and won't cause undefined behavior.
     unsafe fn get_l1_mut(
         &mut self,
         pml4_index: PageTableIndex,

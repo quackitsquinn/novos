@@ -12,7 +12,7 @@ use x86_64::{
 
 use crate::memory::{self, paging::KernelPhysFrame, req_data::MemoryMap};
 
-pub(crate) struct PageFrameAllocator {
+pub(crate) struct PhysFrameAllocator {
     map: &'static MemoryMap,
     off: usize,
     current: Entry,
@@ -20,7 +20,7 @@ pub(crate) struct PageFrameAllocator {
     unused: Vec<KernelPhysFrame>,
 }
 
-impl PageFrameAllocator {
+impl PhysFrameAllocator {
     pub fn new(map: &'static MemoryMap) -> Self {
         // Find the first usable entry
         let (current, entry) = map
@@ -156,7 +156,7 @@ impl From<UnmapError> for MapError {
     }
 }
 
-unsafe impl FrameAllocator<Size4KiB> for PageFrameAllocator {
+unsafe impl FrameAllocator<Size4KiB> for PhysFrameAllocator {
     fn allocate_frame(&mut self) -> Option<KernelPhysFrame> {
         if self.unused.len() > 0 {
             return self.unused.pop();
@@ -176,7 +176,7 @@ unsafe impl FrameAllocator<Size4KiB> for PageFrameAllocator {
     }
 }
 
-impl FrameDeallocator<Size4KiB> for PageFrameAllocator {
+impl FrameDeallocator<Size4KiB> for PhysFrameAllocator {
     unsafe fn deallocate_frame(&mut self, frame: KernelPhysFrame) {
         if memory::is_initialized() {
             self.unused.push(frame);

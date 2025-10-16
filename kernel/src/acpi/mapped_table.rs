@@ -1,11 +1,11 @@
 //! Support for mapping dynamically sized ACPI tables from physical memory.
 use core::fmt;
 
-use acpi::{sdt::SdtHeader, AcpiError, AcpiTable};
+use acpi::{AcpiError, AcpiTable, sdt::SdtHeader};
 use cake::Owned;
-use x86_64::{structures::paging::PageTableFlags, PhysAddr};
+use x86_64::{PhysAddr, structures::paging::PageTableFlags};
 
-use crate::memory::paging::phys::phys_mem::{map_address, unmap_address, PhysicalMemoryMap};
+use crate::memory::paging::phys::phys_mem::{PhysicalMemoryMap, map_address, unmap_address};
 /// A mapped ACPI table.
 pub struct MappedTable<'a, T: AcpiTable> {
     table: Owned<T>,
@@ -19,12 +19,14 @@ impl<'a, T: AcpiTable> MappedTable<'a, T> {
     /// # Safety
     /// The caller must ensure that the physical address is valid and that the table is not already mapped.
     pub unsafe fn new(addr: PhysAddr) -> Result<Self, AcpiError> {
-        let mut phys_map = map_address(
-            addr,
-            core::mem::size_of::<T>() as u64,
-            PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
-        )
-        .expect("Failed to map ACPI table");
+        let mut phys_map = unsafe {
+            map_address(
+                addr,
+                core::mem::size_of::<T>() as u64,
+                PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
+            )
+            .expect("Failed to map ACPI table")
+        };
 
         let table: &mut SdtHeader = unsafe { &mut *(phys_map.ptr() as *mut SdtHeader) };
 
@@ -34,11 +36,13 @@ impl<'a, T: AcpiTable> MappedTable<'a, T> {
 
         let length = table.length as usize;
         if length > core::mem::size_of::<T>() {
-            let new_phys_map = map_address(
-                addr,
-                length as u64,
-                PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
-            )
+            let new_phys_map = unsafe {
+                map_address(
+                    addr,
+                    length as u64,
+                    PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
+                )
+            }
             .expect("Failed to map full ACPI table");
             unmap_address(phys_map);
             phys_map = new_phys_map;

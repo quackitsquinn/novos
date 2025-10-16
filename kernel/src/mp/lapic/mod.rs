@@ -2,9 +2,9 @@
 //!
 //! Most of the documentation for individual types are taken directly from section 3A of
 //! the Intel® 64 and IA-32 Architectures Software Developer’s Manual
-use cake::log::{debug, info};
+use cake::log::info;
 use cake::spin::Once;
-use x86_64::{registers::model_specific::Msr, structures::paging::PageTableFlags};
+use x86_64::registers::model_specific::Msr;
 
 use crate::mp::lapic::lvt::TimerLvt;
 use crate::{
@@ -54,8 +54,9 @@ impl Lapic {
         self.base.call_once(|| base);
         info!("LAPIC base address: {:#x}", base);
         let phys_addr = x86_64::PhysAddr::new(base);
-        let map =
-            phys_mem::map_address(phys_addr, 1, apic_page_flags()).expect("Failed to map LAPIC");
+        let map = unsafe {
+            phys_mem::map_address(phys_addr, 1, apic_page_flags()).expect("Failed to map LAPIC")
+        };
 
         self.table.call_once(|| map);
         self.mapped.call_once(|| map.ptr().cast_mut());

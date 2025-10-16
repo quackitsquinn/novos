@@ -1,6 +1,7 @@
+//! Virtual address range utilities.
 use x86_64::{
-    structures::paging::{page::PageRangeInclusive, Page},
     VirtAddr,
+    structures::paging::{Page, page::PageRangeInclusive},
 };
 
 use crate::memory::paging::{KernelPage, KernelPageSize};
