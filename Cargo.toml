@@ -25,3 +25,8 @@ krun = { path = "krun" }
 
 [workspace.metadata.smartcheck]
 kernel = "x86_64-unknown-none"
+
+[workspace.lints.rust]
+unsafe-op-in-unsafe-function = "forbid"
+missing_debug_implementations = "warn"
+missing_docs = "warn"

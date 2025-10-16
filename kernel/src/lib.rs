@@ -7,10 +7,6 @@
 #![feature(custom_test_frameworks)]
 #![feature(allocator_api)]
 #![feature(pointer_is_aligned_to)]
-/* LINT OPTS */
-#![forbid(unsafe_op_in_unsafe_fn)]
-#![warn(missing_debug_implementations)]
-#![warn(missing_docs)]
 /* TEST RUNNER */
 #![test_runner(crate::testing::test_runner)]
 #![reexport_test_harness_main = "test_main"]

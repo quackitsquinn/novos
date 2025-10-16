@@ -6,3 +6,6 @@ edition = "2024"
 description = "Modularized build system for nova"
 
 [dependencies]
+
+[lints]
+workspace = true

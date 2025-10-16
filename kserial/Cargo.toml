@@ -16,6 +16,9 @@ kserial_derive = {path = "kserial_derive"}
 default = ["std"]
 std = []
 
+[lints]
+workspace = true
+
 # INFO: THIS CFG DIRECTIVE IS *VERY IMPORTANT* FOR THE BUILD SYSTEM
 # If the `cfg(unix)` directive is not present, cargo will insist that you are trying to build this for #![no_std].
 # This will cause rust-analyzer to do *really* weird things, and make you spend 3 hours trying to figure out why
