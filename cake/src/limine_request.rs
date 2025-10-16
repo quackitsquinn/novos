@@ -1,13 +1,18 @@
-use core::sync::atomic::AtomicBool;
+use core::{fmt, sync::atomic::AtomicBool};
 
 use spin::Once;
 
 use crate::{ResourceGuard, resource::ResourceMutex};
 
+/// A trait representing a raw Limine request.
 pub trait RawLimineRequest<'a> {
+    /// The type of the response associated with this Limine request.
     type Response;
+    /// Returns true if the Limine request is present.
     fn is_present(&self) -> bool;
+    /// Gets the Limine response.
     fn get_response(&'a self) -> Option<&'a Self::Response>;
+    /// Gets a mutable reference to the Limine response.
     fn get_response_mut(&'a mut self) -> Option<&'a mut Self::Response>;
 }
 
@@ -47,7 +52,7 @@ impl_lim_req! {
 /// A Limine request paired with kernel data initialized from the Limine response.
 pub struct LimineRequest<'a, LimineType: RawLimineRequest<'a>, KernelType: 'static> {
     limine_request: ResourceMutex<LimineType>,
-    pub kernel_data: Once<KernelType>,
+    kernel_data: Once<KernelType>,
     _phantom: core::marker::PhantomData<&'a ()>,
 }
 
@@ -58,6 +63,7 @@ impl<'a, L, K> LimineRequest<'a, L, K>
 where
     L: RawLimineRequest<'a>,
 {
+    /// Creates a new LimineRequest.
     pub const fn new(new: L) -> Self {
         Self {
             limine_request: ResourceMutex::new(new).with_validator(requests_active),
@@ -92,6 +98,27 @@ where
     pub fn get_limine(&'a self) -> ResourceGuard<'a, L::Response> {
         self.limine_request
             .lock_map(|t| t.get_response_mut().expect("response not present"))
+    }
+}
+
+impl<'a, L: RawLimineRequest<'a> + fmt::Debug, K: fmt::Debug> fmt::Debug
+    for LimineRequest<'a, L, K>
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut f = f.debug_struct("LimineRequest");
+        if requests_terminated() {
+            f.field(
+                "kernel_data",
+                &self
+                    .kernel_data
+                    .get()
+                    .expect("all limine requests must be init before termination"),
+            );
+        } else {
+            f.field("limine_request", &*self.limine_request.lock());
+        }
+
+        f.finish()
     }
 }
 

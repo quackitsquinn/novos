@@ -1,5 +1,6 @@
 use core::{
     cell::UnsafeCell,
+    fmt::{Debug, write},
     sync::atomic::{AtomicBool, Ordering},
 };
 
@@ -129,3 +130,17 @@ impl<T> core::ops::DerefMut for ResourceGuard<'_, T> {
 
 unsafe impl<T: Send> Send for ResourceGuard<'_, T> {}
 unsafe impl<T: Sync> Sync for ResourceGuard<'_, T> {}
+
+impl<T: Debug> Debug for ResourceGuard<'_, T> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{:?}", self.data)
+    }
+}
+
+impl<T> Debug for ResourceMutex<T> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("ResourceGuard")
+            .field("is_locked", &self.lock.load(Ordering::SeqCst))
+            .finish()
+    }
+}

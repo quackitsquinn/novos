@@ -1,7 +1,6 @@
 use core::fmt::Debug;
 
 use log::info;
-use spin::Once;
 
 use crate::Fuse;
 
@@ -52,6 +51,9 @@ where
     }
 }
 
+/// Declare a kernel module.
+///
+/// This declares a `pub static MODULE` with the given name and init function along with error type (defaults to `Infallible`)
 #[macro_export]
 macro_rules! declare_module {
     ($name: literal, $func: ident, $error_type: ty) => {

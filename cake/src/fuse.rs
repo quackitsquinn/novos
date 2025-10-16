@@ -1,7 +1,4 @@
-use core::{
-    fmt::{Debug, write},
-    sync::atomic::AtomicBool,
-};
+use core::{fmt::Debug, sync::atomic::AtomicBool};
 
 /// A fuse that can be "blown" exactly once.
 ///

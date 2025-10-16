@@ -4,14 +4,15 @@ use spin::{Mutex, MutexGuard, Once};
 
 use crate::{get_caller_rip_1_up, get_caller_rip_2_up, is_multithreaded};
 
+/// A mutex that can be initialized once.
 pub struct OnceMutex<T> {
+    /// The inner mutex.
     pub inner: Once<Mutex<T>>,
     caller: Mutex<Option<*const ()>>,
 }
 
-static SINGLE_CORE: Once<bool> = Once::new();
-
 impl<'a, T> OnceMutex<T> {
+    /// Creates a new uninitialized `OnceMutex`.
     pub const fn uninitialized() -> Self {
         Self {
             inner: Once::new(),
@@ -19,6 +20,7 @@ impl<'a, T> OnceMutex<T> {
         }
     }
 
+    /// Creates an already initialized `OnceMutex`.
     pub const fn new_with(value: T) -> Self {
         Self {
             inner: Once::initialized(Mutex::new(value)),
@@ -26,20 +28,30 @@ impl<'a, T> OnceMutex<T> {
         }
     }
 
+    /// Initializes it with the given value
+    #[deprecated(note = "Use call_init instead for lazy evaluation of T")]
     pub fn init(&self, value: T) {
         self.inner.call_once(|| Mutex::new(value));
     }
 
+    /// Initializes the OnceMutex with the result of the provided function.
+    pub fn call_init(&self, f: impl FnOnce() -> T) {
+        self.inner.call_once(|| Mutex::new(f()));
+    }
+
+    /// Tries to get the lock without blocking.
     pub fn try_get(&self) -> Option<MutexGuard<'_, T>> {
         self.inner.get()?.try_lock()
     }
 
+    /// Gets a reference to the inner mutex.
     pub fn mutex(&'a self) -> &'a Mutex<T> {
         self.inner
             .get()
             .expect("Attempted to access an uninitialized OnceMutex!")
     }
 
+    /// Gets a lock guard to the inner data.
     #[track_caller]
     pub fn get(&self) -> MutexGuard<'_, T> {
         if is_multithreaded() {
@@ -79,18 +91,30 @@ impl<'a, T> OnceMutex<T> {
         self.mutex().lock()
     }
 
+    /// Returns if the mutex is currently locked.
+    ///
+    /// This does not have any synchronization guarantees.
     pub fn is_locked(&self) -> bool {
         self.mutex().is_locked()
     }
 
+    /// REturns if the once mutex is initialized.
     pub fn is_initialized(&self) -> bool {
         self.inner.is_completed()
     }
 
+    /// Force unlocks the mutex.
+    ///
+    /// # Safety
+    /// This is incredibly unsafe if the mutex is locked by another thread.
     pub unsafe fn force_unlock(&self) {
         unsafe { self.mutex().force_unlock() }
     }
 
+    /// Forces a lock guard to the inner data.
+    ///
+    /// # Safety
+    /// This is incredibly unsafe if the mutex is locked by another thread.
     pub unsafe fn force_get(&self) -> MutexGuard<'_, T> {
         unsafe {
             self.force_unlock();
@@ -100,26 +124,6 @@ impl<'a, T> OnceMutex<T> {
         *self.caller.lock() = get_caller_rip_1_up();
         t
     }
-}
-
-// Returns true if the system is single core (e.g. running on a single core CPU or in QEMU).
-// This is used to catch overlapping locks in a single core environment.
-// In a multi core environment, waiting for resources is expected and common, so we don't do this check.
-fn is_single_core() -> bool {
-    if SINGLE_CORE.is_completed() {
-        return *SINGLE_CORE.get().unwrap();
-    }
-    true
-}
-
-/// Sets the system to multi core mode. In this mode, concurrent locks will not cause a panic.
-pub fn multi_core() {
-    SINGLE_CORE.call_once(|| false);
-}
-
-/// Sets the system to single core mode. In this mode, concurrent locks will cause a panic. This is the default state.
-pub fn single_core() {
-    SINGLE_CORE.call_once(|| true);
 }
 
 unsafe impl<T> Sync for OnceMutex<T> {}

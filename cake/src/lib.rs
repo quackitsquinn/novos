@@ -1,3 +1,4 @@
+//! Workspace-wide types and utilities
 #![cfg_attr(not(test), no_std)]
 #![cfg_attr(test, feature(thread_id_value))]
 #![feature(debug_closure_helpers)]
@@ -19,7 +20,6 @@ pub use module::KernelModule;
 pub use oncemut::OnceMutex;
 pub use oncerw::{OnceRwLock, OnceRwReadGuard, OnceRwWriteGuard};
 pub use owned::Owned;
-use raw_cpuid::CpuId;
 pub use resource::{ResourceGuard, ResourceMutex};
 use spin::Once;
 
@@ -89,12 +89,16 @@ mod _macro {
 
 pub(crate) use _macro::get_caller_rip_2_up;
 
+/// Gets the current core ID.
 #[allow(unreachable_code)]
 pub fn core_id() -> u64 {
     #[cfg(all(target_arch = "x86_64", not(test)))]
-    return CpuId::with_cpuid_reader(raw_cpuid::CpuIdReaderNative)
-        .get_feature_info()
-        .map_or(0, |finfo| finfo.initial_local_apic_id() as u64);
+    {
+        use raw_cpuid::CpuId;
+        return CpuId::with_cpuid_reader(raw_cpuid::CpuIdReaderNative)
+            .get_feature_info()
+            .map_or(0, |finfo| finfo.initial_local_apic_id() as u64);
+    }
     #[cfg(not(target_arch = "x86_64"))]
     return 0;
     #[cfg(any(test, feature = "std"))]

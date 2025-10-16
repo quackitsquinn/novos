@@ -1,16 +1,17 @@
 use core::{
     any::type_name,
     cell::UnsafeCell,
-    mem::{self, MaybeUninit},
+    fmt::Debug,
+    mem::{self},
     ops::{Deref, DerefMut},
-    sync::atomic::{AtomicI64, AtomicIsize, AtomicUsize, Ordering},
+    sync::atomic::{AtomicI64, AtomicUsize, Ordering},
 };
 
-use log::trace;
 use spin::Once;
 
 use crate::core_id;
 
+/// A readers-writer lock that can be initialized once.
 pub struct OnceRwLock<T> {
     data: Once<UnsafeCell<T>>,
     readers: AtomicUsize,
@@ -19,6 +20,7 @@ pub struct OnceRwLock<T> {
 }
 
 impl<T> OnceRwLock<T> {
+    /// Creates a new empty `OnceRwLock`.
     pub const fn new() -> Self {
         Self {
             data: Once::new(),
@@ -28,6 +30,7 @@ impl<T> OnceRwLock<T> {
         }
     }
 
+    /// Sets the value of self to the result of the provided function.
     pub fn init(&self, init: impl FnOnce() -> T) {
         self.data.call_once(|| UnsafeCell::new(init()));
     }
@@ -40,6 +43,7 @@ impl<T> OnceRwLock<T> {
         }
     }
 
+    /// Acquires a write lock, blocking the current thread until it is able to do so.
     #[track_caller]
     pub fn write(&self) -> OnceRwWriteGuard<'_, T> {
         let cid = core_id();
@@ -78,6 +82,7 @@ impl<T> OnceRwLock<T> {
         }
     }
 
+    /// Acquires a read lock, blocking the current thread until it is able to do so.
     pub fn read(&self) -> OnceRwReadGuard<'_, T> {
         // Spin until there is no active writer unless we are the active writer.
         let cid = core_id();
@@ -104,6 +109,7 @@ impl<T> OnceRwLock<T> {
 unsafe impl<T> Send for OnceRwLock<T> {}
 unsafe impl<T> Sync for OnceRwLock<T> {}
 
+/// A guard that releases the write lock when dropped.
 pub struct OnceRwWriteGuard<'a, T> {
     data: &'a UnsafeCell<T>,
     readers: &'a AtomicUsize,
@@ -126,6 +132,7 @@ impl<'a, T> OnceRwWriteGuard<'a, T> {
         }
     }
 
+    /// Downgrades a write lock into a read lock.
     pub fn downgrade(self) -> OnceRwReadGuard<'a, T> {
         self.readers.fetch_add(1, Ordering::Release);
 
@@ -166,6 +173,8 @@ impl<T> DerefMut for OnceRwWriteGuard<'_, T> {
     }
 }
 
+/// A guard that releases the read lock when dropped.
+
 pub struct OnceRwReadGuard<'a, T> {
     data: &'a UnsafeCell<T>,
     readers: &'a AtomicUsize,
@@ -188,6 +197,7 @@ impl<'a, T> OnceRwReadGuard<'a, T> {
         }
     }
 
+    /// Upgrades a read lock to a write lock.
     pub fn upgrade(self) -> OnceRwWriteGuard<'a, T> {
         // Check if there are other active readers.
         // This does introduce a possible single threaded deadlock.
@@ -228,6 +238,27 @@ impl<T> Deref for OnceRwReadGuard<'_, T> {
 
     fn deref(&self) -> &Self::Target {
         unsafe { &*self.data.get() }
+    }
+}
+
+impl<T: Debug> Debug for OnceRwReadGuard<'_, T> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{:?}", unsafe { &*self.data.get() })
+    }
+}
+
+impl<T: Debug> Debug for OnceRwWriteGuard<'_, T> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{:?}", unsafe { &*self.data.get() })
+    }
+}
+
+impl<T> Debug for OnceRwLock<T> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("OnceRwLock")
+            .field("has_writer", &(self.writers.load(Ordering::Acquire) > 0))
+            .field("readers", &self.readers.load(Ordering::Acquire))
+            .finish()
     }
 }
 
