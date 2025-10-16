@@ -1,3 +1,4 @@
+//! Kalloc - A Kernel Memory Allocator
 #![cfg_attr(not(test), no_std)]
 #![feature(allocator_api)]
 #![feature(pointer_is_aligned_to)]
@@ -18,30 +19,31 @@ pub mod locked_vec;
 pub mod mut_alloc;
 
 pub use alloc_wrap::GlobalAllocatorWrapper;
-use cake::spin::Once;
 
 pub(crate) static ALLOC_LOG: AtomicBool = AtomicBool::new(false);
-pub(crate) static FRAME_OUTPUT_FN: Once<fn(&[u8])> = Once::new();
+/// pub(crate) static FRAME_OUTPUT_FN: Once<fn(&[u8])> = Once::new();
 
-pub(crate) fn frame_output(data: &[u8]) {
-    if let Some(fn_ptr) = FRAME_OUTPUT_FN.get() {
-        adebug!("Logging frame output with length: {}", data.len());
-        fn_ptr(data);
-    }
-}
+// pub(crate) fn frame_output(data: &[u8]) {
+//     if let Some(fn_ptr) = FRAME_OUTPUT_FN.get() {
+//         adebug!("Logging frame output with length: {}", data.len());
+//         fn_ptr(data);
+//     }
+// }
 
-pub fn set_frame_output_fn(fn_ptr: fn(&[u8])) -> bool {
-    if FRAME_OUTPUT_FN.is_completed() {
-        return false;
-    }
-    FRAME_OUTPUT_FN.call_once(|| fn_ptr);
-    true
-}
+// pub fn set_frame_output_fn(fn_ptr: fn(&[u8])) -> bool {
+//     if FRAME_OUTPUT_FN.is_completed() {
+//         return false;
+//     }
+//     FRAME_OUTPUT_FN.call_once(|| fn_ptr);
+//     true
+// }
 
+/// Enables logging for the allocator.
 pub fn enable_logging() {
     ALLOC_LOG.store(true, core::sync::atomic::Ordering::Relaxed);
 }
 
+/// Disables logging for the allocator
 pub fn disable_logging() {
     ALLOC_LOG.store(false, core::sync::atomic::Ordering::Relaxed);
 }

@@ -1,3 +1,4 @@
+//! A manually managed vector that requires explicit capacity management.
 use core::{
     fmt::Debug,
     marker::PhantomData,

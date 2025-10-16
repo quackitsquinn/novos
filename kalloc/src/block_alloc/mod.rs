@@ -1,12 +1,5 @@
-//! Kinda working block allocator
-//!
-//!
-//! This is absolutely insane. Let me take this moment to scream.
-//!
-//! WHY DO THE TESTS FAIL ON MAC OS BUT NOT LINUX???? THIS ISN'T USING ANY PLATFORM DEPENDENT CODE
-//! IT'S AN ALLOCATOR!!!! THE MEMORY BETWEEN THE TWO IS THE SAME!!! WHY DOES MAC OS RANDOMLY *RANDOMLY* FAIL??? FOR LIKE 4 DIFFERENT, INCONSISTENT REASONS????
+//! Block based allocator.
 
-use core::alloc::Allocator;
 use core::alloc::Layout;
 
 use allocator::BlockAllocator;

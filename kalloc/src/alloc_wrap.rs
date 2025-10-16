@@ -33,7 +33,7 @@ where
         self.inner.call_once(|| Mutex::new(init()));
     }
     /// Gets the global allocator, if it is initialized.
-    pub fn get(&self) -> Option<MutexGuard<T>> {
+    pub fn get(&self) -> Option<MutexGuard<'_, T>> {
         self.inner.get()?.try_lock()
     }
     /// Is the global allocator locked?
@@ -53,7 +53,7 @@ where
     }
 
     /// Force unlocks the global allocator and returns it.
-    pub unsafe fn force_get(&self) -> Option<MutexGuard<T>> {
+    pub unsafe fn force_get(&self) -> Option<MutexGuard<'_, T>> {
         if let Some(inner) = self.inner.get() {
             unsafe {
                 inner.force_unlock();

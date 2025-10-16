@@ -1,3 +1,4 @@
+//! Wrapper for allocators that need mutable `self` access
 use core::alloc::Layout;
 
 /// A trait for types that can allocate and deallocate memory. This is similar to the `Allocator` or `GlobalAlloc` traits in the standard library,

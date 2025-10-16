@@ -1,3 +1,4 @@
+#![doc = include_str!("block_alloc.md")]
 // TODO: Strict Provenance? Would that even be possible?
 use core::{
     alloc::Layout,
@@ -7,8 +8,9 @@ use core::{
 };
 
 use super::block::Block;
-use crate::{frame_output, locked_vec::LockedVec};
+use crate::locked_vec::LockedVec;
 
+/// The block allocator is responsible for managing memory blocks.
 pub struct BlockAllocator {
     // The blocks are stored in a downwards-growing vector.
     pub(crate) blocks: LockedVec<Block>,
@@ -161,9 +163,7 @@ impl BlockAllocator {
     #[must_use = "Returned pointer must be deallocated with deallocate"]
     pub unsafe fn allocate(&mut self, layout: Layout) -> *mut u8 {
         atrace!("Allocating layout {:?}", layout);
-        frame_output(unsafe {
-            core::slice::from_raw_parts(self.heap_start as *mut u8, self.heap_size)
-        });
+
         // If the size is 0, we can just return a null pointer.
         if layout.size() == 0 {
             return ptr::null_mut();
@@ -238,9 +238,7 @@ impl BlockAllocator {
 
         atrace!("Returning pointer {:p}", ptr);
         self.condition_check();
-        frame_output(unsafe {
-            core::slice::from_raw_parts(self.heap_start as *mut u8, self.heap_size)
-        });
+
         ptr
     }
 
@@ -454,7 +452,7 @@ impl BlockAllocator {
     }
 
     #[track_caller]
-    pub fn condition_check(&self) {
+    pub(crate) fn condition_check(&self) {
         ainfo!("Checking block allocator condition");
         for block in &*self.blocks {
             if block.address >= self.heap_end as *mut u8
@@ -466,12 +464,6 @@ impl BlockAllocator {
             }
         }
         ainfo!("Block allocator condition check passed");
-    }
-
-    pub fn heap_snapshot(&self) {
-        let slc =
-            unsafe { core::slice::from_raw_parts(self.heap_start as *const u8, self.heap_size) };
-        crate::frame_output(slc);
     }
 }
 

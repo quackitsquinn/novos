@@ -1,3 +1,5 @@
+//! The fundamental unit of memory allocation in this allocator.
+
 /// The fundamental unit of memory allocation in this allocator.
 /// Blocks represent a contiguous memory region that may or may not be allocated.
 #[derive(Debug, Clone, PartialEq, Eq)]

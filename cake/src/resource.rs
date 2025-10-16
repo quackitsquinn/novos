@@ -1,6 +1,6 @@
 use core::{
     cell::UnsafeCell,
-    fmt::{Debug, write},
+    fmt::Debug,
     sync::atomic::{AtomicBool, Ordering},
 };
 
