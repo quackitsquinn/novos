@@ -1,17 +1,17 @@
 use core::fmt::Debug;
 
 use x86_64::structures::paging::{
+    FrameDeallocator, Mapper, OffsetPageTable, PageTable, PageTableFlags, PageTableIndex,
+    PhysFrame, RecursivePageTable, Translate,
     mapper::{
         FlagUpdateError, MapToError, MapperFlush, MapperFlushAll, TranslateError, TranslateResult,
         UnmapError,
     },
-    FrameDeallocator, Mapper, OffsetPageTable, PageTable, PageTableFlags, PageTableIndex,
-    PhysFrame, RecursivePageTable, Translate,
 };
 
 use crate::memory::paging::{
-    builder::PageTableBuilder, page_tree::PageTree, phys::FRAME_ALLOCATOR, KernelPage,
-    KernelPageSize, KernelPhysFrame,
+    KernelPage, KernelPageSize, KernelPhysFrame, builder::PageTableBuilder, page_tree::PageTree,
+    phys::FRAME_ALLOCATOR,
 };
 
 /// Represents the currently active page table, which can be either the
@@ -25,9 +25,9 @@ pub struct ActivePageTable<'a> {
 macro_rules! active_pt {
     (mut $self: ident.$fn: ident($($arg:tt)*)) => {{
         if let Some(lpt) = &mut $self.limine {
-            lpt.$fn($($arg)*)
+             lpt.$fn($($arg)*)
         } else if let Some(rpt) = &mut $self.remapped {
-            rpt.$fn($($arg)*)
+             rpt.$fn($($arg)*)
         } else {
             panic!("No active page table");
         }
@@ -106,7 +106,7 @@ impl<'a> ActivePageTable<'a> {
         let mut frame_allocator = FRAME_ALLOCATOR.get();
 
         for i in 0..512 {
-            let table = self.get_mut(indexes).expect("Invalid page table indexes");
+            let table = unsafe { self.get_mut(indexes).expect("Invalid page table indexes") };
             let entry = &mut table[i];
             if entry.is_unused() {
                 continue;
@@ -226,11 +226,11 @@ impl PageTree for ActivePageTable<'_> {
         active_pt!(self.get_l3(pml4_index))
     }
 
-    fn get_l3_mut(
+    unsafe fn get_l3_mut(
         &mut self,
         pml4_index: x86_64::structures::paging::PageTableIndex,
     ) -> Option<&mut x86_64::structures::paging::PageTable> {
-        active_pt!(mut self.get_l3_mut(pml4_index))
+        unsafe { active_pt!(mut self.get_l3_mut(pml4_index)) }
     }
 
     fn get_l2(
@@ -241,12 +241,12 @@ impl PageTree for ActivePageTable<'_> {
         active_pt!(self.get_l2(pml4_index, pdpt_index))
     }
 
-    fn get_l2_mut(
+    unsafe fn get_l2_mut(
         &mut self,
         pml4_index: x86_64::structures::paging::PageTableIndex,
         pdpt_index: x86_64::structures::paging::PageTableIndex,
     ) -> Option<&mut x86_64::structures::paging::PageTable> {
-        active_pt!(mut self.get_l2_mut(pml4_index, pdpt_index))
+        unsafe { active_pt!(mut self.get_l2_mut(pml4_index, pdpt_index)) }
     }
 
     fn get_l1(
@@ -258,13 +258,13 @@ impl PageTree for ActivePageTable<'_> {
         active_pt!(self.get_l1(pml4_index, pdpt_index, pd_index))
     }
 
-    fn get_l1_mut(
+    unsafe fn get_l1_mut(
         &mut self,
         pml4_index: x86_64::structures::paging::PageTableIndex,
         pdpt_index: x86_64::structures::paging::PageTableIndex,
         pd_index: x86_64::structures::paging::PageTableIndex,
     ) -> Option<&mut x86_64::structures::paging::PageTable> {
-        active_pt!(mut self.get_l1_mut(pml4_index, pdpt_index, pd_index))
+        unsafe { active_pt!(mut self.get_l1_mut(pml4_index, pdpt_index, pd_index)) }
     }
 
     fn get_pml4(&self) -> &PageTable {
