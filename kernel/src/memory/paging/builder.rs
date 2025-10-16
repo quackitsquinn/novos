@@ -1,14 +1,17 @@
+use core::fmt::Debug;
+
 use alloc::collections::BTreeMap;
 use cake::log::debug;
 use x86_64::structures::paging::{
-    page_table::PageTableEntry, FrameAllocator, Mapper, Page, PageTable, PageTableFlags,
-    PageTableIndex,
+    FrameAllocator, Mapper, Page, PageTable, PageTableFlags, PageTableIndex,
+    page_table::PageTableEntry,
 };
 
 use crate::memory::paging::{
-    phys::FRAME_ALLOCATOR, KernelPage, KernelPhysFrame, KERNEL_PAGE_TABLE,
+    ACTIVE_PAGE_TABLE, KernelPage, KernelPhysFrame, phys::FRAME_ALLOCATOR,
 };
 
+/// A builder for creating and managing page tables.
 pub struct PageTableBuilder<'a, T>
 where
     T: Iterator<Item = KernelPage>,
@@ -41,7 +44,7 @@ where
     pub const RECURSIVE_ENTRY_INDEX: PageTableIndex = RECURSIVE_ENTRY_INDEX;
 
     pub fn new(mut page_range: T) -> Self {
-        let mut pgtbl = KERNEL_PAGE_TABLE.write();
+        let mut pgtbl = ACTIVE_PAGE_TABLE.write();
         let mut alc = FRAME_ALLOCATOR.get();
         let root_frame = alc
             .allocate_frame()
@@ -89,7 +92,7 @@ where
 
     fn create_pagetable(&mut self) -> (KernelPhysFrame, &'a mut PageTable) {
         let mut alc = FRAME_ALLOCATOR.get();
-        let mut active_pagetable = KERNEL_PAGE_TABLE.write();
+        let mut active_pagetable = ACTIVE_PAGE_TABLE.write();
         let pagetable_frame = alc
             .allocate_frame()
             .expect("Unable to allocate root frame for page table");
@@ -216,6 +219,15 @@ where
                 Self::RECURSIVE_ENTRY_INDEX,
             ),
         )
+    }
+}
+
+impl<'a, T: Iterator<Item = KernelPage>> Debug for PageTableBuilder<'a, T> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("PageTableBuilder")
+            .field("root", &self.root)
+            .field("pml4", &self.pml4)
+            .finish()
     }
 }
 

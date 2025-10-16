@@ -1,22 +1,22 @@
+//! Stack management and abstractions.
 use cake::log::info;
 use x86_64::{
-    structures::paging::{mapper::MapToError, OffsetPageTable, Page, PageTableFlags},
     VirtAddr,
+    structures::paging::{Mapper, Page, PageTableFlags, Size4KiB, mapper::MapToError},
 };
 
 use crate::memory::paging::KernelPage;
 
 use super::paging::{
-    phys::{mapper::MapError, FRAME_ALLOCATOR},
+    phys::{FRAME_ALLOCATOR, mapper::MapError},
     vaddr_mapper::VIRT_MAPPER,
 };
 
 /// Represents a stack in the system.
 #[derive(Debug, Clone, Copy)]
 pub struct Stack {
-    pub stack_base: VirtAddr,
-    pub start_page: Page,
-    pub end_page: Page,
+    start_page: Page,
+    end_page: Page,
 }
 
 impl Stack {
@@ -26,19 +26,29 @@ impl Stack {
     ///
     /// The caller must ensure the page range is valid and not overlapping with other memory regions.
     pub unsafe fn new(start: &Page, end: &Page) -> Self {
-        let stack_base = start.start_address();
         let start_page = *start;
         let end_page = *end;
 
         Self {
-            stack_base,
             start_page,
             end_page,
         }
     }
 
-    pub fn allocate_stack(
-        offset_table: &mut OffsetPageTable,
+    /// Allocates a new stack with the given size and base page.
+    ///
+    /// # Arguments
+    ///
+    /// * `offset_table` - The page table mapper to use for mapping pages.
+    /// * `size` - The size of the stack in bytes.
+    /// * `base` - The base page of the stack. This is the lowest address of the stack.
+    /// * `stack_flags` - The flags to use for the stack pages.
+    ///
+    /// # Returns
+    ///
+    /// A Result containing the newly allocated Stack or a MapError if the allocation failed.
+    pub fn allocate_stack<T: Mapper<Size4KiB>>(
+        mapper: &mut T,
         size: u64,
         base: Page,
         stack_flags: StackFlags,
@@ -48,13 +58,24 @@ impl Stack {
         unsafe {
             FRAME_ALLOCATOR
                 .get()
-                .map_range_pagetable(range, stack_flags.flags(), offset_table)?;
+                .map_range_pagetable(range, stack_flags.flags(), mapper)?;
         }
 
         let stack = unsafe { Self::new(&base, &(base + size)) };
         Ok(stack)
     }
 
+    /// Creates a new kernel stack with the given size and start page.
+    ///
+    /// # Arguments
+    ///
+    /// * `size` - The size of the stack in bytes.
+    /// * `start_page` - The start page of the stack.
+    /// * `stack_flags` - The flags to use for the stack pages.
+    ///
+    /// # Returns
+    ///
+    /// A Result containing the newly created Stack or a MapError if the creation failed.
     pub fn create_kernel_stack(
         size: u64,
         start_page: Page,
@@ -76,6 +97,7 @@ impl Stack {
         Ok(stack)
     }
 
+    /// Allocates a new kernel stack with the given size and stack flags.
     pub fn allocate_kernel_stack(size: u64, stack_flags: StackFlags) -> Result<Self, MapError> {
         assert!(size % 4096 == 0, "Stack size must be a multiple of 4096");
         // Map enough pages for the stack
@@ -98,18 +120,19 @@ impl Stack {
         }
     }
 
-    pub fn deallocate_stack(self, offset_table: &mut OffsetPageTable) -> Result<(), MapError> {
+    /// Deallocates the stack using the given page table mapper.
+    /// # Safety
+    /// The caller must ensure that the page table mapper is the same one that was used to allocate the stack.
+    pub unsafe fn deallocate_stack(
+        self,
+        mut mapper: impl Mapper<Size4KiB>,
+    ) -> Result<(), MapError> {
         let range = Page::range_inclusive(self.start_page, self.end_page);
         unsafe {
             FRAME_ALLOCATOR
                 .get()
-                .unmap_range_pagetable(range, offset_table)
+                .unmap_range_pagetable(range, &mut mapper)
         }
-    }
-
-    pub fn deallocate_kernel_stack(self) -> Result<(), MapError> {
-        let range = Page::range_inclusive(self.start_page, self.end_page);
-        unsafe { FRAME_ALLOCATOR.get().unmap_range(range) }
     }
 
     /// Returns the stack base address.
@@ -119,18 +142,23 @@ impl Stack {
     }
 }
 
+/// Flags for configuring the properties of a stack.
 #[derive(Debug, Clone, Copy)]
 pub enum StackFlags {
-    RWKernel,
-    RWUser,
+    /// Read-write stack accessible only in kernel space.
+    KernelMode,
+    /// Read-write stack accessible from both userspace and kernel space.
+    UserMode,
+    /// Custom flags for the stack pages.
     Custom(PageTableFlags),
 }
 
 impl StackFlags {
+    /// Returns the page table flags for the stack.s
     pub fn flags(&self) -> PageTableFlags {
         match self {
-            StackFlags::RWKernel => PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
-            StackFlags::RWUser => {
+            StackFlags::KernelMode => PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
+            StackFlags::UserMode => {
                 PageTableFlags::PRESENT | PageTableFlags::WRITABLE | PageTableFlags::USER_ACCESSIBLE
             }
             StackFlags::Custom(flags) => *flags,
@@ -140,6 +168,6 @@ impl StackFlags {
 
 impl Default for StackFlags {
     fn default() -> Self {
-        StackFlags::RWKernel
+        StackFlags::KernelMode
     }
 }

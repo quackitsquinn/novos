@@ -2,12 +2,12 @@ use alloc::vec::Vec;
 use cake::limine::memory_map::{Entry, EntryType};
 use cake::log::{debug, error, info};
 use x86_64::{
+    PhysAddr,
     structures::paging::{
+        FrameAllocator, FrameDeallocator, Mapper, PhysFrame, Size4KiB,
         mapper::{MapToError, UnmapError},
         page::PageRangeInclusive,
-        FrameAllocator, FrameDeallocator, Mapper, PhysFrame, Size4KiB,
     },
-    PhysAddr,
 };
 
 use crate::memory::{self, paging::KernelPhysFrame, req_data::MemoryMap};
@@ -76,7 +76,7 @@ impl PageFrameAllocator {
         page_range: PageRangeInclusive<Size4KiB>,
         flags: x86_64::structures::paging::PageTableFlags,
     ) -> Result<(), MapError> {
-        let mut mapper = memory::paging::KERNEL_PAGE_TABLE.write();
+        let mut mapper = memory::paging::ACTIVE_PAGE_TABLE.write();
         unsafe { self.map_range_pagetable(page_range, flags, &mut *mapper) }
     }
 
@@ -99,7 +99,7 @@ impl PageFrameAllocator {
         &mut self,
         page_range: PageRangeInclusive<Size4KiB>,
     ) -> Result<(), MapError> {
-        let mut mapper = memory::paging::KERNEL_PAGE_TABLE.write();
+        let mut mapper = memory::paging::ACTIVE_PAGE_TABLE.write();
         unsafe { self.unmap_range_pagetable(page_range, &mut *mapper) }
     }
 

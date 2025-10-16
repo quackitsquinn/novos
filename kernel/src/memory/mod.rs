@@ -3,8 +3,8 @@ use core::convert::Infallible;
 use cake::log::info;
 use paging::map::{KERNEL_HEAP_SIZE, KERNEL_HEAP_START};
 use x86_64::{
-    structures::paging::{page::PageRangeInclusive, Page, PageTableFlags},
     VirtAddr,
+    structures::paging::{Page, PageTableFlags, page::PageRangeInclusive},
 };
 
 use crate::{declare_module, memory::paging::KernelPageSize, requests::KERNEL_ELF};
@@ -15,6 +15,7 @@ pub mod paging;
 pub mod req_data;
 pub mod stack;
 
+/// Enables or disables allocation debugging based on the ALLOC_DEBUG environment variable.
 pub const ALLOC_DEBUG: bool = option_env!("ALLOC_DEBUG").is_some();
 
 declare_module!("memory", init);

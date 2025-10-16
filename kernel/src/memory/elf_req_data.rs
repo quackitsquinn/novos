@@ -1,8 +1,9 @@
+//! Post page table switch data structures and abstractions.
 use core::{alloc::Layout, fmt::Debug};
 
 use alloc::alloc::alloc;
 use cake::spin::{Mutex, Once};
-use cake::{limine::response::ExecutableFileResponse, spin, LimineData};
+use cake::{LimineData, limine::response::ExecutableFileResponse, spin};
 use kelp::Elf;
 
 /// The kernel's ELF executable, stored in a way that allows moving it to the heap later.
@@ -48,6 +49,7 @@ impl KernelElf {
         self.elf.lock()
     }
 
+    /// Copies the ELF data to the heap.
     pub fn copy_to_heap(&self) {
         let mut limine_data = self.limine_data.lock();
         if let Some(data) = limine_data.take() {

@@ -1,13 +1,12 @@
+//! Abstractions for managing memory paging in the kernel.
+
 use core::convert::Infallible;
 
-use cake::{
-    spin::{lock_api::RwLock, Once},
-    OnceMutex, OnceRwLock,
-};
+use cake::OnceRwLock;
 use x86_64::{
+    VirtAddr,
     registers::control::Cr3,
     structures::paging::{OffsetPageTable, Page, PageTable, PhysFrame, Size4KiB},
-    VirtAddr,
 };
 
 use crate::{declare_module, requests::PHYSICAL_MEMORY_OFFSET};
@@ -21,11 +20,15 @@ pub mod page_tree;
 pub mod phys;
 pub mod vaddr_mapper;
 
+/// The size of a kernel page.
 pub type KernelPageSize = Size4KiB;
+/// A kernel page.
 pub type KernelPage = Page<KernelPageSize>;
+/// A kernel phys frame
 pub type KernelPhysFrame = PhysFrame<KernelPageSize>;
 
-pub static KERNEL_PAGE_TABLE: OnceRwLock<ActivePageTable> = OnceRwLock::new();
+/// The active kernel page table.
+pub static ACTIVE_PAGE_TABLE: OnceRwLock<ActivePageTable> = OnceRwLock::new();
 
 declare_module!("paging", init);
 
@@ -36,7 +39,7 @@ fn init() -> Result<(), Infallible> {
         .expect("physical memory offset uninitialized");
     let page_table = unsafe { &mut *((cr3.0.start_address().as_u64() + off) as *mut PageTable) };
     let offset_table = unsafe { OffsetPageTable::new(page_table, VirtAddr::new(off)) };
-    KERNEL_PAGE_TABLE.init(|| ActivePageTable::new(offset_table));
+    ACTIVE_PAGE_TABLE.init(|| ActivePageTable::new(offset_table));
 
     phys::MODULE.init();
     Ok(())
@@ -67,24 +70,37 @@ pub mod map {
                 ()
             };
             paste::paste! {
+                #[doc = concat!("The raw start address of the ", stringify!($name), " memory region.")]
                 pub const [<$name _RAW>]: u64 = $start;
+
+                #[doc = concat!("The start address of the ", stringify!($name), " memory region.")]
                 pub const [<$name _START>]: ::x86_64::VirtAddr = ::x86_64::VirtAddr::new_truncate([<$name _RAW>]);
+                #[doc = concat!("The size of the ", stringify!($name), " memory region.")]
                 pub const [<$name _SIZE>]: u64 = $size;
+                #[doc = concat!("The raw end address of the ", stringify!($name), " memory region.")]
                 pub const [<$name _END_RAW>]: u64 = $start + $size;
+                #[doc = concat!("The end address of the ", stringify!($name), " memory region.")]
                 pub const [<$name _END>]: ::x86_64::VirtAddr = ::x86_64::VirtAddr::new_truncate([<$name _END_RAW>]);
+                #[doc = concat!("The start page of the ", stringify!($name), " memory region.")]
                 pub const [<$name _START_PAGE>]: super::KernelPage = super::KernelPage::containing_address([<$name _START>]);
+                #[doc = concat!("The end page of the ", stringify!($name), " memory region.")]
                 pub const [<$name _END_PAGE>]: super::KernelPage = super::KernelPage::containing_address([<$name _END>]);
+                #[doc = concat!("The page range of the ", stringify!($name), " memory region.")]
                 pub const [<$name _PAGE_RANGE>]: ::x86_64::structures::paging::page::PageRangeInclusive<super::KernelPageSize> =
                     super::KernelPage::range_inclusive([<$name _START_PAGE>], [<$name _END_PAGE>]);
             }
         };
     }
 
-    // Taken from linker script
+    /// The start address of the kernel binary.
+    /// Taken from linker script
     pub const KERNEL_BINARY: u64 = 0xFFFF_FFFF_8000_0000;
+    /// The start of the higher half of the kernel.
     pub const HIGHER_HALF_START: u64 = 0xFFFF_8000_0000;
+    /// The maximum virtual address.
     pub const MAX_VIRT_ADDR: VirtAddr = VirtAddr::new_truncate(u64::MAX);
 
+    /// The start of the kernel.
     pub const KERNEL_START: u64 = HIGHER_HALF_START + 0x1000_0000;
 
     define_map!(KERNEL_HEAP, KERNEL_START, 0x100_0000); // 16MB

@@ -37,7 +37,7 @@ impl KernelThreadScheduler {
     }
 
     pub fn spawn(&mut self, entry: ThreadEntry) {
-        let stack = Stack::allocate_kernel_stack(0x4000, StackFlags::RWKernel)
+        let stack = Stack::allocate_kernel_stack(0x4000, StackFlags::KernelMode)
             .expect("Failed to allocate stack");
         let context = unsafe {
             InterruptContextValue::new(

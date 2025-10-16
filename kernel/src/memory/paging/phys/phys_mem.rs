@@ -1,12 +1,12 @@
 use cake::log::{info, trace};
 use x86_64::{
-    structures::paging::{mapper::MapToError, Mapper, PageTableFlags, PhysFrame},
     PhysAddr, VirtAddr,
+    structures::paging::{Mapper, PageTableFlags, PhysFrame, mapper::MapToError},
 };
 
 use crate::memory::paging::{
-    vaddr_mapper::{VirtualAddressRange, VIRT_MAPPER},
-    KernelPageSize, KERNEL_PAGE_TABLE,
+    ACTIVE_PAGE_TABLE, KernelPageSize,
+    vaddr_mapper::{VIRT_MAPPER, VirtualAddressRange},
 };
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -70,7 +70,7 @@ pub fn map_address(
         range.len()
     );
 
-    let mut active_page_table = KERNEL_PAGE_TABLE.write();
+    let mut active_page_table = ACTIVE_PAGE_TABLE.write();
     let mut frame_allocator = crate::memory::paging::phys::FRAME_ALLOCATOR.get();
     for page in addr_range.as_page_range() {
         let frame = range
@@ -107,7 +107,7 @@ pub fn map_address(
 
 pub fn unmap_address(map: PhysicalMemoryMap) {
     let mut vmapper = VIRT_MAPPER.get();
-    let mut active_page_table = KERNEL_PAGE_TABLE.write();
+    let mut active_page_table = ACTIVE_PAGE_TABLE.write();
     for page in map.virt_range.as_page_range() {
         active_page_table
             .unmap(page)

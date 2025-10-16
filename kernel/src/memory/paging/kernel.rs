@@ -2,6 +2,7 @@
 //! In the future, this will almost certainly be converted into it's own module.
 use core::convert::Infallible;
 
+use cake::Fuse;
 use cake::log::{debug, info, trace};
 use cake::{spin::Once, terminate_requests};
 use kelp::goblin::elf64::program_header::ProgramHeader;
@@ -18,7 +19,7 @@ use x86_64::{
 use crate::{
     declare_module,
     memory::paging::{
-        KERNEL_PAGE_TABLE, KernelPage, KernelPhysFrame,
+        ACTIVE_PAGE_TABLE, KernelPage, KernelPhysFrame,
         builder::PageTableBuilder,
         map::{FRAMEBUFFER_START_PAGE, KERNEL_REMAP_PAGE_RANGE},
     },
@@ -26,7 +27,16 @@ use crate::{
     requests::{FRAMEBUFFER, KERNEL_ELF},
 };
 
-pub fn create_kernel_pagetable() -> (KernelPhysFrame, KernelPage) {
+/// Creates the kernel page table.
+///
+/// # Safety
+/// The caller must ensure that this function is only called once.
+pub unsafe fn create_kernel_pagetable() -> (KernelPhysFrame, KernelPage) {
+    static KERNEL_PAGETABLE_FUSE: Fuse = Fuse::new();
+    if KERNEL_PAGETABLE_FUSE.is_blown() {
+        panic!("Kernel page table has already been created");
+    }
+    KERNEL_PAGETABLE_FUSE.blow();
     let mut builder = PageTableBuilder::new(KERNEL_REMAP_PAGE_RANGE);
     // First, map the kernel to the same address as right now.
     map_kernel(&mut builder);
@@ -275,10 +285,11 @@ fn remap_ptr(ptr: *const u8, new_page: KernelPage) -> *const u8 {
     (new_page.start_address().as_u64() + offset) as *const u8
 }
 
+/// The CR3 register holds the physical address of the top-level page table (PML4) in x86_64 architecture.
 pub static KERNEL_CR3: Once<KernelPhysFrame> = Once::new();
 
 fn init() -> Result<(), Infallible> {
-    let (kernel_frame, new_ptr) = create_kernel_pagetable();
+    let (kernel_frame, new_ptr) = unsafe { create_kernel_pagetable() };
     info!(
         "Kernel page table created with root frame: {:#x?}",
         kernel_frame
@@ -294,7 +305,7 @@ fn init() -> Result<(), Infallible> {
         kernel_frame
     );
 
-    KERNEL_PAGE_TABLE.write().switch(
+    ACTIVE_PAGE_TABLE.write().switch(
         RecursivePageTable::new(unsafe { &mut *new_ptr.start_address().as_mut_ptr::<PageTable>() })
             .unwrap(),
     );
