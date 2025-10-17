@@ -1,35 +1,40 @@
+//! Client module for kserial. Compatible with `no_std` environments.
 pub mod cfg;
 pub mod fs;
 pub mod serial;
 pub mod serial_adapter;
 
-use core::fmt;
+use core::fmt::{self, Debug};
 
 use serial::SerialClient;
 pub use serial_adapter::SerialAdapter;
 
 use crate::{
     client::serial::AdapterContainer,
-    common::{commands::StringPacket, packet::Packet, PacketContents},
+    common::{commands::StringPacket, PacketContents},
 };
 
 // TODO: This crate assumes there is a serial connection that works 2 way. This is not always true. We should add a way to test this at some point.
 
 static SERIAL_ADAPTER: SerialClient = SerialClient::new();
 
+/// Initialize the global serial adapter.
 pub fn init(adapter: &'static mut dyn SerialAdapter) {
     SERIAL_ADAPTER.init(adapter);
 }
 
+/// Get the global serial client.
 pub fn get_serial_client() -> &'static SerialClient<'static> {
     // This is used to get the serial client for other modules.
     &SERIAL_ADAPTER
 }
 
+/// Send a string over the serial connection.
 pub fn send_string(string: &str) {
     send_string_with(&mut SERIAL_ADAPTER.lock().expect("uninit"), string);
 }
 
+/// Send a string over the serial connection using the given adapter lock.
 pub fn send_string_with<'a>(lock: &mut AdapterContainer<'a>, string: &str) {
     let serial_adapter = lock
         .get_adapter()
@@ -49,18 +54,7 @@ pub fn send_string_with<'a>(lock: &mut AdapterContainer<'a>, string: &str) {
     }
 }
 
-pub fn test_two_way_serial() {
-    let serial = &SERIAL_ADAPTER;
-    let packet = StringPacket::new("Hello, world!").unwrap();
-    let echo_packet = unsafe { Packet::new(0xFE, packet) };
-    let mut session = serial.lock().expect("Serial not initialized");
-    session.send_packet(&echo_packet);
-    let echoed_packet: Packet<StringPacket> = session.read_packet().expect("Failed to read packet");
-    assert_eq!(echoed_packet.command(), 0xFE);
-    assert_eq!(echoed_packet.checksum(), 0);
-    assert_eq!(echoed_packet.payload().as_str(), "Hello, world!");
-}
-
+/// A writer that writes to the serial connection.
 pub struct SerialWriter<'a>(AdapterContainer<'a>);
 
 impl<'a> fmt::Write for SerialWriter<'a> {
@@ -70,6 +64,13 @@ impl<'a> fmt::Write for SerialWriter<'a> {
     }
 }
 
+impl Debug for SerialWriter<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("SerialWriter").finish()
+    }
+}
+
+/// Get a SerialWriter that writes to the global serial adapter.
 pub fn writer() -> SerialWriter<'static> {
     SerialWriter(SERIAL_ADAPTER.lock().expect("Serial not initialized"))
 }

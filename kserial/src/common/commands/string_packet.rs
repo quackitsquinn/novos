@@ -10,9 +10,11 @@ use crate::common::{
 
 use super::ids::STRING_PACKET_ID;
 
+/// A command to send a string packet.
 #[derive(Debug, Clone, Copy, Pod, Zeroable, PartialEq, Eq, Validate)]
 #[repr(C)]
 pub struct StringPacket {
+    /// The string data.
     pub data: varlen!(u8, StringPacket::CAPACITY),
 }
 
@@ -21,13 +23,16 @@ impl PacketContents for StringPacket {
 }
 
 impl StringPacket {
+    /// The maximum capacity of the string packet.
     pub const CAPACITY: usize = 32;
 
+    /// Create a new `StringPacket` command.
     pub fn new(data: &str) -> Option<Self> {
         let data = ArrayVec::from_str(data)?;
         Some(Self { data })
     }
 
+    /// Create a `StringPacket` from raw bytes without validation.
     pub unsafe fn from_bytes_unchecked(bytes: &[u8]) -> Self {
         // Safety: The caller must ensure that the bytes are valid.
         // Also, this is a relatively no-op operation, so it's safe to mark as unsafe.
@@ -35,6 +40,7 @@ impl StringPacket {
         Self { data }
     }
 
+    /// Get the string data as a `&str`.
     pub fn as_str(&self) -> &str {
         // Safety: The contained bytes are guaranteed to be valid UTF-8.
         unsafe { str::from_utf8_unchecked(&self.data) }

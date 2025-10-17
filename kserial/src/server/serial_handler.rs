@@ -1,3 +1,5 @@
+//! Handler for serial connections.
+use core::fmt::Debug;
 use std::{
     fs::File,
     io::{self, Read, Write},
@@ -7,6 +9,7 @@ use crate::common::PACKET_MODE_ENTRY_SIG;
 
 use super::{copy_rw::CopiedReadWrite, handlers, serial_stream::SerialStream};
 
+/// A handler for serial connections that processes packets.
 pub struct SerialHandler<T>
 where
     T: Read + Write,
@@ -43,6 +46,7 @@ where
         })
     }
 
+    /// Sets the output for string packets to the given writer.
     pub fn with_output<W>(self, output: W) -> Self
     where
         W: Write + 'static,
@@ -53,6 +57,7 @@ where
         }
     }
 
+    /// Runs the serial handler, processing incoming packets.
     pub fn run(self) -> Result<(), io::Error> {
         println!("Server started");
         let mut stream = SerialStream::new(self.datastream, self.string_output);
@@ -115,7 +120,9 @@ fn read_until_signature(stream: &mut SerialStream, signature: &[u8]) -> Result<(
     }
 }
 
-pub const MAX_CONTINUOUS_INVALID_BYTES: usize = 10;
+/// Maximum number of continuous invalid bytes before exiting packet mode.
+pub const MAX_CONTINUOUS_INVALID_BYTES: usize = 0x10;
+
 fn run_packet_mode(stream: &mut SerialStream) -> Result<Vec<u8>, io::Error> {
     let mut invalid_bytes = Vec::new();
     loop {
@@ -142,5 +149,13 @@ fn run_packet_mode(stream: &mut SerialStream) -> Result<Vec<u8>, io::Error> {
             println!("Too many invalid bytes, exiting packet mode.");
             return Ok(invalid_bytes);
         }
+    }
+}
+
+impl<T: Read + Write + Debug> Debug for SerialHandler<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SerialHandler")
+            .field("datastream", &self.datastream.inner)
+            .finish()
     }
 }

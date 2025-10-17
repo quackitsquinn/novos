@@ -2,18 +2,22 @@ use core::{ops::Deref, slice};
 
 use bytemuck::{Pod, Zeroable};
 
+/// A fixed-size null-terminated string.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FixedNulString<const N: usize> {
     data: [u8; N],
 }
 
 impl<const N: usize> FixedNulString<N> {
+    /// Create a new empty `FixedNulString`.
     pub fn new() -> Self {
         Self { data: [0; N] }
     }
 
+    /// Create a new `FixedNulString` from a string slice.
+    /// Returns `None` if the string is longer than `N`.
     pub const fn from_str(s: &str) -> Option<Self> {
-        if s.len() >= N {
+        if s.len() > N {
             return None;
         }
 

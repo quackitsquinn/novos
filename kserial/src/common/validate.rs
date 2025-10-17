@@ -1,4 +1,6 @@
+/// A trait for validating data structures.
 pub trait Validate {
+    /// Validate the data structure.
     fn validate(&self) -> bool;
 }
 macro_rules! always_validate {

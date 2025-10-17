@@ -3,9 +3,11 @@ macro_rules! cfg_value {
         static $name: $at_type = <$at_type>::new($default);
 
         pastey::paste! {
+            #[doc = concat!("Sets the value of `", stringify!($name), "`.")]
             $set_vis fn [<$set_prefix _ $name:lower>](value: $inner) {
                 $name.store(value, $store_type);
             }
+            #[doc = concat!("Gets the value of `", stringify!($name), "`.")]
             $get_vis fn [<$get_prefix _ $name:lower>]() -> $inner {
                 $name.load($load_type)
             }

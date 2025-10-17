@@ -1,3 +1,5 @@
+//! An abstraction over serial communication for the kernel.
+
 /// An adapter for serial communication. This is used to abstract the serial port from the rest of the kernel.
 pub trait SerialAdapter
 where

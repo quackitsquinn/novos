@@ -44,6 +44,7 @@ impl<T: Pod, const CAP: usize> ArrayVec<T, CAP> {
 }
 
 impl<const CAP: usize> ArrayVec<u8, CAP> {
+    /// Create an `ArrayVec` from a string slice.
     pub fn from_str(s: &str) -> Option<Self> {
         if s.len() > CAP {
             return None;
@@ -62,6 +63,7 @@ impl<const CAP: usize> ArrayVec<u8, CAP> {
             data,
         })
     }
+    /// Try to convert the `ArrayVec` to a `String`.
     #[cfg(feature = "std")]
     pub fn try_to_string(&self) -> Option<String> {
         let mut s = String::with_capacity(self.len());
@@ -77,6 +79,7 @@ impl<T, const CAP: usize> ArrayVec<T, CAP>
 where
     T: Pod,
 {
+    /// Create an `ArrayVec` from raw bytes without validation.
     pub unsafe fn from_bytes_unchecked(bytes: &[u8]) -> Self {
         let mut data: [T; CAP] = [Zeroable::zeroed(); CAP];
         let mut len = 0;
@@ -93,6 +96,7 @@ where
         }
     }
 
+    /// Try to create an `ArrayVec` from raw bytes with validation.
     pub fn try_from_bytes(bytes: &[u8]) -> Option<Self> {
         if bytes.len() > CAP * core::mem::size_of::<T>() {
             return None;
@@ -104,6 +108,7 @@ where
         Some(unsafe { Self::from_bytes_unchecked(bytes) })
     }
 
+    /// Create an `ArrayVec` from raw bytes, panicking on failure.
     pub fn from_bytes(bytes: &[u8]) -> Self {
         if bytes.len() > CAP * core::mem::size_of::<T>() {
             panic!("ArrayVec::from_bytes: bytes too long");

@@ -1,3 +1,4 @@
+//! Commands that can be sent over the serial port.
 use bytemuck::{Pod, Zeroable};
 use ids::SHUTDOWN_ID;
 use kserial_derive::Validate;
@@ -13,9 +14,11 @@ pub use incremental::{CloseIncrementalFileChannel, CreateIncrementalFileChannel,
 pub use string_packet::StringPacket;
 pub mod ids;
 
+/// A command to shut down the system.
 #[derive(Debug, Clone, Copy, Pod, Zeroable, Validate)]
 #[repr(C)]
 pub struct Shutdown {
+    /// The shutdown code.
     pub code: i32,
 }
 
@@ -24,6 +27,7 @@ impl PacketContents for Shutdown {
 }
 
 impl Shutdown {
+    /// Create a new `Shutdown` command.
     pub fn new(code: i32) -> Self {
         Self { code }
     }

@@ -1,3 +1,4 @@
+//! Configuration options for the kserial client.
 use core::sync::atomic::AtomicBool;
 
 use crate::common::macros::cfg_value;

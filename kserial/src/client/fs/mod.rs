@@ -1,5 +1,5 @@
+//! File system client module.
 use err::FileError;
-use spin::Mutex;
 
 use crate::common::{
     commands::{
@@ -12,10 +12,11 @@ use crate::common::{
 
 use super::{cfg::is_packet_mode, send_string, serial::SerialClient};
 
-use core::fmt::Write;
+use core::fmt::{Debug, Write};
 
 pub mod err;
 
+/// A file on the server.
 pub struct File<'a> {
     handle: FileHandle,
     open_mode: FileFlags,
@@ -39,6 +40,7 @@ impl<'a> File<'a> {
         }
     }
 
+    /// Create a file with the given name on the server.
     pub fn create_file_with(serial: &'a SerialClient<'a>, name: &str) -> Result<Self, FileError> {
         let open_file = OpenFile::create(name).ok_or(FileError::FilenameTooLong)?;
         // Copy the flags so that if the flags for `create` are changed, we don't have to change this function.
@@ -69,6 +71,7 @@ impl<'a> File<'a> {
         Ok(file)
     }
 
+    /// Write data to the file.
     pub fn write(&self, data: &[u8]) -> Result<(), FileError> {
         if !is_packet_mode() {
             send_string("Packet mode is not enabled, cannot write to file.");
@@ -101,7 +104,6 @@ impl<'a> File<'a> {
             send_string("Packet mode is not enabled, cannot close file.");
             return Err(FileError::NotInPacketMode);
         }
-        let mut client = self.client.lock();
         let close_file = CloseFile::new(self.handle);
         let mut session = self.client.lock().expect("Serial not initialized");
         session.send_packet(&close_file.into_packet());
@@ -114,16 +116,19 @@ impl<'a> File<'a> {
         Ok(())
     }
 
+    /// Get the file handle.
     pub fn handle(&self) -> &FileHandle {
         &self.handle
     }
 
+    /// Get the open mode of the file.
     pub fn open_mode(&self) -> &FileFlags {
         &self.open_mode
     }
 }
 
 impl File<'static> {
+    /// Create a new file with the given name using the global serial adapter.
     pub fn create_file(name: &str) -> Result<Self, FileError> {
         Self::create_file_with(&super::SERIAL_ADAPTER, name)
     }
@@ -136,6 +141,15 @@ impl<'a> Write for File<'a> {
             return Err(core::fmt::Error);
         }
         self.write(s.as_bytes()).map_err(|_| core::fmt::Error)
+    }
+}
+
+impl<'a> Debug for File<'a> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("File")
+            .field("handle", &self.handle)
+            .field("open_mode", &self.open_mode)
+            .finish()
     }
 }
 

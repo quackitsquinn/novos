@@ -22,7 +22,7 @@ static COMMANDS: [Command; 255] = {
     commands
 };
 
-fn invalid(i: u8, _: &mut SerialStream) -> PacketResult {
+fn invalid(_i: u8, _: &mut SerialStream) -> PacketResult {
     Err(PacketError::InvalidCommand)
 }
 

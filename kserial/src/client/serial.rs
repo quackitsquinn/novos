@@ -1,31 +1,37 @@
-use core::{mem, slice};
+//! A client for serial communication.
+use core::{fmt::Debug, mem, slice};
 
 use bytemuck::Zeroable;
-use spin::{Mutex, MutexGuard, Once};
+use spin::{Mutex, MutexGuard};
 
 use crate::common::{packet::Packet, PacketContents, PACKET_MODE_ENTRY_SIG};
 
 use super::{cfg, SerialAdapter};
-
+/// A client for serial communication.
 pub struct SerialClient<'a> {
     adapter: Mutex<Option<&'a mut dyn SerialAdapter>>,
 }
 
 impl<'a> SerialClient<'a> {
+    /// Create a new, uninitialized serial client.
     pub const fn new() -> Self {
         Self {
             adapter: Mutex::new(None),
         }
     }
 
+    /// Initialize the serial client with the given adapter.
     pub fn init(&self, adapter: &'a mut dyn SerialAdapter) {
         *self.adapter.lock() = Some(adapter);
     }
 
-    pub fn lock(&'a self) -> Option<AdapterContainer> {
+    /// Lock the serial client and get an adapter container.
+    /// Returns None if the adapter is not initialized.
+    pub fn lock(&'a self) -> Option<AdapterContainer<'a>> {
         AdapterContainer::new(self.adapter.lock())
     }
 
+    /// Enable packet mode support. This will set the packet mode configuration option and send a marker over the serial connection.
     pub fn enable_packet_support(&'a self) {
         cfg::set_packet_mode(true);
         unsafe {
@@ -36,6 +42,7 @@ impl<'a> SerialClient<'a> {
     }
 }
 
+/// A container for a locked serial adapter.
 pub struct AdapterContainer<'a> {
     adapter: MutexGuard<'a, Option<&'a mut dyn SerialAdapter>>,
 }
@@ -49,10 +56,6 @@ impl<'a> AdapterContainer<'a> {
         } else {
             None
         }
-    }
-
-    fn init(&mut self, adapter: &'a mut dyn SerialAdapter) {
-        self.adapter.replace(adapter);
     }
 
     /// Sends a packet over the serial connection.
@@ -140,10 +143,24 @@ impl<'a> AdapterContainer<'a> {
         assert_eq!(adapter.read_slice(&mut bytes), mem::size_of::<T>());
     }
 
+    /// Get a mutable reference to the underlying adapter.
     pub fn get_adapter(&mut self) -> &mut MutexGuard<'a, Option<&'a mut dyn SerialAdapter>> {
         &mut self.adapter
     }
 }
+
+impl Debug for AdapterContainer<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("AdapterContainer").finish()
+    }
+}
+
+impl Debug for SerialClient<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("SerialClient").finish()
+    }
+}
+
 #[cfg(test)]
 pub mod tests {
     use core::{ops::Deref, pin::Pin};
