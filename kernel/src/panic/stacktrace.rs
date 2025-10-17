@@ -46,9 +46,9 @@ pub unsafe fn symbol_trace(addr: *const ()) {
 unsafe fn sym_trace_inner(addr: *const (), writer: &mut dyn Write) {
     let elf = unsafe { KERNEL_ELF.get().elf_unchecked() };
     let strings = elf.strings().expect("Failed to get kernel strings");
-    let mut symbols = elf.symbols().expect("Failed to get kernel symbols");
+    let symbols = elf.symbols().expect("Failed to get kernel symbols");
 
-    let sym = symbols.find(|sym| {
+    let sym = symbols.iter().find(|sym| {
         let sym_addr = sym.st_value as *const ();
         sym_addr <= addr
             && addr < (sym.st_value as usize + sym.st_size as usize) as *mut ()

@@ -1,4 +1,4 @@
-use std::{env::VarError, fs, io::ErrorKind, option, path::PathBuf};
+use std::{env::VarError, fs, io::ErrorKind};
 
 use toml::{Value, map::Map};
 

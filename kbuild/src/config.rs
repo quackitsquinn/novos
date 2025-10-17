@@ -1,11 +1,20 @@
+//! Configuration for building the Nova Kernel.
 use std::{env, fmt::Debug, path::PathBuf};
 
+/// Configuration for building and running the Nova Kernel.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Config {
+    /// Path to the kernel binary.
     pub kernel_binary: PathBuf,
+    /// Path to the artifact directory.
     pub artifact_dir: PathBuf,
+    /// Whether to reinstall Limine bootloader files.
     pub reinstall_limine: bool,
+    /// Path to the Limine configuration file.
     pub limine_config: PathBuf,
+    /// Path to the ISO root directory.
     pub iso_root: PathBuf,
+    /// Name of the output ISO file.
     pub iso_name: String,
 }
 
@@ -21,6 +30,7 @@ where
 }
 
 impl Config {
+    /// Create a new `Config`, using environment variables to override any provided values.
     pub fn new(
         artifact_dir: PathBuf,
         kernel_binary: PathBuf,
@@ -37,11 +47,13 @@ impl Config {
             iso_name: val_or_env(iso_name, "ISO_NAME"),
         }
     }
+
     /// Joins `path` with the output directory.
     pub fn a(&self, path: &str) -> PathBuf {
         self.artifact_dir.join(path)
     }
 
+    /// Joins `path` with the ISO output directory.
     pub fn iso(&self, path: &str) -> PathBuf {
         self.a(&self.iso_name).join(path)
     }

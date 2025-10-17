@@ -1,3 +1,4 @@
+//!! Kernel build utilities: ISO creation and bootloader setup.
 use std::{fs, path::Path};
 
 use config::Config;
@@ -6,6 +7,7 @@ pub mod config;
 mod iso;
 mod limine;
 
+/// Builds the kernel ISO and sets up the Limine bootloader.
 pub fn build(cfg: &Config) {
     fs::create_dir_all(&cfg.a("iso")).ok();
     limine::update_limine(&cfg);

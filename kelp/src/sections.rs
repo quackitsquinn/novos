@@ -1,5 +1,8 @@
+use core::fmt::Debug;
+
 use goblin::elf64::{header, section_header};
 
+/// An iterator over the sections in an ELF file.
 pub struct ElfSections<'a> {
     data: &'a [u8],
     header: &'a header::Header,
@@ -36,5 +39,19 @@ impl<'a> Iterator for ElfSections<'a> {
         } else {
             None
         }
+    }
+}
+
+impl<'a> ExactSizeIterator for ElfSections<'a> {
+    fn len(&self) -> usize {
+        self.header.e_shnum as usize - self.i
+    }
+}
+
+impl Debug for ElfSections<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("ElfSections")
+            .field("count", &self.header.e_shnum)
+            .finish()
     }
 }

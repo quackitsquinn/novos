@@ -1,10 +1,6 @@
 use std::{
     fs,
-    io::{PipeWriter, Read, Write, pipe, stdin, stdout},
-    process::{Child, Command, exit},
-    rc::Rc,
-    thread,
-    time::Duration,
+    process::{Child, exit},
 };
 
 use crate::gdb::{BINARY_PATH, GdbConfig, GdbInvocation};

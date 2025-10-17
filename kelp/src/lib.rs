@@ -20,33 +20,45 @@ use goblin::{
 
 pub use goblin;
 
-use crate::{
-    phdr::ElfSegments,
-    reloc::{ElfRelocation, ElfRelocations},
-    sections::ElfSections,
-    strings::ElfStrings,
-    sym::ElfSymbols,
-};
+pub use crate::{reloc::ElfRelocation, sections::ElfSections, strings::ElfStrings};
 
-pub mod phdr;
-pub mod reloc;
-pub mod sections;
-pub mod strings;
-pub mod sym;
+mod reloc;
+mod sections;
+mod strings;
 
 /// An ELF executable
 pub struct Elf<'a> {
+    /// The raw ELF data
     pub data: &'a [u8],
     header: &'a header::Header,
 }
+/// An error that can occur while parsing an ELF file.
 #[derive(thiserror::Error, Debug)]
 pub enum ElfError {
+    /// The ELF file does not contain enough data.
     #[error("Not enough data: {actual} < {expected}")]
-    NotEnoughData { actual: usize, expected: usize },
+    NotEnoughData {
+        /// The actual size of the data.
+        actual: usize,
+        /// The expected size of the data.
+        expected: usize,
+    },
+    /// The ELF file has an invalid magic number.
     #[error("Invalid magic: {actual:?} != {expected:?}")]
-    InvalidMagic { actual: [u8; 4], expected: [u8; 4] },
+    InvalidMagic {
+        /// The actual magic number.
+        actual: [u8; 4],
+        /// The expected magic number.
+        expected: [u8; 4],
+    },
+    /// The ELF file has an invalid architecture.
     #[error("Invalid architecture: {actual} != {expected}")]
-    InvalidArchitecture { actual: u8, expected: u8 },
+    InvalidArchitecture {
+        /// The actual architecture.
+        actual: u8,
+        /// The expected architecture.
+        expected: u8,
+    },
 }
 
 impl<'a> Elf<'a> {
@@ -82,17 +94,8 @@ impl<'a> Elf<'a> {
         unsafe { ElfSections::new(self.data, self.header) }
     }
 
-    /// Iterate over the symbols in the ELF file.
-    pub fn symbols(&'a self) -> Option<ElfSymbols<'a>> {
-        let symtab = self
-            .sections()
-            .find(|section| section.sh_type == SHT_SYMTAB)?;
-
-        Some(unsafe { ElfSymbols::new(self.data, symtab) })
-    }
-
     /// Returns the symbols in the ELF file as a slice.
-    pub fn symbols_slice(&'a self) -> Option<&'a [Sym]> {
+    pub fn symbols(&'a self) -> Option<&'a [Sym]> {
         let symtab = self
             .sections()
             .find(|section| section.sh_type == SHT_SYMTAB)?;
@@ -105,25 +108,17 @@ impl<'a> Elf<'a> {
         })
     }
 
-    /// Iterate over the segments in the ELF file.
-    pub fn segments(&'a self) -> ElfSegments<'a> {
-        unsafe { ElfSegments::new(self.data, self.header) }
-    }
-
     /// Returns the segments in the ELF file as a slice.
-    pub fn segments_slice(&'a self) -> Option<&'a [ProgramHeader]> {
-        if self.header.e_phnum == 0 {
-            return None;
-        }
+    pub fn segments(&'a self) -> &'a [ProgramHeader] {
         let size = self.header.e_phnum as usize;
         let offset = self.header.e_phoff as usize;
 
-        Some(unsafe {
+        unsafe {
             core::slice::from_raw_parts(
                 self.data.as_ptr().add(offset).cast::<ProgramHeader>(),
                 size,
             )
-        })
+        }
     }
 
     /// Returns the string table in the ELF file.
@@ -131,17 +126,8 @@ impl<'a> Elf<'a> {
         Some(unsafe { ElfStrings::new(self.data, self) })
     }
 
-    /// Returns the relocations in the ELF file.
-    pub fn relocations(&'a self) -> Option<ElfRelocations<'a>> {
-        let reloc_section = self
-            .sections()
-            .find(|section| section.sh_type == section_header::SHT_RELA)?;
-
-        Some(ElfRelocations::new(self.data, reloc_section))
-    }
-
     /// Returns the relocations in the ELF file as a slice.
-    pub fn relocations_slice(&'a self) -> Option<&'a [ElfRelocation]> {
+    pub fn relocations(&'a self) -> Option<&'a [ElfRelocation]> {
         let reloc_section = self
             .sections()
             .find(|section| section.sh_type == section_header::SHT_RELA)?;

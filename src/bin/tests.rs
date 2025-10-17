@@ -27,7 +27,7 @@ fn main() {
     let mut cfg = QemuConfig::default();
     cfg.iso = "boot_images/kernel_tests.iso".to_string();
     cfg.dev_exit = true;
-    cfg.graphics = false;
+    cfg.display = false;
     cfg.serial.clear();
     cfg.serial.push("chardev:output".to_string());
     //cfg.wait_for_debugger = true;

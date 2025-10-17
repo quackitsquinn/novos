@@ -1,11 +1,5 @@
-use std::{
-    env,
-    fs::File,
-    io::{BufRead, Read, Write, stdout},
-    path::PathBuf,
-    process::{Command, Stdio},
-    thread::{self, Thread, spawn},
-};
+//! Rust abstractions for configuring and running QEMU.
+use std::{env, path::PathBuf, process::Command, thread::spawn};
 
 use ovmf_prebuilt::Source;
 
@@ -15,20 +9,29 @@ use crate::{
     qemu_ctl::QemuCtl,
 };
 
+/// Configuration for running QEMU.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct QemuConfig {
+    /// Path to the ISO image to boot.
     pub iso: String,
+    /// Whether to wait for a debugger to attach.
     pub wait_for_debugger: bool,
-    pub graphics: bool,
+    /// Whether to display the QEMU window.
+    pub display: bool,
+    /// Amount of memory to allocate to the VM.
     pub memory: String,
+    /// Serial port configurations.
     pub serial: Vec<String>,
+    /// Whether to enable the dev exit device.
     pub dev_exit: bool,
     /// Path to the UEFI code and variables images
     pub uefi_img: Option<(PathBuf, PathBuf)>,
+    /// Extra arguments to pass to QEMU.
     pub extra_args: Vec<String>,
 }
 
 impl QemuConfig {
+    /// Run QEMU with the current configuration.
     pub fn run(&mut self) {
         let mut args = vec!["-cdrom".to_string(), self.iso.to_string()];
         self.add_debug_flags(&mut args);
@@ -67,11 +70,12 @@ impl QemuConfig {
         }
     }
 
+    /// Create an empty QEMU configuration.
     pub fn empty() -> QemuConfig {
         QemuConfig {
             iso: "".to_string(),
             wait_for_debugger: false,
-            graphics: true,
+            display: true,
             memory: "".to_string(),
             serial: Vec::new(),
             dev_exit: false,
@@ -89,7 +93,7 @@ impl QemuConfig {
             args.push("-device".to_string());
             args.push("isa-debug-exit,iobase=0xf4,iosize=0x04".to_string());
         }
-        if !self.graphics {
+        if !self.display {
             args.push("-nographic".to_string());
             args.push("-monitor".to_string());
             args.push("pty".to_string());
@@ -153,7 +157,7 @@ impl Default for QemuConfig {
         cfg.iso = iso_path;
         cfg.memory = kernel_mem;
         cfg.dev_exit = no_display || debug_mode;
-        cfg.graphics = !no_display;
+        cfg.display = !no_display;
         cfg.wait_for_debugger = debug_mode;
         cfg.uefi_img = uefi_img;
         if !no_display {
