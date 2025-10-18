@@ -1,20 +1,12 @@
 use alloc::alloc::alloc;
-use core::{
-    alloc::Layout,
-    arch::naked_asm,
-    hint,
-    sync::atomic::Ordering,
-};
+use cake::RwLockUpgradableReadGuard;
+use core::{alloc::Layout, arch::naked_asm, hint, sync::atomic::Ordering};
 use x86_64::registers::control::{Cr3, Cr3Flags};
 
-use cake::{limine::mp::Cpu, spin::RwLock};
 use cake::log::info;
+use cake::{RwLock, limine::mp::Cpu};
 
-use crate::{
-    interrupts::IDT,
-    memory::paging::kernel::KERNEL_CR3,
-    mp::mp_setup::CoreContext,
-};
+use crate::{interrupts::IDT, memory::paging::kernel::KERNEL_CR3, mp::mp_setup::CoreContext};
 
 #[unsafe(naked)]
 pub unsafe extern "C" fn _ap_trampoline(a: &Cpu) -> ! {
@@ -53,14 +45,14 @@ extern "C" fn ap_trampoline(cpu: &Cpu, stack_base: u64) -> ! {
         Cr3::write(*cr3, Cr3Flags::empty());
     }
     loop {
-        let context_lock = context.upgradeable_read();
+        let context_lock = context.upgradable_read();
         if context_lock.tasks.is_empty() {
             drop(context_lock);
             hint::spin_loop();
             continue;
         }
 
-        let mut context_lock = context_lock.upgrade();
+        let mut context_lock = RwLockUpgradableReadGuard::upgrade(context_lock);
         let task = context_lock.tasks.remove(0);
         task();
     }

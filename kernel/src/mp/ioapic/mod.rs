@@ -6,7 +6,7 @@ use ::acpi::{
     sdt::madt::{Madt, MadtEntry},
 };
 use cake::log::info;
-use cake::{OnceMutex, spin::Once};
+use cake::{Once, OnceMutex};
 use modular_bitfield::prelude::*;
 
 use crate::{

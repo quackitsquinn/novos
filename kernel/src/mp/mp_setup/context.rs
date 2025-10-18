@@ -1,5 +1,5 @@
 use alloc::vec::Vec;
-use cake::{limine::mp::Cpu, spin::Once};
+use cake::{Once, limine::mp::Cpu};
 
 /// Represents the context of a CPU core.
 #[derive(Debug)]

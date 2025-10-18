@@ -2,8 +2,8 @@
 use core::{alloc::Layout, fmt::Debug};
 
 use alloc::alloc::alloc;
-use cake::spin::{Mutex, Once};
-use cake::{LimineData, limine::response::ExecutableFileResponse, spin};
+use cake::{LimineData, limine::response::ExecutableFileResponse};
+use cake::{Mutex, MutexGuard, Once};
 use kelp::Elf;
 
 /// The kernel's ELF executable, stored in a way that allows moving it to the heap later.
@@ -32,7 +32,7 @@ impl KernelElf {
     }
 
     /// Returns the Elf instance for the kernel. This will panic if the requests have terminated and the ELF data has not been copied to the heap yet.
-    pub fn elf(&self) -> spin::MutexGuard<'_, Elf<'static>> {
+    pub fn elf(&self) -> MutexGuard<'_, Elf<'static>> {
         if !self.kernel_data.is_completed() {
             panic!("Kernel ELF data has not been copied to the heap yet");
         }
@@ -45,7 +45,7 @@ impl KernelElf {
     ///
     /// The caller must ensure the returned reference is discarded before limine requests are terminated.
     /// It is *not* undefined behavior to call this function before it has been copied.
-    pub unsafe fn elf_unchecked(&self) -> spin::MutexGuard<'_, Elf<'static>> {
+    pub unsafe fn elf_unchecked(&self) -> MutexGuard<'_, Elf<'static>> {
         self.elf.lock()
     }
 

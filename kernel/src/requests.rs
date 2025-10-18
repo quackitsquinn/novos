@@ -3,7 +3,7 @@ use core::convert::Infallible;
 
 use cake::limine::BaseRevision;
 use cake::limine::{paging::Mode, request::*, response::ExecutableAddressResponse};
-use cake::{spin::Once, LimineRequest};
+use cake::{LimineRequest, Once};
 
 use crate::{
     declare_module,

@@ -4,7 +4,7 @@ use core::convert::Infallible;
 
 use cake::Fuse;
 use cake::log::{debug, info, trace};
-use cake::{spin::Once, terminate_requests};
+use cake::{Once, terminate_requests};
 use kelp::goblin::elf64::program_header::ProgramHeader;
 use x86_64::{
     VirtAddr,

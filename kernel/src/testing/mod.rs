@@ -1,6 +1,6 @@
 //! Testing tools.
 
-use cake::spin::Mutex;
+use cake::Mutex;
 
 mod qemu_exit;
 pub mod test_fn;

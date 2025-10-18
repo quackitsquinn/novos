@@ -1,7 +1,7 @@
 //! Rust abstractions for working with hardware interrupts
 use core::{convert::Infallible, mem::transmute};
 
-use cake::spin::Mutex;
+use cake::Mutex;
 use pic8259::ChainedPics;
 
 use crate::declare_module;

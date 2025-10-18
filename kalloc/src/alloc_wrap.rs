@@ -5,7 +5,7 @@ use core::{
     fmt::Debug,
 };
 
-use cake::spin::{Mutex, MutexGuard, Once};
+use cake::{Mutex, MutexGuard, Once};
 
 use crate::mut_alloc::MutableAllocator;
 

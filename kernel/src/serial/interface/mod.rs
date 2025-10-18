@@ -1,8 +1,8 @@
 //! Sets up the kernel serial interface.
 use core::fmt::Write;
 
-use cake::spin::Once;
-use cake::spin::{Mutex, MutexGuard};
+use cake::Once;
+use cake::{Mutex, MutexGuard};
 use kserial::client::SerialAdapter;
 use serial::Serial;
 

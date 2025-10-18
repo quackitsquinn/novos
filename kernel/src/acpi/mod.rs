@@ -6,7 +6,7 @@ use acpi::{AcpiError, rsdp::Rsdp, sdt::Signature};
 use alloc::collections::btree_map::BTreeMap;
 use cake::Owned;
 use cake::log::{info, warn};
-use cake::spin::{Mutex, MutexGuard, Once};
+use cake::{Mutex, MutexGuard, Once};
 pub use mapped_table::MappedTable;
 use x86_64::{PhysAddr, structures::paging::PageTableFlags};
 

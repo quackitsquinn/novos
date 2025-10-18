@@ -17,9 +17,9 @@ use core::arch::asm;
 
 use cake::{Fuse, declare_module};
 
+use cake::Once;
 use cake::limine::BaseRevision;
 use cake::log::info;
-use cake::spin::Once;
 use interrupts::hardware;
 use kserial::client::get_serial_client;
 

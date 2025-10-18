@@ -21,11 +21,12 @@ pub use oncemut::OnceMutex;
 pub use oncerw::{OnceRwLock, OnceRwReadGuard, OnceRwWriteGuard};
 pub use owned::Owned;
 pub use resource::{ResourceGuard, ResourceMutex};
-use spin::Once;
 
 pub use limine;
+pub use lock_api;
 pub use log;
-pub use spin;
+pub use spin::lock_api::*;
+pub use spin::{Barrier, Lazy, Once};
 
 static CALLER_INSTRUCTION_POINTER_FN: Once<fn() -> usize> = Once::new();
 static CALLER_INSTRUCTION_POINTER_NAME_RESOLVER: Once<fn(usize) -> Option<&'static str>> =

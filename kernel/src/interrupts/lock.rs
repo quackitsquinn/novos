@@ -3,7 +3,7 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
-use cake::spin::Mutex;
+use cake::Mutex;
 
 use crate::interrupts;
 
@@ -14,7 +14,7 @@ pub struct InterruptMutex<T> {
 
 /// A guard that releases the interrupt mutex when dropped.
 pub struct InterruptMutexGuard<'a, T> {
-    guard: cake::spin::MutexGuard<'a, T>,
+    guard: cake::MutexGuard<'a, T>,
     reenable: bool,
 }
 

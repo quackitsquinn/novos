@@ -5,10 +5,7 @@ use core::convert::Infallible;
 
 use alloc::collections::btree_map::BTreeMap;
 use cake::log::info;
-use cake::{
-    declare_module,
-    spin::{Once, RwLock},
-};
+use cake::{Once, RwLock, declare_module};
 pub use context::CoreContext;
 
 use crate::{mp::mp_setup::trampoline::prepare_cpu, requests::MP_INFO};

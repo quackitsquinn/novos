@@ -1,8 +1,8 @@
 //! Persistent framebuffer information.
 use core::fmt::Debug;
 
-use cake::spin::Mutex;
-use cake::{limine::response::FramebufferResponse, LimineData};
+use cake::Mutex;
+use cake::{LimineData, limine::response::FramebufferResponse};
 
 /// Information about the framebuffer.
 #[derive(Debug)]

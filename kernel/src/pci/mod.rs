@@ -1,7 +1,7 @@
 #![allow(dead_code, missing_docs)]
 //! This whole module is deprecated and is pending a rewrite.
 use alloc::vec::Vec;
-use cake::spin::Mutex;
+use cake::Mutex;
 use device::{PCIDevice, pci_get_device};
 use x86_64::instructions::port::Port;
 
