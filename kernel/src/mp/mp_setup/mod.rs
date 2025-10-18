@@ -8,9 +8,11 @@ use cake::log::info;
 use cake::{Once, RwLock, declare_module};
 pub use context::CoreContext;
 
+use crate::mp::mp_setup::trampoline::core_wait;
 use crate::{mp::mp_setup::trampoline::prepare_cpu, requests::MP_INFO};
 
-static CORES: Once<BTreeMap<u32, &'static RwLock<CoreContext>>> = Once::new();
+pub(super) static CORES: Once<BTreeMap<u32, &'static RwLock<CoreContext>>> = Once::new();
+pub(super) static CORE_COUNT: Once<usize> = Once::new();
 
 pub(super) fn init() -> Result<(), Infallible> {
     let mp = MP_INFO.get_limine();
@@ -19,6 +21,7 @@ pub(super) fn init() -> Result<(), Infallible> {
 
     let ap_cpus = cpus.len() - 1;
     info!("Found {} apCPUs", ap_cpus);
+    CORE_COUNT.call_once(|| cpus.len());
 
     cake::set_multithreaded(ap_cpus > 0);
 
@@ -35,6 +38,7 @@ pub(super) fn init() -> Result<(), Infallible> {
     }
 
     CORES.call_once(|| cores);
+    core_wait();
 
     Ok(())
 }

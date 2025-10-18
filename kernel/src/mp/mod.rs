@@ -1,24 +1,32 @@
 //! Multiprocessor setup and processor local APIC management.
 use core::convert::Infallible;
 
-use cake::log::info;
+use alloc::vec::Vec;
+use cake::{Once, log::info};
 use raw_cpuid::CpuId;
 
 use crate::{
     declare_module,
     interrupts::hardware,
-    mp::{ioapic::IoApic, lapic::Lapic, mp_setup::dispatch_all},
+    mp::{
+        ioapic::IoApic,
+        lapic::Lapic,
+        mp_setup::{dispatch_all, trampoline::core_wait},
+    },
 };
 
 pub mod ioapic;
 pub mod lapic;
 pub mod req_data;
 
+mod core_local;
 mod mp_setup;
 
 pub use mp_setup::{
     CoreContext, MODULE as PREINIT_MODULE, cores, dispatch_to, is_initialized as has_init_mp,
 };
+
+pub use core_local::CoreLocal;
 
 pub use req_data::{ApplicationCore, ApplicationCores};
 
@@ -27,6 +35,8 @@ pub static LAPIC: Lapic = Lapic::new();
 
 /// The IO APIC for the current system.
 pub static IOAPIC: IoApic = IoApic::new();
+
+pub static CPU_IDS: Once<Vec<u64>> = Once::new();
 
 fn init() -> Result<(), Infallible> {
     LAPIC.init();
@@ -43,6 +53,7 @@ fn init() -> Result<(), Infallible> {
         hardware::disable();
     }
     dispatch_all(apic_init);
+    core_wait();
     Ok(())
 }
 

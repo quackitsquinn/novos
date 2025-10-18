@@ -28,6 +28,11 @@ pub use log;
 pub use spin::lock_api::*;
 pub use spin::{Barrier, Lazy, Once};
 
+/// Type aliases for a raw mutex.
+pub type RawMutex = spin::Mutex<()>;
+/// Type alias for a raw read-write lock.
+pub type RawRwLock = spin::RwLock<()>;
+
 static CALLER_INSTRUCTION_POINTER_FN: Once<fn() -> usize> = Once::new();
 static CALLER_INSTRUCTION_POINTER_NAME_RESOLVER: Once<fn(usize) -> Option<&'static str>> =
     Once::new();
