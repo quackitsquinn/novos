@@ -31,7 +31,7 @@ impl SerialAdapter for Serial {
 
     fn send_slice(&mut self, data: &[u8]) {
         for byte in data {
-            self.port.send(*byte);
+            self.port.send_raw(*byte);
         }
     }
 
