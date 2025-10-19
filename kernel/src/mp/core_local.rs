@@ -84,7 +84,10 @@ impl<T, C: ConstructMethod<T>> CoreLocal<T, C> {
 
 trait Sealed {}
 
+/// A trait for methods of constructing data for application cores.
+#[allow(private_bounds)]
 pub trait ConstructMethod<T>: Sealed + Sized {
+    /// Construct the data for an application core.
     fn construct(&self, local: &CoreLocal<T, Self>) -> T;
 }
 

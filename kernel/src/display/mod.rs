@@ -23,8 +23,8 @@ pub static TERMINAL: OnceMutex<terminal::Terminal> = OnceMutex::uninitialized();
 declare_module!("display", init);
 
 fn init() -> Result<(), Infallible> {
-    FRAMEBUFFER.init(unsafe { Framebuffer::new(requests::FRAMEBUFFER.get()) });
-    TERMINAL.init(terminal::Terminal::new(1, 2));
+    FRAMEBUFFER.call_init(|| unsafe { Framebuffer::new(requests::FRAMEBUFFER.get()) });
+    TERMINAL.call_init(|| terminal::Terminal::new(1, 2));
     Ok(())
 }
 

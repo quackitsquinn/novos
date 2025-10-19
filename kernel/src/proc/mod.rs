@@ -72,7 +72,7 @@ pub static KERNEL_THREAD_SCHEDULER: OnceMutex<KernelThreadScheduler> = OnceMutex
 
 fn init_proc() -> Result<(), Infallible> {
     let scheduler = KernelThreadScheduler::new();
-    KERNEL_THREAD_SCHEDULER.init(scheduler);
+    KERNEL_THREAD_SCHEDULER.call_init(|| scheduler);
     Ok(())
 }
 

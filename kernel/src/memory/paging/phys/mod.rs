@@ -12,6 +12,6 @@ pub(crate) static FRAME_ALLOCATOR: OnceMutex<PhysFrameAllocator> = OnceMutex::un
 declare_module!("physical memory mapping", init, &'static str);
 
 fn init() -> Result<(), &'static str> {
-    FRAME_ALLOCATOR.init(PhysFrameAllocator::new(MEMORY_MAP.get()));
+    FRAME_ALLOCATOR.call_init(|| PhysFrameAllocator::new(MEMORY_MAP.get()));
     Ok(())
 }
