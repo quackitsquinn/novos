@@ -42,13 +42,9 @@ impl Into<usize> for InterruptIndex {
 }
 
 pub(super) fn define_hardware() {
-    let mut idt = super::IDT.modify();
+    let mut idt = super::IDT.get_mut();
     idt[InterruptIndex::Timer as u8]
         .set_handler_fn(unsafe { transmute(timer::timer_handler_raw as *mut ()) });
-    drop(idt);
-    unsafe {
-        super::IDT.commit();
-    }
 }
 
 declare_module!("hardware_interrupts", init);

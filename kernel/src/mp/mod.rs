@@ -26,7 +26,7 @@ pub use mp_setup::{
     CoreContext, MODULE as PREINIT_MODULE, cores, dispatch_to, is_initialized as has_init_mp,
 };
 
-pub use core_local::CoreLocal;
+pub use core_local::{CloneBootstrap, ConstructMethod, Constructor, CoreLocal};
 
 pub use req_data::{ApplicationCore, ApplicationCores};
 
@@ -35,8 +35,6 @@ pub static LAPIC: Lapic = Lapic::new();
 
 /// The IO APIC for the current system.
 pub static IOAPIC: IoApic = IoApic::new();
-
-pub static CPU_IDS: Once<Vec<u64>> = Once::new();
 
 fn init() -> Result<(), Infallible> {
     LAPIC.init();

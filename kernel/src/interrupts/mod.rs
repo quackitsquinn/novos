@@ -6,26 +6,21 @@ use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
 
 mod exception;
 pub mod hardware;
+
+pub mod local;
 mod lock;
 mod macros;
 
 use crate::{
     context::{InterruptCodeContext, InterruptContext, PageFaultInterruptContext},
-    declare_module, init_interrupt_table, interrupt_wrapper,
+    declare_module, init_idt, interrupt_wrapper,
+    interrupts::local::LocalIdt,
 };
 
 pub use lock::{InterruptMutex, InterruptMutexGuard};
 
-/// The global Interrupt Descriptor Table.
-pub static IDT: InterruptTable = InterruptTable::uninitialized();
-
-/// The interrupt table for the kernel.
-#[derive(Debug)]
-pub struct InterruptTable {
-    table: Mutex<InterruptDescriptorTable>,
-    exchange: Mutex<InterruptDescriptorTable>,
-    init: Once<()>,
-}
+/// The local IDT for each core.
+pub static IDT: LocalIdt = LocalIdt::new();
 
 /// A handler for interrupts with an error code.
 pub type CodeHandler = fn(ctx: InterruptCodeContext, index: u8, name: &'static str);
@@ -34,97 +29,23 @@ pub type InterruptHandler = fn(ctx: InterruptContext, index: u8, name: &'static 
 /// A handler for page fault interrupts.
 pub type PageFaultHandler = fn(ctx: PageFaultInterruptContext);
 
-impl InterruptTable {
-    /// Create a new, uninitialized interrupt table.
-    pub const fn uninitialized() -> InterruptTable {
-        InterruptTable {
-            table: Mutex::new(InterruptDescriptorTable::new()),
-            exchange: Mutex::new(InterruptDescriptorTable::new()),
-            init: Once::new(),
-        }
-    }
-    /// Commit the table, returning the old table if it was initialized.
-    ///
-    /// # Safety
-    /// The caller must ensure that all modifications to the exchange table are complete and will not violate memory safety.
-    ///
-    /// The caller must ensure that interrupts are disabled when calling this function.
-    pub unsafe fn commit(&'static self) -> Option<InterruptDescriptorTable> {
-        let mut old = None;
-        let mut table = self.table.try_lock().expect("Interrupt table is locked");
-
-        // If the table is uninitialized, initialize it.
-        if !self.init.is_completed() {
-            // Interrupts are disabled, so we can safely initialize the table.
-            self.init.call_once(|| ());
-            // Get the raw pointer to the table, convert it to &'static, and load it.
-            unsafe {
-                mem::transmute::<&InterruptDescriptorTable, &'static InterruptDescriptorTable>(
-                    &*table as &InterruptDescriptorTable,
-                )
-                .load();
-            }
-        } else {
-            old = Some(mem::replace(&mut *table, InterruptDescriptorTable::new()));
-        }
-        // Copy the table to the exchange table.
-        let exchange = self
-            .exchange
-            .try_lock()
-            .expect("Interrupt exchange table is locked");
-
-        // Copy the exchange table to the real table.
-        table.clone_from(&*exchange);
-
-        unsafe {
-            mem::transmute::<&InterruptDescriptorTable, &'static InterruptDescriptorTable>(
-                &*table as &InterruptDescriptorTable,
-            )
-            .load();
-        }
-
-        old
-    }
-
-    /// Loads the interrupt descriptor table using `lidt`.
-    ///
-    /// # Safety
-    /// The caller must ensure that anything referenced in the table is valid.
-    pub unsafe fn load(&'static self) {
-        let table = self.table.try_lock().expect("Interrupt table is locked");
-        unsafe {
-            mem::transmute::<&InterruptDescriptorTable, &'static InterruptDescriptorTable>(
-                &*table as &InterruptDescriptorTable,
-            )
-            .load();
-        }
-    }
-
-    /// Return a guard to the interrupt table.
-    /// Modifications to this table *will not* take effect until `commit` is called,
-    /// and this table may not be a complete representation of the loaded interrupt table.
-    pub fn modify(&self) -> MutexGuard<'_, InterruptDescriptorTable> {
-        self.exchange
-            .try_lock()
-            .expect("Interrupt exchange table is locked")
-    }
-}
-
 declare_module!("interrupts", init);
 
 fn init() -> Result<(), Infallible> {
     x86_64::instructions::interrupts::disable();
-    init_interrupt_table!(
+
+    let mut idt = IDT.get_mut();
+
+    init_idt!(
         exception::general_code_handler,
         exception::page_fault_handler,
         exception::general_handler,
-        IDT
+        &mut idt
     );
-    unsafe {
-        IDT.commit();
-    }
 
+    drop(idt);
     hardware::define_hardware();
+    IDT.swap_and_sync();
     Ok(())
 }
 

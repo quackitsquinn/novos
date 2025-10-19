@@ -20,14 +20,13 @@ pub unsafe extern "C" fn _ap_trampoline(a: &Cpu) -> ! {
 }
 
 static IDLE: AtomicUsize = AtomicUsize::new(0);
+static INIT: AtomicUsize = AtomicUsize::new(0);
 
 // Application Processor trampoline function.
 extern "C" fn ap_trampoline(cpu: &Cpu, stack_base: u64) -> ! {
     let context = unsafe {
         &*(cpu.extra.load(core::sync::atomic::Ordering::SeqCst) as *const RwLock<CoreContext>)
     };
-
-    unsafe { IDT.load() };
 
     let context_lock = context.write();
 
@@ -50,6 +49,7 @@ extern "C" fn ap_trampoline(cpu: &Cpu, stack_base: u64) -> ! {
     }
     // Now we can enter the idle loop.
     IDLE.fetch_add(1, Ordering::AcqRel);
+    INIT.fetch_add(1, Ordering::AcqRel);
     loop {
         let context_lock = context.upgradable_read();
         if context_lock.tasks.is_empty() {
@@ -82,11 +82,21 @@ pub(super) fn prepare_cpu(cpu: &Cpu) -> *const RwLock<CoreContext> {
     context
 }
 
+/// Returns true if all application processors have initialized.
+pub fn aps_init() -> bool {
+    let total = *CORE_COUNT.get().expect("not all cores init");
+    let init = INIT.load(Ordering::Acquire);
+    total > 0 && total == init
+}
+
 /// Returns true if all application processors have finished their tasks.
 pub fn aps_finished() -> bool {
     let total = *CORE_COUNT.get().expect("not all cores init");
+    if total == 1 {
+        return true;
+    }
     let idle = IDLE.load(Ordering::Acquire);
-    total > 0 && total == idle
+    total == idle
 }
 
 /// Waits until all application processors have finished their tasks.
