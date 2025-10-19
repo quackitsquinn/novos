@@ -14,6 +14,7 @@
 extern crate alloc;
 
 use core::arch::asm;
+use core::ptr;
 
 use cake::{Fuse, declare_module};
 

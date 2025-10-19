@@ -75,4 +75,17 @@ impl LocalIdt {
             *back = front.clone();
         });
     }
+
+    /// Load the local IDT into the CPU's IDT register. This only needs to be done once per core.
+    ///
+    /// # Safety
+    /// The caller must ensure that no interrupts occur while the IDT is being modified.
+    pub unsafe fn load(&'static self) {
+        let tables = self.tables.read();
+        // Safety: Any modification to the IDT is always done with interrupts disabled.
+        // Thus, converting the read guard to a static reference is safe.
+        let (front, _) =
+            unsafe { &*(&*tables as *const (InterruptDescriptorTable, InterruptDescriptorTable)) };
+        front.load();
+    }
 }

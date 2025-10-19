@@ -34,18 +34,21 @@ declare_module!("interrupts", init);
 fn init() -> Result<(), Infallible> {
     x86_64::instructions::interrupts::disable();
 
-    let mut idt = IDT.get_mut();
+    {
+        let mut idt = IDT.get_mut();
 
-    init_idt!(
-        exception::general_code_handler,
-        exception::page_fault_handler,
-        exception::general_handler,
-        &mut idt
-    );
-
-    drop(idt);
+        init_idt!(
+            exception::general_code_handler,
+            exception::page_fault_handler,
+            exception::general_handler,
+            idt
+        );
+    }
     hardware::define_hardware();
     IDT.swap_and_sync();
+    unsafe {
+        IDT.load();
+    }
     Ok(())
 }
 
