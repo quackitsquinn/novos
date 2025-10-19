@@ -1,5 +1,4 @@
 //! SDT (System Description Table) support. Provides abstractions for safely accessing ACPI SDT headers.
-use core::{mem, pin::Pin};
 
 use acpi::{
     AcpiError, AcpiTable,
@@ -8,12 +7,15 @@ use acpi::{
 use cake::Owned;
 use x86_64::{PhysAddr, structures::paging::PageTableFlags};
 
-use crate::memory::paging::phys::phys_mem::{PhysicalMemoryMap, map_address, remap_address};
+use crate::{
+    acpi::MappedTable,
+    memory::paging::phys::phys_mem::{PhysicalMemoryMap, map_address, unmap_address},
+};
 
 /// A header for an ACPI SDT (System Description Table).
 #[derive(Debug)]
 pub struct TableHeader<'a> {
-    _map: PhysicalMemoryMap,
+    map: PhysicalMemoryMap,
     sdt: Owned<SdtHeader>,
     _phantom: core::marker::PhantomData<&'a ()>,
 }
@@ -33,18 +35,6 @@ impl<'a> TableHeader<'a> {
         .expect("Failed to map ACPI table header");
 
         let inner = unsafe { Owned::new(&mut *(map.ptr() as *mut acpi::sdt::SdtHeader)) };
-        let len = inner.length;
-        if len as usize > mem::size_of::<SdtHeader>() {
-            let new_map = remap_address(
-                &map,
-                len as u64,
-                PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
-            )
-            .expect("Failed to map full ACPI table header");
-
-            let inner = unsafe { Owned::new(&mut *(new_map.ptr() as *mut acpi::sdt::SdtHeader)) };
-            return unsafe { Self::from_raw_parts(new_map, inner) };
-        }
 
         unsafe { Self::from_raw_parts(map, inner) }
     }
@@ -55,10 +45,24 @@ impl<'a> TableHeader<'a> {
     /// The caller must ensure that the physical memory map and SDT header are valid.
     pub unsafe fn from_raw_parts(map: PhysicalMemoryMap, sdt: Owned<SdtHeader>) -> Self {
         Self {
-            _map: map,
+            map: map,
             sdt,
             _phantom: core::marker::PhantomData,
         }
+    }
+
+    /// Tries to convert the table to a mutable reference of the given type.
+    /// Returns `None` if the signatures do not match.
+    pub fn to_table<T>(self) -> Result<MappedTable<T>, AcpiError>
+    where
+        T: AcpiTable,
+    {
+        // First validate the table signature
+        unsafe { self.sdt.validate(T::SIGNATURE)? };
+        // Then unmap the table and create a MappedTable
+        let p_addr = self.map.phys_addr();
+        unmap_address(self.map);
+        unsafe { Ok(MappedTable::new_unchecked(p_addr)) }
     }
 
     /// Returns a reference to the table header.
@@ -69,28 +73,6 @@ impl<'a> TableHeader<'a> {
     /// Returns a pointer to the table data, immediately following the header.
     pub fn table_ptr(&self) -> *const u8 {
         unsafe { (&*self.sdt as *const SdtHeader).add(1).cast() }
-    }
-
-    /// Tries to convert the table to a reference of the given type.
-    /// Returns `None` if the signatures do not match.
-    pub fn try_as<T>(&self) -> Result<Pin<&T>, AcpiError>
-    where
-        T: AcpiTable,
-    {
-        unsafe { self.sdt.validate(T::SIGNATURE)? };
-        let ptr = &*self.sdt as *const SdtHeader as *const T;
-        Ok(unsafe { Pin::new_unchecked(&*ptr) })
-    }
-
-    /// Tries to convert the table to a mutable reference of the given type.
-    /// Returns `None` if the signatures do not match.
-    pub fn try_as_mut<T>(&mut self) -> Result<Pin<&mut T>, AcpiError>
-    where
-        T: AcpiTable,
-    {
-        unsafe { self.sdt.validate(T::SIGNATURE)? };
-        let ptr = &mut *self.sdt as *mut SdtHeader as *mut T;
-        Ok(unsafe { Pin::new_unchecked(&mut *ptr) })
     }
 
     /// Validates the table signature with the given `sig`.

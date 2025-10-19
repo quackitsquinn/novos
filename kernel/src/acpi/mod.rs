@@ -2,11 +2,12 @@
 //! This includes methods for accessing various ACPI tables and their entries (see the [mapped_table] module).
 use core::{mem, ops::Deref, ptr::read_unaligned};
 
+use acpi::AcpiTable;
 use acpi::{AcpiError, rsdp::Rsdp, sdt::Signature};
 use alloc::collections::btree_map::BTreeMap;
-use cake::Owned;
 use cake::log::{info, warn};
 use cake::{Mutex, MutexGuard, Once};
+use cake::{OnceMutex, Owned};
 pub use mapped_table::MappedTable;
 use x86_64::{PhysAddr, structures::paging::PageTableFlags};
 
@@ -21,7 +22,7 @@ pub static RSDP: Once<Owned<Rsdp>> = Once::new();
 /// A locked ACPI table. This prevents any concurrent access.
 pub type AcpiTableLock = MutexGuard<'static, TableHeader<'static>>;
 
-static ACPI_TABLES: Once<BTreeMap<u32, Mutex<TableHeader<'static>>>> = Once::new();
+static ACPI_TABLES: OnceMutex<BTreeMap<u32, TableHeader<'static>>> = OnceMutex::uninitialized();
 
 fn init() -> Result<(), AcpiError> {
     let rsdp_addr = *crate::requests::RSDP_ADDRESS
@@ -95,10 +96,10 @@ fn init() -> Result<(), AcpiError> {
         }
         info!("    Signature: {}", entry.header().signature,);
         let key = table_key(entry.header().signature);
-        tables.insert(key, Mutex::new(entry));
+        tables.insert(key, entry);
     }
 
-    ACPI_TABLES.call_once(|| tables);
+    ACPI_TABLES.call_init(|| tables);
 
     Ok(())
 }
@@ -109,10 +110,14 @@ fn table_key(sig: Signature) -> u32 {
 }
 
 /// Returns a locked ACPI table with the given signature.
-pub fn get_table(signature: Signature) -> Option<AcpiTableLock> {
-    let tables = ACPI_TABLES.get().expect("ACPI tables not initialized");
-    let key = table_key(signature);
-    tables.get(&key).map(|t| t.try_lock()).flatten()
+pub fn get_table<T: AcpiTable>() -> Result<MappedTable<T>, AcpiError> {
+    let mut tables = ACPI_TABLES.get();
+    let key = table_key(T::SIGNATURE);
+    tables
+        .remove(&key)
+        .ok_or(AcpiError::TableNotFound(T::SIGNATURE))
+        .map(|t| t.to_table())
+        .flatten()
 }
 
 declare_module!("ACPI", init, AcpiError);

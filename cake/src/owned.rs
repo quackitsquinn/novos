@@ -1,7 +1,7 @@
 use core::{
     fmt,
     ops::{Deref, DerefMut},
-    ptr::{drop_in_place, NonNull},
+    ptr::{NonNull, drop_in_place},
 };
 
 /// A pointer type that provides ownership semantics.
@@ -60,6 +60,8 @@ where
         write!(f, "Owned({:?})", unsafe { self.val.as_ref() })
     }
 }
+
+impl<T> Unpin for Owned<T> where T: Unpin {}
 
 unsafe impl<T> Send for Owned<T> where T: Send {}
 unsafe impl<T> Sync for Owned<T> where T: Sync {}

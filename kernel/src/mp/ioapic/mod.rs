@@ -41,9 +41,8 @@ impl IoApic {
 
     /// Initializes the IOAPIC by reading the MADT and mapping the IOAPIC's physical address into the kernel's address space.
     pub fn init(&self) {
-        let madt_raw = acpi::get_table(Madt::SIGNATURE).expect("Failed to get MADT");
-        let madt = madt_raw.try_as::<Madt>().expect("MADT is not a MADT");
-        for entry in madt.entries() {
+        let madt = acpi::get_table::<Madt>().expect("Failed to get MADT");
+        for entry in madt.table_pin().entries() {
             if let MadtEntry::IoApic(i) = entry {
                 self.base.call_once(|| i.io_apic_address as u64);
                 break;
@@ -59,7 +58,7 @@ impl IoApic {
 
         info!("Mapped IO APIC at {:p}", map.ptr());
 
-        self.mapped.init(map.ptr().cast_mut());
+        self.mapped.call_init(|| map.ptr().cast_mut());
         self.table.call_once(|| map);
     }
 
