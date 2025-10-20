@@ -6,7 +6,9 @@ use cake::Fuse;
 
 use crate::{
     declare_module, hlt_loop,
+    interrupts::KernelInterrupt,
     memory::{self, allocator},
+    mp::{self, ipi::IPIDestination},
     print, println,
     serial::{self, interface::SERIAL_PORT_NUM, raw::SerialPort},
     testing,
@@ -46,10 +48,6 @@ pub fn panic_extended_info(pi: &PanicInfo) {
         // Safety: We are in a panic, so the allocator should be completely halted
         let alloc = unsafe { allocator::ALLOCATOR.force_get().unwrap() };
         alloc.print_state();
-        // Drop the allocator so that it isn't locked when we print to the screen
-        println!("Sending heap state to serial");
-
-        // alloc.blocks.export_block_binary("heap.raw"); TODO: Update this to use the new allocator
     } else {
         println!("Heap allocator not initialized");
     }
@@ -78,6 +76,9 @@ pub fn panic(pi: &PanicInfo) -> ! {
         hlt_loop();
     }
     PANICKED.blow();
+    unsafe {
+        mp::ipi::send_ipi(IPIDestination::AllExceptSelf, KernelInterrupt::Panic);
+    }
     panic_extended_info(pi);
     println!("Done; attempting QEMU exit");
     testing::try_shutdown_qemu(true);

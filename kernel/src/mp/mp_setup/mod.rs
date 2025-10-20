@@ -38,7 +38,6 @@ pub(super) fn init() -> Result<(), Infallible> {
     }
 
     CORES.call_once(|| cores);
-    core_wait();
 
     Ok(())
 }

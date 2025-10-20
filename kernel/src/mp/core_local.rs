@@ -37,9 +37,6 @@ impl<T, C: ConstructMethod<T>> CoreLocal<T, C> {
             return apps;
         }
 
-        if !aps_finished() {
-            panic!("Attempted to access application core data before all cores initialized");
-        }
         self.applications.call_once(|| {
             let cores = CORES.get().expect("Cores not initialized");
             let mut apps = Vec::with_capacity(cores.len() - 1);

@@ -109,6 +109,7 @@ pub(crate) unsafe fn init_kernel_services() {
     pci::MODULE.init();
     proc::MODULE.init();
     info!("Kernel services initialized");
+    panic!("wee woo wee woo"); // Force a panic to test panic handling
 }
 
 #[macro_export]

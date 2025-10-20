@@ -16,6 +16,7 @@ use crate::{
 };
 
 pub mod ioapic;
+pub mod ipi;
 pub mod lapic;
 pub mod req_data;
 
@@ -50,9 +51,16 @@ fn init() -> Result<(), Infallible> {
     unsafe {
         hardware::disable();
     }
+    dispatch_all(load_idt);
     dispatch_all(apic_init);
     core_wait();
     Ok(())
+}
+
+fn load_idt() {
+    unsafe {
+        crate::interrupts::IDT.load();
+    }
 }
 
 fn apic_init() {
@@ -64,7 +72,7 @@ declare_module!("MP", init);
 /// Returns the current core's APIC ID.
 #[inline]
 pub fn current_core_id() -> u64 {
-    // INFO: We don't use `CpuId::new()` because
+    // INFO: We don't use `CpuId::new()` because RA fails to generate the IDE definition for it on non-x86_64 platforms.
     CpuId::with_cpuid_reader(raw_cpuid::CpuIdReaderNative)
         .get_feature_info()
         .map_or(0, |finfo| finfo.initial_local_apic_id() as u64)

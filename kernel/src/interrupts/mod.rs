@@ -2,7 +2,10 @@
 use core::{convert::Infallible, mem};
 
 use cake::{Mutex, MutexGuard, Once};
-use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
+use x86_64::{
+    VirtAddr,
+    structures::idt::{InterruptDescriptorTable, InterruptStackFrame},
+};
 
 mod exception;
 pub mod hardware;
@@ -29,6 +32,16 @@ pub type InterruptHandler = fn(ctx: InterruptContext, index: u8, name: &'static 
 /// A handler for page fault interrupts.
 pub type PageFaultHandler = fn(ctx: PageFaultInterruptContext);
 
+/// The interrupts that are guaranteed to be available on each x86_64 CPU.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KernelInterrupt {
+    /// The LAPIC timer interrupt.
+    Timer = 253,
+    /// The panic interrupt.
+    /// This interrupt is triggered when the kernel panics to halt all other cores.
+    Panic = 254,
+}
+
 declare_module!("interrupts", init);
 
 fn init() -> Result<(), Infallible> {
@@ -43,6 +56,12 @@ fn init() -> Result<(), Infallible> {
             exception::general_handler,
             idt
         );
+
+        // Set up the panic interrupt
+        unsafe {
+            idt[KernelInterrupt::Panic as u8]
+                .set_handler_addr(VirtAddr::from_ptr(exception::panic_handler_raw as *mut ()))
+        };
     }
     hardware::define_hardware();
     IDT.swap_and_sync();

@@ -2,6 +2,7 @@ use x86_64::registers::control::Cr2;
 
 use crate::{
     context::{InterruptCodeContext, InterruptContext, PageFaultInterruptContext},
+    interrupt_wrapper,
     panic::stacktrace::{self, StackFrame},
     println,
 };
@@ -42,3 +43,11 @@ pub fn page_fault_handler(ctx: PageFaultInterruptContext) {
     exception_brk();
     loop {}
 }
+
+pub extern "C" fn panic_handler(_: InterruptContext) {
+    loop {
+        x86_64::instructions::hlt();
+    }
+}
+
+interrupt_wrapper!(panic_handler, panic_handler_raw);

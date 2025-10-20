@@ -96,7 +96,7 @@ pub fn aps_finished() -> bool {
         return true;
     }
     let idle = IDLE.load(Ordering::Acquire);
-    total == idle
+    total - 1 == idle
 }
 
 /// Waits until all application processors have finished their tasks.
