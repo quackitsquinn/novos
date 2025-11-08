@@ -1,5 +1,5 @@
 use std::{
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::Child,
     sync::{Arc, RwLock},
 };
@@ -9,9 +9,9 @@ pub struct QemuCtl {
 }
 
 impl QemuCtl {
-    pub fn new(qemu: Child, pty_path: PathBuf) -> Self {
+    pub fn new(qemu: Child, socket_path: &Path) -> Self {
         QemuCtl {
-            inner: Arc::new(RwLock::new(QemuInner::new(qemu, pty_path))),
+            inner: Arc::new(RwLock::new(QemuInner::new(qemu, socket_path.to_path_buf()))),
         }
     }
 

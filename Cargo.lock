@@ -570,6 +570,7 @@ name = "krun"
 version = "0.1.0"
 dependencies = [
  "kserial",
+ "lazy_static",
  "ovmf-prebuilt",
  "toml",
  "which",

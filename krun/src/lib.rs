@@ -1,7 +1,10 @@
 //! Custom QEMU control and GDB integration for running kernels.
+mod env;
 mod gdb;
 mod packet;
-mod qemu_cfg;
-mod qemu_ctl;
+mod qemu;
 
-pub use qemu_cfg::QemuConfig;
+pub use qemu::{
+    QemuConfig,
+    chardev::{CharDev, CharDevRef},
+};

@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 kserial = { path = "../kserial"}
+lazy_static = "1.5.0"
 ovmf-prebuilt = "0.2.3"
 toml = "0.8.22"
 which = "7.0.3"

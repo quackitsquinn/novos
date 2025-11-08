@@ -9,7 +9,7 @@ use std::{
 
 use kserial::server::SerialHandler;
 
-use crate::qemu_ctl::QemuCtl;
+use crate::qemu::controller::QemuCtl;
 
 const SOCKET_CREATION_WAIT_INTERVAL: Duration = Duration::from_millis(500);
 const MAX_SOCKET_CREATION_ATTEMPTS: u8 = 10;

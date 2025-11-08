@@ -1,9 +1,16 @@
-use krun::QemuConfig;
+use std::path::Path;
 
+use krun::{CharDev, QemuConfig};
+
+pub const MONITOR_PTY_LINK: &str = "target/monitor.pty";
 pub fn main() {
-    let mut cfg = QemuConfig::default();
-    // TODO: Refactor so that you don't have to do this
-    cfg.serial.clear();
-    cfg.serial.push("chardev:output".to_string());
+    let mut cfg = QemuConfig::default().with_default_chardevs();
+    let chardev = cfg
+        .push_chardev(CharDev::pty(
+            "monitor",
+            Some((Path::new(MONITOR_PTY_LINK), true)),
+        ))
+        .expect("unable to create monitor chardev");
+    cfg.monitor(chardev);
     cfg.run();
 }

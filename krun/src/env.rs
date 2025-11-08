@@ -1,0 +1,135 @@
+use std::{env::VarError, path::PathBuf};
+
+/// Environment variable to control debugger attachment.
+/// If set to "1", "true", or "yes", QEMU will wait for GDB to attach.
+/// If set to "nowait", "no-wait", or "no_wait", QEMU will start a GDB server but not wait for a debugger to attach.
+pub const DEBUGGER_ENV_FLAG: &str = "DEBUG";
+/// Environment variable to enable UEFI booting. If set to any value, UEFI will be enabled.
+pub const UEFI_ENV_FLAG: &str = "UEFI";
+/// Environment variable to disable QEMU graphical output. If set to any value, QEMU will run without a display.
+pub const NO_GRAPHIC_ENV_FLAG: &str = "NO_DISPLAY";
+/// Environment variable to specify the kernel image path. This should be a path to an ISO file.
+pub const IMAGE_PATH_ENV_FLAG: &str = "KERNEL_IMAGE_PATH";
+/// Environment variable to specify the amount of memory for the kernel. This can also include hotpluggable memory settings.
+pub const MEM_ENV_FLAG: &str = "QEMU_MEM";
+/// Environment variable to enable QEMU's dev exit feature. If set to any value, dev exit will be enabled.
+pub const DEV_EXIT_ENV_FLAG: &str = "DEV_EXIT";
+/// Environment variable to specify extra QEMU arguments.
+pub const EXTRA_ARGS_ENV_FLAG: &str = "QEMU_ARGS";
+/// Environment variable to enable verbose mode.
+pub const VERBOSE_ENV_FLAG: &str = "VERBOSE";
+/// Environment variable to prevent spawning GDB automatically.
+pub const NO_SPAWN_GDB_ENV_FLAG: &str = "NO_SPAWN_GDB";
+
+fn read_env(key: &str) -> Option<String> {
+    match std::env::var(key) {
+        Ok(val) => Some(val),
+        Err(VarError::NotPresent) => None,
+        Err(VarError::NotUnicode(_)) => {
+            panic!("Environment variable {} is not valid unicode", key);
+        }
+    }
+}
+
+fn env_present(key: &str) -> bool {
+    // Don't care about the value, just if it's set
+    match std::env::var(key) {
+        Ok(_) | Err(VarError::NotUnicode(_)) => true,
+        Err(VarError::NotPresent) => false,
+    }
+}
+
+/// Returns if qemu should be configured to (start a gdb server, wait for gdb).
+pub fn should_attach_debugger() -> (bool, bool) {
+    let debug = read_env(DEBUGGER_ENV_FLAG);
+
+    if debug.is_none() {
+        return (false, false);
+    }
+
+    let mut debug = debug.unwrap();
+    debug.make_ascii_lowercase();
+
+    match debug.as_str() {
+        "" | "1" | "true" | "yes" => (true, true),
+        "nowait" | "no-wait" | "no_wait" => (true, false),
+        _ => {
+            eprintln!("Unrecognized value for {}: {}", DEBUGGER_ENV_FLAG, debug);
+            (false, false)
+        }
+    }
+}
+
+/// Returns if UEFI is enabled.
+pub fn uefi_enabled() -> bool {
+    env_present(UEFI_ENV_FLAG)
+}
+
+/// Returns if display is enabled.
+pub fn display_enabled() -> bool {
+    !env_present(NO_GRAPHIC_ENV_FLAG)
+}
+
+/// Default kernel image path if none is specified.
+pub const DEFAULT_KERNEL_IMAGE_PATH: &str = "boot_images/novaos.iso";
+
+/// Returns the kernel image path.
+pub fn kernel_image_path() -> PathBuf {
+    let path = read_env(IMAGE_PATH_ENV_FLAG);
+
+    match path {
+        Some(p) => {
+            let image = PathBuf::from(p);
+            if !image.exists() {
+                panic!(
+                    "Kernel image path specified in {} does not exist: {}",
+                    IMAGE_PATH_ENV_FLAG,
+                    image.display()
+                );
+            }
+            image
+        }
+        None => PathBuf::from(DEFAULT_KERNEL_IMAGE_PATH),
+    }
+}
+
+/// Default memory size for QEMU if none is specified.
+pub const DEFAULT_QEMU_MEMORY: &str = "1G";
+
+/// Returns the configured memory settings for QEMU. This can include features like hotplug memory and does not only
+/// represent a single memory size.
+///
+/// Defaults to "1G" if the environment variable is not set.
+pub fn memory_config() -> String {
+    match read_env(MEM_ENV_FLAG) {
+        Some(size) => size,
+        None => DEFAULT_QEMU_MEMORY.to_string(),
+    }
+}
+
+/// Returns if QEMU's dev exit feature is enabled.
+pub fn dev_exit_enabled() -> bool {
+    env_present(DEV_EXIT_ENV_FLAG)
+}
+
+/// Returns extra QEMU arguments specified in the environment variable.
+pub fn extra_arguments() -> Vec<String> {
+    let extra_args = read_env(EXTRA_ARGS_ENV_FLAG);
+    match extra_args {
+        Some(args) => args
+            .split_whitespace()
+            .map(|s| s.to_string())
+            .collect::<Vec<String>>(),
+        None => vec![],
+    }
+}
+
+/// Returns if verbose mode is enabled.
+pub fn verbose_mode() -> bool {
+    env_present(VERBOSE_ENV_FLAG)
+}
+
+/// Returns if GDB should be spawned automatically.
+pub fn should_spawn_gdb() -> bool {
+    !env_present(NO_SPAWN_GDB_ENV_FLAG)
+}
