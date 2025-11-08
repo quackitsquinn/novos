@@ -27,6 +27,6 @@ krun = { path = "krun" }
 kernel = "x86_64-unknown-none"
 
 [workspace.lints.rust]
-unsafe-op-in-unsafe-function = "forbid"
+unsafe_op_in_unsafe_fn = "forbid"
 missing_debug_implementations = "warn"
 missing_docs = "warn"

@@ -36,7 +36,7 @@ impl StringPacket {
     pub unsafe fn from_bytes_unchecked(bytes: &[u8]) -> Self {
         // Safety: The caller must ensure that the bytes are valid.
         // Also, this is a relatively no-op operation, so it's safe to mark as unsafe.
-        let data = ArrayVec::from_bytes_unchecked(bytes);
+        let data = unsafe { ArrayVec::from_bytes_unchecked(bytes) };
         Self { data }
     }
 
