@@ -1,4 +1,8 @@
-use std::{env::VarError, path::PathBuf};
+use std::{
+    env::VarError,
+    path::{Path, PathBuf},
+    sync::OnceLock,
+};
 
 /// Environment variable to control debugger attachment.
 /// If set to "1", "true", or "yes", QEMU will wait for GDB to attach.
@@ -20,6 +24,8 @@ pub const EXTRA_ARGS_ENV_FLAG: &str = "QEMU_ARGS";
 pub const VERBOSE_ENV_FLAG: &str = "VERBOSE";
 /// Environment variable to prevent spawning GDB automatically.
 pub const NO_SPAWN_GDB_ENV_FLAG: &str = "NO_SPAWN_GDB";
+/// Environment variable to specify a custom QEMU binary path.
+pub const QEMU_BINARY_ENV_FLAG: &str = "QEMU_PATH";
 
 fn read_env(key: &str) -> Option<String> {
     match std::env::var(key) {
@@ -132,4 +138,14 @@ pub fn verbose_mode() -> bool {
 /// Returns if GDB should be spawned automatically.
 pub fn should_spawn_gdb() -> bool {
     !env_present(NO_SPAWN_GDB_ENV_FLAG)
+}
+
+pub const DEFAULT_QEMU: &str = "qemu-system-x86_64";
+
+pub fn qemu_path() -> &'static Path {
+    static QEMU: OnceLock<PathBuf> = OnceLock::new();
+    QEMU.get_or_init(|| which::which(read_env(QEMU_BINARY_ENV_FLAG).unwrap_or(DEFAULT_QEMU.to_string())).expect(
+        "Unable to find qemu-system-x86_64 in PATH! 
+             Please ensure QEMU is in PATH or that QEMU_PATH points to a valid qemu-system-x86_64 binary!",
+    ))
 }

@@ -10,7 +10,7 @@ use lazy_static::lazy_static;
 use ovmf_prebuilt::{Arch, FileType, Prebuilt, Source};
 
 use crate::{
-    env,
+    env::{self, qemu_path},
     gdb::{GdbConfig, run_gdb},
     packet::run_kserial,
     qemu::{
@@ -70,7 +70,7 @@ impl QemuConfig {
             println!("QEMU Invocation: qemu-system-x86_64 {}", args.join(" "));
         }
 
-        let qemu = Command::new("qemu-system-x86_64")
+        let qemu = Command::new(qemu_path())
             .args(&args)
             .spawn()
             .expect("qemu-system-x86_64 failed to start");
