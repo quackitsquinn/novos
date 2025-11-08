@@ -27,6 +27,15 @@ impl QemuCtl {
         let qemu = self.inner.read().unwrap();
         qemu.pty_path.clone()
     }
+
+    pub fn died(&self) -> bool {
+        let mut qemu = self.inner.write().unwrap();
+        match qemu.try_wait() {
+            Ok(Some(_)) => true,
+            Ok(None) => false,
+            Err(_) => true,
+        }
+    }
     // .. other methods
 }
 

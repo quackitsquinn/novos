@@ -21,6 +21,7 @@ use crate::{
 
 pub mod chardev;
 pub mod controller;
+pub mod debug;
 
 /// Configuration for running QEMU.
 #[derive(Debug, Clone, PartialEq, Eq)]

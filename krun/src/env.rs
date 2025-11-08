@@ -4,6 +4,8 @@ use std::{
     sync::OnceLock,
 };
 
+use crate::qemu::debug::{flag_is_trace, flag_is_valid_standard, flag_is_valid_trace};
+
 /// Environment variable to control debugger attachment.
 /// If set to "1", "true", or "yes", QEMU will wait for GDB to attach.
 /// If set to "nowait", "no-wait", or "no_wait", QEMU will start a GDB server but not wait for a debugger to attach.
@@ -28,6 +30,18 @@ pub const NO_SPAWN_GDB_ENV_FLAG: &str = "NO_SPAWN_GDB";
 pub const QEMU_BINARY_ENV_FLAG: &str = "QEMU_PATH";
 /// Environment variable to specify the number of SMP cores.
 pub const SMP_CORES_ENV_FLAG: &str = "SMP_CORES";
+/// Environment variable to specify additional QEMU debug flags. Flags should be comma-separated.
+///
+/// You can list valid flags by running `qemu-system-x86_64 -d help`.
+///
+/// You can list trace flags by running`qemu-system-x86_64 -d trace:help`.
+/// Warning: there are almost 5000 trace flags.
+///
+/// Trace flags must be prefixed with `trace:` but the following shorthands are supported:
+/// - `t/` -> `trace:`
+/// - `trace/` -> `trace:`
+/// - `t:` -> `trace:`
+pub const QEMU_DEBUG_FLAGS_ENV_FLAG: &str = "QEMU_DEBUG_OPTS";
 
 fn read_env(key: &str) -> Option<String> {
     match std::env::var(key) {
@@ -166,4 +180,46 @@ pub fn smp_cores() -> Option<usize> {
             );
         }
     }
+}
+
+/// Returns the list of QEMU debug flags to use, based on the environment variable.
+pub fn qemu_debug_flags() -> Option<Vec<String>> {
+    let debug_opts = read_env(QEMU_DEBUG_FLAGS_ENV_FLAG)?;
+    let mut flags = Vec::new();
+
+    let check_flag_valid = |flag: &str, is_trace: bool| {
+        if is_trace {
+            if !flag_is_valid_trace(flag) {
+                panic!(
+                    "Invalid QEMU trace debug flag specified in {}: {}",
+                    QEMU_DEBUG_FLAGS_ENV_FLAG, flag
+                );
+            }
+        } else {
+            if !flag_is_valid_standard(flag) {
+                panic!(
+                    "Invalid QEMU standard debug flag specified in {}: {}",
+                    QEMU_DEBUG_FLAGS_ENV_FLAG, flag
+                );
+            }
+        }
+    };
+
+    for flag in debug_opts.split(',') {
+        let flag = flag.trim();
+        if flag.is_empty() {
+            continue;
+        }
+
+        let (is_trace, flag) = flag_is_trace(flag);
+
+        check_flag_valid(&flag, is_trace);
+
+        flags.push(flag);
+    }
+
+    if flags.is_empty() {
+        return None;
+    }
+    Some(flags)
 }
