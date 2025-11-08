@@ -26,6 +26,8 @@ pub const VERBOSE_ENV_FLAG: &str = "VERBOSE";
 pub const NO_SPAWN_GDB_ENV_FLAG: &str = "NO_SPAWN_GDB";
 /// Environment variable to specify a custom QEMU binary path.
 pub const QEMU_BINARY_ENV_FLAG: &str = "QEMU_PATH";
+/// Environment variable to specify the number of SMP cores.
+pub const SMP_CORES_ENV_FLAG: &str = "SMP_CORES";
 
 fn read_env(key: &str) -> Option<String> {
     match std::env::var(key) {
@@ -140,12 +142,28 @@ pub fn should_spawn_gdb() -> bool {
     !env_present(NO_SPAWN_GDB_ENV_FLAG)
 }
 
+/// Default QEMU binary to use if none is specified.
 pub const DEFAULT_QEMU: &str = "qemu-system-x86_64";
 
+/// Returns the path to the QEMU binary to use.
 pub fn qemu_path() -> &'static Path {
     static QEMU: OnceLock<PathBuf> = OnceLock::new();
     QEMU.get_or_init(|| which::which(read_env(QEMU_BINARY_ENV_FLAG).unwrap_or(DEFAULT_QEMU.to_string())).expect(
         "Unable to find qemu-system-x86_64 in PATH! 
              Please ensure QEMU is in PATH or that QEMU_PATH points to a valid qemu-system-x86_64 binary!",
     ))
+}
+
+/// Returns the number of SMP cores to use, if specified.
+pub fn smp_cores() -> Option<usize> {
+    let cores_str = read_env(SMP_CORES_ENV_FLAG)?;
+    match cores_str.parse::<usize>() {
+        Ok(cores) if cores > 0 => Some(cores),
+        _ => {
+            panic!(
+                "Invalid value for {}: {}. Must be a positive integer.",
+                SMP_CORES_ENV_FLAG, cores_str
+            );
+        }
+    }
 }

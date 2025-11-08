@@ -33,12 +33,14 @@ pub struct QemuConfig {
     pub display: bool,
     /// Amount of memory to allocate to the VM.
     pub memory: String,
+    /// Number of CPU cores to allocate to the VM. Defaults to single core if None.
+    pub core_count: Option<usize>,
     /// Serial port configurations for COM0.
-    pub com0: Option<CharDevRef>,
+    com0: Option<CharDevRef>,
     /// Serial port configurations for the qemu monitor.
-    pub monitor: Option<CharDevRef>,
+    monitor: Option<CharDevRef>,
     /// Character devices to create.
-    pub character_devices: Vec<CharDev>,
+    character_devices: Vec<CharDev>,
     /// Whether to enable the dev exit device.
     pub dev_exit: bool,
     /// Path to the UEFI code and variables images
@@ -65,6 +67,11 @@ impl QemuConfig {
         self.uefi(&mut args);
 
         args.extend(self.extra_args.iter().cloned());
+
+        if let Some(cores) = self.core_count {
+            args.push("-smp".to_string());
+            args.push(cores.to_string());
+        }
 
         if env::verbose_mode() {
             println!("QEMU Invocation: qemu-system-x86_64 {}", args.join(" "));
@@ -119,6 +126,7 @@ impl QemuConfig {
             dev_exit: false,
             extra_args: Vec::new(),
             uefi_img: None,
+            core_count: None,
         }
     }
 
@@ -219,6 +227,7 @@ impl Default for QemuConfig {
         cfg.memory = env::memory_config();
         cfg.dev_exit = env::dev_exit_enabled();
         cfg.extra_args = env::extra_arguments();
+        cfg.core_count = env::smp_cores();
 
         cfg
     }
