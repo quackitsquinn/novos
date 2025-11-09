@@ -104,6 +104,8 @@ pub(crate) fn qemu_args_from_flags(flags: &[String]) -> Option<Vec<String>> {
         return None;
     }
 
+    #[cfg(not(test))]
+    // Don't generate the folder during tests because qemu shouldn't even be invoked
     ensure_log_dir();
 
     let mut full_flags = vec!["tid".to_string()]; // Always include tid for per-CPU logs
@@ -177,11 +179,11 @@ mod tests {
     #[test]
     fn test_qemu_args_from_flags() {
         let flags = vec!["cpu".to_string(), "mmu".to_string()];
-        let args = dbg!(qemu_args_from_flags(flags).unwrap());
+        let args = dbg!(qemu_args_from_flags(&flags).unwrap());
         assert_eq!(args.len(), 4, "Expected 4 arguments");
         assert_eq!(args[0], "-D");
         assert_eq!(args[1], QEMU_LOG_FILE_LOCATION.display().to_string());
         assert_eq!(args[2], "-d");
-        assert_eq!(args[3], "cpu,mmu");
+        assert_eq!(args[3], "tid,cpu,mmu");
     }
 }
