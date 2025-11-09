@@ -29,13 +29,14 @@ pub struct QemuConfig {
     /// Path to the ISO image to boot.
     pub iso: PathBuf,
     /// Debugger status.
-    pub debugger: DebugStatus,
+    pub debugger: DebuggerStatus,
     /// Whether to display the QEMU window.
     pub display: bool,
     /// Amount of memory to allocate to the VM.
     pub memory: String,
     /// Number of CPU cores to allocate to the VM. Defaults to single core if None.
     pub core_count: Option<usize>,
+    debug_flags: Option<Vec<String>>,
     /// Serial port configurations for COM0.
     com0: Option<CharDevRef>,
     /// Serial port configurations for the qemu monitor.
@@ -67,12 +68,18 @@ impl QemuConfig {
         self.add_memory(&mut args);
         self.uefi(&mut args);
 
-        args.extend(self.extra_args.iter().cloned());
+        if let Some(flags) = &self.debug_flags {
+            if let Some(flags) = debug::qemu_args_from_flags(flags) {
+                args.extend(flags);
+            }
+        }
 
         if let Some(cores) = self.core_count {
             args.push("-smp".to_string());
             args.push(cores.to_string());
         }
+
+        args.extend(self.extra_args.iter().cloned());
 
         if env::verbose_mode() {
             println!("QEMU Invocation: qemu-system-x86_64 {}", args.join(" "));
@@ -118,9 +125,10 @@ impl QemuConfig {
     pub fn empty() -> QemuConfig {
         QemuConfig {
             iso: PathBuf::new(),
-            debugger: DebugStatus::NoDebug,
+            debugger: DebuggerStatus::NoDebug,
             display: true,
             memory: "".to_string(),
+            debug_flags: None,
             com0: None,
             monitor: None,
             character_devices: Vec::new(),
@@ -214,7 +222,7 @@ impl Default for QemuConfig {
     fn default() -> Self {
         let mut cfg = QemuConfig::empty();
 
-        cfg.debugger = DebugStatus::from_env();
+        cfg.debugger = DebuggerStatus::from_env();
 
         if env::uefi_enabled() {
             cfg.uefi_img = Some(get_uefi_images());
@@ -229,7 +237,7 @@ impl Default for QemuConfig {
         cfg.dev_exit = env::dev_exit_enabled();
         cfg.extra_args = env::extra_arguments();
         cfg.core_count = env::smp_cores();
-
+        cfg.debug_flags = env::qemu_debug_flags();
         cfg
     }
 }
@@ -244,7 +252,7 @@ fn get_uefi_images() -> (PathBuf, PathBuf) {
 
 /// Debug status for QEMU.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DebugStatus {
+pub enum DebuggerStatus {
     /// No debug support.
     NoDebug,
     /// Enable GDB remote debugging and wait for debugger to attach.
@@ -253,34 +261,34 @@ pub enum DebugStatus {
     Debugger,
 }
 
-impl DebugStatus {
+impl DebuggerStatus {
     /// Create a DebugStatus from environment variables.
     pub fn from_env() -> Self {
         let (debug, wait) = crate::env::should_attach_debugger();
 
         if debug && wait {
-            DebugStatus::WaitForDebugger
+            DebuggerStatus::WaitForDebugger
         } else if debug {
-            DebugStatus::Debugger
+            DebuggerStatus::Debugger
         } else {
-            DebugStatus::NoDebug
+            DebuggerStatus::NoDebug
         }
     }
 
     /// Convert the DebugStatus to QEMU command line flags.
     pub fn to_flags(&self) -> &[&str] {
         match self {
-            DebugStatus::NoDebug => &[],
-            DebugStatus::Debugger => &["-s"],
-            DebugStatus::WaitForDebugger => &["-s", "-S"],
+            DebuggerStatus::NoDebug => &[],
+            DebuggerStatus::Debugger => &["-s"],
+            DebuggerStatus::WaitForDebugger => &["-s", "-S"],
         }
     }
 
     /// Check if a debugger might be present.
     pub fn present(&self) -> bool {
         match self {
-            DebugStatus::NoDebug => false,
-            DebugStatus::Debugger | DebugStatus::WaitForDebugger => true,
+            DebuggerStatus::NoDebug => false,
+            DebuggerStatus::Debugger | DebuggerStatus::WaitForDebugger => true,
         }
     }
 }

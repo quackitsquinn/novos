@@ -215,7 +215,11 @@ pub fn qemu_debug_flags() -> Option<Vec<String>> {
 
         check_flag_valid(&flag, is_trace);
 
-        flags.push(flag);
+        if is_trace {
+            flags.push(format!("trace:{}", flag));
+        } else {
+            flags.push(flag);
+        }
     }
 
     if flags.is_empty() {

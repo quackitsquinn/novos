@@ -1,14 +1,19 @@
 use std::{
     collections::HashSet,
+    fs,
+    io::ErrorKind,
+    path::Path,
     process::Command,
     sync::{Arc, OnceLock},
 };
+
+use lazy_static::lazy_static;
 
 use crate::env::qemu_path;
 
 // We don't create this at runtime because qemu doesn't output the debug flags in a nice to parse way.
 /// The standard set of QEMU debug flags that can be used with `-d`.
-pub static QEMU_STANDARD_DEBUG_FLAGS: &[&str] = &[
+pub const QEMU_STANDARD_DEBUG_FLAGS: &[&str] = &[
     "out_asm",
     "in_asm",
     "op",
@@ -33,6 +38,11 @@ pub static QEMU_STANDARD_DEBUG_FLAGS: &[&str] = &[
     "vpu",
     "invalid_mem",
 ];
+
+lazy_static! {
+/// Location to store QEMU log files. This expects the `tid` debug flag to be used for per-CPU logs.
+pub static ref QEMU_LOG_FILE_LOCATION: &'static Path = Path::new("output/qemu/cpu%d.log");
+}
 
 static QEMU_TRACE_DEBUG_FLAGS: OnceLock<HashSet<Arc<str>>> = OnceLock::new();
 
@@ -86,6 +96,40 @@ pub fn flag_is_trace(flag: &str) -> (bool, String) {
     }
 }
 
+/// Converts a list of debug flags into QEMU command-line arguments.
+/// This does not validate the flags; it assumes they are valid.
+pub(crate) fn qemu_args_from_flags(flags: &[String]) -> Option<Vec<String>> {
+    let mut qemu_args = Vec::new();
+    if flags.is_empty() {
+        return None;
+    }
+
+    ensure_log_dir();
+
+    let mut full_flags = vec!["tid".to_string()]; // Always include tid for per-CPU logs
+    full_flags.extend_from_slice(flags);
+
+    qemu_args.push("-D".to_string());
+    qemu_args.push(QEMU_LOG_FILE_LOCATION.display().to_string());
+
+    qemu_args.push("-d".to_string());
+    qemu_args.push(full_flags.join(","));
+
+    Some(qemu_args)
+}
+
+fn ensure_log_dir() {
+    let parent = QEMU_LOG_FILE_LOCATION.parent().unwrap();
+    if let Err(e) = fs::remove_dir_all(parent) {
+        // Ignore if the directory doesn't exist
+        if e.kind() != ErrorKind::NotFound {
+            panic!("Failed to clean output/qemu directory: {}", e)
+        }
+    }
+
+    fs::create_dir_all(parent).expect("Failed to create output/qemu directory");
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -128,5 +172,16 @@ mod tests {
                 flag
             );
         }
+    }
+
+    #[test]
+    fn test_qemu_args_from_flags() {
+        let flags = vec!["cpu".to_string(), "mmu".to_string()];
+        let args = dbg!(qemu_args_from_flags(flags).unwrap());
+        assert_eq!(args.len(), 4, "Expected 4 arguments");
+        assert_eq!(args[0], "-D");
+        assert_eq!(args[1], QEMU_LOG_FILE_LOCATION.display().to_string());
+        assert_eq!(args[2], "-d");
+        assert_eq!(args[3], "cpu,mmu");
     }
 }

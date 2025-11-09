@@ -65,6 +65,7 @@ fn load_idt() {
 
 fn apic_init() {
     info!("Initializing LAPIC on core {}", current_core_id());
+    info!("LAPIC Version: {:?}", LAPIC.version());
 }
 
 declare_module!("MP", init);
