@@ -1,8 +1,8 @@
 use std::{
-    fmt, fs,
-    io::{self, ErrorKind, stdout},
+    fs,
+    io::{self, ErrorKind},
     os::unix::{fs::FileTypeExt, net::UnixListener},
-    panic::{AssertUnwindSafe, UnwindSafe, catch_unwind},
+    panic::{AssertUnwindSafe, UnwindSafe},
     path::Path,
     thread,
     time::Duration,
@@ -12,7 +12,7 @@ mod joint;
 
 use kserial::server::SerialHandler;
 
-use crate::qemu::{controller::QemuCtl, packet::joint::JointStdoutFileStream};
+use crate::qemu::packet::joint::JointStdoutFileStream;
 
 /// Loads the packet mode for QEMU communication over the provided socket.
 pub fn load_packet_mode<T>(rw: T)

@@ -1,7 +1,4 @@
-use std::{
-    fs,
-    process::{Child, exit},
-};
+use std::{fs, process::Child};
 
 use crate::gdb::{BINARY_PATH, GdbConfig, GdbInvocation};
 
@@ -13,14 +10,6 @@ const SCRATCHPAD_DEFAULT_CONTENT: &str = "# This is a scratchpad file for GDB co
 ";
 
 impl Gdb {
-    pub fn wait_terminate(&mut self) {
-        if let Err(e) = self.0.wait() {
-            eprintln!("GDB process terminated with error: {}", e);
-            exit(1);
-        }
-        exit(0);
-    }
-
     pub fn kill(&mut self) {
         if let Err(e) = self.0.kill() {
             eprintln!("Failed to kill GDB process: {}", e);

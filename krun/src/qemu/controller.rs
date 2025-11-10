@@ -1,5 +1,4 @@
 use std::{
-    path::{Path, PathBuf},
     process::Child,
     sync::{Arc, RwLock},
 };
@@ -28,16 +27,6 @@ impl QemuCtl {
         let mut qemu = self.inner.write().unwrap();
         qemu.kill()
     }
-
-    pub fn died(&self) -> bool {
-        let mut qemu = self.inner.write().unwrap();
-        match qemu.try_wait() {
-            Ok(Some(_)) => true,
-            Ok(None) => false,
-            Err(_) => true,
-        }
-    }
-    // .. other methods
 }
 
 impl Clone for QemuCtl {

@@ -108,15 +108,18 @@ impl QemuConfig {
         }
 
         let stream = sock.accept().expect("Failed to accept connection").0;
+
         let qemu_ctl = QemuCtl::new(qemu);
+
         QEMU_CTL
             .set(qemu_ctl.clone())
             .expect("unable to set QEMU_CTL lock");
+
         std::panic::set_hook(Box::new(panic_hook));
+
         let kserial_handle = spawn(move || load_packet_mode(stream));
 
         let mut gdb = None;
-
         if self.debugger.present() && env::should_spawn_gdb() {
             // If we're in debug mode, we want to wait for the debugger to attach
             gdb = Some(run_gdb(&mut GdbConfig::default()));
@@ -312,7 +315,7 @@ impl DebuggerStatus {
     }
 }
 
-fn panic_hook(info: &std::panic::PanicHookInfo) {
+fn panic_hook(_: &std::panic::PanicHookInfo) {
     if let Some(qemu_ctl) = QEMU_CTL.get() {
         if qemu_ctl.try_shutdown().is_err() {
             qemu_ctl.kill().ok();

@@ -40,33 +40,6 @@ impl Default for GdbConfig {
 }
 
 impl GdbConfig {
-    pub const fn new(invocation: GdbInvocation, port: u16, host: String) -> Self {
-        GdbConfig {
-            invocation: Some(invocation),
-            port,
-            host,
-        }
-    }
-
-    pub fn apply(
-        &mut self,
-        invocation: Option<GdbInvocation>,
-        port: Option<u16>,
-        host: Option<String>,
-    ) {
-        if let Some(path) = invocation
-            && self.invocation.is_some()
-        {
-            self.invocation = Some(path);
-        }
-        if let Some(p) = port {
-            self.port = p;
-        }
-        if let Some(h) = host {
-            self.host = h;
-        }
-    }
-
     fn try_apply(
         &mut self,
         invocation: Option<String>,
