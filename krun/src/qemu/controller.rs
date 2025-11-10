@@ -4,14 +4,15 @@ use std::{
     sync::{Arc, RwLock},
 };
 
+#[derive(Debug)]
 pub struct QemuCtl {
     inner: Arc<RwLock<QemuInner>>,
 }
 
 impl QemuCtl {
-    pub fn new(qemu: Child, socket_path: &Path) -> Self {
+    pub fn new(qemu: Child) -> Self {
         QemuCtl {
-            inner: Arc::new(RwLock::new(QemuInner::new(qemu, socket_path.to_path_buf()))),
+            inner: Arc::new(RwLock::new(QemuInner::new(qemu))),
         }
     }
 
@@ -23,9 +24,9 @@ impl QemuCtl {
         Ok(())
     }
 
-    pub fn get_pty_path(&self) -> PathBuf {
-        let qemu = self.inner.read().unwrap();
-        qemu.pty_path.clone()
+    pub fn kill(&self) -> Result<(), std::io::Error> {
+        let mut qemu = self.inner.write().unwrap();
+        qemu.kill()
     }
 
     pub fn died(&self) -> bool {
@@ -47,14 +48,14 @@ impl Clone for QemuCtl {
     }
 }
 
+#[derive(Debug)]
 struct QemuInner {
     qemu: Child,
-    pty_path: PathBuf,
 }
 
 impl QemuInner {
-    fn new(qemu: Child, pty_path: PathBuf) -> Self {
-        QemuInner { qemu, pty_path }
+    fn new(qemu: Child) -> Self {
+        QemuInner { qemu }
     }
 
     fn try_wait(&mut self) -> Result<Option<std::process::ExitStatus>, std::io::Error> {

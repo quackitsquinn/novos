@@ -2,6 +2,7 @@
 use std::{
     path::{Path, PathBuf},
     process::Command,
+    sync::OnceLock,
     thread::{self, spawn},
     time::Duration,
 };
@@ -12,16 +13,19 @@ use ovmf_prebuilt::{Arch, FileType, Prebuilt, Source};
 use crate::{
     env::{self, qemu_path},
     gdb::{GdbConfig, run_gdb},
-    packet::run_kserial,
     qemu::{
         chardev::{CharDev, CharDevRef},
         controller::QemuCtl,
+        packet::{create_unix_socket_listener, load_packet_mode},
     },
 };
 
 pub mod chardev;
 pub mod controller;
 pub mod debug;
+pub mod packet;
+
+static QEMU_CTL: OnceLock<QemuCtl> = OnceLock::new();
 
 /// Configuration for running QEMU.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -85,26 +89,35 @@ impl QemuConfig {
             println!("QEMU Invocation: qemu-system-x86_64 {}", args.join(" "));
         }
 
+        self.exec_qemu(&args);
+    }
+
+    fn exec_qemu(&self, args: &[String]) {
+        let sock = create_unix_socket_listener(&COMMUNICATION_SOCKET_PATH)
+            .expect("unable to make unix socket");
         let mut qemu = Command::new(qemu_path())
-            .args(&args)
+            .args(args)
             .spawn()
             .expect("qemu-system-x86_64 failed to start");
 
+        // Give QEMU some time to start up and possibly fail if there's an issue with the command line.
         thread::sleep(Duration::from_millis(500));
 
         if !qemu.try_wait().unwrap().is_none() {
             panic!("QEMU process exited prematurely!");
         }
 
-        let qemu = QemuCtl::new(qemu, &COMMUNICATION_SOCKET_PATH);
-
-        let kserial_handle = spawn(move || run_kserial(qemu.clone()));
+        let stream = sock.accept().expect("Failed to accept connection").0;
+        let qemu_ctl = QemuCtl::new(qemu);
+        QEMU_CTL
+            .set(qemu_ctl.clone())
+            .expect("unable to set QEMU_CTL lock");
+        std::panic::set_hook(Box::new(panic_hook));
+        let kserial_handle = spawn(move || load_packet_mode(stream));
 
         let mut gdb = None;
 
         if self.debugger.present() && env::should_spawn_gdb() {
-            // Sleep for a little bit so that QEMU has time to fail if the arguments are bad
-            thread::sleep(Duration::from_millis(100));
             // If we're in debug mode, we want to wait for the debugger to attach
             gdb = Some(run_gdb(&mut GdbConfig::default()));
         }
@@ -295,6 +308,14 @@ impl DebuggerStatus {
         match self {
             DebuggerStatus::NoDebug => false,
             DebuggerStatus::Debugger | DebuggerStatus::WaitForDebugger => true,
+        }
+    }
+}
+
+fn panic_hook(info: &std::panic::PanicHookInfo) {
+    if let Some(qemu_ctl) = QEMU_CTL.get() {
+        if qemu_ctl.try_shutdown().is_err() {
+            qemu_ctl.kill().ok();
         }
     }
 }
