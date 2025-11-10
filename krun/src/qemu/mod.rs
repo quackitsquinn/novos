@@ -85,10 +85,16 @@ impl QemuConfig {
             println!("QEMU Invocation: qemu-system-x86_64 {}", args.join(" "));
         }
 
-        let qemu = Command::new(qemu_path())
+        let mut qemu = Command::new(qemu_path())
             .args(&args)
             .spawn()
             .expect("qemu-system-x86_64 failed to start");
+
+        thread::sleep(Duration::from_millis(500));
+
+        if !qemu.try_wait().unwrap().is_none() {
+            panic!("QEMU process exited prematurely!");
+        }
 
         let qemu = QemuCtl::new(qemu, &COMMUNICATION_SOCKET_PATH);
 
