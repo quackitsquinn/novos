@@ -62,7 +62,11 @@ if not CARGO:
     sys.exit(1)
 
 def cargo_check(*args, **kwargs):
-    return subprocess.run([CARGO, "check", *args], *kwargs)
+    check = "check"
+    if os.environ.get("CHECK_COMMAND"):
+        check = os.environ["CHECK_COMMAND"]
+
+    return subprocess.run([CARGO, check, *args], *kwargs)
 
 
 def workspace_check():

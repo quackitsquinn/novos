@@ -30,3 +30,7 @@ kernel = "x86_64-unknown-none"
 unsafe_op_in_unsafe_fn = "forbid"
 missing_debug_implementations = "warn"
 missing_docs = "warn"
+
+[workspace.lints.clippy]
+undocumented_unsafe_blocks = "warn"
+missing_safety_doc = "warn"
