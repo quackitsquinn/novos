@@ -301,8 +301,8 @@ impl DebuggerStatus {
     pub fn to_flags(&self) -> &[&str] {
         match self {
             DebuggerStatus::NoDebug => &[],
-            DebuggerStatus::Debugger => &["-s"],
-            DebuggerStatus::WaitForDebugger => &["-s", "-S"],
+            DebuggerStatus::Debugger => &["-s", "--no-reboot", "--no-shutdown"],
+            DebuggerStatus::WaitForDebugger => &["-s", "-S", "--no-reboot", "--no-shutdown"],
         }
     }
 
