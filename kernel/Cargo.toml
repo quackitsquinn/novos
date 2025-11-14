@@ -27,6 +27,7 @@ cake = {path = "../cake"}
 raw-cpuid = "11.6.0"
 modular-bitfield = "0.12.0"
 kelp = { path = "../kelp" }
+bitfield = "0.19.3"
 
 [lints]
 workspace = true

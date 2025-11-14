@@ -2,12 +2,14 @@
 use core::convert::Infallible;
 
 use alloc::vec::Vec;
+use bitfield::{BitMut, BitRangeMut};
 use cake::{Once, log::info};
 use raw_cpuid::CpuId;
 
 use crate::{
     declare_module,
-    interrupts::hardware,
+    gdt::LGDT,
+    interrupts::{KernelInterrupt, hardware},
     mp::{
         ioapic::IoApic,
         lapic::Lapic,
@@ -59,6 +61,7 @@ fn init() -> Result<(), Infallible> {
 
 fn load_idt() {
     unsafe {
+        LGDT.load();
         crate::interrupts::IDT.load();
     }
 }
@@ -66,6 +69,19 @@ fn load_idt() {
 fn apic_init() {
     info!("Initializing LAPIC on core {}", current_core_id());
     info!("LAPIC Version: {:?}", LAPIC.version());
+    // So this is *not* a smart way to do this, but considering how many issues i've had with getting IPIs to work, im just going to
+    // enable stuff the raw way.
+
+    // First, set the spurious interrupt vector
+    let mut spi_reg: u32 = 0;
+    spi_reg.set_bit_range(7, 0, KernelInterrupt::Spurious as u8);
+    spi_reg.set_bit(8, true); // Enable LAPIC
+    unsafe { LAPIC.write_offset(0xF0, spi_reg) };
+
+    // Second, enable the APIC error interrupt
+    let mut error_reg: u32 = 0;
+    error_reg.set_bit_range(7, 0, KernelInterrupt::ApicError as u8);
+    unsafe { LAPIC.write_offset(0x280, error_reg) };
 }
 
 declare_module!("MP", init);

@@ -36,10 +36,16 @@ pub type PageFaultHandler = fn(ctx: PageFaultInterruptContext);
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KernelInterrupt {
     /// The LAPIC timer interrupt.
-    Timer = 253,
+    Timer = 252,
     /// The panic interrupt.
     /// This interrupt is triggered when the kernel panics to halt all other cores.
-    Panic = 254,
+    Panic = 253,
+    /// The APIC error interrupt.
+    /// This interrupt is triggered when the local APIC detects an error.
+    ApicError = 254,
+    /// The spurious interrupt.
+    /// This interrupt is triggered when the local APIC receives a spurious interrupt.
+    Spurious = 255,
 }
 
 declare_module!("interrupts", init);
@@ -60,7 +66,12 @@ fn init() -> Result<(), Infallible> {
         // Set up the panic interrupt
         unsafe {
             idt[KernelInterrupt::Panic as u8]
-                .set_handler_addr(VirtAddr::from_ptr(exception::panic_handler_raw as *mut ()))
+                .set_handler_addr(VirtAddr::from_ptr(exception::panic_handler_raw as *mut ()));
+            idt[KernelInterrupt::Spurious as u8].set_handler_addr(VirtAddr::from_ptr(
+                exception::spurious_handler_raw as *mut (),
+            ));
+            idt[KernelInterrupt::ApicError as u8]
+                .set_handler_addr(VirtAddr::from_ptr(exception::apic_error_raw as *mut ()));
         };
     }
     hardware::define_hardware();
