@@ -6,6 +6,8 @@ use cake::{Once, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use crate::mp::mp_setup::{CORES, trampoline::aps_finished};
 
 /// A structure that holds data local to each core.
+// TODO: Refactor out the Once and RwLock usage to reduce overhead.
+// This would
 #[derive(Debug)]
 pub struct CoreLocal<T, C = Constructor<T>> {
     bootstrap: RwLock<T>,
@@ -78,6 +80,9 @@ impl<T, C: ConstructMethod<T>> CoreLocal<T, C> {
         panic!("No data for core ID {}", core_id);
     }
 }
+
+unsafe impl<T, C> Send for CoreLocal<T, C> where C: ConstructMethod<T> {}
+unsafe impl<T, C> Sync for CoreLocal<T, C> where C: ConstructMethod<T> {}
 
 trait Sealed {}
 

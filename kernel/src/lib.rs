@@ -27,7 +27,7 @@ use kserial::client::get_serial_client;
 pub mod acpi;
 pub mod context;
 pub mod display;
-mod gdt;
+pub mod gdt;
 pub mod interrupts;
 pub mod memory;
 pub mod mp;

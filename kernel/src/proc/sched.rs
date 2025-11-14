@@ -3,7 +3,6 @@ use x86_64::VirtAddr;
 
 use crate::{
     context::{InterruptContext, InterruptContextValue},
-    gdt::GDT,
     memory::stack::{Stack, StackFlags},
 };
 
@@ -37,18 +36,18 @@ impl KernelThreadScheduler {
     }
 
     pub fn spawn(&mut self, entry: ThreadEntry) {
-        let stack = Stack::allocate_kernel_stack(0x4000, StackFlags::KernelMode)
-            .expect("Failed to allocate stack");
-        let context = unsafe {
-            InterruptContextValue::new(
-                VirtAddr::new(entry as u64),
-                stack.get_stack_base(),
-                GDT.1.code_selector(),
-            )
-        };
-        // TODO: Probably should be an Arc<Thread> or something similar. Really want to avoid Arc<Mutex<Thread>> though.
-        let thread = Thread::from_stack_context(stack, context);
-        self.add_thread(thread);
+        // let stack = Stack::allocate_kernel_stack(0x4000, StackFlags::KernelMode)
+        //     .expect("Failed to allocate stack");
+        // let context = unsafe {
+        //     InterruptContextValue::new(
+        //         VirtAddr::new(entry as u64),
+        //         stack.get_stack_base(),
+        //         GDT.1.code_selector(),
+        //     )
+        // };
+        // // TODO: Probably should be an Arc<Thread> or something similar. Really want to avoid Arc<Mutex<Thread>> though.
+        // let thread = Thread::from_stack_context(stack, context);
+        // self.add_thread(thread);
     }
     pub fn switch(&mut self, mut ctx: InterruptContext) {
         if self.threads.is_empty() {
