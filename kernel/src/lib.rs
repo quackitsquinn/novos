@@ -14,8 +14,9 @@
 extern crate alloc;
 
 use core::arch::asm;
-use core::ptr;
+use core::{hint, ptr};
 
+use bitfield::{Bit, BitMut, BitRangeMut};
 use cake::{Fuse, declare_module};
 
 use cake::Once;
@@ -23,6 +24,9 @@ use cake::limine::BaseRevision;
 use cake::log::info;
 use interrupts::hardware;
 use kserial::client::get_serial_client;
+
+use crate::interrupts::KernelInterrupt;
+use crate::mp::LAPIC;
 
 pub mod acpi;
 pub mod context;
@@ -109,7 +113,45 @@ pub(crate) unsafe fn init_kernel_services() {
     pci::MODULE.init();
     proc::MODULE.init();
     info!("Kernel services initialized");
-    panic!("wee woo wee woo"); // Force a panic to test panic handling
+
+    // Test IPIs. This is purely for testing purposes.
+    let mut icr: u64 = 0;
+    icr.set_bit_range(63, 56, 2); // 2nd core
+    icr.set_bit_range(7, 0, KernelInterrupt::Panic as u8); // Panic interrupt
+
+    let low = (icr & 0xFFFFFFFF) as u32;
+    let high = (icr >> 32) as u32;
+    unsafe {
+        LAPIC.write_offset(0x310, high);
+        LAPIC.write_offset(0x300, low);
+    }
+    info!("Sent IPI to core 2");
+    while unsafe {
+        LAPIC.read_offset::<u32>(0x300).bit(12) // Delivery Status
+    } {
+        hint::spin_loop();
+    }
+    info!("IPI to core 2 delivered");
+
+    // Okay.. well. that didn't work. Lets try sending an IPI to the current core.
+    let mut icr: u64 = 0;
+    icr.set_bit_range(7, 0, KernelInterrupt::Panic as u8); // Panic interrupt
+    icr.set_bit_range(19, 18, 0b01); // Self
+
+    let low = (icr & 0xFFFFFFFF) as u32;
+    let high = (icr >> 32) as u32;
+    unsafe {
+        LAPIC.write_offset(0x310, high);
+        LAPIC.write_offset(0x300, low);
+    }
+
+    info!("Sent IPI to self");
+    while unsafe {
+        LAPIC.read_offset::<u32>(0x300).bit(12) // Delivery Status
+    } {
+        hint::spin_loop();
+    }
+    info!("IPI to self delivered");
 }
 
 #[macro_export]

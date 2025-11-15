@@ -4,8 +4,11 @@
 //! the Intel® 64 and IA-32 Architectures Software Developer’s Manual
 use cake::Once;
 use cake::log::info;
+use x86_64::VirtAddr;
 use x86_64::registers::model_specific::Msr;
+use x86_64::structures::paging::Translate;
 
+use crate::memory::paging::ACTIVE_PAGE_TABLE;
 use crate::mp::lapic::lvt::TimerLvt;
 use crate::{
     memory::paging::phys::phys_mem::{self, PhysicalMemoryMap},
@@ -58,6 +61,11 @@ impl Lapic {
             phys_mem::map_address(phys_addr, 1, apic_page_flags()).expect("Failed to map LAPIC")
         };
 
+        let translated = ACTIVE_PAGE_TABLE
+            .read()
+            .translate(VirtAddr::new(map.ptr() as u64));
+
+        info!("LAPIC mapped at virtual address: {:#x?}", translated);
         self.table.call_once(|| map);
         self.mapped.call_once(|| map.ptr().cast_mut());
     }

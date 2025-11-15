@@ -12,8 +12,8 @@ use crate::{
     interrupts::{KernelInterrupt, hardware},
     mp::{
         ioapic::IoApic,
-        lapic::Lapic,
-        mp_setup::{dispatch_all, trampoline::core_wait},
+        lapic::{LAPIC_BASE_MSR, Lapic},
+        mp_setup::{dispatch_all, dispatch_others, trampoline::core_wait},
     },
 };
 
@@ -53,7 +53,7 @@ fn init() -> Result<(), Infallible> {
     unsafe {
         hardware::disable();
     }
-    dispatch_all(load_idt);
+    dispatch_others(load_idt);
     dispatch_all(apic_init);
     core_wait();
     Ok(())
@@ -82,6 +82,14 @@ fn apic_init() {
     let mut error_reg: u32 = 0;
     error_reg.set_bit_range(7, 0, KernelInterrupt::ApicError as u8);
     unsafe { LAPIC.write_offset(0x280, error_reg) };
+
+    // Now, finally, enable the LAPIC in the MSR
+    unsafe {
+        let mut msr = LAPIC_BASE_MSR.read();
+        msr.set_bit(11, true); // Enable xAPIC mode
+        let mut base = LAPIC_BASE_MSR;
+        base.write(msr);
+    }
 }
 
 declare_module!("MP", init);

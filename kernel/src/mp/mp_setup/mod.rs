@@ -64,4 +64,12 @@ pub fn dispatch_all(f: fn() -> ()) {
     f();
 }
 
+/// Dispatches a function to all application processors only.
+pub fn dispatch_others(f: fn() -> ()) {
+    let cores = cores();
+    for mut core in cores.values().map(|c| c.write()) {
+        core.add_task(f);
+    }
+}
+
 declare_module!("MP Preinit", init);
