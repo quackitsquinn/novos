@@ -2,8 +2,9 @@
 //!
 //! Most of the documentation for individual types are taken directly from section 3A of
 //! the Intel® 64 and IA-32 Architectures Software Developer’s Manual
+use bitfield::{Bit, BitRange};
 use cake::Once;
-use cake::log::info;
+use cake::log::{info, trace};
 use x86_64::VirtAddr;
 use x86_64::registers::model_specific::Msr;
 use x86_64::structures::paging::Translate;
@@ -179,8 +180,13 @@ impl Lapic {
     /// The caller must ensure that the given ICR value is valid.
     /// The caller must also ensure that the deliver status is not modified.
     pub unsafe fn write_icr(&self, icr: InterruptCommandRegister) {
+        let icr: u64 = icr.into();
+        trace!("Writing ICR: {:#016x}", icr);
+        let low: u32 = (icr & 0xFFFF_FFFF) as u32;
+        let high: u32 = (icr >> 32) as u32;
         unsafe {
-            self.write_offset::<[u8; 8]>(InterruptCommandRegister::REGISTER, icr.into_bytes());
+            self.write_offset::<u32>(InterruptCommandRegister::REGISTER + 0x10, high);
+            self.write_offset::<u32>(InterruptCommandRegister::REGISTER, low);
         }
     }
 

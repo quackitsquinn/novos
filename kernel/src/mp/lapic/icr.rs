@@ -6,6 +6,7 @@ use crate::mp::id;
 /// Interrupt Command Register (ICR) register.
 #[derive(Clone, Copy)]
 #[bitfield(bytes = 8)]
+#[repr(u64)]
 pub struct InterruptCommandRegister {
     /// The interrupt vector to send.
     pub vector: B8,

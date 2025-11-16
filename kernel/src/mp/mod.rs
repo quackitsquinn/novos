@@ -9,7 +9,7 @@ use raw_cpuid::CpuId;
 use crate::{
     declare_module,
     gdt::LGDT,
-    interrupts::{KernelInterrupt, hardware},
+    interrupts::{self, KernelInterrupt, hardware},
     mp::{
         ioapic::IoApic,
         lapic::{LAPIC_BASE_MSR, Lapic},
@@ -72,24 +72,32 @@ fn apic_init() {
     // So this is *not* a smart way to do this, but considering how many issues i've had with getting IPIs to work, im just going to
     // enable stuff the raw way.
 
-    // First, set the spurious interrupt vector
-    let mut spi_reg: u32 = 0;
-    spi_reg.set_bit_range(7, 0, KernelInterrupt::Spurious as u8);
-    spi_reg.set_bit(8, true); // Enable LAPIC
-    unsafe { LAPIC.write_offset(0xF0, spi_reg) };
-
-    // Second, enable the APIC error interrupt
-    let mut error_reg: u32 = 0;
-    error_reg.set_bit_range(7, 0, KernelInterrupt::ApicError as u8);
-    unsafe { LAPIC.write_offset(0x280, error_reg) };
-
-    // Now, finally, enable the LAPIC in the MSR
+    // First, enable xAPIC mode
     unsafe {
         let mut msr = LAPIC_BASE_MSR.read();
         msr.set_bit(11, true); // Enable xAPIC mode
         let mut base = LAPIC_BASE_MSR;
         base.write(msr);
     }
+
+    // Second, enable the LAPIC and some basic interrupts.
+    let mut spi_reg: u32 = 0;
+    spi_reg.set_bit_range(7, 0, KernelInterrupt::Spurious as u8);
+    spi_reg.set_bit(8, true); // Enable LAPIC
+    unsafe { LAPIC.write_offset(0xF0, spi_reg) };
+
+    // Third, enable the APIC error interrupt
+    let mut error_reg: u32 = 0;
+    error_reg.set_bit_range(7, 0, KernelInterrupt::ApicError as u8);
+    unsafe { LAPIC.write_offset(0x280, error_reg) };
+
+    // Fourth, set DFR to all ones (flat model) and LDR to logical ID 1
+    unsafe {
+        LAPIC.write_offset(0xE0, 0xFFFFFFFFu32); // DFR
+    }
+
+    // Finally, enable interrupts.
+    interrupts::enable();
 }
 
 declare_module!("MP", init);
