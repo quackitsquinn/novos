@@ -2,7 +2,6 @@
 //!
 //! Most of the documentation for individual types are taken directly from section 3A of
 //! the Intel® 64 and IA-32 Architectures Software Developer’s Manual
-use bitfield::{Bit, BitRange};
 use cake::Once;
 use cake::log::{info, trace};
 use x86_64::VirtAddr;
@@ -10,7 +9,8 @@ use x86_64::registers::model_specific::Msr;
 use x86_64::structures::paging::Translate;
 
 use crate::memory::paging::ACTIVE_PAGE_TABLE;
-use crate::mp::lapic::lvt::TimerLvt;
+
+use crate::mp::lapic::lvt::ApicTimerLvt;
 use crate::{
     memory::paging::phys::phys_mem::{self, PhysicalMemoryMap},
     mp::apic_page_flags,
@@ -103,10 +103,7 @@ impl Lapic {
 
     /// Reads the LAPIC version register.
     pub fn version(&self) -> LapicVersion {
-        LapicVersion::from_bytes(unsafe {
-            self.read_offset::<u32>(LapicVersion::REGISTER)
-                .to_ne_bytes()
-        })
+        LapicVersion(unsafe { self.read_offset::<u32>(LapicVersion::REGISTER) })
     }
 
     /// Sends an End Of Interrupt (EOI) signal to the LAPIC.
@@ -121,9 +118,8 @@ impl Lapic {
 
     /// Reads the Spurious Interrupt Vector Register (SVR).
     pub fn read_svr(&self) -> SpuriousInterruptVector {
-        SpuriousInterruptVector::from_bytes(unsafe {
+        SpuriousInterruptVector(unsafe {
             self.read_offset::<u32>(SpuriousInterruptVector::REGISTER)
-                .to_ne_bytes()
         })
     }
 
@@ -133,10 +129,7 @@ impl Lapic {
     /// The caller must also ensure that the value being written is valid.
     pub unsafe fn write_svr(&self, svr: SpuriousInterruptVector) {
         unsafe {
-            self.write_offset::<u32>(
-                SpuriousInterruptVector::REGISTER,
-                u32::from_ne_bytes(svr.into_bytes()),
-            );
+            self.write_offset::<u32>(SpuriousInterruptVector::REGISTER, svr.0);
         }
     }
 
@@ -168,9 +161,9 @@ impl Lapic {
     /// Reads the Interrupt Command Register (ICR).
     pub fn read_icr(&self) -> InterruptCommandRegister {
         unsafe {
-            InterruptCommandRegister::from_bytes(
-                self.read_offset::<[u8; 8]>(InterruptCommandRegister::REGISTER),
-            )
+            let low = self.read_offset::<u32>(InterruptCommandRegister::REGISTER);
+            let high = self.read_offset::<u32>(InterruptCommandRegister::REGISTER + 0x10);
+            InterruptCommandRegister(u64::from(high) << 32 | u64::from(low))
         }
     }
 
@@ -180,7 +173,7 @@ impl Lapic {
     /// The caller must ensure that the given ICR value is valid.
     /// The caller must also ensure that the deliver status is not modified.
     pub unsafe fn write_icr(&self, icr: InterruptCommandRegister) {
-        let icr: u64 = icr.into();
+        let icr: u64 = icr.0;
         trace!("Writing ICR: {:#016x}", icr);
         let low: u32 = (icr & 0xFFFF_FFFF) as u32;
         let high: u32 = (icr >> 32) as u32;
@@ -203,16 +196,16 @@ impl Lapic {
     }
 
     /// Reads the Local Vector Table (LVT) Timer Register.
-    pub fn read_lvt_timer(&self) -> TimerLvt {
-        unsafe { TimerLvt::from_bytes(self.read_offset::<[u8; 4]>(TimerLvt::REGISTER)) }
+    pub fn read_lvt_timer(&self) -> ApicTimerLvt {
+        unsafe { ApicTimerLvt(self.read_offset::<u32>(ApicTimerLvt::REGISTER)) }
     }
 
     /// Writes to the Local Vector Table (LVT) Timer Register.
     /// # Safety
     /// The caller must ensure that the given LVT Timer value is valid and does not conflict with other LVT entries.
-    pub unsafe fn write_lvt_timer(&self, lvt: TimerLvt) {
+    pub unsafe fn write_lvt_timer(&self, lvt: ApicTimerLvt) {
         unsafe {
-            self.write_offset::<[u8; 4]>(TimerLvt::REGISTER, lvt.into_bytes());
+            self.write_offset::<u32>(ApicTimerLvt::REGISTER, lvt.0);
         }
     }
 
@@ -221,7 +214,7 @@ impl Lapic {
     /// The caller must ensure that the given LVT Timer closure will keep the LVT entry valid and does not conflict with other LVT entries.
     pub unsafe fn update_lvt_timer<F>(&self, f: F)
     where
-        F: FnOnce(&mut TimerLvt),
+        F: FnOnce(&mut ApicTimerLvt),
     {
         let mut lvt = self.read_lvt_timer();
         f(&mut lvt);

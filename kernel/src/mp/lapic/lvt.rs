@@ -1,37 +1,40 @@
 use core::fmt::Debug;
 
-use modular_bitfield::prelude::*;
+use bitfield::bitfield;
 
 use crate::mp::id;
 
-/// Local Vector Table (LVT) entry for the timer.
-#[bitfield(bytes = 4)]
-pub struct TimerLvt {
-    /// Interrupt vector.
-    pub vector: B8,
-    #[skip]
-    __: B4,
-    /// Delivery status. Must not be written by software.
-    pub delivery_status: bool,
-    #[skip]
-    __: B4,
-    /// Mask the timer interrupt.
-    pub mask: bool,
-    /// The mode of the timer.
-    pub timer_mode: B2,
-    #[skip]
-    __: B12,
+bitfield! {
+    /// Local Vector Table (LVT) entry for the timer.
+    pub struct ApicTimerLvt(u32);
+    impl Debug;
+    /// The interrupt vector number.
+    pub u8, vector, set_vector: 7, 0;
+    /// The delivery mode of the interrupt.
+    pub bool, delivery_status, _: 12;
+    /// The mask bit (0 = enabled, 1 = masked).
+    /// When masked, the interrupt will not be delivered.
+    pub bool, mask, set_mask: 16;
+    /// The timer mode (0 = one-shot, 1 = periodic).
+    pub u8, from TimerMode, timer_mode, set_timer_mode: 17, 16;
 }
 
-id!(TimerLvt, REGISTER, 0x320);
+id!(ApicTimerLvt, REGISTER, 0x320);
 
-impl Debug for TimerLvt {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("TimerLvt")
-            .field("vector", &self.vector())
-            .field("delivery_status", &self.delivery_status())
-            .field("mask", &self.mask())
-            .field("timer_mode", &self.timer_mode())
-            .finish()
+/// Timer mode for the LAPIC timer.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub enum TimerMode {
+    /// One-shot mode. The timer counts down once and then stops.
+    OneShot = 0b00,
+    /// Periodic mode. The timer reloads the initial count value and continues counting down.
+    Periodic = 0b01,
+    /// TSC-Deadline mode. The timer is triggered when the TSC reaches the value in the MSR.
+    TscDeadline = 0b10,
+}
+
+impl From<TimerMode> for u8 {
+    fn from(value: TimerMode) -> Self {
+        value as u8
     }
 }

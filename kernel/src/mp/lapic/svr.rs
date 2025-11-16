@@ -1,37 +1,24 @@
-use core::fmt::Debug;
-use modular_bitfield::prelude::*;
+use bitfield::bitfield;
 
 use crate::mp::id;
 
-/// Spurious Interrupt Vector Register (SVR).
-#[derive(Clone, Copy)]
-#[bitfield(bytes = 4)]
-pub struct SpuriousInterruptVector {
-    /// Determines the vector number to be delivered to the processor when the local APIC generates a spurious vector.
-    pub vector: B8,
-    /// Allows software to temporarily enable (1) or disable (0) the local APIC
-    pub apic_enable: bool,
-    /// Determines if focus processor checking is enabled (0) or disabled (1) when using the lowest-priority delivery mode.
-    pub focus_processor_checking: bool,
-    #[skip]
-    __: B6,
-    pub eoi_broadcast_suppression: bool,
-    #[skip]
-    __: B15,
+bitfield! {
+    /// Spurious Interrupt Vector Register (SVR).
+    #[repr(transparent)]
+    #[derive(Clone, Copy, PartialEq, Eq)]
+    pub struct SpuriousInterruptVector(u32);
+    impl Debug;
+    /// The spurious interrupt vector number.
+    pub u8, vector, set_vector: 7, 0;
+    /// The APIC software enable/disable bit.
+    /// 0 = disabled, 1 = enabled.
+    pub bool, apic_enable, set_apic_enable: 8;
+    /// The focus processor checking bit.
+    /// 0 = disabled, 1 = enabled.
+    pub bool, focus_processor_checking, set_focus_processor_checking: 9;
+    /// The EOI broadcast suppression bit.
+    /// 0 = disabled, 1 = enabled.
+    pub bool, eoi_broadcast_suppression, set_eoi_broadcast_suppression: 12;
 }
 
 id!(SpuriousInterruptVector, REGISTER, 0xF0);
-
-impl Debug for SpuriousInterruptVector {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("SpuriousInterruptVector")
-            .field("vector", &self.vector())
-            .field("apic_enable", &self.apic_enable())
-            .field("focus_processor_checking", &self.focus_processor_checking())
-            .field(
-                "eoi_broadcast_suppression",
-                &self.eoi_broadcast_suppression(),
-            )
-            .finish()
-    }
-}

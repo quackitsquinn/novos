@@ -1,40 +1,38 @@
+use bitfield::bitfield;
 use core::fmt::Debug;
-use modular_bitfield::prelude::*;
 
 use crate::mp::id;
 
-/// Interrupt Command Register (ICR) register.
-#[derive(Clone, Copy)]
-#[bitfield(bytes = 8)]
-#[repr(u64)]
-pub struct InterruptCommandRegister {
+bitfield! {
+    /// Interrupt Command Register (ICR) register.
+    #[repr(transparent)]
+    #[derive(Clone, Copy, PartialEq, Eq)]
+    pub struct InterruptCommandRegister(u64);
+    impl Debug;
     /// The interrupt vector to send.
-    pub vector: B8,
+    pub u8, vector, set_vector: 7, 0;
     /// The delivery mode of the interrupt.
-    #[bits = 3]
-    pub delivery_mode: DeliverMode,
+    pub u8, from DeliverMode, delivery_mode, set_delivery_mode: 10, 8;
     /// The destination mode of the interrupt (0 = physical, 1 = logical).
-    pub destination_mode: bool,
+    pub bool, destination_mode, set_destination_mode: 11;
     /// The delivery status of the interrupt (0 = idle, 1 = send pending).
-    pub delivery_status: bool,
+    pub bool, delivery_status, _: 12;
     /// The level of the interrupt (0 = deassert, 1 = assert).
-    pub level: bool,
+    /// Because limine does the initialization for each AP, we will always be asserting.
+    pub bool, level, set_level: 14;
     /// The trigger mode of the interrupt (0 = edge, 1 = level).
-    pub trigger_mode: bool,
-    #[skip]
-    __: B2,
-    /// The destination shorthand of the interrupt.
-    pub destination_shorthand: DestinationShorthand,
-    #[skip]
-    __: B37,
-    /// The destination field of the interrupt (only used if destination shorthand is 0).
-    pub destination: B8,
+    pub bool, trigger_mode, set_trigger_mode: 15;
+    /// An optional shorthand notation for the destination field.
+    pub u8, from DestinationShorthand, destination_shorthand, set_destination_shorthand: 19, 18;
+    /// The destination field specifying the target processor(s).
+    pub u8, destination, set_destination: 63, 56;
 }
 
 id!(InterruptCommandRegister, REGISTER, 0x300);
 
 /// Delivery mode of the interrupt.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Specifier)]
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DeliverMode {
     /// Delivers the interrupt specified in the vector field to the target processor
     /// or processors.
@@ -70,8 +68,15 @@ pub enum DeliverMode {
     _Invalid2 = 0b111,
 }
 
+impl From<DeliverMode> for u8 {
+    fn from(deliver: DeliverMode) -> u8 {
+        deliver as u8
+    }
+}
+
 /// An optional shorthand notation for the destination field.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Specifier)]
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DestinationShorthand {
     /// No shorthand notation. The destination field contains the destination
     NoShorthand = 0b00,
@@ -83,17 +88,8 @@ pub enum DestinationShorthand {
     AllExcludingSelf = 0b11,
 }
 
-impl Debug for InterruptCommandRegister {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("InterruptCommandRegister")
-            .field("vector", &self.vector())
-            .field("delivery_mode", &self.delivery_mode())
-            .field("destination_mode", &self.destination_mode())
-            .field("delivery_status", &self.delivery_status())
-            .field("level", &self.level())
-            .field("trigger_mode", &self.trigger_mode())
-            .field("destination_shorthand", &self.destination_shorthand())
-            .field("destination", &self.destination())
-            .finish()
+impl From<DestinationShorthand> for u8 {
+    fn from(shorthand: DestinationShorthand) -> u8 {
+        shorthand as u8
     }
 }

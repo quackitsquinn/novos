@@ -1,32 +1,22 @@
 use core::fmt::Debug;
-use modular_bitfield::prelude::*;
+
+use bitfield::bitfield;
 
 use crate::mp::id;
 
-/// Represents the LAPIC version register.
-#[derive(Clone, Copy)]
-#[bitfield(bytes = 4)]
-pub struct LapicVersion {
-    pub version: u8,
-    #[skip]
-    __: B8,
-    pub max_lvt_entry: B7,
-    pub supports_eoi_broadcast_suppression: bool,
-    #[skip]
-    __: B8,
+bitfield! {
+    /// LAPIC Version Register.
+    #[repr(transparent)]
+    #[derive(Clone, Copy, PartialEq, Eq)]
+    pub struct LapicVersion(u32);
+    impl Debug;
+    /// The version number of the LAPIC.
+    pub u8, version, _: 7, 0;
+    /// The maximum LVT entry supported (number of LVT entries - 1).
+    pub u8, max_lvt_entry, _: 23, 16;
+    /// Indicates whether the LAPIC supports EOI broadcast suppression.
+    /// 0 = does not support, 1 = supports.
+    pub bool, supports_eoi_broadcast_suppression, _: 24;
 }
 
 id!(LapicVersion, REGISTER, 0x30);
-
-impl Debug for LapicVersion {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("LapicVersion")
-            .field("version", &self.version())
-            .field("max_lvt_entry", &self.max_lvt_entry())
-            .field(
-                "supports_eoi_broadcast_suppression",
-                &self.supports_eoi_broadcast_suppression(),
-            )
-            .finish()
-    }
-}

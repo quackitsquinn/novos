@@ -24,14 +24,15 @@ pub enum IPIDestination {
 }
 
 pub unsafe fn send_ipi(dest: IPIDestination, vector: KernelInterrupt) {
-    let mut icr = InterruptCommandRegister::new()
-        .with_vector(vector as u8)
-        .with_delivery_mode(DeliverMode::Fixed)
-        .with_destination_mode(false) // Physical mode
-        .with_level(true) // Assert
-        .with_trigger_mode(false); // Edge triggered
+    let mut icr = InterruptCommandRegister(0);
 
-    /// Set the destination based on the specified type.
+    icr.set_vector(vector as u8);
+    icr.set_delivery_mode(DeliverMode::Fixed);
+    icr.set_destination_mode(false); // Physical mode
+    icr.set_level(true); // Assert
+    icr.set_trigger_mode(false); // Edge triggered
+
+    // Set the destination based on the specified type.
     match dest {
         IPIDestination::AllCores => {
             icr.set_destination_shorthand(DestinationShorthand::AllIncludingSelf);
