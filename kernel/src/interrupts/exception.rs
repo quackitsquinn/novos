@@ -1,3 +1,5 @@
+use core::sync::atomic::{AtomicU64, Ordering};
+
 use cake::log::info;
 use x86_64::registers::control::Cr2;
 
@@ -55,7 +57,7 @@ pub extern "C" fn panic_handler(_: InterruptContext) {
 
 interrupt_wrapper!(panic_handler, panic_handler_raw);
 
-pub extern "C" fn spurious_handler(_: InterruptContext, _: u8, _: &'static str) {
+pub extern "C" fn spurious_handler(_: InterruptContext, _: u8) {
     // Currently we don't really care about spurious interrupts, but logging them might help in debugging.
     info!(
         "Spurious interrupt received on core {}",
@@ -69,7 +71,7 @@ pub extern "C" fn spurious_handler(_: InterruptContext, _: u8, _: &'static str) 
 
 interrupt_wrapper!(spurious_handler, spurious_handler_raw);
 
-pub extern "C" fn apic_error(_: InterruptContext, _: u8, _: &'static str) {
+pub extern "C" fn apic_error(_: InterruptContext, _: u8) {
     info!(
         "APIC error interrupt received on core {}: {}",
         mp::current_core_id(),
@@ -82,3 +84,18 @@ pub extern "C" fn apic_error(_: InterruptContext, _: u8, _: &'static str) {
 }
 
 interrupt_wrapper!(apic_error, apic_error_raw);
+
+static TIMER_TICKS: AtomicU64 = AtomicU64::new(0);
+
+pub extern "C" fn timer_handler(_: InterruptContext, _: u8) {
+    let ticks = TIMER_TICKS.fetch_add(1, Ordering::Relaxed) + 1;
+    if ticks % 1000 == 0 {
+        info!("Core {} timer tick: {}", mp::current_core_id(), ticks);
+    }
+
+    unsafe {
+        LAPIC.eoi();
+    }
+}
+
+interrupt_wrapper!(timer_handler, timer_handler_raw);

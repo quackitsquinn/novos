@@ -65,13 +65,15 @@ fn init() -> Result<(), Infallible> {
 
         // Set up the panic interrupt
         unsafe {
-            idt[KernelInterrupt::Panic as u8]
-                .set_handler_addr(VirtAddr::from_ptr(exception::panic_handler_raw as *mut ()));
             idt[KernelInterrupt::Spurious as u8].set_handler_addr(VirtAddr::from_ptr(
                 exception::spurious_handler_raw as *mut (),
             ));
             idt[KernelInterrupt::ApicError as u8]
                 .set_handler_addr(VirtAddr::from_ptr(exception::apic_error_raw as *mut ()));
+            idt[KernelInterrupt::Panic as u8]
+                .set_handler_addr(VirtAddr::from_ptr(exception::panic_handler_raw as *mut ()));
+            idt[KernelInterrupt::Timer as u8]
+                .set_handler_addr(VirtAddr::from_ptr(exception::timer_handler_raw as *mut ()));
         };
     }
     hardware::define_hardware();

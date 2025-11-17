@@ -1,3 +1,4 @@
+//! Local APIC Timer LVT entry and related enums.
 use core::fmt::Debug;
 
 use bitfield::bitfield;
@@ -16,7 +17,7 @@ bitfield! {
     /// When masked, the interrupt will not be delivered.
     pub bool, mask, set_mask: 16;
     /// The timer mode (0 = one-shot, 1 = periodic).
-    pub u8, from TimerMode, timer_mode, set_timer_mode: 17, 16;
+    pub u8, from TimerMode, timer_mode, set_timer_mode: 18, 17;
 }
 
 id!(ApicTimerLvt, REGISTER, 0x320);
@@ -37,4 +38,26 @@ impl From<TimerMode> for u8 {
     fn from(value: TimerMode) -> Self {
         value as u8
     }
+}
+
+/// Timer divider values for the LAPIC timer.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub enum TimerDivider {
+    /// Divide by 1.
+    By1 = 0b111,
+    /// Divide by 2.
+    By2 = 0b0000,
+    /// Divide by 4.
+    By4 = 0b0001,
+    /// Divide by 8.
+    By8 = 0b010,
+    /// Divide by 16.
+    By16 = 0b011,
+    /// Divide by 32.
+    By32 = 0b100,
+    /// Divide by 64.
+    By64 = 0b101,
+    /// Divide by 128.
+    By128 = 0b110,
 }

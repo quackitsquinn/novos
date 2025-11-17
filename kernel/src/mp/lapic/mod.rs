@@ -3,6 +3,7 @@
 //! Most of the documentation for individual types are taken directly from section 3A of
 //! the Intel® 64 and IA-32 Architectures Software Developer’s Manual
 use cake::Once;
+use cake::limine::mp::Cpu;
 use cake::log::{info, trace};
 use x86_64::VirtAddr;
 use x86_64::registers::model_specific::Msr;
@@ -10,15 +11,15 @@ use x86_64::structures::paging::Translate;
 
 use crate::memory::paging::ACTIVE_PAGE_TABLE;
 
-use crate::mp::lapic::lvt::ApicTimerLvt;
+use crate::mp::lapic::timer::{ApicTimerLvt, TimerDivider};
 use crate::{
     memory::paging::phys::phys_mem::{self, PhysicalMemoryMap},
     mp::apic_page_flags,
 };
 
 mod icr;
-mod lvt;
 mod svr;
+pub mod timer;
 mod version;
 
 pub use icr::{DeliverMode, DestinationShorthand, InterruptCommandRegister};
@@ -30,6 +31,12 @@ pub const LAPIC_BASE_MSR: Msr = Msr::new(0x1B);
 
 /// The offset for the End Of Interrupt (EOI) register.
 pub const LAPIC_EOI_OFFSET: usize = 0xB0;
+/// The offset for the Timer Divide Configuration register of the LAPIC timer.
+pub const LAPIC_TIMER_DIVIDE_OFFSET: usize = 0x3E0;
+/// The offset for the Initial Count register of the LAPIC timer.
+pub const LAPIC_TIMER_INITIAL_COUNT_OFFSET: usize = 0x380;
+/// The offset for the Current Count register of the LAPIC timer.
+pub const LAPIC_TIMER_CURRENT_COUNT_OFFSET: usize = 0x390;
 
 /// Represents the Local APIC (LAPIC) of the CPU.
 /// Provides methods to read and write LAPIC registers, send interrupts, and manage LAPIC state
@@ -219,6 +226,48 @@ impl Lapic {
         let mut lvt = self.read_lvt_timer();
         f(&mut lvt);
         unsafe { self.write_lvt_timer(lvt) };
+    }
+
+    /// Sets the LAPIC timer divider.
+    pub fn set_timer_divider(&self, divider: TimerDivider) {
+        let val = divider as u8;
+        // For some reason, there is a reserved bit in the middle of the divider value. Intel loves making things complicated.
+        let up_bit = (val << 1) & 0b1000;
+        let low_bits = val & 0b11;
+        let final_val = up_bit | low_bits;
+        trace!("Setting LAPIC timer divider to: {:#05b}", final_val);
+        unsafe {
+            self.write_offset::<u32>(LAPIC_TIMER_DIVIDE_OFFSET, final_val as u32);
+        }
+    }
+
+    /// Reads the current count value of the LAPIC timer.
+    pub fn read_timer_current_count(&self) -> u32 {
+        unsafe { self.read_offset::<u32>(LAPIC_TIMER_CURRENT_COUNT_OFFSET) }
+    }
+
+    /// Writes the initial count value to the LAPIC timer.
+    pub fn write_timer_initial_count(&self, count: u32) {
+        unsafe {
+            self.write_offset::<u32>(LAPIC_TIMER_INITIAL_COUNT_OFFSET, count);
+        }
+    }
+
+    /// Attempts to read the base frequency of the LAPIC timer in Hz.
+    /// Returns `None` if the frequency cannot be determined.
+    pub fn timer_base_freq_hz(&self) -> Option<u64> {
+        raw_cpuid::CpuId::with_cpuid_reader(raw_cpuid::CpuIdReaderNative)
+            .get_tsc_info()
+            .map_or(None, |tsc_info| tsc_info.tsc_frequency())
+    }
+
+    /// Checks if the LAPIC timer is of consistent speed (i.e., not affected by power-saving modes).
+    /// Returns `true` if the timer is consistent speed, `false` otherwise.
+    #[doc(alias = "arat")]
+    pub fn timer_is_consistent_speed(&self) -> bool {
+        raw_cpuid::CpuId::with_cpuid_reader(raw_cpuid::CpuIdReaderNative)
+            .get_thermal_power_info()
+            .map_or(false, |therm_info| therm_info.has_arat())
     }
 }
 

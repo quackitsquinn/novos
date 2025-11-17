@@ -27,6 +27,7 @@ use kserial::client::get_serial_client;
 
 use crate::interrupts::KernelInterrupt;
 use crate::mp::LAPIC;
+use crate::mp::lapic::timer::{ApicTimerLvt, TimerDivider, TimerMode};
 
 pub mod acpi;
 pub mod context;
@@ -67,7 +68,7 @@ pub extern "sysv64" fn init_kernel(rsp: u64) -> ! {
         init_kernel_services();
     }
     info!("Kernel initialized! Entering hlt loop");
-    x86_64::instructions::interrupts::disable();
+    interrupts::enable();
     loop {}
 }
 
@@ -114,8 +115,15 @@ pub(crate) unsafe fn init_kernel_services() {
     proc::MODULE.init();
     info!("Kernel services initialized");
 
-    interrupts::enable();
-    panic!("`x")
+    interrupts::disable();
+
+    LAPIC.set_timer_divider(TimerDivider::By1);
+    LAPIC.write_timer_initial_count(0x80);
+    let mut lvt = ApicTimerLvt(0);
+    lvt.set_vector(KernelInterrupt::Timer as u8);
+    lvt.set_mask(false);
+    lvt.set_timer_mode(TimerMode::Periodic); // Periodic mode
+    unsafe { LAPIC.write_lvt_timer(lvt) };
 }
 
 #[macro_export]
