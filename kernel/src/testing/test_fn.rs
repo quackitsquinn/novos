@@ -1,7 +1,7 @@
 //! Test function declaration
 use cake::log::{self, info};
 
-use crate::{serial, sprintln};
+use crate::{output, serial, sprintln};
 
 use super::IN_TEST_FRAMEWORK;
 
@@ -59,7 +59,7 @@ impl TestFunction {
     }
 
     fn do_bench(&self, count: usize) {
-        let log_level = serial::LOG_LEVEL;
+        let log_level = output::LOG_LEVEL;
         info!("Reducing log level to error for benchmarking");
         log::set_max_level(log::LevelFilter::Error);
         // Don't bother to set / unset IN_TEST_FRAMEWORK as we're not going to panic on a for loop

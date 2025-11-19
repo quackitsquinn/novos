@@ -78,7 +78,7 @@ fn init_proc() -> Result<(), Infallible> {
 
 pub fn sched_next(ctx: InterruptContext) {
     // The interrupt wrapper is guaranteed to disable interrupts and reenable them.
-    if !KERNEL_THREAD_SCHEDULER.is_initialized() || KERNEL_THREAD_SCHEDULER.is_locked() {
+    if !KERNEL_THREAD_SCHEDULER.is_initialized() || KERNEL_THREAD_SCHEDULER.is_locked().is_some() {
         // Still in kernel initialization, just return and continue
         return;
     }

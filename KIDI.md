@@ -46,7 +46,7 @@ The main modules will be:
 There is currently not a defined set of functions for KIDI because it's so early in development. However, here are some ideas for functions that could be included in the standard:
 
 
-Functions are currently written in rust style pseudocode. All functions can be assumed to be `extern "C"` unless otherwise specified.
+Functions are currently written in rust style pseudocode. All functions can be assumed to be `extern "C"` unless otherwise specified. `!` can also be assumed to be equivalent to C's various `noreturn` attributes.
 
 ## Error Handling / Management
 
@@ -86,6 +86,10 @@ The parameter `include_last_err: bool` indicates whether the last error code sho
 
 
 ## Core Module
+
+```rust
+const KIDI_CORE_MODULE_ID: u16 = 0x0000;
+```
 
 ### Error Types
 

@@ -36,6 +36,7 @@ pub mod gdt;
 pub mod interrupts;
 pub mod memory;
 pub mod mp;
+pub mod output;
 pub mod panic;
 pub mod pci;
 pub mod proc;
@@ -89,6 +90,7 @@ pub(crate) unsafe fn init_kernel_services() {
     INIT.blow();
 
     serial::MODULE.init();
+    output::MODULE.init();
     requests::MODULE.init();
     panic::MODULE.init();
     gdt::MODULE.init();

@@ -4,7 +4,7 @@ use core::convert::Infallible;
 use cake::OnceMutex;
 use framebuffer::Framebuffer;
 
-mod character;
+pub mod character;
 pub mod color;
 mod framebuffer;
 pub mod req_data;

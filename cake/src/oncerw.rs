@@ -30,6 +30,16 @@ impl<T> OnceRwLock<T> {
         }
     }
 
+    /// Creates a new `OnceRwLock` initialized with the provided data.
+    pub const fn initialized(data: T) -> Self {
+        Self {
+            data: Once::initialized(UnsafeCell::new(data)),
+            readers: AtomicUsize::new(0),
+            writers: AtomicUsize::new(0),
+            active_writer: AtomicI64::new(-1),
+        }
+    }
+
     /// Sets the value of self to the result of the provided function.
     pub fn init(&self, init: impl FnOnce() -> T) {
         self.data.call_once(|| UnsafeCell::new(init()));

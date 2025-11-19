@@ -10,6 +10,9 @@ use spin::{Mutex, MutexGuard, Once};
 use crate::{get_caller_rip_1_up, resolve_symbol};
 
 /// A mutex that can be initialized once.
+///
+/// This mutex tracks which core has locked it and the instruction pointer of the caller that locked it.
+/// This allows for deadlock detection if the same core attempts to re-lock the mutex.
 pub struct OnceMutex<T> {
     /// The inner mutex.
     inner: Once<UnsafeCell<T>>,
@@ -39,7 +42,8 @@ impl<'a, T> OnceMutex<T> {
         self.inner.call_once(|| UnsafeCell::new(f()));
     }
 
-    /// Tries to get the lock without blocking.
+    /// Tries to get a lock guard to the inner data. Returns None on deadlock.
+    #[track_caller]
     pub fn try_get(&self) -> Option<OnceMutexGuard<'_, T>> {
         let cid = crate::core_id() as i64;
         let caller = get_caller_rip_1_up();
@@ -126,8 +130,9 @@ impl<'a, T> OnceMutex<T> {
     /// Returns if the mutex is currently locked.
     ///
     /// This does not have any synchronization guarantees.
-    pub fn is_locked(&self) -> bool {
-        self.locker.0.load(Ordering::Acquire) != -1
+    pub fn is_locked(&self) -> Option<u64> {
+        let val = self.locker.0.load(Ordering::Acquire);
+        if val == -1 { None } else { Some(val as u64) }
     }
 
     /// Returns true if the mutex has been initialized.
