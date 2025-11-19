@@ -1,14 +1,20 @@
-use core::panic;
+use core::{
+    cell::UnsafeCell,
+    panic, ptr,
+    sync::atomic::{AtomicI64, AtomicPtr, AtomicU64, AtomicUsize, Ordering},
+};
 
+use log::{error, trace};
 use spin::{Mutex, MutexGuard, Once};
 
-use crate::{get_caller_rip_1_up, get_caller_rip_2_up, is_multithreaded};
+use crate::{get_caller_rip_1_up, resolve_symbol};
 
 /// A mutex that can be initialized once.
 pub struct OnceMutex<T> {
     /// The inner mutex.
-    pub inner: Once<Mutex<T>>,
-    caller: Mutex<Option<*const ()>>,
+    inner: Once<UnsafeCell<T>>,
+    /// (core id / lock holder, caller instruction pointer)
+    locker: (AtomicI64, AtomicPtr<()>),
 }
 
 impl<'a, T> OnceMutex<T> {
@@ -16,113 +22,117 @@ impl<'a, T> OnceMutex<T> {
     pub const fn uninitialized() -> Self {
         Self {
             inner: Once::new(),
-            caller: Mutex::new(None),
+            locker: (AtomicI64::new(-1), AtomicPtr::new(ptr::null_mut())),
         }
     }
 
     /// Creates an already initialized `OnceMutex`.
     pub const fn new_with(value: T) -> Self {
         Self {
-            inner: Once::initialized(Mutex::new(value)),
-            caller: Mutex::new(None),
+            inner: Once::initialized(UnsafeCell::new(value)),
+            locker: (AtomicI64::new(-1), AtomicPtr::new(ptr::null_mut())),
         }
-    }
-
-    /// Initializes it with the given value
-    #[deprecated(note = "Use call_init instead for lazy evaluation of T")]
-    pub fn init(&self, value: T) {
-        self.inner.call_once(|| Mutex::new(value));
     }
 
     /// Initializes the OnceMutex with the result of the provided function.
     pub fn call_init(&self, f: impl FnOnce() -> T) {
-        self.inner.call_once(|| Mutex::new(f()));
+        self.inner.call_once(|| UnsafeCell::new(f()));
     }
 
     /// Tries to get the lock without blocking.
-    pub fn try_get(&self) -> Option<MutexGuard<'_, T>> {
-        self.inner.get()?.try_lock()
+    pub fn try_get(&self) -> Option<OnceMutexGuard<'_, T>> {
+        let cid = crate::core_id() as i64;
+        let caller = get_caller_rip_1_up();
+
+        self.acquire(cid as u64, caller)?;
+
+        unsafe { Some(OnceMutexGuard::from_raw_parts(self.cell(), &self.locker)) }
     }
 
     /// Gets a reference to the inner mutex.
-    pub fn mutex(&'a self) -> &'a Mutex<T> {
+    fn cell(&'a self) -> &'a UnsafeCell<T> {
         self.inner
             .get()
             .expect("Attempted to access an uninitialized OnceMutex!")
     }
 
+    /// Acquires the lock for the given core id and caller instruction pointer. Returns None on deadlock.
+    fn acquire(&self, cid: u64, caller: Option<*const ()>) -> Option<()> {
+        let ptr = caller.unwrap_or_else(ptr::dangling).cast_mut();
+        let state =
+            self.locker
+                .0
+                .compare_exchange(-1, cid as i64, Ordering::AcqRel, Ordering::Acquire);
+
+        // If we failed to acquire the lock, check for deadlock, then spin until we acquire it.
+        if let Err(locker_cid) = state {
+            self.lock_check(locker_cid, cid)?;
+            while self
+                .locker
+                .0
+                .compare_exchange(-1, cid as i64, Ordering::AcqRel, Ordering::Acquire)
+                .is_err()
+            {}
+        }
+
+        // Set the caller pointer
+        self.locker.1.store(ptr, Ordering::Release);
+        Some(())
+    }
+
+    fn lock_check(&self, locker_cid: i64, cid: u64) -> Option<()> {
+        if locker_cid != cid as i64 {
+            return Some(());
+        }
+
+        let locker_caller = self.locker.1.load(Ordering::Acquire);
+
+        if locker_caller.is_null() {
+            trace!(
+                "Deadlock detected: Attempted to re-lock OnceMutex on core {} by unknown!",
+                cid
+            );
+            return None;
+        }
+
+        if let Some(s) = resolve_symbol(locker_caller) {
+            trace!(
+                "Deadlock detected: Attempted to re-lock OnceMutex on core {}: Locked by {}.",
+                cid, s,
+            );
+            return None;
+        }
+
+        trace!(
+            "Deadlock detected: Attempted to re-lock OnceMutex on core {} by unknown!",
+            cid
+        );
+
+        None
+    }
+
     /// Gets a lock guard to the inner data.
     #[track_caller]
-    pub fn get(&self) -> MutexGuard<'_, T> {
-        if is_multithreaded() {
-            self.get_multithreaded()
-        } else {
-            self.get_singlethreaded()
-        }
-    }
+    pub fn get(&self) -> OnceMutexGuard<'_, T> {
+        let caller = get_caller_rip_1_up();
+        let cid = crate::core_id() as i64;
 
-    fn get_singlethreaded(&self) -> MutexGuard<'_, T> {
-        let mutex = self.mutex();
-        if !mutex.is_locked() {
-            *self.caller.lock() = get_caller_rip_2_up!();
-            return mutex.lock();
-        }
+        self.acquire(cid as u64, caller)
+            .expect("Deadlock detected on OnceMutex!");
 
-        let caller = self.caller.lock();
-
-        if caller.is_none() {
-            panic!("OnceMutex locked by unknown caller!");
-        }
-
-        let caller = caller.unwrap();
-
-        let mut sym = "unknown";
-        if let Some(name) = crate::resolve_symbol(caller) {
-            sym = name;
-        }
-
-        panic!(
-            "OnceMutex locked by caller at address {:p} ({})",
-            caller, sym
-        );
-    }
-
-    fn get_multithreaded(&self) -> MutexGuard<'_, T> {
-        self.mutex().lock()
+        unsafe { OnceMutexGuard::from_raw_parts(self.cell(), &self.locker) }
     }
 
     /// Returns if the mutex is currently locked.
     ///
     /// This does not have any synchronization guarantees.
     pub fn is_locked(&self) -> bool {
-        self.mutex().is_locked()
+        self.locker.0.load(Ordering::Acquire) != -1
     }
 
-    /// REturns if the once mutex is initialized.
+    /// Returns true if the mutex has been initialized.
     pub fn is_initialized(&self) -> bool {
         self.inner.is_completed()
-    }
-
-    /// Force unlocks the mutex.
-    ///
-    /// # Safety
-    /// This is incredibly unsafe if the mutex is locked by another thread.
-    pub unsafe fn force_unlock(&self) {
-        unsafe { self.mutex().force_unlock() }
-    }
-
-    /// Forces a lock guard to the inner data.
-    ///
-    /// # Safety
-    /// This is incredibly unsafe if the mutex is locked by another thread.
-    pub unsafe fn force_get(&self) -> MutexGuard<'_, T> {
-        unsafe {
-            self.force_unlock();
-        }
-        let t = self.get();
-        // Set the caller to the correct value
-        *self.caller.lock() = get_caller_rip_1_up();
-        t
     }
 }
 
@@ -136,5 +146,43 @@ impl<T> core::fmt::Debug for OnceMutex<T> {
             .field("is_initialized", &self.is_initialized())
             .field("is_locked", &self.is_locked())
             .finish()
+    }
+}
+
+/// A guard that releases the OnceMutex when dropped.
+#[derive(Debug)]
+pub struct OnceMutexGuard<'a, T> {
+    guard: &'a UnsafeCell<T>,
+    locker: &'a (AtomicI64, AtomicPtr<()>),
+}
+
+impl<'a, T> OnceMutexGuard<'a, T> {
+    unsafe fn from_raw_parts(
+        guard: &'a UnsafeCell<T>,
+        locker: &'a (AtomicI64, AtomicPtr<()>),
+    ) -> Self {
+        Self { guard, locker }
+    }
+}
+
+impl<T> Drop for OnceMutexGuard<'_, T> {
+    fn drop(&mut self) {
+        // Clear the locker info
+        self.locker.1.store(ptr::null_mut(), Ordering::Release);
+        self.locker.0.store(-1, Ordering::Release);
+    }
+}
+
+impl<T> core::ops::Deref for OnceMutexGuard<'_, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { &*self.guard.get() }
+    }
+}
+
+impl<T> core::ops::DerefMut for OnceMutexGuard<'_, T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        unsafe { &mut *self.guard.get() }
     }
 }
