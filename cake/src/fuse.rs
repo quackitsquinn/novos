@@ -3,6 +3,10 @@ use core::{
     sync::atomic::{AtomicBool, AtomicU8},
 };
 
+const FUSE_INTACT: u8 = 0;
+const FUSE_BLOWING: u8 = 1;
+const FUSE_BLOWN: u8 = 2;
+
 /// A fuse that can be "blown" exactly once.
 ///
 /// This is useful as a initialization primitive to ensure that things are initialized once.
@@ -16,18 +20,19 @@ impl Fuse {
     /// Creates a new fuse.
     pub const fn new() -> Self {
         Self {
-            is_blown: AtomicU8::new(0),
+            is_blown: AtomicU8::new(FUSE_INTACT),
         }
     }
 
     /// Returns true if the fuse has been blown.
     pub fn is_blown(&self) -> bool {
-        self.is_blown.load(core::sync::atomic::Ordering::SeqCst) == 2
+        self.is_blown.load(core::sync::atomic::Ordering::SeqCst) == FUSE_BLOWN
     }
 
     /// "Blows" the fuse. Once blown, it cannot be reset.
     pub fn blow(&self) {
-        self.is_blown.store(2, core::sync::atomic::Ordering::SeqCst);
+        self.is_blown
+            .store(FUSE_BLOWN, core::sync::atomic::Ordering::SeqCst);
     }
 
     /// Runs the given closure and "blows" the fuse.
@@ -39,15 +44,16 @@ impl Fuse {
         if self
             .is_blown
             .compare_exchange(
-                0,
-                1,
+                FUSE_INTACT,
+                FUSE_BLOWING,
                 core::sync::atomic::Ordering::SeqCst,
                 core::sync::atomic::Ordering::SeqCst,
             )
             .is_ok()
         {
             let ret = Some(f());
-            self.is_blown.store(2, core::sync::atomic::Ordering::SeqCst);
+            self.is_blown
+                .store(FUSE_BLOWN, core::sync::atomic::Ordering::SeqCst);
             ret
         } else {
             None
