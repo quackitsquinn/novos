@@ -116,16 +116,7 @@ pub(crate) unsafe fn init_kernel_services() {
     pci::MODULE.init();
     proc::MODULE.init();
     info!("Kernel services initialized");
-
-    interrupts::disable();
-
-    LAPIC.set_timer_divider(TimerDivider::By1);
-    LAPIC.write_timer_initial_count(0x80);
-    let mut lvt = ApicTimerLvt(0);
-    lvt.set_vector(KernelInterrupt::Timer as u8);
-    lvt.set_mask(false);
-    lvt.set_timer_mode(TimerMode::Periodic); // Periodic mode
-    unsafe { LAPIC.write_lvt_timer(lvt) };
+    panic!("Kernel init complete panic for testing purposes");
 }
 
 #[macro_export]

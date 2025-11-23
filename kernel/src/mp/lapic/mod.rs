@@ -11,18 +11,18 @@ use x86_64::structures::paging::Translate;
 
 use crate::memory::paging::ACTIVE_PAGE_TABLE;
 
+use crate::mp::lapic::icr::InterruptCommandRegister;
 use crate::mp::lapic::timer::{ApicTimerLvt, TimerDivider};
 use crate::{
     memory::paging::phys::phys_mem::{self, PhysicalMemoryMap},
     mp::apic_page_flags,
 };
 
-mod icr;
+pub mod icr;
 mod svr;
 pub mod timer;
 mod version;
 
-pub use icr::{DeliverMode, DestinationShorthand, InterruptCommandRegister};
 pub use svr::SpuriousInterruptVector;
 pub use version::LapicVersion;
 
@@ -165,41 +165,9 @@ impl Lapic {
         }
     }
 
-    /// Reads the Interrupt Command Register (ICR).
-    pub fn read_icr(&self) -> InterruptCommandRegister {
-        unsafe {
-            let low = self.read_offset::<u32>(InterruptCommandRegister::REGISTER);
-            let high = self.read_offset::<u32>(InterruptCommandRegister::REGISTER + 0x10);
-            InterruptCommandRegister(u64::from(high) << 32 | u64::from(low))
-        }
-    }
-
-    /// Writes to the Interrupt Command Register (ICR).
-    ///
-    /// # Safety
-    /// The caller must ensure that the given ICR value is valid.
-    /// The caller must also ensure that the deliver status is not modified.
-    pub unsafe fn write_icr(&self, icr: InterruptCommandRegister) {
-        let icr: u64 = icr.0;
-        trace!("Writing ICR: {:#016x}", icr);
-        let low: u32 = (icr & 0xFFFF_FFFF) as u32;
-        let high: u32 = (icr >> 32) as u32;
-        unsafe {
-            self.write_offset::<u32>(InterruptCommandRegister::REGISTER + 0x10, high);
-            self.write_offset::<u32>(InterruptCommandRegister::REGISTER, low);
-        }
-    }
-
-    /// Updates the Interrupt Command Register (ICR) by applying the given function to the current value.
-    /// # Safety
-    /// The caller must ensure that the given function does not modify the deliver status bit.
-    pub unsafe fn update_icr<F>(&self, f: F)
-    where
-        F: FnOnce(&mut InterruptCommandRegister),
-    {
-        let mut icr = self.read_icr();
-        f(&mut icr);
-        unsafe { self.write_icr(icr) };
+    /// Provides access to the Interrupt Command Register (ICR) interface.
+    pub fn icr(&self) -> InterruptCommandRegister {
+        InterruptCommandRegister::new(self)
     }
 
     /// Reads the Local Vector Table (LVT) Timer Register.

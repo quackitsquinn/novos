@@ -18,7 +18,6 @@ use crate::{
 };
 
 pub mod ioapic;
-pub mod ipi;
 pub mod lapic;
 pub mod req_data;
 
@@ -95,6 +94,9 @@ fn apic_init() {
     unsafe {
         LAPIC.write_offset(0xE0, 0xFFFFFFFFu32); // DFR
     }
+
+    // Finally, enable interrupts globally on this core
+    interrupts::enable();
 }
 
 declare_module!("MP", init);

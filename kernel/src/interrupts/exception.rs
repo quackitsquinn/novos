@@ -5,7 +5,7 @@ use x86_64::registers::control::Cr2;
 
 use crate::{
     context::{InterruptCodeContext, InterruptContext, PageFaultInterruptContext},
-    interrupt_wrapper,
+    interrupt_wrapper, interrupts,
     mp::{self, LAPIC},
     panic::stacktrace::{self, StackFrame},
     println,
@@ -49,7 +49,7 @@ pub fn page_fault_handler(ctx: PageFaultInterruptContext) {
 }
 
 pub extern "C" fn panic_handler(_: InterruptContext) {
-    info!("Core {} halted due to panic!", mp::current_core_id());
+    interrupts::disable();
     loop {
         x86_64::instructions::hlt();
     }
@@ -85,17 +85,6 @@ pub extern "C" fn apic_error(_: InterruptContext, _: u8) {
 
 interrupt_wrapper!(apic_error, apic_error_raw);
 
-static TIMER_TICKS: AtomicU64 = AtomicU64::new(0);
-
-pub extern "C" fn timer_handler(_: InterruptContext, _: u8) {
-    let ticks = TIMER_TICKS.fetch_add(1, Ordering::Relaxed) + 1;
-    if ticks % 1000 == 0 {
-        info!("Core {} timer tick: {}", mp::current_core_id(), ticks);
-    }
-
-    unsafe {
-        LAPIC.eoi();
-    }
-}
+pub extern "C" fn timer_handler(_: InterruptContext, _: u8) {}
 
 interrupt_wrapper!(timer_handler, timer_handler_raw);

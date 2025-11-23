@@ -8,7 +8,7 @@ use crate::{
     declare_module, hlt_loop,
     interrupts::KernelInterrupt,
     memory::{self, allocator},
-    mp::{self, ipi::IPIDestination},
+    mp::{self, LAPIC, lapic::icr::IPIDestination},
     print, println,
     serial::{self, interface::SERIAL_PORT_NUM, raw::SerialPort},
     testing,
@@ -76,9 +76,14 @@ pub fn panic(pi: &PanicInfo) -> ! {
         hlt_loop();
     }
     PANICKED.blow();
-    unsafe {
-        mp::ipi::send_ipi(IPIDestination::AllExceptSelf, KernelInterrupt::Panic);
-    }
+
+    // Send an IPI to all other cores to notify them of the panic. We don't care about waiting for delivery, because
+    // that could potentially result in deadlock if those cores do not have interrupts enabled.
+    LAPIC
+        .icr()
+        .send(IPIDestination::AllExceptSelf, KernelInterrupt::Panic)
+        .ignore();
+
     panic_extended_info(pi);
     println!("Done; attempting QEMU exit");
     testing::try_shutdown_qemu(true);
