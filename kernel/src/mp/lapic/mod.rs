@@ -13,15 +13,16 @@ use crate::memory::paging::ACTIVE_PAGE_TABLE;
 
 use crate::mp::lapic::icr::InterruptCommandRegister;
 use crate::mp::lapic::svr::SpuriousInterruptVector;
-use crate::mp::lapic::timer::{ApicTimerLvt, TimerDivider};
+
 use crate::{
     memory::paging::phys::phys_mem::{self, PhysicalMemoryMap},
     mp::apic_page_flags,
 };
 
 pub mod icr;
+pub mod lvt;
 pub mod svr;
-pub mod timer;
+
 mod version;
 
 pub use svr::SpuriousInterruptVectorValue;
@@ -129,72 +130,9 @@ impl Lapic {
         InterruptCommandRegister::new(self)
     }
 
-    /// Reads the Local Vector Table (LVT) Timer Register.
-    pub fn read_lvt_timer(&self) -> ApicTimerLvt {
-        unsafe { ApicTimerLvt(self.read_offset::<u32>(ApicTimerLvt::REGISTER)) }
-    }
-
-    /// Writes to the Local Vector Table (LVT) Timer Register.
-    /// # Safety
-    /// The caller must ensure that the given LVT Timer value is valid and does not conflict with other LVT entries.
-    pub unsafe fn write_lvt_timer(&self, lvt: ApicTimerLvt) {
-        unsafe {
-            self.write_offset::<u32>(ApicTimerLvt::REGISTER, lvt.0);
-        }
-    }
-
-    /// Updates the Local Vector Table (LVT) Timer Register by applying the given function to the current value.
-    /// # Safety
-    /// The caller must ensure that the given LVT Timer closure will keep the LVT entry valid and does not conflict with other LVT entries.
-    pub unsafe fn update_lvt_timer<F>(&self, f: F)
-    where
-        F: FnOnce(&mut ApicTimerLvt),
-    {
-        let mut lvt = self.read_lvt_timer();
-        f(&mut lvt);
-        unsafe { self.write_lvt_timer(lvt) };
-    }
-
-    /// Sets the LAPIC timer divider.
-    pub fn set_timer_divider(&self, divider: TimerDivider) {
-        let val = divider as u8;
-        // For some reason, there is a reserved bit in the middle of the divider value. Intel loves making things complicated.
-        let up_bit = (val << 1) & 0b1000;
-        let low_bits = val & 0b11;
-        let final_val = up_bit | low_bits;
-        trace!("Setting LAPIC timer divider to: {:#05b}", final_val);
-        unsafe {
-            self.write_offset::<u32>(LAPIC_TIMER_DIVIDE_OFFSET, final_val as u32);
-        }
-    }
-
-    /// Reads the current count value of the LAPIC timer.
-    pub fn read_timer_current_count(&self) -> u32 {
-        unsafe { self.read_offset::<u32>(LAPIC_TIMER_CURRENT_COUNT_OFFSET) }
-    }
-
-    /// Writes the initial count value to the LAPIC timer.
-    pub fn write_timer_initial_count(&self, count: u32) {
-        unsafe {
-            self.write_offset::<u32>(LAPIC_TIMER_INITIAL_COUNT_OFFSET, count);
-        }
-    }
-
-    /// Attempts to read the base frequency of the LAPIC timer in Hz.
-    /// Returns `None` if the frequency cannot be determined.
-    pub fn timer_base_freq_hz(&self) -> Option<u64> {
-        raw_cpuid::CpuId::with_cpuid_reader(raw_cpuid::CpuIdReaderNative)
-            .get_tsc_info()
-            .map_or(None, |tsc_info| tsc_info.tsc_frequency())
-    }
-
-    /// Checks if the LAPIC timer is of consistent speed (i.e., not affected by power-saving modes).
-    /// Returns `true` if the timer is consistent speed, `false` otherwise.
-    #[doc(alias = "arat")]
-    pub fn timer_is_consistent_speed(&self) -> bool {
-        raw_cpuid::CpuId::with_cpuid_reader(raw_cpuid::CpuIdReaderNative)
-            .get_thermal_power_info()
-            .map_or(false, |therm_info| therm_info.has_arat())
+    /// Provides access to the Local Vector Table (LVT) interface.
+    pub fn lvt(&self) -> lvt::LocalVectorTable<'_> {
+        lvt::LocalVectorTable::new(self)
     }
 }
 
