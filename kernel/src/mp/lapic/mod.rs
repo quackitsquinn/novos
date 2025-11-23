@@ -12,6 +12,7 @@ use x86_64::structures::paging::Translate;
 use crate::memory::paging::ACTIVE_PAGE_TABLE;
 
 use crate::mp::lapic::icr::InterruptCommandRegister;
+use crate::mp::lapic::svr::SpuriousInterruptVector;
 use crate::mp::lapic::timer::{ApicTimerLvt, TimerDivider};
 use crate::{
     memory::paging::phys::phys_mem::{self, PhysicalMemoryMap},
@@ -19,11 +20,11 @@ use crate::{
 };
 
 pub mod icr;
-mod svr;
+pub mod svr;
 pub mod timer;
 mod version;
 
-pub use svr::SpuriousInterruptVector;
+pub use svr::SpuriousInterruptVectorValue;
 pub use version::LapicVersion;
 
 /// The Model Specific Register (MSR) used to determine the base address of the Local APIC.
@@ -69,11 +70,6 @@ impl Lapic {
             phys_mem::map_address(phys_addr, 1, apic_page_flags()).expect("Failed to map LAPIC")
         };
 
-        let translated = ACTIVE_PAGE_TABLE
-            .read()
-            .translate(VirtAddr::new(map.ptr() as u64));
-
-        info!("LAPIC mapped at virtual address: {:#x?}", translated);
         self.table.call_once(|| map);
         self.mapped.call_once(|| map.ptr().cast_mut());
     }
@@ -123,50 +119,13 @@ impl Lapic {
         }
     }
 
-    /// Reads the Spurious Interrupt Vector Register (SVR).
-    pub fn read_svr(&self) -> SpuriousInterruptVector {
-        SpuriousInterruptVector(unsafe {
-            self.read_offset::<u32>(SpuriousInterruptVector::REGISTER)
-        })
-    }
-
-    /// Writes to the Spurious Interrupt Vector Register (SVR).
-    ///
-    /// # Safety
-    /// The caller must also ensure that the value being written is valid.
-    pub unsafe fn write_svr(&self, svr: SpuriousInterruptVector) {
-        unsafe {
-            self.write_offset::<u32>(SpuriousInterruptVector::REGISTER, svr.0);
-        }
-    }
-
-    /// Updates the Spurious Interrupt Vector Register (SVR) by applying the given function to the current value.
-    /// # Safety
-    /// The caller must ensure that the given function does not violate any invariants of the SVR.
-    pub unsafe fn update_svr<F>(&self, f: F)
-    where
-        F: FnOnce(&mut SpuriousInterruptVector),
-    {
-        let mut svr = self.read_svr();
-        f(&mut svr);
-        unsafe { self.write_svr(svr) };
-    }
-
-    /// Enables the LAPIC by setting the APIC enable bit in the SVR and setting the spurious interrupt vector.
-    /// # Safety
-    /// The caller must ensure that the LAPIC is in a valid state to be enabled.
-    /// The caller must also ensure that the current IDT is valid for the current LAPIC configuration.
-    pub unsafe fn enable(&self, vector: u8) {
-        unsafe {
-            self.update_svr(|svr| {
-                svr.set_vector(vector);
-                svr.set_apic_enable(true);
-            });
-        }
+    /// Provides access to the Spurious Interrupt Vector Register (SVR) interface.
+    pub fn spurious_interrupt_vector(&self) -> SpuriousInterruptVector<'_> {
+        SpuriousInterruptVector::new(self)
     }
 
     /// Provides access to the Interrupt Command Register (ICR) interface.
-    pub fn icr(&self) -> InterruptCommandRegister {
+    pub fn icr(&self) -> InterruptCommandRegister<'_> {
         InterruptCommandRegister::new(self)
     }
 

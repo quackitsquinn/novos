@@ -80,10 +80,7 @@ fn apic_init() {
     }
 
     // Second, enable the LAPIC and some basic interrupts.
-    let mut spi_reg: u32 = 0;
-    spi_reg.set_bit_range(7, 0, KernelInterrupt::Spurious as u8);
-    spi_reg.set_bit(8, true); // Enable LAPIC
-    unsafe { LAPIC.write_offset(0xF0, spi_reg) };
+    LAPIC.spurious_interrupt_vector().enable();
 
     // Third, enable the APIC error interrupt
     let mut error_reg: u32 = 0;
