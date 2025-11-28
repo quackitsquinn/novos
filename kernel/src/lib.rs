@@ -27,7 +27,6 @@ use kserial::client::get_serial_client;
 
 use crate::interrupts::KernelInterrupt;
 use crate::mp::LAPIC;
-use crate::mp::lapic::timer::{ApicTimerLvt, TimerDivider, TimerMode};
 
 pub mod acpi;
 pub mod context;
