@@ -33,7 +33,7 @@ pub struct ApicTimerLvt<'a>(&'a crate::mp::lapic::Lapic);
 
 impl ApicTimerLvt<'_> {
     /// Creates a new ApicTimerLvt interface for the given LAPIC.
-    pub(super) fn new(lapic: &crate::mp::lapic::Lapic) -> ApicTimerLvt {
+    pub(super) fn new(lapic: &crate::mp::lapic::Lapic) -> ApicTimerLvt<'_> {
         ApicTimerLvt(lapic)
     }
 

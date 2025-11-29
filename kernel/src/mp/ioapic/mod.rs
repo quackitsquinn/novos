@@ -1,10 +1,7 @@
 //! Various Rust abstractions for IOAPIC support.
 use core::fmt::Debug;
 
-use ::acpi::{
-    AcpiTable,
-    sdt::madt::{Madt, MadtEntry},
-};
+use ::acpi::sdt::madt::{Madt, MadtEntry};
 use cake::log::info;
 use cake::{Once, OnceMutex};
 use modular_bitfield::prelude::*;

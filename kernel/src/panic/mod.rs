@@ -8,7 +8,7 @@ use crate::{
     declare_module, hlt_loop,
     interrupts::KernelInterrupt,
     memory::{self, allocator},
-    mp::{self, LAPIC, lapic::icr::IPIDestination},
+    mp::{LAPIC, lapic::icr::IPIDestination},
     print, println,
     serial::{self, interface::SERIAL_PORT_NUM, raw::SerialPort},
     testing,

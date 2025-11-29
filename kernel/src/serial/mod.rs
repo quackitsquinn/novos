@@ -4,10 +4,8 @@
 
 use core::convert::Infallible;
 
-use cake::log::{self, Level, Log, Metadata, Record};
-use kproc::log_filter;
 
-use crate::{declare_module, mp, println};
+use crate::declare_module;
 
 pub mod interface;
 pub mod raw; // Things to interact with the serial port directly

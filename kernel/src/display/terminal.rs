@@ -7,9 +7,9 @@ use core::{
 
 use alloc::{vec, vec::Vec};
 
-use crate::{interrupts::without_interrupts, sprintln};
+use crate::sprintln;
 
-use super::{FRAMEBUFFER, TERMINAL, color::Color, get_char, screen_char::ScreenChar};
+use super::{FRAMEBUFFER, color::Color, get_char, screen_char::ScreenChar};
 
 const CHARACTER_BASE_SIZE: usize = 8;
 

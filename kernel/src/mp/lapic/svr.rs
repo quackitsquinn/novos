@@ -30,7 +30,7 @@ pub struct SpuriousInterruptVector<'a>(&'a Lapic);
 
 impl SpuriousInterruptVector<'_> {
     /// Creates a new SpuriousInterruptVector interface for the given LAPIC.
-    pub(super) fn new(lapic: &Lapic) -> SpuriousInterruptVector {
+    pub(super) fn new(lapic: &Lapic) -> SpuriousInterruptVector<'_> {
         SpuriousInterruptVector(lapic)
     }
 

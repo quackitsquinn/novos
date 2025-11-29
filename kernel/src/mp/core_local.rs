@@ -1,9 +1,9 @@
-use core::{fmt::Debug, mem};
+use core::fmt::Debug;
 
 use alloc::vec::Vec;
 use cake::{Once, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
-use crate::mp::mp_setup::{CORES, trampoline::aps_finished};
+use crate::mp::mp_setup::CORES;
 
 /// A structure that holds data local to each core.
 // TODO: Refactor out the Once and RwLock usage to reduce overhead.

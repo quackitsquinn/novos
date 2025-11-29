@@ -3,10 +3,10 @@
 use core::{
     cell::UnsafeCell,
     fmt::{Debug, Write},
-    sync::atomic::{AtomicI64, AtomicU8, AtomicU32, AtomicU64, AtomicUsize, Ordering},
+    sync::atomic::{AtomicI64, AtomicUsize, Ordering},
 };
 
-use cake::{OnceMutex, OnceRwLock, RwLock, core_id};
+use cake::{OnceMutex, core_id};
 
 /// A lock-free output buffer for kernel logs and output.
 /// More specifically, this acts as a ring buffer that wraps a `Write` implementor. This will provide a lock on the writer, but the buffer itself is lock-free.

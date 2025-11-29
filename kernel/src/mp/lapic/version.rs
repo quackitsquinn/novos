@@ -1,4 +1,3 @@
-use core::fmt::Debug;
 
 use bitfield::bitfield;
 

@@ -1,6 +1,5 @@
 //! Timer interrupt handler and utilities.
 
-use x86_64::structures::idt::InterruptStackFrame;
 
 use crate::{context::InterruptContext, interrupt_wrapper, proc::sched_next};
 

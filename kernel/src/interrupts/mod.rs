@@ -1,11 +1,7 @@
 //! Rust abstractions for handling interrupts and IRQs.
 use core::{convert::Infallible, mem};
 
-use cake::{Mutex, MutexGuard, Once};
-use x86_64::{
-    VirtAddr,
-    structures::idt::{InterruptDescriptorTable, InterruptStackFrame},
-};
+use x86_64::VirtAddr;
 
 mod exception;
 pub mod hardware;

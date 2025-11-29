@@ -1,9 +1,8 @@
 //! Multiprocessor setup and processor local APIC management.
 use core::convert::Infallible;
 
-use alloc::vec::Vec;
 use bitfield::{BitMut, BitRangeMut};
-use cake::{Once, log::info};
+use cake::log::info;
 use raw_cpuid::CpuId;
 
 use crate::{

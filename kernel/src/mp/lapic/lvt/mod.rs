@@ -41,7 +41,7 @@ impl LvtEntry<'_> {
         lapic: &Lapic,
         byte_off: usize,
         delivery_mode_reserved: bool,
-    ) -> LvtEntry {
+    ) -> LvtEntry<'_> {
         LvtEntry {
             lapic,
             reg_off: byte_off,
@@ -239,7 +239,7 @@ pub struct LocalVectorTable<'a>(&'a Lapic);
 
 impl LocalVectorTable<'_> {
     /// Creates a new LocalVectorTable interface for the given LAPIC.
-    pub(super) fn new(lapic: &Lapic) -> LocalVectorTable {
+    pub(super) fn new(lapic: &Lapic) -> LocalVectorTable<'_> {
         LocalVectorTable(lapic)
     }
 

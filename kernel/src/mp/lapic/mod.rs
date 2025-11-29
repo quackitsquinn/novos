@@ -3,13 +3,9 @@
 //! Most of the documentation for individual types are taken directly from section 3A of
 //! the Intel® 64 and IA-32 Architectures Software Developer’s Manual
 use cake::Once;
-use cake::limine::mp::Cpu;
-use cake::log::{info, trace};
-use x86_64::VirtAddr;
+use cake::log::info;
 use x86_64::registers::model_specific::Msr;
-use x86_64::structures::paging::Translate;
 
-use crate::memory::paging::ACTIVE_PAGE_TABLE;
 
 use crate::mp::lapic::icr::InterruptCommandRegister;
 use crate::mp::lapic::svr::SpuriousInterruptVector;

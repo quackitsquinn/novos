@@ -1,4 +1,3 @@
-use core::sync::atomic::{AtomicU64, Ordering};
 
 use cake::log::info;
 use x86_64::registers::control::Cr2;

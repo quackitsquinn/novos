@@ -8,7 +8,7 @@ use cake::log::info;
 use cake::{RwLock, limine::mp::Cpu};
 
 use crate::mp::mp_setup::CORE_COUNT;
-use crate::{interrupts::IDT, memory::paging::kernel::KERNEL_CR3, mp::mp_setup::CoreContext};
+use crate::{memory::paging::kernel::KERNEL_CR3, mp::mp_setup::CoreContext};
 
 #[unsafe(naked)]
 pub unsafe extern "C" fn _ap_trampoline(a: &Cpu) -> ! {

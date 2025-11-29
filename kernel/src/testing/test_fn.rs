@@ -1,7 +1,7 @@
 //! Test function declaration
 use cake::log::{self, info};
 
-use crate::{output, serial, sprintln};
+use crate::{output, sprintln};
 
 use super::IN_TEST_FRAMEWORK;
 

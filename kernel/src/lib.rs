@@ -14,19 +14,14 @@
 extern crate alloc;
 
 use core::arch::asm;
-use core::{hint, ptr};
 
-use bitfield::{Bit, BitMut, BitRangeMut};
 use cake::{Fuse, declare_module};
 
 use cake::Once;
-use cake::limine::BaseRevision;
 use cake::log::info;
 use interrupts::hardware;
 use kserial::client::get_serial_client;
 
-use crate::interrupts::KernelInterrupt;
-use crate::mp::LAPIC;
 
 pub mod acpi;
 pub mod context;

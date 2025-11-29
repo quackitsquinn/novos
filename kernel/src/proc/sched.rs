@@ -1,10 +1,6 @@
 use alloc::collections::btree_map::BTreeMap;
-use x86_64::VirtAddr;
 
-use crate::{
-    context::{InterruptContext, InterruptContextValue},
-    memory::stack::{Stack, StackFlags},
-};
+use crate::context::InterruptContext;
 
 use super::{Thread, ThreadID, ThreadState};
 #[derive(Debug)]
