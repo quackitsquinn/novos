@@ -84,7 +84,7 @@ where
         }
 
         drop(request);
-        self.kernel_data.call_once(|| data(self.get_limine()));
+        self.kernel_data.call_once(|| data(self.lock_limine()));
     }
 
     /// Returns a reference to the kernel data. This will panic if the data has not been initialized yet.
@@ -95,7 +95,7 @@ where
     }
 
     /// Returns a lock guard to the Limine response data.
-    pub fn get_limine(&'a self) -> ResourceGuard<'a, L::Response> {
+    pub fn lock_limine(&'a self) -> ResourceGuard<'a, L::Response> {
         self.limine_request
             .lock_map(|t| t.get_response_mut().expect("response not present"))
     }

@@ -14,7 +14,7 @@ pub(super) static CORES: Once<BTreeMap<u32, &'static RwLock<CoreContext>>> = Onc
 pub(super) static CORE_COUNT: Once<usize> = Once::new();
 
 pub(super) fn init() -> Result<(), Infallible> {
-    let mp = MP_INFO.get_limine();
+    let mp = MP_INFO.lock_limine();
 
     let cpus = mp.cpus();
 
