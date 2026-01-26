@@ -13,6 +13,7 @@ use crate::{declare_module, requests::PHYSICAL_MEMORY_OFFSET};
 
 pub use self::page_table::ActivePageTable;
 
+pub mod addr_space;
 mod builder;
 pub mod kernel;
 mod page_table;
@@ -109,7 +110,9 @@ pub mod map {
 
     // Area used to remap the kernel onto a new page table. This area will not be used after the pml4 switch
     define_map!(KERNEL_REMAP, KERNEL_PHYS_MAP_END_RAW, 0x1000_0000); // 256MB
-
     // Where the framebuffer is mapped in the remapped kernel.
     define_map!(FRAMEBUFFER, KERNEL_PHYS_MAP_END_RAW, 0x1000_0000); // 2MB
+
+    // The address space info structure mapped area.
+    define_map!(ADDRESS_SPACE_INFO, FRAMEBUFFER_END_RAW, 0x1000); // 4KB
 }

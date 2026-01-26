@@ -16,6 +16,7 @@ use x86_64::{
     },
 };
 
+use crate::memory::paging::addr_space;
 use crate::{
     declare_module,
     memory::paging::{
@@ -309,6 +310,13 @@ fn init() -> Result<(), Infallible> {
         RecursivePageTable::new(unsafe { &mut *new_ptr.start_address().as_mut_ptr::<PageTable>() })
             .unwrap(),
     );
+
+    let kernel_only_address_space = addr_space::AddressSpaceInfo {
+        cr3: kernel_frame.start_address(),
+    };
+
+    unsafe { kernel_only_address_space.write_to_active() }
+        .expect("Failed to write address space info to active page table");
 
     unsafe { terminate_requests() };
 

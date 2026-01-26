@@ -22,6 +22,7 @@ use cake::log::info;
 use interrupts::hardware;
 use kserial::client::get_serial_client;
 
+use crate::memory::paging::addr_space;
 
 pub mod acpi;
 pub mod context;
@@ -39,7 +40,7 @@ pub mod serial;
 pub mod testing;
 
 /// The size of the kernel stack in bytes.
-pub const STACK_SIZE: u64 = 1 << 16; // Limine defaults to 16KiB
+pub const STACK_SIZE: u64 = 1 << 15; // 32 KiB
 
 /// The base address of the kernel stack. Set by the function that calls [init_kernel].
 pub static STACK_BASE: Once<u64> = Once::new();
@@ -110,7 +111,7 @@ pub(crate) unsafe fn init_kernel_services() {
     pci::MODULE.init();
     proc::MODULE.init();
     info!("Kernel services initialized");
-    panic!("Kernel init complete panic for testing purposes");
+    info!("Address space info {:?}", addr_space::read());
 }
 
 #[macro_export]

@@ -5,6 +5,7 @@ use cake::limine::BaseRevision;
 use cake::limine::{paging::Mode, request::*, response::ExecutableAddressResponse};
 use cake::{LimineRequest, Once};
 
+use crate::STACK_SIZE;
 use crate::{
     declare_module,
     display::req_data::FramebufferInfo,
@@ -51,7 +52,12 @@ pub static MP_INFO: LimineRequest<MpRequest, ApplicationCores> =
 /// Executable address provided by the bootloader
 pub static EXECUTABLE_ADDRESS: Once<&'static ExecutableAddressResponse> = Once::new();
 
+static STACK_SIZE_REQUEST: StackSizeRequest = StackSizeRequest::new().with_size(STACK_SIZE);
+
 fn init() -> Result<(), Infallible> {
+    if STACK_SIZE_REQUEST.get_response().is_none() {
+        panic!("Bootloader did not provide stack size request response");
+    }
     let offset = PHYSICAL_MEMORY_OFFSET_REQUEST
         .get_response()
         .unwrap()
