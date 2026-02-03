@@ -1,0 +1,14 @@
+[package]
+name = "nmm"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+
+[lints]
+workspace = true
+
+[features]
+# yes this is me opening the door for more architectures in the future.. don't get your hopes up though as this is more.. distant future
+default = ["x86_64"]
+x86_64 = []

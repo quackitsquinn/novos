@@ -743,6 +743,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "nmm"
+version = "0.1.0"
+
+[[package]]
 name = "novos"
 version = "0.1.0"
 dependencies = [
