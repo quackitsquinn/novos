@@ -5,3 +5,4 @@
 compile_error!("Only x86_64 architecture is currently supported.");
 
 pub mod arch;
+pub mod paging;
