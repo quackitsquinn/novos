@@ -1,6 +1,10 @@
 //! Address primitives for x86_64 architecture.
 
+use core::ops::Sub;
 use core::ops::{Deref, DerefMut};
+
+use crate::paging::Table;
+use crate::{arch::x86_64::VIRTUAL_ADDRESS_WIDTH, paging::StructureLayout};
 
 // You might wonder why we don't just re-export x86_64::PhysAddr and x86_64::VirtAddr directly.
 // There are a few reasons for this:
@@ -8,6 +12,9 @@ use core::ops::{Deref, DerefMut};
 //    By wrapping these types, I can more easily swap out implementations later.
 // 2. If I want to add a method to PhysAddr or VirtAddr, I can't do that directly on the types from the x86_64 crate.
 //    Wrapping them allows me to add methods as needed.
+
+/// The pointer-sized unsigned integer type for the current architecture. This is used for addresses and offsets.
+pub type AddressType = u64;
 
 /// Physical address type for x86_64 architecture.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -50,7 +57,7 @@ pub struct VirtAddr(x86_64::VirtAddr);
 
 impl VirtAddr {
     /// The bit width of virtual addresses on x86_64.
-    pub const BIT_WIDTH: u8 = 48; // Note: 52 bit virtual addresses are *possible*, but it's so new that we'll stick with 48 for now.
+    pub const BIT_WIDTH: u8 = VIRTUAL_ADDRESS_WIDTH; // Note: 52 bit virtual addresses are *possible*, but it's so new that we'll stick with 48 for now.
     /// The start of the higher half in virtual address space.
     pub const HIGHER_HALF_START: VirtAddr =
         VirtAddr(x86_64::VirtAddr::new_truncate(1 << (Self::BIT_WIDTH - 1)));
@@ -74,6 +81,10 @@ impl VirtAddr {
     /// The returned usize will always be canonical, since this is only active when the architecture's pointer width is 64 bits.
     pub const fn as_usize(&self) -> usize {
         self.0.as_u64() as usize
+    }
+    /// Converts this virtual address to a physical address with a bitwise identical representation.
+    pub const fn as_phys_addr(&self) -> PhysAddr {
+        PhysAddr(x86_64::PhysAddr::new_truncate(self.as_u64()))
     }
 }
 

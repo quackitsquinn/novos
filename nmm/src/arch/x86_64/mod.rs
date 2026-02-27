@@ -7,15 +7,17 @@ use bitflags::bitflags;
 pub use addr::{PhysAddr, VirtAddr};
 
 /// The width of virtual addresses in bits for x86_64 architecture.
-pub const VIRTUAL_ADDRESS_WIDTH: usize = 48;
+pub const VIRTUAL_ADDRESS_WIDTH: u8 = 48;
 /// The width of physical addresses in bits for x86_64 architecture.
-pub const PHYSICAL_ADDRESS_WIDTH: usize = 52;
+pub const PHYSICAL_ADDRESS_WIDTH: u8 = 52;
 /// The number of bits used for indexing into page tables at each level.
 pub const TABLE_INDEX_BITS: usize = 9;
 /// The size of a page table in bytes for x86_64 architecture.
 pub const TABLE_SIZE: usize = 4096;
 /// The number of entries in a page table for x86_64 architecture.
 pub const ENTRY_COUNT: usize = TABLE_SIZE / core::mem::size_of::<u64>();
+/// A page table entry for x86_64 architecture, represented as a 64-bit value.
+pub type PageEntryType = u64;
 
 bitflags! {
     /// Page table entry flags for x86_64 architecture.

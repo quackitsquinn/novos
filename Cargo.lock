@@ -753,6 +753,8 @@ name = "nmm"
 version = "0.1.0"
 dependencies = [
  "bitflags 2.10.0",
+ "cake",
+ "thiserror",
  "x86_64",
 ]
 
