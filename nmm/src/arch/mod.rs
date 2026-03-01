@@ -45,36 +45,42 @@ pub const ENTRY_COUNT: usize = arch_impl::ENTRY_COUNT;
 // TODO: This functions will probably have more shared code between architectures than the public API,
 // so the functions shouldn't just instantly dip into the architecture-specific implementations,
 // but should have some shared code for common functionality, and then call into the architecture-specific implementations for the parts that are different between architectures. This will allow for more code reuse and less duplication between architectures, while still allowing for the necessary differences in implementation.
+
+#[inline(always)]
 pub(crate) unsafe fn init_unchecked(
     offset: VirtAddr,
     ranges: &'static [memory_map::Entry],
     scratch_range: (VirtAddr, u64),
 ) -> Result<(), MemError> {
-    todo!("todo")
+    unsafe { arch_impl::api::init_unchecked(offset, ranges, scratch_range) }
 }
 
+#[inline(always)]
 pub(crate) unsafe fn init_load_recursive(
     index: paging::PageTableIndex,
     phys_addr: PhysAddr,
 ) -> Result<(), MemError> {
-    todo!("todo")
+    unsafe { arch_impl::api::init_load_recursive(index, phys_addr) }
 }
 
+#[inline(always)]
 pub(crate) unsafe fn map_unchecked(
     virt_base: VirtAddr,
     phys_base: PhysAddr,
     byte_size: u64,
     flags: MapFlags,
 ) -> Result<(), MemError> {
-    todo!()
+    unsafe { arch_impl::api::map_unchecked(virt_base, phys_base, byte_size, flags) }
 }
 
+#[inline(always)]
 pub(crate) unsafe fn unmap_unchecked(virt_base: VirtAddr, byte_size: u64) -> Result<(), MemError> {
-    todo!()
+    unsafe { arch_impl::api::unmap_unchecked(virt_base, byte_size) }
 }
 
 /// Maps `byte_size` bytes of memory, returning the base virtual address of the mapped region. The physical memory for this mapping is allocated by the memory manager, and the mapping is created with the specified flags.
+#[inline(always)]
 #[must_use = "The returned virtual address must be freed with `unmap` when it is no longer needed to avoid memory leaks and ensure proper resource management."]
 pub(crate) unsafe fn alloc_paged(byte_size: u64, flags: MapFlags) -> Result<VirtAddr, MemError> {
-    todo!()
+    unsafe { arch_impl::api::alloc_paged(byte_size, flags) }
 }

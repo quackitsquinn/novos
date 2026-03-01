@@ -88,6 +88,36 @@ pub fn alloc_paged(byte_size: u64, flags: MapFlags) -> Result<VirtAddr, MemError
     unsafe { arch::alloc_paged(byte_size, flags) }
 }
 
+/// Allocates a virtual address range of the specified size without mapping it to any physical memory.
+#[must_use = "The returned virtual address must be freed with `free_virtspace` when it is no longer needed to avoid memory leaks and ensure proper resource management."]
+pub fn alloc_virtspace(byte_size: u64) -> Result<VirtAddr, MemError> {
+    todo!("bitmap allocator for virtual address space");
+}
+
+/// Frees a virtual address range of the specified size that was previously allocated with `alloc_virtspace`.
+///
+/// # Safety
+/// The caller must ensure that the provided virtual address range is not currently mapped to any physical memory and is not in use before freeing it,
+/// as freeing a virtual address range that is still in use can lead to undefined behavior such as use-after-free or memory corruption.
+pub unsafe fn free_virtspace(virt_base: VirtAddr, byte_size: u64) -> Result<(), MemError> {
+    check_range_virt(virt_base, byte_size)?;
+    todo!("bitmap allocator for virtual address space");
+}
+
+/// Maps a physical address range to a virtual address range of the specified size with the given flags, where the virtual address is allocated by the memory manager. This is a convenience function that combines `alloc_paged` and `map` into a single operation for ease of use.
+#[must_use = "The returned virtual address must be freed with `unmap` when it is no longer needed to avoid memory leaks and ensure proper resource management."]
+// TODO: how to handle freeing the virtspace allocated by this function?
+pub fn map_alloc(
+    phys_addr: PhysAddr,
+    byte_size: u64,
+    flags: MapFlags,
+) -> Result<VirtAddr, MemError> {
+    check_range_phys(phys_addr, byte_size)?;
+    let virt_addr = alloc_virtspace(byte_size)?;
+    unsafe { arch::map_unchecked(virt_addr, phys_addr, byte_size, flags) }?;
+    Ok(virt_addr)
+}
+
 /// An error that can occur during memory mapping operations, such as invalid addresses, insufficient resources, or permission issues. The specific variants of this error type can be defined based on the needs of the memory manager implementation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 #[non_exhaustive]
@@ -120,6 +150,16 @@ pub enum MemError {
     /// An error that originated from architecture-specific operations in the memory manager.
     #[error("An architecture-specific error occurred during memory management operations: {0}")]
     ArchError(#[from] arch::ArchError),
+    /// The provided scratch space for initialization is too small to be used for the necessary virtual memory operations during initialization and `alloc_paged`.
+    #[error(
+        "The provided scratch space is too small: provided {provided} bytes, but at least {required} bytes are required."
+    )]
+    ScratchSpaceTooSmall {
+        /// The size of the provided scratch space in bytes.
+        provided: u64,
+        /// The minimum required size of the scratch space in bytes.
+        required: u64,
+    },
 }
 
 fn check_range_virt(virt_base: VirtAddr, byte_size: u64) -> Result<(), MemError> {
@@ -146,6 +186,7 @@ fn check_range_phys(phys_base: PhysAddr, byte_size: u64) -> Result<(), MemError>
 
 bitflags! {
     /// Flags for memory mapping, such as read/write permissions and caching behavior.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct MapFlags: u64 {
         // PRESENT and it's forms are implicit by the usage of any map/alloc function
         // GLOBAL is similar, any allocation or mapping is implicitly global if it's in kernel space.

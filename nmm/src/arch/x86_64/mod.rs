@@ -1,6 +1,7 @@
 //! Architecture-specific types and implementations for x86_64.
 
 pub mod addr;
+pub(crate) mod api;
 
 use bitflags::bitflags;
 
