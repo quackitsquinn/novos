@@ -28,6 +28,7 @@ raw-cpuid = "11.6.0"
 modular-bitfield = "0.12.0"
 kelp = { path = "../kelp" }
 bitfield = "0.19.3"
+nmm = { path = "../nmm", features = ["x86_64"] }
 
 [lints]
 workspace = true

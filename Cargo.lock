@@ -574,6 +574,7 @@ dependencies = [
  "kserial",
  "lazy_static",
  "modular-bitfield",
+ "nmm",
  "paste",
  "pic8259",
  "raw-cpuid 11.6.0",

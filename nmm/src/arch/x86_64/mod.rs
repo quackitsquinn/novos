@@ -6,10 +6,16 @@ use bitflags::bitflags;
 
 pub use addr::{PhysAddr, VirtAddr};
 
+use crate::MapFlags;
+
 /// The width of virtual addresses in bits for x86_64 architecture.
 pub const VIRTUAL_ADDRESS_WIDTH: u8 = 48;
+/// The maximum valid virtual address for x86_64 architecture.
+pub const VIRTUAL_ADDRESS_MAX: u64 = (1 << VIRTUAL_ADDRESS_WIDTH) - 1;
 /// The width of physical addresses in bits for x86_64 architecture.
 pub const PHYSICAL_ADDRESS_WIDTH: u8 = 52;
+/// The maximum valid physical address for x86_64 architecture.
+pub const PHYSICAL_ADDRESS_MAX: u64 = (1 << PHYSICAL_ADDRESS_WIDTH) - 1;
 /// The number of bits used for indexing into page tables at each level.
 pub const TABLE_INDEX_BITS: usize = 9;
 /// The size of a page table in bytes for x86_64 architecture.
@@ -78,3 +84,6 @@ mod tests {
         ));
     }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum ArchError {}

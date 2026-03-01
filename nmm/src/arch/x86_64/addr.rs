@@ -34,6 +34,23 @@ impl PhysAddr {
     pub const fn as_u64(&self) -> u64 {
         self.0.as_u64()
     }
+
+    /// Adds the given offset to this virtual address, returning `None` if the result would overflow or be out of bounds for the architecture.
+    pub const fn add_checked(&self, offset: u64) -> Option<Self> {
+        // First, just add it, and if it overflows, return None.
+        // We can't short circuit this check, since this is a const function.
+        let res = match self.0.as_u64().checked_add(offset) {
+            Some(val) => val,
+            None => return None,
+        };
+
+        // Then, check if the result is a valid virtual address for the architecture. If not, return None.
+        if res > super::VIRTUAL_ADDRESS_MAX {
+            None
+        } else {
+            Some(PhysAddr(x86_64::PhysAddr::new_truncate(res)))
+        }
+    }
 }
 
 impl Deref for PhysAddr {
@@ -56,6 +73,7 @@ impl DerefMut for PhysAddr {
 pub struct VirtAddr(x86_64::VirtAddr);
 
 impl VirtAddr {
+    // TODO: Move these constants and some of the associated functions to a implementation in ::arch
     /// The bit width of virtual addresses on x86_64.
     pub const BIT_WIDTH: u8 = VIRTUAL_ADDRESS_WIDTH; // Note: 52 bit virtual addresses are *possible*, but it's so new that we'll stick with 48 for now.
     /// The start of the higher half in virtual address space.
@@ -82,9 +100,27 @@ impl VirtAddr {
     pub const fn as_usize(&self) -> usize {
         self.0.as_u64() as usize
     }
+
     /// Converts this virtual address to a physical address with a bitwise identical representation.
     pub const fn as_phys_addr(&self) -> PhysAddr {
         PhysAddr(x86_64::PhysAddr::new_truncate(self.as_u64()))
+    }
+
+    /// Adds the given offset to this virtual address, returning `None` if the result would overflow or be out of bounds for the architecture.
+    pub const fn add_checked(&self, offset: u64) -> Option<Self> {
+        // First, just add it, and if it overflows, return None.
+        // We can't short circuit this check, since this is a const function.
+        let res = match self.0.as_u64().checked_add(offset) {
+            Some(val) => val,
+            None => return None,
+        };
+
+        // Then, check if the result is a valid virtual address for the architecture. If not, return None.
+        if res > super::VIRTUAL_ADDRESS_MAX {
+            None
+        } else {
+            Some(VirtAddr(x86_64::VirtAddr::new_truncate(res)))
+        }
     }
 }
 
@@ -93,5 +129,26 @@ impl Deref for VirtAddr {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::PhysAddr;
+
+    #[test]
+    fn test_phys_addr_add_checked() {
+        let addr = PhysAddr::new(0x1000);
+        assert_eq!(addr.add_checked(0x1000), Some(PhysAddr::new(0x2000)));
+        assert_eq!(addr.add_checked(0xFFFFFFFFFFFFF000), None); // This would overflow
+        assert_eq!(addr.add_checked(0xFFFFFFFFFFFFE000), None); // This would be out of bounds
+    }
+
+    #[test]
+    fn test_virt_addr_add_checked() {
+        let addr = super::VirtAddr::new(0x1000);
+        assert_eq!(addr.add_checked(0x1000), Some(super::VirtAddr::new(0x2000)));
+        assert_eq!(addr.add_checked(0xFFFFFFFFFFFFF000), None); // This would overflow
+        assert_eq!(addr.add_checked(0xFFFFFFFFFFFFE000), None); // This would be out of bounds
     }
 }
