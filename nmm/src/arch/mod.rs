@@ -48,19 +48,21 @@ pub const ENTRY_COUNT: usize = arch_impl::ENTRY_COUNT;
 
 #[inline(always)]
 pub(crate) unsafe fn init_unchecked(
+    root: *mut (),
     offset: VirtAddr,
     ranges: &'static [memory_map::Entry],
     scratch_range: (VirtAddr, u64),
 ) -> Result<(), MemError> {
-    unsafe { arch_impl::api::init_unchecked(offset, ranges, scratch_range) }
+    unsafe { arch_impl::api::init_unchecked(root, offset, ranges, scratch_range) }
 }
 
 #[inline(always)]
 pub(crate) unsafe fn init_load_recursive(
+    root: *mut (),
     index: paging::PageTableIndex,
     phys_addr: PhysAddr,
 ) -> Result<(), MemError> {
-    unsafe { arch_impl::api::init_load_recursive(index, phys_addr) }
+    unsafe { arch_impl::api::init_load_recursive(root, index, phys_addr) }
 }
 
 #[inline(always)]

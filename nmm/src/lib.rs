@@ -14,18 +14,25 @@ pub mod paging;
 
 /// Initializes the memory manager.
 ///
+/// - `root` is a pointer to the root page table structure, which will be used as the base for all page table operations. The specific type and structure of this root page table is architecture-specific and will be defined in the architecture-specific implementation. This allows the memory manager to work with different page table formats and structures depending on the architecture being used.
 /// - `offset` is the virtual address offset where the physical memory is mapped in the virtual address space.
 /// - `ranges` is a slice of memory map entries provided by the bootloader, describing the physical memory layout and available memory regions.
 ///    Currently, this is hardcoded to use the limine memory map, but in the future this could be converted to a more generic format to allow for different bootloaders
 ///    or custom memory map formats.
 /// - `scratch_range` is a tuple containing a virtual address and size that's used as a backing for virtual memory operations during initialization, and for `alloc_paged`
 pub unsafe fn init(
+    root: *mut (),
     offset: VirtAddr,
     ranges: &'static [memory_map::Entry],
     scratch_range: (VirtAddr, u64),
 ) -> Result<(), MemError> {
     check_range_virt(scratch_range.0, scratch_range.1)?;
-    unsafe { arch::init_unchecked(offset, ranges, scratch_range) }
+    assert!(
+        !root.is_null(),
+        "The root page table pointer must not be null."
+    );
+
+    unsafe { arch::init_unchecked(root, offset, ranges, scratch_range) }
 }
 
 /// Enables recursive paging at the specified page table index, loading the given physical address into the architecture-specific register for the page table base address.
@@ -35,6 +42,7 @@ pub unsafe fn init(
 /// The caller must ensure that the recursive mapping is a. present and b. pointing towards `phys_addr` before enabling it,
 /// as enabling a recursive mapping that is not properly set up can lead to undefined behavior when accessing the page tables through the recursive mapping.
 pub unsafe fn load_recursive(
+    root: *mut (),
     index: paging::PageTableIndex,
     phys_addr: PhysAddr,
 ) -> Result<(), MemError> {
@@ -44,7 +52,12 @@ pub unsafe fn load_recursive(
             size: arch::TABLE_SIZE as u64,
         });
     }
-    unsafe { arch::init_load_recursive(index, phys_addr) }
+    assert!(
+        !root.is_null(),
+        "The root page table pointer must not be null."
+    );
+
+    unsafe { arch::init_load_recursive(root, index, phys_addr) }
 }
 
 /// Maps a virtual address range to a physical address range with the specified size

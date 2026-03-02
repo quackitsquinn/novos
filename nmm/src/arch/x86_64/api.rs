@@ -1,4 +1,5 @@
 use cake::limine::memory_map;
+use x86_64::structures::paging::OffsetPageTable;
 
 use crate::{
     MapFlags, MemError,
@@ -7,14 +8,16 @@ use crate::{
 };
 
 pub(crate) unsafe fn init_unchecked(
+    root: *mut (),
     offset: VirtAddr,
     ranges: &'static [memory_map::Entry],
     scratch_range: (VirtAddr, u64),
 ) -> Result<(), MemError> {
-    todo!("todo")
+    todo!()
 }
 
 pub(crate) unsafe fn init_load_recursive(
+    root: *mut (),
     index: PageTableIndex,
     phys_addr: PhysAddr,
 ) -> Result<(), MemError> {
