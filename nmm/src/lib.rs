@@ -1,5 +1,6 @@
 //! nmm - Novos Memory Manager Library
 #![cfg_attr(not(test), no_std)]
+#![feature(ptr_alignment_type)]
 
 use bitflags::bitflags;
 use cake::limine::{self, memory_map};
@@ -10,6 +11,7 @@ use crate::arch::{PhysAddr, VirtAddr};
 compile_error!("Only x86_64 architecture is currently supported.");
 
 pub mod arch;
+pub mod entry_walker;
 pub mod paging;
 
 /// Initializes the memory manager.

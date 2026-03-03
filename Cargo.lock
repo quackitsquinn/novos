@@ -753,6 +753,7 @@ dependencies = [
 name = "nmm"
 version = "0.1.0"
 dependencies = [
+ "arrayvec",
  "bitflags 2.10.0",
  "cake",
  "thiserror",

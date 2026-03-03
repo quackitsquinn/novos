@@ -83,10 +83,14 @@ pub(crate) unsafe fn init_kernel_services() {
         panic!("init_kernel_services called more than once");
     }
     INIT.blow();
-
     serial::MODULE.init();
     output::MODULE.init();
     requests::MODULE.init();
+    info!(
+        "Detected {:X} bytes of useable memory!",
+        nmm::entry_walker::EntryWalker::new(requests::MEMORY_MAP.lock_limine().entries())
+            .usable_memory()
+    );
     panic::MODULE.init();
     gdt::MODULE.init();
     interrupts::MODULE.init();

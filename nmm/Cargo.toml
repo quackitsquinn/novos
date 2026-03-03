@@ -8,6 +8,7 @@ bitflags = "2.10.0"
 x86_64 = { version = "0.15.4", optional = true }
 cake = {path = "../cake"}
 thiserror = { version = "2.0.3", default-features = false }
+arrayvec = { version = "0.7.6", default-features = false }
 
 [lints]
 workspace = true
