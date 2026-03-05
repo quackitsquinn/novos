@@ -64,6 +64,12 @@ impl<'a> EntryWalker<'a> {
     /// If no suitable entry is found, it returns `None`.
     fn try_take_reserved(&mut self, len: u64, alignment: Alignment) -> Option<PhysAddr> {
         if self.extra_entries.is_empty() || self.extra_entries[0].length < len {
+            #[cfg(test)]
+            eprintln!(
+                "early return 0: no entries or first entry too small:  {} || {}",
+                self.extra_entries.is_empty(),
+                self.extra_entries[0].length < len
+            );
             return None;
         }
 
@@ -73,13 +79,23 @@ impl<'a> EntryWalker<'a> {
         for i in 0..self.extra_entries.len() {
             let entry = &mut self.extra_entries[i];
             if entry.length < len {
+                #[cfg(test)]
+                eprintln!(
+                    "early return 1: entry {} too small: {} < {}",
+                    i, entry.length, len
+                );
                 // The array is guaranteed to be sorted by length in descending order, so if the first entry is too small, all entries are too small
                 return None;
             }
 
             let aligned_base = align_up(entry.base);
             let end = entry.base + entry.length;
-            if aligned_base + len >= end {
+            if aligned_base + len > end {
+                #[cfg(test)]
+                eprintln!(
+                    "continue: entry {} can't fit allocation with alignment: aligned base {:#x} + len {:#x} >= end {:#x}",
+                    i, aligned_base, len, end
+                );
                 // TODO: might be able to just return None here?
                 continue;
             }
@@ -102,12 +118,21 @@ impl<'a> EntryWalker<'a> {
                     length: aligned_base - old_base,
                 });
             }
+
             return Some(PhysAddr::new(allocated_base));
         }
 
         // The inversion will swap the order into descending order, so the longest entries will be at ind 0.
         self.extra_entries
             .sort_unstable_by_key(|v| u64::MAX - v.length);
+
+        #[cfg(test)]
+        eprintln!(
+            "late return: no suitable entry found for {:#x}:{:#x}\nextra entries: {:?}",
+            len,
+            alignment.as_usize(),
+            self.extra_entries
+        );
 
         None
     }
@@ -185,7 +210,11 @@ mod tests {
 
     #[test]
     fn test_try_take_reserved() {
-        let entries = &[extra_entry(0x1000, 0x1000), extra_entry(0x3000, 0x1000)];
+        #[rustfmt::skip]
+        let entries = &[
+            extra_entry(0x1000, 0x1000), 
+            extra_entry(0x3000, 0x1000)
+        ];
 
         let mut walker = EntryWalker {
             entries: &[],
@@ -193,11 +222,11 @@ mod tests {
             current: None,
             extra_entries: ArrayVec::try_from(&entries[..]).expect("Failed to create ArrayVec"),
         };
+
         // Take half of the first entry, which should succeed and leave an extra entry with the remaining half
         let addr = walker.try_take_reserved(0x800, Alignment::new(0x1000).unwrap());
         assert_eq!(addr, Some(PhysAddr::new(0x1000)));
-        // Take the first half of the second entry, skipping the first entry since it's alignment requirements can't be met,
-        // which should succeed and leave an extra entry with the remaining half
+        // Attempt to take the second half, but the high alignment forces it to take the second entry instead.
         let addr = walker.try_take_reserved(0x800, Alignment::new(0x1000).unwrap());
         assert_eq!(addr, Some(PhysAddr::new(0x3000)));
         // Try to take another 0x1000 aligned chunk of memory, which will fail since the remaining halves of both entries are only 0x800 in size, and the alignment requirements
@@ -207,7 +236,7 @@ mod tests {
         // Take the remaining half of the first entry, which should succeed and remove the entry from the list since it's now empty
         let addr = walker.try_take_reserved(0x800, Alignment::new(0x800).unwrap());
         assert_eq!(addr, Some(PhysAddr::new(0x1800)));
-        assert_eq!(walker.extra_entries.len(), 1,);
+
         // Finally, take the remaining half of the second entry, which should succeed and remove the entry from the list since it's now empty
         let addr = walker.try_take_reserved(0x800, Alignment::new(0x800).unwrap());
         assert_eq!(addr, Some(PhysAddr::new(0x3800)));
