@@ -213,6 +213,11 @@ impl<'a> EntryWalker<'a> {
             return self.next(len, alignment);
         }
 
+        if aligned_base > current_entry.base {
+            // If there is a gap between the original base and the aligned base, we can add an extra entry for that gap
+            self.extra_entries.push(current_entry.into());
+        }
+
         current_entry.base += len;
         current_entry.length -= len;
 
@@ -361,7 +366,7 @@ mod tests {
         ];
         let mut walker = EntryWalker::from_limine_entries(entries);
         assert_eq!(walker.next_entry(), Some(*entries[1]));
-        assert_eq!(walker.next_entry(), Some(*entries[3]));
+        assert_eq!(walker.next_entry(), None);
         if walker.next_entry().is_some() {
             panic!("Expected no more entries");
         }
@@ -384,6 +389,36 @@ mod tests {
         assert_eq!(
             walker.next(0x10, Alignment::new(0x10).unwrap()),
             Some(PhysAddr::new(0xE0))
+        );
+    }
+
+    #[test]
+    fn test_next_simple() {
+        let entries = &[
+            &make_entry(0x0, 0x20, EntryType::RESERVED),
+            &make_entry(0x20, 0x20, EntryType::USABLE),
+        ];
+
+        let mut walker = EntryWalker::from_limine_entries(entries);
+        assert_eq!(
+            walker.next(0x10, Alignment::new(0x10).unwrap()),
+            Some(PhysAddr::new(0x20))
+        );
+    }
+
+    #[test]
+    fn test_next_alignment() {
+        let entries = &[&make_entry(0x1, 0x20, EntryType::USABLE)];
+
+        let mut walker = EntryWalker::from_limine_entries(entries);
+        assert_eq!(
+            walker.next(0x10, Alignment::new(0x10).unwrap()),
+            Some(PhysAddr::new(0x10))
+        );
+        assert!(!walker.extra_entries.is_empty(),);
+        assert_eq!(
+            walker.next(0xF, Alignment::new(0x1).unwrap()),
+            Some(PhysAddr::new(0x1)),
         );
     }
 }
