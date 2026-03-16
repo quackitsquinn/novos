@@ -1,5 +1,6 @@
 //! Address primitives for x86_64 architecture.
 
+use core::ops::Add;
 use core::ops::Sub;
 use core::ops::{Deref, DerefMut};
 
@@ -129,6 +130,22 @@ impl Deref for VirtAddr {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl Add for VirtAddr {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        self.add_checked(rhs.as_u64()).expect("address overflow")
+    }
+}
+
+impl Add<u64> for VirtAddr {
+    type Output = Self;
+
+    fn add(self, rhs: u64) -> Self::Output {
+        self.add_checked(rhs).expect("address overflow")
     }
 }
 

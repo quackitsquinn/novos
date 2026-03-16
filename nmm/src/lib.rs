@@ -11,30 +11,35 @@ use crate::arch::{PhysAddr, VirtAddr};
 compile_error!("Only x86_64 architecture is currently supported.");
 
 pub mod arch;
+pub mod bitmap;
 pub mod entry_walker;
 pub mod paging;
 
 /// Initializes the memory manager.
 ///
-/// - `root` is a pointer to the root page table structure, which will be used as the base for all page table operations. The specific type and structure of this root page table is architecture-specific and will be defined in the architecture-specific implementation. This allows the memory manager to work with different page table formats and structures depending on the architecture being used.
+/// - `root` is a pointer to the root page table structure, which will be used as the base for all page table operations. The specific type and
+///          structure of this root page table is architecture-specific and will be defined in the architecture-specific implementation.
+///          This allows the memory manager to work with different page table formats and structures depending on the architecture being used.
 /// - `offset` is the virtual address offset where the physical memory is mapped in the virtual address space.
 /// - `ranges` is a slice of memory map entries provided by the bootloader, describing the physical memory layout and available memory regions.
 ///    Currently, this is hardcoded to use the limine memory map, but in the future this could be converted to a more generic format to allow for different bootloaders
 ///    or custom memory map formats.
-/// - `scratch_range` is a tuple containing a virtual address and size that's used as a backing for virtual memory operations during initialization, and for `alloc_paged`
+/// - `managed_range` is a tuple containing the starting virtual address and size of a range of virtual memory manager will manage.
+///   This range is used for virtual address allocation (e.g., for `alloc_virtspace`) and physical memory mapping (e.g., for `alloc_paged`),
+///   as well as internal memory management state.
 pub unsafe fn init(
     root: *mut (),
     offset: VirtAddr,
     ranges: &'static [memory_map::Entry],
-    scratch_range: (VirtAddr, u64),
+    managed_range: (VirtAddr, u64),
 ) -> Result<(), MemError> {
-    check_range_virt(scratch_range.0, scratch_range.1)?;
+    check_range_virt(managed_range.0, managed_range.1)?;
     assert!(
         !root.is_null(),
         "The root page table pointer must not be null."
     );
 
-    unsafe { arch::init_unchecked(root, offset, ranges, scratch_range) }
+    unsafe { arch::init_unchecked(root, offset, ranges, managed_range) }
 }
 
 /// Enables recursive paging at the specified page table index, loading the given physical address into the architecture-specific register for the page table base address.

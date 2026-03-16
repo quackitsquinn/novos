@@ -1,3 +1,4 @@
+//! A helper struct for iterating over memory map entries and calculating the total usable memory.
 use core::fmt::Debug;
 use core::{alloc::Layout, ptr::Alignment};
 use core::{mem, slice};
