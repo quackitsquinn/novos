@@ -7,8 +7,6 @@ use bitflags::bitflags;
 
 pub use addr::{PhysAddr, VirtAddr};
 
-use crate::MapFlags;
-
 /// The width of virtual addresses in bits for x86_64 architecture.
 pub const VIRTUAL_ADDRESS_WIDTH: u8 = 48;
 /// The maximum valid virtual address for x86_64 architecture.
@@ -86,5 +84,7 @@ mod tests {
     }
 }
 
+/// An error that originate from architecture-specific operations in the memory manager. This is the error type for x86_64 architecture.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
 pub enum ArchError {}

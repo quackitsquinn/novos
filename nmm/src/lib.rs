@@ -3,7 +3,7 @@
 #![feature(ptr_alignment_type)]
 
 use bitflags::bitflags;
-use cake::limine::{self, memory_map};
+use cake::limine::memory_map;
 
 use crate::arch::{PhysAddr, VirtAddr};
 
@@ -110,7 +110,7 @@ pub fn alloc_paged(byte_size: u64, flags: MapFlags) -> Result<VirtAddr, MemError
 
 /// Allocates a virtual address range of the specified size without mapping it to any physical memory.
 #[must_use = "The returned virtual address must be freed with `free_virtspace` when it is no longer needed to avoid memory leaks and ensure proper resource management."]
-pub fn alloc_virtspace(byte_size: u64) -> Result<VirtAddr, MemError> {
+pub fn alloc_virtspace(_byte_size: u64) -> Result<VirtAddr, MemError> {
     todo!("bitmap allocator for virtual address space");
 }
 

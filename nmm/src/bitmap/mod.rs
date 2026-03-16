@@ -1,14 +1,19 @@
 //! Bitmap virtual memory manager.
 
+use core::fmt::Debug;
 use core::ptr::Alignment;
 
-use crate::arch::{self, VirtAddr};
+use crate::{
+    arch::{self, VirtAddr},
+    bitmap::state::AllocationStateMachine,
+};
 
 mod state;
 
 type Container = u64; // Each bit in this type represents the allocation status of a page. Using u64 allows us to track 64 pages per entry in the bitmap.
 
-#[derive(Debug)]
+/// A bitmap-based virtual memory manager that tracks the allocation status of pages using a bitmap data structure.
+/// Each bit in the bitmap represents whether a corresponding page is allocated or free.
 pub struct Bitmap<'a> {
     /// The bitmap data, where each bit represents the allocation status of a page.
     pub data: &'a mut [Container],
@@ -36,33 +41,6 @@ impl BitPtr {
 
 const ENTRY_SIZE: u64 = arch::TABLE_SIZE * 64;
 
-/// The states of the state machine used during allocation.
-enum AllocationScanState {
-    /// Scanning for a free range of pages that satisfies the allocation request.
-    Scanning,
-    // Currently allocating a range larger than `ENTRY_SIZE`, which means we are allocating whole entries in the bitmap.
-    // this allows for very fast allocation of large ranges of pages, since we can just check if an entry is zero (fully free) or not, and skip over it if it's not.
-    // down the line this can be extended to use SIMD instructions to check multiple entries at once for even faster allocation of large ranges.
-    // right now for a 2MiB allocation, it would check and set 8 entries in the bitmap, but 2GiB allocations take 4k entries, which is a lot.
-    Allocating {
-        start: BitPtr,
-        len_remaining: usize,
-    },
-    // We found memory and do not need to continue scanning.
-    Found {
-        start: BitPtr,
-    },
-}
-
-struct AllocationStateMachine<'a> {
-    size: u64,              // The total size of the allocation request in bytes
-    align: u64,             // The alignment requirement for the allocation in bytes
-    entry_skip: usize,      // Number of entries to skip for alignment
-    page_align: usize,      // Alignment in pages
-    entry: u64,             // Current entry being scanned
-    entry_ref: &'a mut u64, // Reference to the current entry in the bitmap data
-}
-
 impl<'a> Bitmap<'a> {
     /// Initializes the bitmap with the given data slice and page count. The bitmap is cleared to mark all pages as free.
     ///
@@ -86,11 +64,6 @@ impl<'a> Bitmap<'a> {
         }
     }
 
-    fn index_for_addr(&self, addr: VirtAddr) -> usize {
-        let page_index = (addr.as_u64() - self.base.as_u64()) / arch::TABLE_SIZE;
-        page_index as usize
-    }
-
     fn addr_for_index(&self, index: usize) -> VirtAddr {
         self.base
             .add_checked(index as u64 * arch::TABLE_SIZE)
@@ -101,16 +74,12 @@ impl<'a> Bitmap<'a> {
         self.addr_for_index(bitptr.entry_index * 64 + bitptr.bit_index)
     }
 
-    fn bitptr_for_addr(&self, addr: VirtAddr) -> BitPtr {
-        let index = self.index_for_addr(addr);
-        BitPtr::new(index / 64, index % 64)
-    }
-
     /// Allocates a contiguous range of pages with the specified length and alignment.
     /// The length is specified in bytes, and the alignment is also specified in bytes (e.g., 4096 for page-aligned).
     /// The function returns the virtual address of the allocated range if successful, or `None` if there is not enough free space to satisfy the allocation request.
-    pub fn alloc(&mut self, len: usize, align: Alignment) -> Option<VirtAddr> {
-        todo!()
+    pub fn alloc(&'a mut self, len: usize, align: Alignment) -> Option<VirtAddr> {
+        let mut state_machine = AllocationStateMachine::new(len as u64, align, self);
+        state_machine.run()
     }
 
     /// Frees a previously allocated range of pages starting at the given virtual address and spanning the specified length in bytes.
@@ -118,7 +87,24 @@ impl<'a> Bitmap<'a> {
     /// # Safety
     /// The caller must ensure that the provided virtual address and length correspond to a valid allocated range of pages that was previously allocated by this bitmap. A
     /// Additionally, the caller must ensure that the range being freed is not currently being accessed or modified by other parts of the code while it is being freed, as this could lead to undefined behavior.
-    pub unsafe fn free(&mut self, addr: VirtAddr, len: usize) {}
+    pub unsafe fn free(&mut self, _addr: VirtAddr, _len: usize) {}
+}
+
+impl Debug for Bitmap<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "Bitmap [")?;
+        let allocated = self
+            .data
+            .iter()
+            .fold(0, |i, entry| i + entry.count_ones() as usize);
+        let free = self.page_count - allocated;
+        let utilization = allocated as f64 / self.page_count as f64 * 100.0;
+        write!(
+            f,
+            "allocated: {}, free: {}, {} utilization]",
+            allocated, free, utilization
+        )
+    }
 }
 
 #[cfg(test)]

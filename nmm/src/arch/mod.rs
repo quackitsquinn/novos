@@ -7,7 +7,7 @@ use x86_64 as arch_impl;
 
 use crate::{
     MapFlags, MemError,
-    paging::{self, StructureLayout, Table},
+    paging::{self},
 };
 
 /// Physical address type for the current architecture.

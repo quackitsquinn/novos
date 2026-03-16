@@ -1,11 +1,9 @@
 //! Address primitives for x86_64 architecture.
 
 use core::ops::Add;
-use core::ops::Sub;
 use core::ops::{Deref, DerefMut};
 
-use crate::paging::Table;
-use crate::{arch::x86_64::VIRTUAL_ADDRESS_WIDTH, paging::StructureLayout};
+use crate::arch::x86_64::VIRTUAL_ADDRESS_WIDTH;
 
 // You might wonder why we don't just re-export x86_64::PhysAddr and x86_64::VirtAddr directly.
 // There are a few reasons for this:

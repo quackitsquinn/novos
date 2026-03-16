@@ -1,6 +1,6 @@
 //! A helper struct for iterating over memory map entries and calculating the total usable memory.
 use core::fmt::Debug;
-use core::{alloc::Layout, ptr::Alignment};
+use core::ptr::Alignment;
 use core::{mem, slice};
 
 use arrayvec::ArrayVec;
@@ -59,6 +59,7 @@ impl<'a> EntryWalker<'a> {
     }
 
     /// Creates a new `EntryWalker` with the given slice of Limine memory map entries.
+    #[cfg(test)]
     pub(crate) fn from_limine_entries(entries: &'a [&'a LimineEntry]) -> Self {
         Self {
             entries,

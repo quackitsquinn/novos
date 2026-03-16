@@ -31,6 +31,7 @@ enum SkipStrategy {
     /// Skip to the next entry that is aligned for the allocation request.
     NextAligned,
     /// Skip a specific number of entries, which is determined based on the current state and the bitmap entry at the given index.
+    #[allow(dead_code)] // for now..
     N(u64),
 }
 
@@ -77,6 +78,22 @@ impl<'a> AllocationStateMachine<'a> {
     /// Steps the state machine forward once, checking the bitmap entry at the given index.
     fn do_step(&mut self, index: usize) -> Result<VirtAddr, SkipStrategy> {
         Self::step(self.bitmap, &self.info, &mut self.scan_state, index)
+    }
+
+    pub fn run(&mut self) -> Option<VirtAddr> {
+        let mut index = 0;
+        while index < self.bitmap.data.len() {
+            match self.do_step(index) {
+                Ok(addr) => return Some(addr),
+                Err(SkipStrategy::Next) => index += 1,
+                Err(SkipStrategy::NextAligned) => {
+                    let align_mask = self.info.entry_align - 1;
+                    index = (index + self.info.entry_align as usize) & !(align_mask as usize);
+                }
+                Err(SkipStrategy::N(n)) => index += n as usize,
+            }
+        }
+        None
     }
 
     /// Steps the state machine forward once, checking the bitmap entry at the given index.
