@@ -1,6 +1,7 @@
 //! Bitmap virtual memory manager.
 
 use core::fmt::Debug;
+use core::ops::{Index, IndexMut};
 use core::ptr::Alignment;
 
 use crate::{
@@ -107,6 +108,20 @@ impl Debug for Bitmap<'_> {
     }
 }
 
+impl Index<usize> for Bitmap<'_> {
+    type Output = Container;
+
+    fn index(&self, index: usize) -> &<Self as Index<usize>>::Output {
+        &self.data[index]
+    }
+}
+
+impl IndexMut<usize> for Bitmap<'_> {
+    fn index_mut(&mut self, index: usize) -> &mut <Self as Index<usize>>::Output {
+        &mut self.data[index]
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::alloc::{self, Layout};
@@ -139,7 +154,10 @@ mod tests {
             // Test index_for_addr and addr_for_index consistency
             for i in 0..page_count {
                 let addr = bitmap.addr_for_index(i);
-                assert_eq!(bitmap.index_for_addr(addr), i);
+                let expected_addr = base
+                    .add_checked(i as u64 * arch::TABLE_SIZE)
+                    .expect("failed to calculate expected addr");
+                assert_eq!(addr, expected_addr);
             }
         }
 

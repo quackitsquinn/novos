@@ -110,6 +110,11 @@ impl<'a> AllocationStateMachine<'a> {
     ) -> Result<VirtAddr, SkipStrategy> {
         let state = *state_ref;
         let entry = bitmap.data[index];
+        #[cfg(test)]
+        println!(
+            "index: {}, entry: {entry:b}, state: {:?}, info: {:?}",
+            index, state, info
+        );
         match state {
             ScanState::Allocating {
                 start,
@@ -131,7 +136,7 @@ impl<'a> AllocationStateMachine<'a> {
                 start,
                 remaining_size,
             } => {
-                let needed_mask = range_mask(remaining_size);
+                let needed_mask = range_mask(bytes_to_pages(remaining_size));
                 if entry & needed_mask != 0 {
                     *state_ref = ScanState::Scanning; // Not enough free pages in this entry, go back to scanning
                     return Err(SkipStrategy::NextAligned); // Skip to the next aligned entry
@@ -145,20 +150,21 @@ impl<'a> AllocationStateMachine<'a> {
             ScanState::Scanning if entry == u64::MAX => {
                 return Err(SkipStrategy::NextAligned); // This entry is fully allocated, so skip to the next aligned entry
             }
-            ScanState::Scanning if info.size > ENTRY_SIZE => {
+            ScanState::Scanning if info.size > ENTRY_SIZE && info.align >= arch::TABLE_SIZE => {
                 // We need to allocate more than one entry, so we check if this entry is fully free and properly aligned for the allocation. If so, we can start allocating.
                 // TODO: Longer check when len > ENTRY_SIZE but align < ENTRY_SIZE
                 if entry != 0 {
                     return Err(SkipStrategy::NextAligned); // Not free, skip to the next aligned entry
                 }
                 debug_assert!(
-                    index % info.entry_align as usize != 0,
+                    bitmap.addr_for_index(index).as_u64() % info.align == 0,
                     "Bitmap is not properly aligned for this allocation request"
                 );
                 *state_ref = ScanState::Allocating {
                     start: BitPtr::new(index, 0),
-                    remaining_size: info.size,
+                    remaining_size: info.size - ENTRY_SIZE,
                 };
+                bitmap.data[index] = u64::MAX; // Mark this entry as fully allocated in the bitmap
                 return Err(SkipStrategy::Next); // We just checked this entry, so check the next one
             }
             ScanState::Scanning if info.needed_pages <= info.page_align => {
@@ -260,7 +266,10 @@ mod tests {
         arch::{self, VirtAddr},
         bitmap::{
             BitPtr, Bitmap,
-            state::{AllocationInfo, AllocationStateMachine, ScanState, SkipStrategy},
+            state::{
+                AllocationInfo, AllocationStateMachine, ScanState, SkipStrategy, range_mask,
+                rep_mask,
+            },
             tests::OwnedBitmap,
         },
     };
@@ -312,7 +321,7 @@ mod tests {
         alignment: usize,
     ) -> AllocationStateMachine<'a> {
         AllocationStateMachine::new(
-            arch::TABLE_SIZE,
+            size,
             Alignment::new(alignment).expect("state_machine: alignment not power of 2"),
             bitmap,
         )
@@ -359,5 +368,60 @@ mod tests {
         assert_eq!(res, Err(SkipStrategy::NextAligned));
         let res = state_machine.do_step(1);
         assert_eq!(res, Ok(TEST_BASE + (arch::TABLE_SIZE as u64 * 64)));
+    }
+
+    #[test]
+    fn test_alloc_entry_unaligned_gt_entry() {
+        let mut owner = OwnedBitmap::new(4, TEST_BASE);
+        let mut bitmap = owner.bitmap();
+        let mut state_machine =
+            state_machine(bitmap, arch::TABLE_SIZE * 65, arch::TABLE_SIZE as usize);
+
+        let res = state_machine.do_step(0);
+
+        assert_eq!(res, Err(SkipStrategy::Next));
+        assert_eq!(
+            state_machine.scan_state,
+            ScanState::Allocating {
+                start: BitPtr::new(0, 0),
+                remaining_size: arch::TABLE_SIZE
+            }
+        );
+        assert_eq!(state_machine.bitmap.data[0], u64::MAX); // The first entry should be fully allocated
+
+        // Step through the next entry, which should satisfy the allocation request
+        let res = state_machine.do_step(1);
+        assert_eq!(res, Ok(TEST_BASE));
+        assert_eq!(
+            state_machine.scan_state,
+            ScanState::Found {
+                start: BitPtr::new(0, 0)
+            },
+        );
+        assert_eq!(
+            state_machine.bitmap.data[1], 0b1,
+            "0b{:b} != 0b1",
+            state_machine.bitmap.data[1]
+        ); // The second entry should have one bit set
+    }
+
+    #[test]
+    fn test_alloc_entry_aligned_lt_entry() {
+        let mut owner = OwnedBitmap::new(4, TEST_BASE);
+        let mut bitmap = owner.bitmap();
+        bitmap[0] = range_mask(9);
+        let mut state_machine =
+            state_machine(bitmap, arch::TABLE_SIZE / 2, arch::TABLE_SIZE as usize * 4);
+
+        let res = state_machine.do_step(0);
+
+        assert_eq!(res, Ok(TEST_BASE + (12 * arch::TABLE_SIZE as u64)));
+        assert_eq!(
+            state_machine.scan_state,
+            ScanState::Found {
+                start: BitPtr::new(0, 12)
+            },
+        );
+        assert_eq!(state_machine.bitmap.data[0], range_mask(9) | 0b1 << 12); // The first bit of the first entry should be set
     }
 }
