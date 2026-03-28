@@ -18,10 +18,6 @@ enum ScanState {
         start: BitPtr,
         remaining_size: u64,
     },
-    // We found memory and do not need to continue scanning.
-    Found {
-        start: BitPtr,
-    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -76,24 +72,127 @@ impl<'a> AllocationStateMachine<'a> {
     }
 
     /// Steps the state machine forward once, checking the bitmap entry at the given index.
-    fn do_step(&mut self, index: usize) -> Result<VirtAddr, SkipStrategy> {
+    fn do_step(&mut self, index: u64) -> Result<VirtAddr, SkipStrategy> {
         Self::step(self.bitmap, &self.info, &mut self.scan_state, index)
+            .map(|f| self.bitmap.addr_for_bitptr(f))
     }
 
     pub fn run(&mut self) -> Option<VirtAddr> {
         let mut index = 0;
-        while index < self.bitmap.data.len() {
+        while index < self.bitmap.data.len() as u64 {
             match self.do_step(index) {
                 Ok(addr) => return Some(addr),
                 Err(SkipStrategy::Next) => index += 1,
                 Err(SkipStrategy::NextAligned) => {
                     let align_mask = self.info.entry_align - 1;
-                    index = (index + self.info.entry_align as usize) & !(align_mask as usize);
+                    index = (index + self.info.entry_align) & !(align_mask);
                 }
-                Err(SkipStrategy::N(n)) => index += n as usize,
+                Err(SkipStrategy::N(n)) => index += n,
             }
         }
         None
+    }
+
+    fn handle_allocation(
+        start: BitPtr,
+        remaining_size: u64,
+        bitmap: &mut Bitmap,
+        state_ref: &mut ScanState,
+        index: u64,
+    ) -> Result<BitPtr, SkipStrategy> {
+        let entry = bitmap.data[index as usize];
+
+        if remaining_size > ENTRY_SIZE {
+            // This allocation will take all of this entry, so we just check if it's zero and bump the length remaining
+            if entry != 0 {
+                *state_ref = ScanState::Scanning; // Not free, go back to scanning
+                return Err(SkipStrategy::NextAligned); // Skip to the next aligned entry
+            }
+
+            *state_ref = ScanState::Allocating {
+                start,
+                remaining_size: remaining_size - ENTRY_SIZE,
+            };
+            return Err(SkipStrategy::Next); // We don't care about alignment, so just check the next entry
+        }
+
+        let needed_mask = range_mask(bytes_to_pages(remaining_size));
+        if entry & needed_mask != 0 {
+            *state_ref = ScanState::Scanning; // Not enough free pages in this entry, go back to scanning
+            return Err(SkipStrategy::NextAligned); // Skip to the next aligned entry
+        }
+
+        Ok(start)
+    }
+
+    fn scan(
+        bitmap: &mut Bitmap,
+        info: &AllocationInfo,
+        state_ref: &mut ScanState,
+        index: u64,
+    ) -> Result<BitPtr, SkipStrategy> {
+        let entry = bitmap.data[index as usize];
+        if entry == u64::MAX {
+            return Err(SkipStrategy::NextAligned); // This entry is fully allocated, so skip to the next aligned entry
+        }
+
+        if info.size > ENTRY_SIZE && info.align >= arch::TABLE_SIZE {
+            // We need to allocate more than one entry, so we check if this entry is fully free and properly aligned for the allocation. If so, we can start allocating.
+            // TODO: Longer check when len > ENTRY_SIZE but align < ENTRY_SIZE
+            if entry != 0 {
+                return Err(SkipStrategy::NextAligned); // Not free, skip to the next aligned entry
+            }
+            debug_assert!(
+                bitmap.addr_for_index(index).as_u64() % info.align == 0,
+                "Bitmap is not properly aligned for this allocation request"
+            );
+            *state_ref = ScanState::Allocating {
+                start: BitPtr::new(index, 0),
+                remaining_size: info.size - ENTRY_SIZE,
+            };
+
+            return Err(SkipStrategy::Next); // We just checked this entry, so check the next one
+        }
+
+        if info.needed_pages <= info.page_align && info.page_align <= 64 {
+            let free_mask = !entry; // Invert the entry to get a mask of the free pages
+            let range_mask = range_mask(info.needed_pages); // Mask for the number of pages we need to allocate
+            let repeated_mask = rep_mask(range_mask, info.page_align); // Create a mask that has the needed number of bits set for the allocation, repeated to fill a u64
+            let mask = repeated_mask & free_mask; // Mask of the free bits that also satisfy the alignment
+            if mask == 0 {
+                return Err(SkipStrategy::NextAligned); // No suitable free range in this entry, just check the next entry
+            }
+
+            for i in 0..((size_of::<u64>() as u64) * 8) / info.page_align {
+                let bit_index = i * info.page_align;
+                let positioned_mask = range_mask << bit_index; // Mask for the current position in the entry
+                if mask & (positioned_mask) != 0 {
+                    let start_val = BitPtr::new(index, bit_index as u8);
+                    return Ok(start_val);
+                }
+            }
+
+            return Err(SkipStrategy::NextAligned); // We just checked this entry, so check the next one
+        }
+
+        let needed_mask = range_mask(info.needed_pages); // Mask for the number of pages
+
+        // TODO: something using leading_zeros to find the first free bit
+        for bit_index in (0..64).step_by(info.page_align as usize) {
+            let positioned_mask = needed_mask << bit_index; // Mask for the current position in the entry
+            if entry & positioned_mask == 0 {
+                if bit_index + info.needed_pages > 64 {
+                    *state_ref = ScanState::Allocating {
+                        start: BitPtr::new(index, bit_index as u8),
+                        remaining_size: info.size - (64 - bit_index) * arch::TABLE_SIZE,
+                    }; // We will allocate the rest of this entry, but we still have remaining size to allocate}
+                    return Err(SkipStrategy::Next);
+                }
+                return Ok(BitPtr::new(index, bit_index as u8));
+            }
+        }
+
+        return Err(SkipStrategy::NextAligned); // We just checked this entry, so check the next one
     }
 
     /// Steps the state machine forward once, checking the bitmap entry at the given index.
@@ -106,123 +205,40 @@ impl<'a> AllocationStateMachine<'a> {
         bitmap: &mut Bitmap,
         info: &AllocationInfo,
         state_ref: &mut ScanState,
-        index: usize,
-    ) -> Result<VirtAddr, SkipStrategy> {
+        index: u64,
+    ) -> Result<BitPtr, SkipStrategy> {
         let state = *state_ref;
-        let entry = bitmap.data[index];
+
         #[cfg(test)]
         println!(
-            "index: {}, entry: {entry:b}, state: {:?}, info: {:?}",
-            index, state, info
+            "index: {}, entry: {:b}, state: {:?}, info: {:?}",
+            index, bitmap.data[index as usize], state, info
         );
-        match state {
+
+        let res: BitPtr = match state {
             ScanState::Allocating {
                 start,
                 remaining_size,
-            } if remaining_size > ENTRY_SIZE => {
-                // This allocation will take all of this entry, so we just check if it's zero and bump the length remaining
-                if entry != 0 {
-                    *state_ref = ScanState::Scanning; // Not free, go back to scanning
-                    return Err(SkipStrategy::NextAligned); // Skip to the next aligned entry
-                }
+            } => Self::handle_allocation(start, remaining_size, bitmap, state_ref, index)?,
 
-                *state_ref = ScanState::Allocating {
-                    start,
-                    remaining_size: remaining_size - ENTRY_SIZE,
-                };
-                return Err(SkipStrategy::Next); // We don't care about alignment, so just check the next entry
-            }
-            ScanState::Allocating {
-                start,
-                remaining_size,
-            } => {
-                let needed_mask = range_mask(bytes_to_pages(remaining_size));
-                if entry & needed_mask != 0 {
-                    *state_ref = ScanState::Scanning; // Not enough free pages in this entry, go back to scanning
-                    return Err(SkipStrategy::NextAligned); // Skip to the next aligned entry
-                }
-                // This entry has enough free pages to satisfy the remaining allocation, so we can allocate and return the address
-                *state_ref = ScanState::Found { start };
-                bitmap.data[index] |= needed_mask; // Mark these pages as allocated in the bitmap
-                return Ok(bitmap.addr_for_bitptr(start));
-            }
-            ScanState::Found { start } => return Ok(bitmap.addr_for_bitptr(start)),
-            ScanState::Scanning if entry == u64::MAX => {
-                return Err(SkipStrategy::NextAligned); // This entry is fully allocated, so skip to the next aligned entry
-            }
-            ScanState::Scanning if info.size > ENTRY_SIZE && info.align >= arch::TABLE_SIZE => {
-                // We need to allocate more than one entry, so we check if this entry is fully free and properly aligned for the allocation. If so, we can start allocating.
-                // TODO: Longer check when len > ENTRY_SIZE but align < ENTRY_SIZE
-                if entry != 0 {
-                    return Err(SkipStrategy::NextAligned); // Not free, skip to the next aligned entry
-                }
-                debug_assert!(
-                    bitmap.addr_for_index(index).as_u64() % info.align == 0,
-                    "Bitmap is not properly aligned for this allocation request"
-                );
-                *state_ref = ScanState::Allocating {
-                    start: BitPtr::new(index, 0),
-                    remaining_size: info.size - ENTRY_SIZE,
-                };
-                bitmap.data[index] = u64::MAX; // Mark this entry as fully allocated in the bitmap
-                return Err(SkipStrategy::Next); // We just checked this entry, so check the next one
-            }
-            ScanState::Scanning if info.needed_pages <= info.page_align => {
-                let free_mask = !entry; // Invert the entry to get a mask of the free pages
-                let range_mask = range_mask(info.needed_pages); // Mask for the number of pages we need to allocate
-                let repeated_mask = rep_mask(range_mask, info.page_align); // Create a mask that has the needed number of bits set for the allocation, repeated to fill a u64
-                let mask = repeated_mask & free_mask; // Mask of the free bits that also satisfy the alignment
-                if mask == 0 {
-                    return Err(SkipStrategy::NextAligned); // No suitable free range in this entry, just check the next entry
-                }
+            ScanState::Scanning => Self::scan(bitmap, info, state_ref, index)?,
+        };
 
-                for i in 0..((size_of::<u64>() as u64) * 8) / info.page_align {
-                    let bit_index = i * info.page_align;
-                    let positioned_mask = range_mask << bit_index; // Mask for the current position in the entry
-                    if mask & (positioned_mask) != 0 {
-                        // This bit is free and properly aligned, so we can allocate here
-                        bitmap.data[index] |= positioned_mask; // Mark these pages as allocated in the bitmap
-                        let start = BitPtr::new(index, bit_index as usize);
-                        *state_ref = ScanState::Found { start };
-                        return Ok(bitmap.addr_for_bitptr(start));
-                    }
-                }
-                return Err(SkipStrategy::NextAligned); // We just checked this entry, so check the next one
-            }
-            ScanState::Scanning => {
-                if entry == u64::MAX {
-                    return Err(SkipStrategy::NextAligned);
-                }
+        // While it probably won't be used in the implementation (maybe), we want to retain the ability to use a single state machine to allocate
+        // multiple chunks of memory with the same layout requirements. The reasoning is speed, but I've yet to test if it presents a significant
+        // performance improvement over the current create as needed approach. TODO: more data needed
+        *state_ref = ScanState::Scanning;
 
-                let needed_mask = range_mask(info.needed_pages); // Mask for the number of pages
-
-                // TODO: something using leading_zeros to find the first free bit
-                for bit_index in (0..64).step_by(info.page_align as usize) {
-                    let positioned_mask = needed_mask << bit_index; // Mask for the current position in the entry
-                    if entry & positioned_mask == 0 {
-                        if bit_index + info.needed_pages > 64 {
-                            *state_ref = ScanState::Allocating {
-                                start: BitPtr::new(index, bit_index as usize),
-                                remaining_size: info.size - (64 - bit_index) * arch::TABLE_SIZE,
-                            }; // We will allocate the rest of this entry, but we still have remaining size to allocate}
-                            return Err(SkipStrategy::Next);
-                        }
-                        // This range of bits is free, so we can allocate here
-                        bitmap.data[index] |= positioned_mask; // Mark these pages as allocated in the bitmap
-                        let start = BitPtr::new(index, bit_index as usize);
-                        *state_ref = ScanState::Found { start };
-                        return Ok(bitmap.addr_for_bitptr(start));
-                    }
-                }
-
-                return Err(SkipStrategy::NextAligned); // We just checked this entry, so check the next one
-            }
-        }
+        unsafe { bitmap.set(res, info.needed_pages) }; // Mark the allocated pages in the bitmap
+        Ok(res)
     }
 }
 
-/// Helper function to create a bitmask for a given length of bits. For example, if `len` is 3, this will return `0b111` (7 in decimal), which can be used to check or set the first 3 bits of a container.
-fn range_mask(len: u64) -> u64 {
+/// Helper function to create a bitmask for a given length of bits.
+/// For example, if `len` is 3, this will return `0b111` (7 in decimal), which can be used to check or set the first 3 bits of a container.
+///
+/// If `len > 64`, this will return `u64::MAX`.
+pub(crate) fn range_mask(len: u64) -> u64 {
     if len >= 64 {
         u64::MAX
     } else {
@@ -242,7 +258,7 @@ fn rep_mask(mask: u64, n_bits: u64) -> u64 {
         return mask;
     }
 
-    let mask = mask & (1 << n_bits) - 1; // Ensure mask is only n_bits long
+    let mask = mask & ((1 << n_bits) - 1); // Ensure mask is only n_bits long
     let mut result = 0;
     for i in 0..(64 / n_bits) {
         result |= (mask as u64) << (i * n_bits); // Shift the mask to the correct position and combine it with the result
@@ -327,22 +343,50 @@ mod tests {
         )
     }
 
+    fn validate_allocation(
+        bitmap: &Bitmap,
+        addr: VirtAddr,
+        expected: VirtAddr,
+        size: u64,
+        alignment: usize,
+    ) {
+        assert!(
+            addr.as_u64() % alignment as u64 == 0,
+            "Address is not properly aligned"
+        );
+        assert!(
+            addr.as_u64() >= bitmap.base.as_u64(),
+            "Address is below bitmap base"
+        );
+        assert!(
+            addr.as_u64() + size <= bitmap.base.as_u64() + bitmap.page_count * arch::TABLE_SIZE,
+            "Address range exceeds bitmap bounds"
+        );
+        assert!(size > 0, "Size must be greater than 0");
+        assert_eq!(
+            addr, expected,
+            "Allocated address does not match expected address"
+        );
+        let offset = addr.as_u64() - bitmap.base.as_u64();
+        assert!(
+            bitmap
+                .is_set(
+                    bitmap.bitptr_for_addr(addr).expect("addr invalid bitptr"),
+                    size / arch::TABLE_SIZE
+                )
+                .expect("ptr should not be out of range")
+        )
+    }
+
     #[test]
     fn test_alloc_one_unalign() {
         let mut owner = OwnedBitmap::new(4, TEST_BASE);
         let mut bitmap = owner.bitmap();
         let mut state_machine = state_machine(bitmap, arch::TABLE_SIZE, 1);
 
-        let res = state_machine.do_step(0);
+        let res = state_machine.do_step(0).expect("should not skip");
 
-        assert_eq!(res, Ok(TEST_BASE));
-        assert_eq!(state_machine.bitmap.data[0], 0b1);
-        assert_eq!(
-            state_machine.scan_state,
-            ScanState::Found {
-                start: BitPtr::new(0, 0)
-            }
-        );
+        validate_allocation(state_machine.bitmap, res, TEST_BASE, arch::TABLE_SIZE, 1);
     }
 
     #[test]
@@ -355,19 +399,21 @@ mod tests {
         let res = state_machine.do_step(0);
 
         assert_eq!(res, Ok(TEST_BASE));
-        assert_eq!(
-            state_machine.scan_state,
-            ScanState::Found {
-                start: BitPtr::new(0, 0)
-            }
-        );
+        assert_eq!(state_machine.scan_state, ScanState::Scanning,);
         assert_eq!(state_machine.bitmap.data[0], 0b1);
 
         state_machine.scan_state = ScanState::Scanning; // Reset the state machine to scanning to test the skip strategy
         let res = state_machine.do_step(0);
         assert_eq!(res, Err(SkipStrategy::NextAligned));
-        let res = state_machine.do_step(1);
-        assert_eq!(res, Ok(TEST_BASE + (arch::TABLE_SIZE as u64 * 64)));
+        let res = state_machine.do_step(1).unwrap();
+
+        validate_allocation(
+            state_machine.bitmap,
+            res,
+            TEST_BASE + (arch::TABLE_SIZE as u64 * 64),
+            arch::TABLE_SIZE,
+            arch::TABLE_SIZE as usize * 64,
+        );
     }
 
     #[test]
@@ -387,22 +433,17 @@ mod tests {
                 remaining_size: arch::TABLE_SIZE
             }
         );
-        assert_eq!(state_machine.bitmap.data[0], u64::MAX); // The first entry should be fully allocated
 
         // Step through the next entry, which should satisfy the allocation request
         let res = state_machine.do_step(1);
-        assert_eq!(res, Ok(TEST_BASE));
-        assert_eq!(
-            state_machine.scan_state,
-            ScanState::Found {
-                start: BitPtr::new(0, 0)
-            },
+
+        validate_allocation(
+            state_machine.bitmap,
+            res.expect("should allocate"),
+            TEST_BASE,
+            arch::TABLE_SIZE * 65,
+            arch::TABLE_SIZE as usize,
         );
-        assert_eq!(
-            state_machine.bitmap.data[1], 0b1,
-            "0b{:b} != 0b1",
-            state_machine.bitmap.data[1]
-        ); // The second entry should have one bit set
     }
 
     #[test]
@@ -415,13 +456,12 @@ mod tests {
 
         let res = state_machine.do_step(0);
 
-        assert_eq!(res, Ok(TEST_BASE + (12 * arch::TABLE_SIZE as u64)));
-        assert_eq!(
-            state_machine.scan_state,
-            ScanState::Found {
-                start: BitPtr::new(0, 12)
-            },
-        );
-        assert_eq!(state_machine.bitmap.data[0], range_mask(9) | 0b1 << 12); // The first bit of the first entry should be set
+        validate_allocation(
+            state_machine.bitmap,
+            res.expect("should allocate"),
+            TEST_BASE + (12 * arch::TABLE_SIZE as u64),
+            arch::TABLE_SIZE / 2,
+            arch::TABLE_SIZE as usize * 4,
+        )
     }
 }

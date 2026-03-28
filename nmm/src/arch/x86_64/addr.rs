@@ -121,6 +121,19 @@ impl VirtAddr {
             Some(VirtAddr(x86_64::VirtAddr::new_truncate(res)))
         }
     }
+
+    /// Adds the given offset to this virtual address, returning `None` if the result would overflow or be out of bounds for the architecture.
+    pub const fn sub_checked(&self, offset: u64) -> Option<Self> {
+        // First, just add it, and if it overflows, return None.
+        // We can't short circuit this check, since this is a const function.
+        let res = match self.0.as_u64().checked_sub(offset) {
+            Some(val) => val,
+            None => return None,
+        };
+
+        // There's no need to check if the result is valid since subtracting from a valid address can never produce an invalid address.
+        Some(VirtAddr(x86_64::VirtAddr::new_truncate(res)))
+    }
 }
 
 impl Deref for VirtAddr {
