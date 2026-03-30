@@ -6,7 +6,8 @@ use cake::limine::memory_map;
 use x86_64 as arch_impl;
 
 use crate::{
-    MapFlags, MemError,
+    MapFlags, MemError, VirtualMemoryRange,
+    entry_walker::EntryWalker,
     paging::{self},
 };
 
@@ -50,8 +51,8 @@ pub const ENTRY_COUNT: usize = arch_impl::ENTRY_COUNT;
 pub(crate) unsafe fn init_unchecked(
     root: *mut (),
     offset: VirtAddr,
-    ranges: &'static [memory_map::Entry],
-    scratch_range: (VirtAddr, u64),
+    ranges: EntryWalker<'static>,
+    scratch_range: VirtualMemoryRange,
 ) -> Result<(), MemError> {
     unsafe { arch_impl::api::init_unchecked(root, offset, ranges, scratch_range) }
 }

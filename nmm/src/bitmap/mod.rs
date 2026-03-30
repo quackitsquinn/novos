@@ -49,9 +49,13 @@ impl BitPtr {
     }
 }
 
+/// The size of the backing memory that each bitmap entry can track.
 const ENTRY_SIZE: u64 = arch::TABLE_SIZE * 64;
 
 impl<'a> Bitmap<'a> {
+    /// The number of bytes that can fit into a fill page of entries.
+    pub const MEMORY_PER_PAGE: u64 = ENTRY_SIZE * (arch::TABLE_SIZE / 8);
+
     /// Initializes the bitmap with the given data slice and page count. The bitmap is cleared to mark all pages as free.
     ///
     /// # Parameters
@@ -76,7 +80,7 @@ impl<'a> Bitmap<'a> {
 
     fn addr_for_index(&self, index: u64) -> VirtAddr {
         self.base
-            .add_checked(index as u64 * arch::TABLE_SIZE)
+            .checked_add(index as u64 * arch::TABLE_SIZE)
             .expect("addr_for_index: index overflow")
     }
 
@@ -85,7 +89,7 @@ impl<'a> Bitmap<'a> {
     }
 
     fn bitptr_for_addr(&self, addr: VirtAddr) -> Option<BitPtr> {
-        let offset = addr.sub_checked(self.base.as_u64())?;
+        let offset = addr.checked_sub(self.base.as_u64())?;
         let page_index = offset.as_u64() / arch::TABLE_SIZE;
         if page_index >= self.page_count as u64 {
             return None;
@@ -221,7 +225,7 @@ mod tests {
             for i in 0..page_count {
                 let addr = bitmap.addr_for_index(i);
                 let expected_addr = base
-                    .add_checked(i as u64 * arch::TABLE_SIZE)
+                    .checked_add(i as u64 * arch::TABLE_SIZE)
                     .expect("failed to calculate expected addr");
                 assert_eq!(addr, expected_addr);
             }
@@ -241,7 +245,7 @@ mod tests {
                     let addr = bitmap.addr_for_bitptr(bitptr);
                     let expected_addr = bitmap
                         .base
-                        .add_checked(
+                        .checked_add(
                             (entry_index * 64 + bit_index as usize) as u64 * arch::TABLE_SIZE,
                         )
                         .expect("failed to calculate expected addr");

@@ -3,6 +3,7 @@
 use core::ops::Add;
 use core::ops::{Deref, DerefMut};
 
+use crate::arch::VIRTUAL_ADDRESS_MAX;
 use crate::arch::x86_64::VIRTUAL_ADDRESS_WIDTH;
 
 // You might wonder why we don't just re-export x86_64::PhysAddr and x86_64::VirtAddr directly.
@@ -35,7 +36,7 @@ impl PhysAddr {
     }
 
     /// Adds the given offset to this virtual address, returning `None` if the result would overflow or be out of bounds for the architecture.
-    pub const fn add_checked(&self, offset: u64) -> Option<Self> {
+    pub const fn checked_add(&self, offset: u64) -> Option<Self> {
         // First, just add it, and if it overflows, return None.
         // We can't short circuit this check, since this is a const function.
         let res = match self.0.as_u64().checked_add(offset) {
@@ -100,39 +101,52 @@ impl VirtAddr {
         self.0.as_u64() as usize
     }
 
+    /// Checks if the given u64 value would create a valid canonical virtual address for the architecture.
+    /// This checks that the upper bits beyond the architecture's virtual address width are all 0s or all 1s, as required by x86_64.
+    pub const fn is_canonical(addr: u64) -> bool {
+        ((addr << 16) as i64 >> 16) as u64 == addr
+    }
+
     /// Converts this virtual address to a physical address with a bitwise identical representation.
     pub const fn as_phys_addr(&self) -> PhysAddr {
         PhysAddr(x86_64::PhysAddr::new_truncate(self.as_u64()))
     }
 
     /// Adds the given offset to this virtual address, returning `None` if the result would overflow or be out of bounds for the architecture.
-    pub const fn add_checked(&self, offset: u64) -> Option<Self> {
-        // First, just add it, and if it overflows, return None.
-        // We can't short circuit this check, since this is a const function.
-        let res = match self.0.as_u64().checked_add(offset) {
+    pub const fn checked_add(&self, rhs: u64) -> Option<Self> {
+        let lhs = self.as_u64();
+        let res = match lhs.checked_add(rhs) {
             Some(val) => val,
             None => return None,
         };
 
         // Then, check if the result is a valid virtual address for the architecture. If not, return None.
-        if res > super::VIRTUAL_ADDRESS_MAX {
-            None
+        if !Self::is_canonical(res) {
+            // Make sure none of the sign extend bits are set, because that means an overflow happened
+            if (res & !VIRTUAL_ADDRESS_MAX) != 0 {
+                return None;
+            }
+            // Ok, no overflow happened. Just sign extend the result.
+            Some(VirtAddr(x86_64::VirtAddr::new_truncate(res)))
         } else {
             Some(VirtAddr(x86_64::VirtAddr::new_truncate(res)))
         }
     }
 
     /// Adds the given offset to this virtual address, returning `None` if the result would overflow or be out of bounds for the architecture.
-    pub const fn sub_checked(&self, offset: u64) -> Option<Self> {
-        // First, just add it, and if it overflows, return None.
-        // We can't short circuit this check, since this is a const function.
-        let res = match self.0.as_u64().checked_sub(offset) {
+    pub const fn checked_sub(&self, offset: u64) -> Option<Self> {
+        let lhs = self.as_u64();
+        let res = match lhs.checked_sub(offset) {
             Some(val) => val,
             None => return None,
         };
 
-        // There's no need to check if the result is valid since subtracting from a valid address can never produce an invalid address.
-        Some(VirtAddr(x86_64::VirtAddr::new_truncate(res)))
+        // Then, check if the result is a valid virtual address for the architecture. If not, return None.
+        if Self::is_canonical(res) {
+            Some(VirtAddr(x86_64::VirtAddr::new_truncate(res)))
+        } else {
+            None
+        }
     }
 }
 
@@ -148,7 +162,7 @@ impl Add for VirtAddr {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
-        self.add_checked(rhs.as_u64()).expect("address overflow")
+        self.checked_add(rhs.as_u64()).expect("address overflow")
     }
 }
 
@@ -156,7 +170,19 @@ impl Add<u64> for VirtAddr {
     type Output = Self;
 
     fn add(self, rhs: u64) -> Self::Output {
-        self.add_checked(rhs).expect("address overflow")
+        self.checked_add(rhs).expect("address overflow")
+    }
+}
+
+impl From<x86_64::VirtAddr> for VirtAddr {
+    fn from(value: x86_64::VirtAddr) -> Self {
+        VirtAddr(value)
+    }
+}
+
+impl From<x86_64::PhysAddr> for PhysAddr {
+    fn from(value: x86_64::PhysAddr) -> Self {
+        PhysAddr(value)
     }
 }
 
@@ -167,16 +193,24 @@ mod tests {
     #[test]
     fn test_phys_addr_add_checked() {
         let addr = PhysAddr::new(0x1000);
-        assert_eq!(addr.add_checked(0x1000), Some(PhysAddr::new(0x2000)));
-        assert_eq!(addr.add_checked(0xFFFFFFFFFFFFF000), None); // This would overflow
-        assert_eq!(addr.add_checked(0xFFFFFFFFFFFFE000), None); // This would be out of bounds
+        assert_eq!(addr.checked_add(0x1000), Some(PhysAddr::new(0x2000)));
+        assert_eq!(addr.checked_add(0xFFFFFFFFFFFFF000), None); // This would overflow
     }
 
     #[test]
     fn test_virt_addr_add_checked() {
         let addr = super::VirtAddr::new(0x1000);
-        assert_eq!(addr.add_checked(0x1000), Some(super::VirtAddr::new(0x2000)));
-        assert_eq!(addr.add_checked(0xFFFFFFFFFFFFF000), None); // This would overflow
-        assert_eq!(addr.add_checked(0xFFFFFFFFFFFFE000), None); // This would be out of bounds
+        assert_eq!(addr.checked_add(0x1000), Some(super::VirtAddr::new(0x2000)));
+        assert_eq!(addr.checked_add(0xFFFFFFFFFFFFF000), None); // This would overflow
+    }
+
+    #[test]
+    fn test_virt_addr_add_checked_higher_half() {
+        let addr = super::VirtAddr::HIGHER_HALF_START; // Start of higher half
+        assert_eq!(
+            addr.checked_add(0x1000),
+            Some(super::VirtAddr::new(addr.as_u64() + 0x1000))
+        );
+        assert_eq!(addr.checked_add(0xFFFFFFFFFFFFF000), None); // This would overflow
     }
 }

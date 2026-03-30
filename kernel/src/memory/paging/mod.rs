@@ -63,25 +63,23 @@ pub mod map {
     macro_rules! define_map {
         ($name:ident, $start:expr, $size:expr) => {
             const _: () = {
+                assert!($start.checked_add($size).is_some(), "Address overflow in map definition");
                 assert!($start % 0x1000 == 0);
                 assert!($size % 0x1000 == 0);
-                assert!($start < MAX_VIRT_ADDR.as_u64());
-                assert!($size < MAX_VIRT_ADDR.as_u64());
-                assert!($start + $size < MAX_VIRT_ADDR.as_u64());
                 ()
             };
             paste::paste! {
                 #[doc = concat!("The raw start address of the ", stringify!($name), " memory region.")]
-                pub const [<$name _RAW>]: u64 = $start;
+                pub const [<$name _RAW>]: u64 = [<$name _START>].as_u64();
 
                 #[doc = concat!("The start address of the ", stringify!($name), " memory region.")]
-                pub const [<$name _START>]: ::x86_64::VirtAddr = ::x86_64::VirtAddr::new_truncate([<$name _RAW>]);
+                pub const [<$name _START>]: ::x86_64::VirtAddr = ::x86_64::VirtAddr::new_truncate($start);
                 #[doc = concat!("The size of the ", stringify!($name), " memory region.")]
                 pub const [<$name _SIZE>]: u64 = $size;
                 #[doc = concat!("The raw end address of the ", stringify!($name), " memory region.")]
-                pub const [<$name _END_RAW>]: u64 = $start + $size;
+                pub const [<$name _END_RAW>]: u64 = [<$name _END>].as_u64();
                 #[doc = concat!("The end address of the ", stringify!($name), " memory region.")]
-                pub const [<$name _END>]: ::x86_64::VirtAddr = ::x86_64::VirtAddr::new_truncate([<$name _END_RAW>]);
+                pub const [<$name _END>]: ::x86_64::VirtAddr = ::x86_64::VirtAddr::new_truncate($start + $size);
                 #[doc = concat!("The start page of the ", stringify!($name), " memory region.")]
                 pub const [<$name _START_PAGE>]: super::KernelPage = super::KernelPage::containing_address([<$name _START>]);
                 #[doc = concat!("The end page of the ", stringify!($name), " memory region.")]
@@ -97,7 +95,7 @@ pub mod map {
     /// Taken from linker script
     pub const KERNEL_BINARY: u64 = 0xFFFF_FFFF_8000_0000;
     /// The start of the higher half of the kernel.
-    pub const HIGHER_HALF_START: u64 = 0xFFFF_8000_0000;
+    pub const HIGHER_HALF_START: u64 = VirtAddr::new_truncate(0xFFFF_8000_0000).as_u64();
     /// The maximum virtual address.
     pub const MAX_VIRT_ADDR: VirtAddr = VirtAddr::new_truncate(u64::MAX);
 
@@ -115,4 +113,11 @@ pub mod map {
 
     // The address space info structure mapped area.
     define_map!(ADDRESS_SPACE_INFO, FRAMEBUFFER_END_RAW, 0x1000); // 4KB
+
+    define_map!(
+        NMM_MANAGED_RANGE,
+        // align up to 1 GIB to to be well aligned for 1GIB page mappings.
+        (((ADDRESS_SPACE_INFO_END_RAW + 0x1000 - 1) & !(0x1000 - 1)) + 0x1000_0000), // Start after the address space info structure, aligned up to the next multiple of 1GB
+        0x200_000_000u64
+    ); // 8GB
 }

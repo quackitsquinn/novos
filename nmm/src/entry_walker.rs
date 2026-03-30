@@ -12,7 +12,7 @@ use crate::paging::limine::LimineEntry;
 /// A helper struct for iterating over memory map entries and calculating the total usable memory.
 #[allow(missing_debug_implementations)] // TODO: allowed to silence the warning for now
 pub struct EntryWalker<'a> {
-    entries: &'a [&'a LimineEntry],
+    pub entries: &'a [&'a LimineEntry],
     idx: usize,
     current: Option<LimineEntry>,
     // Contains entries that were skipped either due to alignment requirements or because they were too small, but may still be usable for smaller allocations

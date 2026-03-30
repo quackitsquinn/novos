@@ -1,17 +1,63 @@
-use cake::limine::memory_map;
+use ::x86_64::structures::paging::{
+    FrameAllocator, Mapper, OffsetPageTable, Page, PageTable, PageTableFlags, Size4KiB,
+    mapper::MapToError,
+};
+use cake::{limine::memory_map, log::debug};
+use cfg_if::cfg_if;
 
 use crate::{
-    MapFlags, MemError,
-    arch::{PhysAddr, VirtAddr},
+    MapFlags, MemError, VirtualMemoryRange,
+    arch::{
+        PhysAddr, VirtAddr,
+        x86_64::{self, ArchError},
+    },
+    bitmap::Bitmap,
+    entry_walker::EntryWalker,
     paging::PageTableIndex,
 };
 
+pub(crate) type Offset<'a> = OffsetPageTable<'a>;
+
 pub(crate) unsafe fn init_unchecked(
-    _root: *mut (),
-    _offset: VirtAddr,
-    _ranges: &'static [memory_map::Entry],
-    _scratch_range: (VirtAddr, u64),
+    root: *mut (),
+    offset: VirtAddr,
+    mut ranges: EntryWalker<'static>,
+    scratch_range: VirtualMemoryRange,
 ) -> Result<(), MemError> {
+    // First, we need to bootstrap the virtual memory system by allocating however many pages we need to manage the scratch range.
+    let scratch_pages = scratch_range.size / super::TABLE_SIZE as u64; // We can safely do this, since it's up to the caller to make sure the size is page-aligned.
+    let needed_pages = scratch_pages.div_ceil(Bitmap::MEMORY_PER_PAGE);
+    let pml4 = unsafe { &mut *(root as *mut PageTable) };
+    let mut offset_table = unsafe { Offset::new(pml4, *offset) };
+    let mut next_page = *scratch_range.base;
+
+    debug!(
+        "NMM: mapping {} pages for scratch space [base: {:x}, size: {:x}]",
+        needed_pages, next_page, scratch_range.size
+    );
+    for _ in 0..needed_pages {
+        unsafe {
+            let flush = offset_table
+                .map_to(
+                    Page::<Size4KiB>::containing_address(next_page),
+                    ranges.allocate_frame().ok_or(MemError::OutOfMemory)?,
+                    PageTableFlags::PRESENT | PageTableFlags::WRITABLE | PageTableFlags::NO_EXECUTE,
+                    &mut ranges,
+                )
+                .map_err(Into::<MemError>::into)?;
+
+            cfg_if::cfg_if! {
+                if #[cfg(target_arch = "x86_64")] {
+                    flush.flush();
+                } else {
+                    flush.ignore();
+                }
+            };
+        };
+
+        next_page += super::TABLE_SIZE as u64;
+    }
+
     todo!()
 }
 
@@ -32,7 +78,10 @@ pub(crate) unsafe fn map_unchecked(
     todo!()
 }
 
-pub(crate) unsafe fn unmap_unchecked(_virt_base: VirtAddr, _byte_size: u64) -> Result<(), MemError> {
+pub(crate) unsafe fn unmap_unchecked(
+    _virt_base: VirtAddr,
+    _byte_size: u64,
+) -> Result<(), MemError> {
     todo!()
 }
 
