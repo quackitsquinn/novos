@@ -615,7 +615,7 @@ dependencies = [
  "kserial_derive",
  "lazy_static",
  "log",
- "pastey",
+ "pastey 0.1.0",
  "spin 0.9.8",
  "thiserror",
 ]
@@ -757,6 +757,7 @@ dependencies = [
  "bitflags 2.10.0",
  "cake",
  "cfg-if",
+ "pastey 0.2.1",
  "thiserror",
  "x86_64",
 ]
@@ -816,6 +817,12 @@ name = "pastey"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b3a8cb46bdc156b1c90460339ae6bfd45ba0394e5effbaa640badb4987fdc261"
+
+[[package]]
+name = "pastey"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b867cad97c0791bbd3aaa6472142568c6c9e8f71937e98379f584cfb0cf35bec"
 
 [[package]]
 name = "pci_types"

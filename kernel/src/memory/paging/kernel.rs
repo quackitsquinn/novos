@@ -22,7 +22,7 @@ use crate::{
     memory::paging::{
         ACTIVE_PAGE_TABLE, KernelPage, KernelPhysFrame,
         builder::PageTableBuilder,
-        map::{FRAMEBUFFER_START_PAGE, KERNEL_REMAP_PAGE_RANGE},
+        map::{KERNEL_REMAP_PAGE_RANGE, map::framebuffer},
     },
     mp::cores,
     requests::{FRAMEBUFFER, KERNEL_ELF},
@@ -136,9 +136,9 @@ fn map_framebuffer(
     let end_page = KernelPage::containing_address(VirtAddr::new(root.as_u64() + size - 1));
     let old_page_range = start_page..=end_page;
 
-    let start_page = FRAMEBUFFER_START_PAGE;
+    let start_page = map::framebuffer;
     let end_page = KernelPage::containing_address(VirtAddr::new(
-        FRAMEBUFFER_START_PAGE.start_address().as_u64() + size - 1,
+        map::framebuffer.start_address().as_u64() + size - 1,
     ));
     let mut new_page_range = start_page..=end_page;
 

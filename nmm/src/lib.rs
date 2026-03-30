@@ -1,9 +1,13 @@
 //! nmm - Novos Memory Manager Library
 #![cfg_attr(not(test), no_std)]
 #![feature(ptr_alignment_type)]
+#![feature(trace_macros)]
 
 use bitflags::bitflags;
 use cake::limine::memory_map;
+
+#[doc(hidden)]
+pub use pastey as _pastey;
 
 use crate::{
     arch::{PhysAddr, VirtAddr},
@@ -16,6 +20,7 @@ compile_error!("Only x86_64 architecture is currently supported.");
 pub mod arch;
 pub mod bitmap;
 pub mod entry_walker;
+pub mod kernel_map;
 pub mod paging;
 
 /// A range of virtual memory, guaranteed to be valid for the architecture (e.g., canonical for x86_64) and properly aligned to page boundaries. This is used for managing virtual address space and ensuring that allocated virtual addresses are valid and usable for mapping physical memory.
@@ -292,4 +297,37 @@ bitflags! {
         /// Disable caching for this page
         const CACHE_DISABLE = 1 << 4;
     }
+}
+
+/// Aligns the given value up or down to the nearest multiple of the specified alignment. The alignment must be a power of two.
+///
+/// # Usage
+///
+/// ```
+/// let aligned_up = align!(up, 0x1234, 0x1000); // Aligns 0x1234 up to the nearest multiple of 0x100
+/// let aligned_down = align!(down, 0x1234, 0x1000); // Aligns 0x1234 down to the nearest multiple of 0x100
+///   ```
+#[macro_export]
+macro_rules! align {
+    (up, $value: expr, $alignment: expr) => {
+        (($value + $alignment - 1) / $alignment) * {
+            const _: () = {
+                assert!(
+                    ($alignment as u64).is_power_of_two(),
+                    "Alignment must be a power of two"
+                )
+            };
+            $alignment
+        }
+    };
+
+    (down, $value: expr, $alignment: expr) => {
+        const _: () = {
+            assert!(
+                $alignment.is_power_of_two(),
+                "Alignment must be a power of two"
+            );
+        };
+        ($value / $alignment) * $alignment
+    };
 }
