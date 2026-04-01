@@ -22,8 +22,6 @@ use cake::log::info;
 use interrupts::hardware;
 use kserial::client::get_serial_client;
 
-use crate::memory::paging::addr_space;
-
 pub mod acpi;
 pub mod context;
 pub mod display;
@@ -34,7 +32,7 @@ pub mod mp;
 pub mod output;
 pub mod panic;
 pub mod pci;
-pub mod proc;
+//pub mod proc;
 pub mod requests;
 pub mod serial;
 pub mod testing;
@@ -107,15 +105,13 @@ pub(crate) unsafe fn init_kernel_services() {
     // test_two_way_serial();
     memory::MODULE.init();
     mp::PREINIT_MODULE.init();
-    memory::paging::kernel::MODULE.init();
     #[cfg(not(test))] // Tests don't have a display
     display::MODULE.init();
     acpi::MODULE.init();
     mp::MODULE.init();
     pci::MODULE.init();
-    proc::MODULE.init();
+    //proc::MODULE.init();
     info!("Kernel services initialized");
-    info!("Address space info {:?}", addr_space::read());
 }
 
 #[macro_export]

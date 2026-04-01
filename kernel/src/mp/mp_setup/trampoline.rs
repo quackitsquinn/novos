@@ -8,7 +8,7 @@ use cake::log::info;
 use cake::{RwLock, limine::mp::Cpu};
 
 use crate::mp::mp_setup::CORE_COUNT;
-use crate::{memory::paging::kernel::KERNEL_CR3, mp::mp_setup::CoreContext};
+use crate::mp::mp_setup::CoreContext;
 
 #[unsafe(naked)]
 pub unsafe extern "C" fn _ap_trampoline(a: &Cpu) -> ! {
@@ -36,17 +36,6 @@ extern "C" fn ap_trampoline(cpu: &Cpu, stack_base: u64) -> ! {
     info!("Stack base: {:#x}", stack_base);
     drop(context_lock);
 
-    // Switch into the kernel page table as soon as possible.
-    info!("Waiting for kernel page table...");
-    let cr3 = KERNEL_CR3.wait();
-    info!(
-        "Switching to kernel page table with root frame: {:#x?}",
-        cr3
-    );
-    // Switch to the kernel page table.
-    unsafe {
-        Cr3::write(*cr3, Cr3Flags::empty());
-    }
     // Now we can enter the idle loop.
     IDLE.fetch_add(1, Ordering::AcqRel);
     INIT.fetch_add(1, Ordering::AcqRel);

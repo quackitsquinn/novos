@@ -8,7 +8,6 @@ use sched::KernelThreadScheduler;
 use crate::{
     context::{InterruptContext, InterruptContextValue},
     declare_module,
-    memory::stack::Stack,
 };
 
 pub mod sched;

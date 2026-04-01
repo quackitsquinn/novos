@@ -16,14 +16,9 @@ use x86_64::{
     },
 };
 
-use crate::memory::paging::addr_space;
 use crate::{
     declare_module,
-    memory::paging::{
-        ACTIVE_PAGE_TABLE, KernelPage, KernelPhysFrame,
-        builder::PageTableBuilder,
-        map::{KERNEL_REMAP_PAGE_RANGE, map::framebuffer},
-    },
+    memory::paging::{ACTIVE_PAGE_TABLE, KernelPage, KernelPhysFrame, builder::PageTableBuilder},
     mp::cores,
     requests::{FRAMEBUFFER, KERNEL_ELF},
 };

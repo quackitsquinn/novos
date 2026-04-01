@@ -25,6 +25,15 @@ impl<T> Owned<T> {
         core::mem::forget(self); // Prevents the destructor from being called
         ptr
     }
+
+    /// Returns the raw pointer contained within the `Owned` instance.
+    pub fn as_ptr(this: &Self) -> *const T {
+        this.val.as_ptr()
+    }
+    /// Returns the raw mutable pointer contained within the `Owned` instance.
+    pub fn as_mut_ptr(this: &mut Self) -> *mut T {
+        this.val.as_ptr()
+    }
 }
 
 impl<T> Deref for Owned<T> {

@@ -5,18 +5,16 @@ use acpi::{
     sdt::{SdtHeader, Signature},
 };
 use cake::Owned;
+use nmm::MapFlags;
 use x86_64::{PhysAddr, structures::paging::PageTableFlags};
 
-use crate::{
-    acpi::MappedTable,
-    memory::paging::phys::phys_mem::{PhysicalMemoryMap, map_address, unmap_address},
-};
+use crate::acpi::MappedTable;
 
 /// A header for an ACPI SDT (System Description Table).
 #[derive(Debug)]
 pub struct TableHeader<'a> {
-    map: PhysicalMemoryMap,
     sdt: Owned<SdtHeader>,
+    physical_address: PhysAddr,
     _phantom: core::marker::PhantomData<&'a ()>,
 }
 
@@ -25,28 +23,26 @@ impl<'a> TableHeader<'a> {
     /// # Safety
     /// The caller must ensure that the physical address is valid and that the table is not already mapped.
     pub unsafe fn new(p_address: PhysAddr) -> Self {
-        let map = unsafe {
-            map_address(
-                p_address,
-                size_of::<SdtHeader>() as u64,
-                PageTableFlags::PRESENT,
-            )
-        }
+        let map = nmm::map_alloc(
+            p_address.into(),
+            size_of::<SdtHeader>() as u64,
+            MapFlags::empty(),
+        )
         .expect("Failed to map ACPI table header");
 
-        let inner = unsafe { Owned::new(&mut *(map.ptr() as *mut acpi::sdt::SdtHeader)) };
+        let inner = unsafe { Owned::new(&mut *(map.as_mut_ptr())) };
 
-        unsafe { Self::from_raw_parts(map, inner) }
+        unsafe { Self::from_raw(inner, p_address) }
     }
 
     /// Creates a new `TableHeader` from raw parts.
     ///
     /// # Safety
     /// The caller must ensure that the physical memory map and SDT header are valid.
-    pub unsafe fn from_raw_parts(map: PhysicalMemoryMap, sdt: Owned<SdtHeader>) -> Self {
+    pub unsafe fn from_raw(sdt: Owned<SdtHeader>, p_addr: PhysAddr) -> Self {
         Self {
-            map: map,
             sdt,
+            physical_address: p_addr,
             _phantom: core::marker::PhantomData,
         }
     }
@@ -59,9 +55,10 @@ impl<'a> TableHeader<'a> {
     {
         // First validate the table signature
         unsafe { self.sdt.validate(T::SIGNATURE)? };
-        // Then unmap the table and create a MappedTable
-        let p_addr = self.map.phys_addr();
-        unmap_address(self.map);
+
+        let p_addr = self.physical_address;
+        drop(self);
+
         unsafe { Ok(MappedTable::new_unchecked(p_addr)) }
     }
 

@@ -4,16 +4,13 @@
 //! the Intel® 64 and IA-32 Architectures Software Developer’s Manual
 use cake::Once;
 use cake::log::info;
+use nmm::MapFlags;
 use x86_64::registers::model_specific::Msr;
-
 
 use crate::mp::lapic::icr::InterruptCommandRegister;
 use crate::mp::lapic::svr::SpuriousInterruptVector;
 
-use crate::{
-    memory::paging::phys::phys_mem::{self, PhysicalMemoryMap},
-    mp::apic_page_flags,
-};
+use crate::mp::apic_page_flags;
 
 pub mod icr;
 pub mod lvt;
@@ -42,7 +39,6 @@ pub const LAPIC_TIMER_CURRENT_COUNT_OFFSET: usize = 0x390;
 #[derive(Debug)]
 pub struct Lapic {
     base: Once<u64>,
-    table: Once<PhysicalMemoryMap>,
     mapped: Once<*mut u8>,
 }
 
@@ -52,7 +48,6 @@ impl Lapic {
         Self {
             base: Once::new(),
             mapped: Once::new(),
-            table: Once::new(),
         }
     }
 
@@ -63,12 +58,14 @@ impl Lapic {
         self.base.call_once(|| base);
         info!("LAPIC base address: {:#x}", base);
         let phys_addr = x86_64::PhysAddr::new(base);
-        let map = unsafe {
-            phys_mem::map_address(phys_addr, 1, apic_page_flags()).expect("Failed to map LAPIC")
-        };
+        let map = nmm::map_alloc(
+            phys_addr.into(),
+            1024,
+            MapFlags::CACHE_DISABLE | MapFlags::WRITABLE,
+        )
+        .expect("Failed to map LAPIC");
 
-        self.table.call_once(|| map);
-        self.mapped.call_once(|| map.ptr().cast_mut());
+        self.mapped.call_once(|| map.as_mut_ptr());
     }
 
     fn base_ptr(&self) -> *mut u8 {

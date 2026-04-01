@@ -5,10 +5,10 @@ use ::acpi::sdt::madt::{Madt, MadtEntry};
 use cake::log::info;
 use cake::{Once, OnceMutex};
 use modular_bitfield::prelude::*;
+use nmm::MapFlags;
 
 use crate::{
     acpi,
-    memory::paging::phys::phys_mem::{self, PhysicalMemoryMap},
     mp::{apic_page_flags, id},
 };
 
@@ -22,7 +22,6 @@ pub use version::IoApicVersion;
 #[derive(Debug)]
 pub struct IoApic {
     base: Once<u64>,
-    table: Once<PhysicalMemoryMap>,
     mapped: OnceMutex<*mut u8>,
 }
 
@@ -32,7 +31,6 @@ impl IoApic {
         Self {
             base: Once::new(),
             mapped: OnceMutex::uninitialized(),
-            table: Once::new(),
         }
     }
 
@@ -49,14 +47,14 @@ impl IoApic {
         let base = *self.base.get().expect("No IOAPIC found in MADT");
         info!("IO APIC base address: {:#x}", base);
         let phys_addr = x86_64::PhysAddr::new(base);
-        let map = unsafe {
-            phys_mem::map_address(phys_addr, 1, apic_page_flags()).expect("Failed to map IOAPIC")
-        };
+        let map = nmm::map_alloc(
+            phys_addr.into(),
+            1024,
+            MapFlags::CACHE_DISABLE | MapFlags::WRITABLE,
+        )
+        .expect("Failed to map LAPIC");
 
-        info!("Mapped IO APIC at {:p}", map.ptr());
-
-        self.mapped.call_init(|| map.ptr().cast_mut());
-        self.table.call_once(|| map);
+        self.mapped.call_init(|| map.as_mut_ptr());
     }
 
     /// Reads a value from the IOAPIC register at the given offset.

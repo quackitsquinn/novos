@@ -5,7 +5,6 @@ use nmm::{
     VirtualMemoryRange,
     arch::{HIGHER_HALF_START, x86_64::VirtAddr},
 };
-use paging::map::{KERNEL_HEAP_SIZE, KERNEL_HEAP_START};
 use x86_64::{
     VirtAddr as XVirtAddr,
     registers::control::Cr3,
@@ -14,10 +13,7 @@ use x86_64::{
 
 use crate::{
     declare_module,
-    memory::paging::{
-        KernelPageSize,
-        map::{NMM_MANAGED_RANGE_SIZE, NMM_MANAGED_RANGE_START},
-    },
+    memory::paging::{KernelPageSize, map::map},
     requests::{KERNEL_ELF, MEMORY_MAP, PHYSICAL_MEMORY_OFFSET},
 };
 
@@ -25,15 +21,9 @@ pub mod allocator;
 pub mod elf_req_data;
 pub mod paging;
 pub mod req_data;
-pub mod stack;
 
 /// Enables or disables allocation debugging based on the ALLOC_DEBUG environment variable.
 pub const ALLOC_DEBUG: bool = option_env!("ALLOC_DEBUG").is_some();
-
-const NMM_MANAGED_RANGE: VirtualMemoryRange = VirtualMemoryRange::new(
-    VirtAddr::new(NMM_MANAGED_RANGE_START.as_u64()),
-    NMM_MANAGED_RANGE_SIZE,
-);
 
 declare_module!("memory", init);
 
@@ -47,14 +37,16 @@ fn init() -> Result<(), Infallible> {
     let memory_map = memory_map.entries();
     info!(
         "Initializing nmm [hhdm_mapping: {:x}, pml4: {}, managed_range: {:?}]",
-        hhdm_offset, pml4_vaddr as u64, NMM_MANAGED_RANGE
+        hhdm_offset,
+        pml4_vaddr as u64,
+        map::nmm_managed_range::RANGE
     );
     unsafe {
         nmm::init(
             pml4_vaddr,
             VirtAddr::new_truncate(hhdm_offset),
             mem::transmute(memory_map),
-            NMM_MANAGED_RANGE,
+            map::nmm_managed_range::RANGE,
         )
     }
     .expect("Failed to initialize memory manager");

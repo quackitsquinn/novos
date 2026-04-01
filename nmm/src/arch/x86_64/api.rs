@@ -1,3 +1,5 @@
+use core::slice;
+
 use ::x86_64::structures::paging::{
     FrameAllocator, Mapper, OffsetPageTable, Page, PageTable, PageTableFlags, Size4KiB,
     mapper::MapToError,
@@ -29,6 +31,7 @@ pub(crate) unsafe fn init_unchecked(
     let needed_pages = scratch_pages.div_ceil(Bitmap::MEMORY_PER_PAGE);
     let pml4 = unsafe { &mut *(root as *mut PageTable) };
     let mut offset_table = unsafe { Offset::new(pml4, *offset) };
+    let mut slice_base: *mut u64 = scratch_range.base.as_mut_ptr();
     let mut next_page = *scratch_range.base;
 
     debug!(
@@ -58,7 +61,14 @@ pub(crate) unsafe fn init_unchecked(
         next_page += super::TABLE_SIZE as u64;
     }
 
-    todo!()
+    let u64_slice = unsafe {
+        slice::from_raw_parts_mut(
+            slice_base,
+            scratch_range.size.div_ceil(Bitmap::BYTES_PER_ENTRY) as usize,
+        )
+    };
+
+    let bitmap = unsafe { Bitmap::init(u64_slice, scratch_pages, scratch_range.base) };
 }
 
 pub(crate) unsafe fn init_load_recursive(

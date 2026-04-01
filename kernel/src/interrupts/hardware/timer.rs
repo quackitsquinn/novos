@@ -1,7 +1,6 @@
 //! Timer interrupt handler and utilities.
 
-
-use crate::{context::InterruptContext, interrupt_wrapper, proc::sched_next};
+use crate::{context::InterruptContext, interrupt_wrapper};
 
 use super::InterruptIndex;
 
@@ -10,7 +9,7 @@ pub const TIMER_FREQUENCY: f32 = 18.2065; // stolen from https://wiki.osdev.org/
 
 pub(super) extern "C" fn timer_handler(frame: InterruptContext) {
     unsafe {
-        sched_next(frame);
+        // sched_next(frame);
 
         super::PICS
             .lock()

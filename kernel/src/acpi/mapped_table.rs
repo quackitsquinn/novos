@@ -6,14 +6,13 @@ use core::{
 
 use acpi::{AcpiError, AcpiTable, sdt::SdtHeader};
 use cake::Owned;
+use nmm::{MapFlags, arch::VirtAddr};
 use x86_64::{PhysAddr, structures::paging::PageTableFlags};
 
-use crate::memory::paging::phys::phys_mem::{PhysicalMemoryMap, map_address, unmap_address};
 /// A mapped ACPI table.
 pub struct MappedTable<T: AcpiTable> {
     table: Owned<T>,
     sdt: Owned<SdtHeader>,
-    phys_range: PhysicalMemoryMap,
 }
 
 impl<T: AcpiTable> MappedTable<T> {
@@ -21,16 +20,14 @@ impl<T: AcpiTable> MappedTable<T> {
     /// # Safety
     /// The caller must ensure that the physical address is valid and that the table is not already mapped.
     pub unsafe fn new(addr: PhysAddr) -> Result<Self, AcpiError> {
-        let mut phys_map = unsafe {
-            map_address(
-                addr,
-                core::mem::size_of::<T>() as u64,
-                PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
-            )
-            .expect("Failed to map ACPI table")
-        };
+        let mut table_addr = nmm::map_alloc(
+            addr.into(),
+            core::mem::size_of::<T>() as u64,
+            MapFlags::WRITABLE,
+        )
+        .expect("Failed to map ACPI table");
 
-        let table: &mut SdtHeader = unsafe { &mut *(phys_map.ptr() as *mut SdtHeader) };
+        let table: &mut SdtHeader = unsafe { &mut *(table_addr.as_mut_ptr()) };
 
         if table.signature != T::SIGNATURE {
             return Err(AcpiError::SdtInvalidSignature(table.signature));
@@ -38,29 +35,21 @@ impl<T: AcpiTable> MappedTable<T> {
 
         let length = table.length as usize;
         if length > core::mem::size_of::<T>() {
-            let new_phys_map = unsafe {
-                map_address(
-                    addr,
-                    length as u64,
-                    PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
-                )
-            }
-            .expect("Failed to map full ACPI table");
-            unmap_address(phys_map);
-            phys_map = new_phys_map;
+            let new_phys_map = nmm::map_alloc(addr.into(), length as u64, MapFlags::WRITABLE)
+                .expect("Failed to map full ACPI table");
+            unsafe { nmm::unmap(table_addr.into(), core::mem::size_of::<T>() as u64) };
+            table_addr = new_phys_map;
         }
 
-        let table: Owned<T> = unsafe { Owned::new(phys_map.ptr().cast_mut().cast()) };
+        // FIXME: I don't know how I never noticed this, but this is flagrantly undefined behavior.
+
+        let table: Owned<T> = unsafe { Owned::new(table_addr.as_mut_ptr()) };
 
         table.validate()?;
 
-        let sdt = unsafe { Owned::new(phys_map.ptr() as *mut SdtHeader) };
+        let sdt = unsafe { Owned::new(table_addr.as_mut_ptr()) };
 
-        Ok(Self {
-            table,
-            phys_range: phys_map,
-            sdt,
-        })
+        Ok(Self { table, sdt })
     }
 
     /// Creates a new mapped ACPI table from the given physical address without validating the signature or the checksum.
@@ -68,40 +57,31 @@ impl<T: AcpiTable> MappedTable<T> {
     /// # Safety
     /// The caller must ensure that the given physical address contains a valid ACPI table of type `T`.
     pub unsafe fn new_unchecked(addr: PhysAddr) -> Self {
-        let mut phys_map = unsafe {
-            map_address(
-                addr,
-                core::mem::size_of::<T>() as u64,
-                PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
-            )
-            .expect("Failed to map ACPI table")
-        };
+        let mut table_addr = nmm::map_alloc(
+            addr.into(),
+            core::mem::size_of::<T>() as u64,
+            MapFlags::WRITABLE,
+        )
+        .expect("Failed to map ACPI table");
 
-        let table: &mut SdtHeader = unsafe { &mut *(phys_map.ptr() as *mut SdtHeader) };
+        let table: &mut SdtHeader = unsafe { &mut *(table_addr.as_mut_ptr()) };
 
         let length = table.length as usize;
         if length > core::mem::size_of::<T>() {
-            let new_phys_map = unsafe {
-                map_address(
-                    addr,
-                    length as u64,
-                    PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
-                )
-            }
-            .expect("Failed to map full ACPI table");
-            unmap_address(phys_map);
-            phys_map = new_phys_map;
+            let new_phys_map = nmm::map_alloc(addr.into(), length as u64, MapFlags::WRITABLE)
+                .expect("Failed to map full ACPI table");
+            unsafe { nmm::unmap(table_addr, length as u64) };
+            table_addr = new_phys_map;
         }
 
-        let table: Owned<T> = unsafe { Owned::new(phys_map.ptr().cast_mut().cast()) };
+        // FIXME: Again, flagrantly undefined behavior. I don't know how I never noticed this, but here we are.
+        // speaking of..
+        // TODO: Owned -> Unique. Owned doesn't stress the uniqueness of the pointer, but really it should.
+        let table: Owned<T> = unsafe { Owned::new(table_addr.as_mut_ptr()) };
 
-        let sdt = unsafe { Owned::new(phys_map.ptr() as *mut SdtHeader) };
+        let sdt = unsafe { Owned::new(table_addr.as_mut_ptr()) };
 
-        Self {
-            table,
-            phys_range: phys_map,
-            sdt,
-        }
+        Self { table, sdt }
     }
 
     /// Returns a reference to the mapped ACPI table.
@@ -117,7 +97,9 @@ impl<T: AcpiTable> MappedTable<T> {
 
 impl<T: AcpiTable> Drop for MappedTable<T> {
     fn drop(&mut self) {
-        unmap_address(self.phys_range);
+        let addr = Owned::as_ptr(&self.table);
+        let length = self.sdt.length as u64;
+        unsafe { nmm::unmap(VirtAddr::from_ptr(addr), length) };
     }
 }
 
@@ -139,7 +121,6 @@ impl<T: AcpiTable> fmt::Debug for MappedTable<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("MappedTable")
             .field("sdt", &self.sdt)
-            .field("phys_range", &self.phys_range)
             .finish()
     }
 }

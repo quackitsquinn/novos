@@ -7,9 +7,7 @@ use x86_64::structures::paging::{
     page_table::PageTableEntry,
 };
 
-use crate::memory::paging::{
-    ACTIVE_PAGE_TABLE, KernelPage, KernelPhysFrame, phys::FRAME_ALLOCATOR,
-};
+use crate::memory::paging::{ACTIVE_PAGE_TABLE, KernelPage, KernelPhysFrame};
 
 /// A builder for creating and managing page tables.
 pub struct PageTableBuilder<'a, T>

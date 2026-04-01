@@ -11,15 +11,10 @@ use x86_64::{
 
 use crate::{declare_module, requests::PHYSICAL_MEMORY_OFFSET};
 
-pub use self::page_table::ActivePageTable;
-
-pub mod addr_space;
-mod builder;
-pub mod kernel;
-mod page_table;
-pub mod page_tree;
-pub mod phys;
-pub mod vaddr_mapper;
+//mod builder;
+// pub mod kernel;
+//mod page_table;
+//pub mod page_tree;
 
 /// The size of a kernel page.
 pub type KernelPageSize = Size4KiB;
@@ -27,9 +22,6 @@ pub type KernelPageSize = Size4KiB;
 pub type KernelPage = Page<KernelPageSize>;
 /// A kernel phys frame
 pub type KernelPhysFrame = PhysFrame<KernelPageSize>;
-
-/// The active kernel page table.
-pub static ACTIVE_PAGE_TABLE: OnceRwLock<ActivePageTable> = OnceRwLock::new();
 
 declare_module!("paging", init);
 
@@ -40,9 +32,7 @@ fn init() -> Result<(), Infallible> {
         .expect("physical memory offset uninitialized");
     let page_table = unsafe { &mut *((cr3.0.start_address().as_u64() + off) as *mut PageTable) };
     let offset_table = unsafe { OffsetPageTable::new(page_table, VirtAddr::new(off)) };
-    ACTIVE_PAGE_TABLE.init(|| ActivePageTable::new(offset_table));
 
-    phys::MODULE.init();
     Ok(())
 }
 

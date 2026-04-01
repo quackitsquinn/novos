@@ -89,6 +89,14 @@ impl VirtAddr {
     pub const fn new_truncate(addr: u64) -> Self {
         VirtAddr(x86_64::VirtAddr::new_truncate(addr))
     }
+    /// Create a new virtual address from a pointer, truncating any bits beyond the architecture's bit width. This will sign-extend the address if necessary.
+    pub fn from_ptr<T>(ptr: *const T) -> Self {
+        VirtAddr(x86_64::VirtAddr::new_truncate(ptr as u64))
+    }
+    /// Create a new virtual address from a mutable pointer, truncating any bits beyond the architecture's bit width. This will sign-extend the address if necessary.
+    pub fn from_mut_ptr<T>(ptr: *mut T) -> Self {
+        VirtAddr(x86_64::VirtAddr::new_truncate(ptr as u64))
+    }
 
     /// Get the underlying u64 value of the virtual address.
     pub const fn as_u64(&self) -> u64 {
