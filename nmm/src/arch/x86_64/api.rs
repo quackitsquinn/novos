@@ -13,7 +13,7 @@ use crate::{
         PhysAddr, VirtAddr,
         x86_64::{self, ArchError},
     },
-    bitmap::Bitmap,
+    bitmap::{Bitmap, register_global_bitmap},
     entry_walker::EntryWalker,
     paging::PageTableIndex,
 };
@@ -69,6 +69,9 @@ pub(crate) unsafe fn init_unchecked(
     };
 
     let bitmap = unsafe { Bitmap::init(u64_slice, scratch_pages, scratch_range.base) };
+    let _ = register_global_bitmap(bitmap); // The user is allowed to register their own bitmap if they want.
+
+    Ok(())
 }
 
 pub(crate) unsafe fn init_load_recursive(

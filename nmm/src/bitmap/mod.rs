@@ -4,6 +4,8 @@ use core::fmt::Debug;
 use core::ops::{Index, IndexMut};
 use core::ptr::Alignment;
 
+use cake::OnceMutex;
+
 use crate::bitmap::state::range_mask;
 use crate::{
     arch::{self, VirtAddr},
@@ -50,11 +52,13 @@ impl BitPtr {
 }
 
 /// The size of the backing memory that each bitmap entry can track.
+#[deprecated(note = "use Bitmap::BYTES_PER_ENTRY instead")]
 const ENTRY_SIZE: u64 = arch::TABLE_SIZE * 64;
 
 impl<'a> Bitmap<'a> {
     /// The number of bytes that can fit into a fill page of entries.
-    pub const MEMORY_PER_PAGE: u64 = ENTRY_SIZE * (arch::TABLE_SIZE / 8);
+    pub const MEMORY_PER_PAGE: u64 = Self::BYTES_PER_ENTRY * (arch::TABLE_SIZE / 8);
+    pub const BYTES_PER_ENTRY: u64 = arch::TABLE_SIZE * 64;
 
     /// Initializes the bitmap with the given data slice and page count. The bitmap is cleared to mark all pages as free.
     ///
@@ -190,6 +194,25 @@ impl IndexMut<usize> for Bitmap<'_> {
     fn index_mut(&mut self, index: usize) -> &mut <Self as Index<usize>>::Output {
         &mut self.data[index]
     }
+}
+
+pub(crate) static GLOBAL_BITMAP: OnceMutex<Bitmap<'static>> = OnceMutex::uninitialized();
+
+/// Registers a global bitmap instance that can be accessed throughout the system.
+///
+/// [crate::init] will call this function during system initialization. If you wish to use your own bitmap instance,
+/// call this function before [crate::init].
+///
+/// # Returns
+/// - `Ok(())` if the bitmap was successfully registered.
+/// - `Err(())` if a bitmap has already been registered, or if the provided bitmap is not properly initialized.
+pub fn register_global_bitmap(map: Bitmap<'static>) -> Result<(), ()> {
+    let mut ret = Err(());
+    GLOBAL_BITMAP.call_init(|| {
+        ret = Ok(());
+        map
+    });
+    ret
 }
 
 #[cfg(test)]

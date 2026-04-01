@@ -11,6 +11,7 @@ pub use pastey as _pastey;
 
 use crate::{
     arch::{PhysAddr, VirtAddr},
+    bitmap::GLOBAL_BITMAP,
     entry_walker::EntryWalker,
 };
 
@@ -158,8 +159,20 @@ pub fn alloc_paged(byte_size: u64, flags: MapFlags) -> Result<VirtAddr, MemError
 
 /// Allocates a virtual address range of the specified size without mapping it to any physical memory.
 #[must_use = "The returned virtual address must be freed with `free_virtspace` when it is no longer needed to avoid memory leaks and ensure proper resource management."]
-pub fn alloc_virtspace(_byte_size: u64) -> Result<VirtAddr, MemError> {
-    todo!("bitmap allocator for virtual address space");
+pub fn alloc_virtspace(byte_size: u64, alignment: u64) -> Result<VirtAddr, MemError> {
+    assert!(
+        alignment.is_power_of_two(),
+        "Alignment must be a power of two, but got {}",
+        alignment
+    );
+
+    if byte_size > arch::VIRTUAL_ADDRESS_MAX {
+        return Err(MemError::OutOfMemory);
+    }
+
+    let bitmap = GLOBAL_BITMAP
+        .try_get()
+        .expect("Global bitmap must be initialized before allocating virtual address space");
 }
 
 /// Frees a virtual address range of the specified size that was previously allocated with `alloc_virtspace`.
@@ -242,6 +255,10 @@ pub enum MemError {
         /// The minimum required size of the scratch space in bytes.
         required: u64,
     },
+    #[error(
+        "The proper resources to complete the requested operation has not been initialized yet. \n This can occur if the global bitmap has not been initialized before calling an operation that relies on it, such as `alloc_virtspace`."
+    )]
+    Uninit,
 }
 
 const fn check_range_virt(virt_base: VirtAddr, byte_size: u64) -> Result<(), MemError> {
