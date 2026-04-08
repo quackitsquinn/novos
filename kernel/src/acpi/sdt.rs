@@ -23,12 +23,8 @@ impl<'a> TableHeader<'a> {
     /// # Safety
     /// The caller must ensure that the physical address is valid and that the table is not already mapped.
     pub unsafe fn new(p_address: PhysAddr) -> Self {
-        let map = nmm::map_alloc(
-            p_address.into(),
-            size_of::<SdtHeader>() as u64,
-            MapFlags::empty(),
-        )
-        .expect("Failed to map ACPI table header");
+        let map = nmm::map_alloc(p_address.into(), size_of::<SdtHeader>(), MapFlags::empty())
+            .expect("Failed to map ACPI table header");
 
         let inner = unsafe { Owned::new(&mut *(map.as_mut_ptr())) };
 

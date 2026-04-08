@@ -42,7 +42,7 @@ impl<'a, T> OnceMutex<T> {
         self.inner.call_once(|| UnsafeCell::new(f()));
     }
 
-    /// Tries to get a lock guard to the inner data. Returns None on deadlock.
+    /// Tries to get a lock guard to the inner data. Returns None on deadlock or if the mutex is not initialized.
     #[track_caller]
     pub fn try_get(&self) -> Option<OnceMutexGuard<'_, T>> {
         let cid = crate::core_id() as i64;
@@ -50,14 +50,24 @@ impl<'a, T> OnceMutex<T> {
 
         self.acquire(cid as u64, caller)?;
 
-        unsafe { Some(OnceMutexGuard::from_raw_parts(self.cell(), &self.locker)) }
+        unsafe {
+            Some(OnceMutexGuard::from_raw_parts(
+                self.try_cell()?,
+                &self.locker,
+            ))
+        }
     }
 
-    /// Gets a reference to the inner mutex.
+    /// Returns a reference to the inner data cell.
     fn cell(&'a self) -> &'a UnsafeCell<T> {
         self.inner
             .get()
             .expect("Attempted to access an uninitialized OnceMutex!")
+    }
+
+    /// Tries to get a reference to the inner data cell without acquiring the lock.
+    fn try_cell(&'a self) -> Option<&'a UnsafeCell<T>> {
+        self.inner.get()
     }
 
     /// Acquires the lock for the given core id and caller instruction pointer. Returns None on deadlock.
@@ -108,7 +118,7 @@ impl<'a, T> OnceMutex<T> {
         }
 
         trace!(
-            "Deadlock detected: Attempted to re-lock OnceMutex on core {} by unknown!",
+            "Deadlock detected: Attempted to re-lock OnceMutex on core {} by unknown (resolve_symbol failed resolution)!",
             cid
         );
 

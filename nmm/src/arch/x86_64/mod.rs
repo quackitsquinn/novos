@@ -28,6 +28,12 @@ pub const TABLE_SIZE: usize = 4096;
 pub const ENTRY_COUNT: usize = TABLE_SIZE / core::mem::size_of::<u64>();
 /// A page table entry for x86_64 architecture, represented as a 64-bit value.
 pub type PageEntryType = u64;
+/// The size of a level 1 page (4KB) for x86_64 architecture.
+pub const L1_PAGE_SIZE: u64 = 4096;
+/// The size of a level 2 page (2MB) for x86_64 architecture.
+pub const L2_PAGE_SIZE: u64 = L1_PAGE_SIZE * ENTRY_COUNT as u64;
+/// The size of a level 3 page (1GB) for x86_64 architecture.
+pub const L3_PAGE_SIZE: u64 = L2_PAGE_SIZE * ENTRY_COUNT as u64;
 
 bitflags! {
     /// Page table entry flags for x86_64 architecture.

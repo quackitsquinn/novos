@@ -34,7 +34,7 @@ fn init() -> Result<(), AcpiError> {
 
     let rsdp_table = nmm::map_alloc(
         PhysAddr::new(rsdp_addr as u64).into(),
-        size_of::<Rsdp>() as u64,
+        size_of::<Rsdp>(),
         MapFlags::empty(),
     )
     .expect("Failed to map RSDP");

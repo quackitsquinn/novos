@@ -70,20 +70,23 @@ pub(crate) unsafe fn init_load_recursive(
 pub(crate) unsafe fn map_unchecked(
     virt_base: VirtAddr,
     phys_base: PhysAddr,
-    byte_size: u64,
+    byte_size: usize,
     flags: MapFlags,
 ) -> Result<(), MemError> {
     unsafe { arch_impl::api::map_unchecked(virt_base, phys_base, byte_size, flags) }
 }
 
 #[inline(always)]
-pub(crate) unsafe fn unmap_unchecked(virt_base: VirtAddr, byte_size: u64) -> Result<(), MemError> {
+pub(crate) unsafe fn unmap_unchecked(
+    virt_base: VirtAddr,
+    byte_size: usize,
+) -> Result<(), MemError> {
     unsafe { arch_impl::api::unmap_unchecked(virt_base, byte_size) }
 }
 
 /// Maps `byte_size` bytes of memory, returning the base virtual address of the mapped region. The physical memory for this mapping is allocated by the memory manager, and the mapping is created with the specified flags.
 #[inline(always)]
 #[must_use = "The returned virtual address must be freed with `unmap` when it is no longer needed to avoid memory leaks and ensure proper resource management."]
-pub(crate) unsafe fn alloc_paged(byte_size: u64, flags: MapFlags) -> Result<VirtAddr, MemError> {
+pub(crate) unsafe fn alloc_paged(byte_size: usize, flags: MapFlags) -> Result<VirtAddr, MemError> {
     unsafe { arch_impl::api::alloc_paged(byte_size, flags) }
 }

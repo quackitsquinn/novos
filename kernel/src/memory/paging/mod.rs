@@ -52,7 +52,7 @@ pub mod map {
 
     kernel_map! {
         . = (higher_half + 512 GiB),
-        NMM_MANAGED_RANGE = 8 GiB; align 1 GiB,
+        NMM_MANAGED_RANGE = 2 GiB; align 1 GiB,
         KERNEL_HEAP = 16 MiB; align 2 MiB,
         KERNEL_PHYS_MAP = 256 MiB; align 2 MiB,
         KERNEL_REMAP = 256 MiB; align 2 MiB,

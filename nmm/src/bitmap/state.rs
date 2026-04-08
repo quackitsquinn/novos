@@ -56,14 +56,14 @@ impl AllocationInfo {
     }
 }
 
-pub(super) struct AllocationStateMachine<'a> {
+pub(super) struct AllocationStateMachine<'a, 'b> {
     info: AllocationInfo,
     scan_state: ScanState,
-    bitmap: &'a mut Bitmap<'a>,
+    bitmap: &'a mut Bitmap<'b>,
 }
 
-impl<'a> AllocationStateMachine<'a> {
-    pub fn new(size: u64, alignment: Alignment, bitmap: &'a mut Bitmap<'a>) -> Self {
+impl<'a, 'b> AllocationStateMachine<'a, 'b> {
+    pub fn new(size: u64, alignment: Alignment, bitmap: &'a mut Bitmap<'b>) -> Self {
         Self {
             info: AllocationInfo::new(size, alignment),
             scan_state: ScanState::Scanning,
@@ -331,11 +331,11 @@ mod tests {
 
     const TEST_BASE: VirtAddr = VirtAddr::new(0x1000_0000);
 
-    fn state_machine<'a>(
-        bitmap: &'a mut Bitmap<'a>,
+    fn state_machine<'a, 'b>(
+        bitmap: &'a mut Bitmap<'b>,
         size: u64,
         alignment: usize,
-    ) -> AllocationStateMachine<'a> {
+    ) -> AllocationStateMachine<'a, 'b> {
         AllocationStateMachine::new(
             size,
             Alignment::new(alignment).expect("state_machine: alignment not power of 2"),

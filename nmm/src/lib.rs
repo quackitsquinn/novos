@@ -3,6 +3,8 @@
 #![feature(ptr_alignment_type)]
 #![feature(trace_macros)]
 
+use core::ptr::Alignment;
+
 use bitflags::bitflags;
 use cake::limine::memory_map;
 
@@ -28,13 +30,13 @@ pub mod paging;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct VirtualMemoryRange {
     pub(crate) base: VirtAddr,
-    pub(crate) size: u64,
+    pub(crate) size: usize,
 }
 
 impl VirtualMemoryRange {
     /// Creates a new `VirtualMemoryRange` with the given base address and size, validating that the range is valid for the architecture.
     /// This includes checks for overflow, alignment, and canonical form (if applicable).
-    pub const fn new(base: VirtAddr, size: u64) -> Self {
+    pub const fn new(base: VirtAddr, size: usize) -> Self {
         match check_range_virt(base, size) {
             Ok(()) => (),
             Err(e) => match e {
@@ -59,7 +61,7 @@ impl VirtualMemoryRange {
     }
 
     /// Returns the size of the virtual memory range in bytes.
-    pub fn size(&self) -> u64 {
+    pub fn size(&self) -> usize {
         self.size
     }
 }
@@ -127,7 +129,7 @@ pub unsafe fn load_recursive(
 pub fn map(
     virt_base: VirtAddr,
     phys_base: PhysAddr,
-    byte_size: u64,
+    byte_size: usize,
     flags: MapFlags,
 ) -> Result<(), MemError> {
     check_range_virt(virt_base, byte_size)?;
@@ -143,8 +145,8 @@ pub fn map(
 /// # Safety
 /// This function is unsafe because unmapping memory that is still in use (e.g., memory that is currently mapped and being accessed) can lead to undefined behavior.
 /// The caller must ensure that unmapped memory is completely unused and will not be accessed after being unmapped to avoid issues such as use-after-free or memory corruption.
-pub unsafe fn unmap(virt_base: VirtAddr, byte_size: u64) -> Result<(), MemError> {
-    check_range_virt(virt_base, byte_size as u64)?;
+pub unsafe fn unmap(virt_base: VirtAddr, byte_size: usize) -> Result<(), MemError> {
+    check_range_virt(virt_base, byte_size)?;
     unsafe { arch::unmap_unchecked(virt_base, byte_size) }
 }
 
@@ -152,27 +154,22 @@ pub unsafe fn unmap(virt_base: VirtAddr, byte_size: u64) -> Result<(), MemError>
 ///
 /// `byte_size` will always be rounded up to the nearest page size, so the actual mapped size may be larger than the requested size.
 #[must_use = "The returned virtual address must be freed with `unmap` when it is no longer needed to avoid memory leaks and ensure proper resource management."]
-pub fn alloc_paged(byte_size: u64, flags: MapFlags) -> Result<VirtAddr, MemError> {
-    if byte_size > arch::VIRTUAL_ADDRESS_MAX {}
+pub fn alloc_paged(byte_size: usize, flags: MapFlags) -> Result<VirtAddr, MemError> {
     unsafe { arch::alloc_paged(byte_size, flags) }
 }
 
 /// Allocates a virtual address range of the specified size without mapping it to any physical memory.
 #[must_use = "The returned virtual address must be freed with `free_virtspace` when it is no longer needed to avoid memory leaks and ensure proper resource management."]
-pub fn alloc_virtspace(byte_size: u64, alignment: u64) -> Result<VirtAddr, MemError> {
-    assert!(
-        alignment.is_power_of_two(),
-        "Alignment must be a power of two, but got {}",
-        alignment
-    );
-
-    if byte_size > arch::VIRTUAL_ADDRESS_MAX {
+pub fn alloc_virtspace(byte_size: usize, alignment: usize) -> Result<VirtAddr, MemError> {
+    let alignment = Alignment::new(alignment).ok_or(MemError::InvalidAlignment(alignment))?;
+    if byte_size > arch::VIRTUAL_ADDRESS_MAX as usize {
         return Err(MemError::OutOfMemory);
     }
 
-    let bitmap = GLOBAL_BITMAP
-        .try_get()
-        .expect("Global bitmap must be initialized before allocating virtual address space");
+    let mut bitmap = GLOBAL_BITMAP.try_get().ok_or(MemError::Uninit)?;
+    bitmap
+        .alloc(byte_size, alignment)
+        .ok_or(MemError::OutOfMemory)
 }
 
 /// Frees a virtual address range of the specified size that was previously allocated with `alloc_virtspace`.
@@ -180,9 +177,11 @@ pub fn alloc_virtspace(byte_size: u64, alignment: u64) -> Result<VirtAddr, MemEr
 /// # Safety
 /// The caller must ensure that the provided virtual address range is not currently mapped to any physical memory and is not in use before freeing it,
 /// as freeing a virtual address range that is still in use can lead to undefined behavior such as use-after-free or memory corruption.
-pub unsafe fn free_virtspace(virt_base: VirtAddr, byte_size: u64) -> Result<(), MemError> {
+pub unsafe fn free_virtspace(virt_base: VirtAddr, byte_size: usize) -> Result<(), MemError> {
     check_range_virt(virt_base, byte_size)?;
-    todo!("bitmap allocator for virtual address space");
+    let mut bitmap = GLOBAL_BITMAP.try_get().ok_or(MemError::Uninit)?;
+    unsafe { bitmap.free(virt_base, byte_size) }
+    Ok(())
 }
 
 /// Maps a physical address range to a virtual address range of the specified size with the given flags, where the virtual address is allocated by the memory manager. This is a convenience function that combines `alloc_paged` and `map` into a single operation for ease of use.
@@ -190,11 +189,11 @@ pub unsafe fn free_virtspace(virt_base: VirtAddr, byte_size: u64) -> Result<(), 
 // TODO: how to handle freeing the virtspace allocated by this function?
 pub fn map_alloc(
     phys_addr: PhysAddr,
-    byte_size: u64,
+    byte_size: usize,
     flags: MapFlags,
 ) -> Result<VirtAddr, MemError> {
     check_range_phys(phys_addr, byte_size)?;
-    let virt_addr = alloc_virtspace(byte_size)?;
+    let virt_addr = alloc_virtspace(byte_size, arch::TABLE_SIZE as usize)?;
     unsafe { arch::map_unchecked(virt_addr, phys_addr, byte_size, flags) }?;
     Ok(virt_addr)
 }
@@ -255,22 +254,26 @@ pub enum MemError {
         /// The minimum required size of the scratch space in bytes.
         required: u64,
     },
+    /// The required resources to complete the requested operation have not been initialized yet.
     #[error(
         "The proper resources to complete the requested operation has not been initialized yet. \n This can occur if the global bitmap has not been initialized before calling an operation that relies on it, such as `alloc_virtspace`."
     )]
     Uninit,
+    /// The provided alignment value is invalid (e.g., not a power of two).
+    #[error("The provided alignment is invalid: {0} is not a power of two.")]
+    InvalidAlignment(usize),
 }
 
-const fn check_range_virt(virt_base: VirtAddr, byte_size: u64) -> Result<(), MemError> {
+const fn check_range_virt(virt_base: VirtAddr, byte_size: usize) -> Result<(), MemError> {
     // Check for overflow in the address range
-    let val = virt_base.checked_add(byte_size);
+    let val = virt_base.checked_add(byte_size as u64);
     match val {
         Some(_) => (),
         None => {
             return Err(MemError::InvalidVirtRange {
                 reason: InvalidVirtRangeReason::Overflow,
                 begin: virt_base,
-                size: byte_size,
+                size: byte_size as u64,
             });
         }
     };
@@ -280,20 +283,20 @@ const fn check_range_virt(virt_base: VirtAddr, byte_size: u64) -> Result<(), Mem
         return Err(MemError::InvalidVirtRange {
             reason: InvalidVirtRangeReason::Unaligned,
             begin: virt_base,
-            size: byte_size,
+            size: byte_size as u64,
         });
     }
 
     Ok(())
 }
 
-fn check_range_phys(phys_base: PhysAddr, byte_size: u64) -> Result<(), MemError> {
+fn check_range_phys(phys_base: PhysAddr, byte_size: usize) -> Result<(), MemError> {
     // Check for overflow in the address range
     phys_base
-        .checked_add(byte_size)
+        .checked_add(byte_size as u64)
         .ok_or(MemError::InvalidPhysRange {
             begin: phys_base,
-            size: byte_size,
+            size: byte_size as u64,
         })
         .map(|_| ())
 }
@@ -321,30 +324,29 @@ bitflags! {
 /// # Usage
 ///
 /// ```
+/// # use nmm::align;
 /// let aligned_up = align!(up, 0x1234, 0x1000); // Aligns 0x1234 up to the nearest multiple of 0x100
 /// let aligned_down = align!(down, 0x1234, 0x1000); // Aligns 0x1234 down to the nearest multiple of 0x100
+///
+/// assert_eq!(aligned_up, 0x2000);
+/// assert_eq!(aligned_down, 0x1000);
 ///   ```
 #[macro_export]
 macro_rules! align {
     (up, $value: expr, $alignment: expr) => {
-        (($value + $alignment - 1) / $alignment) * {
-            const _: () = {
-                assert!(
-                    ($alignment as u64).is_power_of_two(),
-                    "Alignment must be a power of two"
-                )
-            };
-            $alignment
+        // bit fiddling method requires pow2
+        {
+            if !($alignment as u64).is_power_of_two() {
+                panic!("Alignment must be a power of two");
+            }
+            ($value + ($alignment - 1)) & !($alignment - 1)
         }
     };
 
-    (down, $value: expr, $alignment: expr) => {
-        const _: () = {
-            assert!(
-                $alignment.is_power_of_two(),
-                "Alignment must be a power of two"
-            );
-        };
-        ($value / $alignment) * $alignment
-    };
+    (down, $value: expr, $alignment: expr) => {{
+        if !($alignment as u64).is_power_of_two() {
+            panic!("Alignment must be a power of two");
+        }
+        $value & !($alignment - 1)
+    }};
 }

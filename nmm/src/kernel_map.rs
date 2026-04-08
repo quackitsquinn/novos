@@ -54,7 +54,7 @@ macro_rules! kernel_map {
             /// The end address of the section as a raw u64.
             pub const END_RAW: u64 = END.as_u64();
             /// The virtual memory range of the section.
-            pub const RANGE: $crate::VirtualMemoryRange = $crate::VirtualMemoryRange::new(START, SIZE);
+            pub const RANGE: $crate::VirtualMemoryRange = $crate::VirtualMemoryRange::new(START, SIZE as usize);
         }}
 
     };
@@ -144,14 +144,4 @@ pub struct KernelMapSection {
     pub start: VirtAddr,
     /// The size of the section.
     pub size: u64,
-}
-
-kernel_map! {
-    . = (higher_half + 512 GiB),
-    NMM_MANAGED_RANGE = 8 GiB; align 1 GiB,
-    KERNEL_HEAP = 16 MiB; align 2 MiB,
-    KERNEL_PHYS_MAP = 256 MiB; align 2 MiB,
-    KERNEL_REMAP = 256 MiB; align 2 MiB,
-    FRAMEBUFFER = 2 MiB; align 2 MiB,
-    ADDRESS_SPACE_INFO = 4 KiB; align 4 KiB,
 }

@@ -34,7 +34,7 @@ pub(crate) struct BitPtr {
 }
 
 impl BitPtr {
-    fn new(entry_index: u64, bit_index: u8) -> Self {
+    pub(crate) fn new(entry_index: u64, bit_index: u8) -> Self {
         assert!(bit_index < 64); // Ensure bit_index is within bounds for u64
         Self {
             entry_index,
@@ -57,8 +57,11 @@ const ENTRY_SIZE: u64 = arch::TABLE_SIZE * 64;
 
 impl<'a> Bitmap<'a> {
     /// The number of bytes that can fit into a fill page of entries.
-    pub const MEMORY_PER_PAGE: u64 = Self::BYTES_PER_ENTRY * (arch::TABLE_SIZE / 8);
-    pub const BYTES_PER_ENTRY: u64 = arch::TABLE_SIZE * 64;
+    pub const MEMORY_PER_PAGE: u64 = arch::TABLE_SIZE * 8;
+    /// The number of bytes that each bitmap entry can track. This is determined by the size of the entry (e.g., 64 bits for a u64) and the size of the current architecture's pages.
+    pub const BYTES_PER_ENTRY: u64 = arch::TABLE_SIZE * Self::PAGES_PER_ENTRY;
+    /// The number of pages that each bitmap entry can track. This is determined by the size of the entry (e.g., 64 bits for a u64) and the size of the pages being tracked.
+    pub const PAGES_PER_ENTRY: u64 = 64;
 
     /// Initializes the bitmap with the given data slice and page count. The bitmap is cleared to mark all pages as free.
     ///
@@ -107,7 +110,7 @@ impl<'a> Bitmap<'a> {
     /// Marks n bits starting at bitptr as allocated in the bitmap.
     ///
     /// n can be greater than 64.
-    unsafe fn set(&mut self, bitptr: BitPtr, n: u64) {
+    pub(crate) unsafe fn set(&mut self, bitptr: BitPtr, n: u64) {
         // TODO: SIMD optimizations
         if n > 64 {
             let (bitptr, remaining) = bitptr.skip_entry();
@@ -118,7 +121,7 @@ impl<'a> Bitmap<'a> {
     }
 
     /// Marks n bits starting at bitptr as free in the bitmap.
-    unsafe fn clear(&mut self, bitptr: BitPtr, n: u64) {
+    pub(crate) unsafe fn clear(&mut self, bitptr: BitPtr, n: u64) {
         // TODO: SIMD optimizations
         if n > 64 {
             let (bitptr, remaining) = bitptr.skip_entry();
@@ -146,7 +149,7 @@ impl<'a> Bitmap<'a> {
     /// Allocates a contiguous range of pages with the specified length and alignment.
     /// The length is specified in bytes, and the alignment is also specified in bytes (e.g., 4096 for page-aligned).
     /// The function returns the virtual address of the allocated range if successful, or `None` if there is not enough free space to satisfy the allocation request.
-    pub fn alloc(&'a mut self, len: usize, align: Alignment) -> Option<VirtAddr> {
+    pub fn alloc(&mut self, len: usize, align: Alignment) -> Option<VirtAddr> {
         let mut state_machine = AllocationStateMachine::new(len as u64, align, self);
         state_machine.run()
     }
