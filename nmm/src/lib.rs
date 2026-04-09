@@ -350,3 +350,18 @@ macro_rules! align {
         $value & !($alignment - 1)
     }};
 }
+
+pub(crate) trait NmmSealed {}
+
+cake::encapsulate_macro!(
+    pub(crate) seal,
+    _seal_mod,
+    /// Implements the `NmmSealed` trait for the specified types.
+    macro_rules! seal {
+        ($($ty: ty),*) => {
+            $(
+                impl $crate::NmmSealed for $ty {}
+            )*
+        };
+    }
+);

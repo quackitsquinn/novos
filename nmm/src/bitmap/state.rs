@@ -1,8 +1,8 @@
-use core::ptr::Alignment;
+use core::mem::Alignment;
 
 use crate::{
     arch::{self, VirtAddr},
-    bitmap::{BitPtr, Bitmap, ENTRY_SIZE},
+    bitmap::{BitPtr, Bitmap},
 };
 
 /// The states of the state machine used during allocation.
@@ -10,7 +10,7 @@ use crate::{
 enum ScanState {
     /// Scanning for a free range of pages that satisfies the allocation request.
     Scanning,
-    // Currently allocating a range larger than `ENTRY_SIZE`, which means we are allocating whole entries in the bitmap.
+    // Currently allocating a range larger than `Bitmap::BYTES_PER_ENTRY`, which means we are allocating whole entries in the bitmap.
     // this allows for very fast allocation of large ranges of pages, since we can just check if an entry is zero (fully free) or not, and skip over it if it's not.
     // down the line this can be extended to use SIMD instructions to check multiple entries at once for even faster allocation of large ranges.
     // right now for a 2MiB allocation, it would check and set 8 entries in the bitmap, but 2GiB allocations take 4k entries, which is a lot.
@@ -102,7 +102,7 @@ impl<'a, 'b> AllocationStateMachine<'a, 'b> {
     ) -> Result<BitPtr, SkipStrategy> {
         let entry = bitmap.data[index as usize];
 
-        if remaining_size > ENTRY_SIZE {
+        if remaining_size > Bitmap::BYTES_PER_ENTRY {
             // This allocation will take all of this entry, so we just check if it's zero and bump the length remaining
             if entry != 0 {
                 *state_ref = ScanState::Scanning; // Not free, go back to scanning
@@ -111,7 +111,7 @@ impl<'a, 'b> AllocationStateMachine<'a, 'b> {
 
             *state_ref = ScanState::Allocating {
                 start,
-                remaining_size: remaining_size - ENTRY_SIZE,
+                remaining_size: remaining_size - Bitmap::BYTES_PER_ENTRY,
             };
             return Err(SkipStrategy::Next); // We don't care about alignment, so just check the next entry
         }
@@ -136,9 +136,9 @@ impl<'a, 'b> AllocationStateMachine<'a, 'b> {
             return Err(SkipStrategy::NextAligned); // This entry is fully allocated, so skip to the next aligned entry
         }
 
-        if info.size > ENTRY_SIZE && info.align >= arch::TABLE_SIZE {
+        if info.size > Bitmap::BYTES_PER_ENTRY && info.align >= arch::TABLE_SIZE {
             // We need to allocate more than one entry, so we check if this entry is fully free and properly aligned for the allocation. If so, we can start allocating.
-            // TODO: Longer check when len > ENTRY_SIZE but align < ENTRY_SIZE
+            // TODO: Longer check when len > Bitmap::BYTES_PER_ENTRY but align < Bitmap::BYTES_PER_ENTRY
             if entry != 0 {
                 return Err(SkipStrategy::NextAligned); // Not free, skip to the next aligned entry
             }
@@ -148,7 +148,7 @@ impl<'a, 'b> AllocationStateMachine<'a, 'b> {
             );
             *state_ref = ScanState::Allocating {
                 start: BitPtr::new(index, 0),
-                remaining_size: info.size - ENTRY_SIZE,
+                remaining_size: info.size - Bitmap::BYTES_PER_ENTRY,
             };
 
             return Err(SkipStrategy::Next); // We just checked this entry, so check the next one

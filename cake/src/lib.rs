@@ -95,6 +95,29 @@ mod _macro {
 
 pub(crate) use _macro::get_caller_rip_2_up;
 
+/// Encapsulates a macro definition within a private module to prevent it from being used outside of the intended scope.
+///
+/// # Usage
+/// ```
+/// encapsulate_macro!(
+///     pub(crate) my_macro,
+///     _my_macro_mod,
+///     macro_rules! my_macro {
+///         // macro definition here
+///     }
+/// );
+/// ```
+#[macro_export]
+macro_rules! encapsulate_macro {
+    ($vis: vis $name: ident, $mod_name:ident, $($rest:tt)*) => {
+        mod $mod_name {
+            $($rest)*
+            pub(super) use $name;
+        }
+        $vis use $mod_name::$name;
+    };
+}
+
 /// Gets the current core ID.
 #[allow(unreachable_code)]
 pub fn core_id() -> u64 {

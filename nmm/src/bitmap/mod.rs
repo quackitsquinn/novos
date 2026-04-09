@@ -1,12 +1,13 @@
 //! Bitmap virtual memory manager.
 
 use core::fmt::Debug;
+use core::mem::Alignment;
 use core::ops::{Index, IndexMut};
-use core::ptr::Alignment;
 
 use cake::OnceMutex;
 
 use crate::bitmap::state::range_mask;
+use crate::paging::{Page, PrimitiveRangeManager, PrimitiveSize};
 use crate::{
     arch::{self, VirtAddr},
     bitmap::state::AllocationStateMachine,
@@ -196,6 +197,19 @@ impl Index<usize> for Bitmap<'_> {
 impl IndexMut<usize> for Bitmap<'_> {
     fn index_mut(&mut self, index: usize) -> &mut <Self as Index<usize>>::Output {
         &mut self.data[index]
+    }
+}
+
+impl<'a, S: PrimitiveSize> PrimitiveRangeManager<Page<S>, S> for Bitmap<'a> {
+    fn allocate_range(&mut self) -> Option<Page<S>> {
+        // TODO: better niche optimizations for
+        let len = S::SIZE as usize;
+        let align = Alignment::new(S::SIZE as usize).expect("invalid page size for alignment");
+        self.alloc(len, align).and_then(Page::try_new)
+    }
+
+    fn deallocate_range(&mut self, page: Page<S>) {
+        unsafe { self.free(page.start_address(), S::SIZE as usize) };
     }
 }
 

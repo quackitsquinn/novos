@@ -37,9 +37,16 @@ pub const PHYSICAL_ADDRESS_MAX: u64 = arch_impl::PHYSICAL_ADDRESS_MAX;
 /// The number of bits used for indexing into page tables at each level.
 pub const TABLE_INDEX_BITS: usize = arch_impl::TABLE_INDEX_BITS;
 /// The size of a page table in bytes for x86_64 architecture.
+#[deprecated]
 pub const TABLE_SIZE: u64 = arch_impl::TABLE_SIZE as u64;
 /// The number of entries in a page table for x86_64 architecture.
 pub const ENTRY_COUNT: usize = arch_impl::ENTRY_COUNT;
+/// The size of a level 1 page (4KB) for x86_64 architecture.
+pub const L1_PAGE_SIZE: u64 = arch_impl::L1_PAGE_SIZE;
+/// The size of a level 2 page (2MB) for x86_64 architecture.
+pub const L2_PAGE_SIZE: u64 = arch_impl::L2_PAGE_SIZE;
+/// The size of a level 3 page (1GB) for x86_64 architecture.
+pub const L3_PAGE_SIZE: u64 = arch_impl::L3_PAGE_SIZE;
 
 // TODO: maybe support x86 in the future? would be cool to watch this run on a xp or 98 era machine
 
