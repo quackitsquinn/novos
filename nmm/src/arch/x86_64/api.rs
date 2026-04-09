@@ -10,7 +10,7 @@ use cfg_if::cfg_if;
 use crate::{
     MapFlags, MemError, VirtualMemoryRange,
     arch::{
-        PhysAddr, VirtAddr,
+        self, PhysAddr, VirtAddr,
         x86_64::{self, ArchError},
     },
     bitmap::{BitPtr, Bitmap, register_global_bitmap},
@@ -26,15 +26,15 @@ pub(crate) unsafe fn init_unchecked(
     mut ranges: EntryWalker<'static>,
     scratch_range: VirtualMemoryRange,
 ) -> Result<(), MemError> {
-    if scratch_range.size < super::TABLE_SIZE * 16 {
+    if scratch_range.size < arch::L1_PAGE_SIZE as usize * 16 {
         return Err(MemError::ScratchSpaceTooSmall {
             provided: scratch_range.size as u64,
-            required: super::TABLE_SIZE as u64 * 16,
+            required: arch::L1_PAGE_SIZE as u64 * 16,
         });
     }
 
     // First, we need to bootstrap the virtual memory system by allocating however many pages we need to manage the scratch range.
-    let scratch_pages = scratch_range.size / super::TABLE_SIZE; // We can safely do this, since it's up to the caller to make sure the size is page-aligned.
+    let scratch_pages = scratch_range.size / arch::L1_PAGE_SIZE as usize; // We can safely do this, since it's up to the caller to make sure the size is page-aligned.
     let needed_pages = scratch_pages.div_ceil(Bitmap::MEMORY_PER_PAGE as usize);
     let n_entries = (scratch_pages as usize).div_ceil(Bitmap::PAGES_PER_ENTRY as usize);
     let pml4 = unsafe { &mut *(root as *mut PageTable) };
@@ -65,7 +65,7 @@ pub(crate) unsafe fn init_unchecked(
             };
         };
 
-        next_page += super::TABLE_SIZE as u64;
+        next_page += arch::L1_PAGE_SIZE as u64;
     }
 
     let u64_slice = unsafe { slice::from_raw_parts_mut(slice_base, n_entries) };

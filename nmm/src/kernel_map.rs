@@ -1,3 +1,4 @@
+//! A module for defining the layout of the kernel's virtual address space. This is used for documentation and debugging purposes, and will eventually be used for KASLR.
 use crate::arch::VirtAddr;
 
 /// A fancy macro for defining the layout of the kernel's virtual address space.

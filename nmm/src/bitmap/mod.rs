@@ -54,13 +54,13 @@ impl BitPtr {
 
 /// The size of the backing memory that each bitmap entry can track.
 #[deprecated(note = "use Bitmap::BYTES_PER_ENTRY instead")]
-const ENTRY_SIZE: u64 = arch::TABLE_SIZE * 64;
+const ENTRY_SIZE: u64 = arch::L1_PAGE_SIZE * 64;
 
 impl<'a> Bitmap<'a> {
     /// The number of bytes that can fit into a fill page of entries.
-    pub const MEMORY_PER_PAGE: u64 = arch::TABLE_SIZE * 8;
+    pub const MEMORY_PER_PAGE: u64 = arch::L1_PAGE_SIZE * 8;
     /// The number of bytes that each bitmap entry can track. This is determined by the size of the entry (e.g., 64 bits for a u64) and the size of the current architecture's pages.
-    pub const BYTES_PER_ENTRY: u64 = arch::TABLE_SIZE * Self::PAGES_PER_ENTRY;
+    pub const BYTES_PER_ENTRY: u64 = arch::L1_PAGE_SIZE * Self::PAGES_PER_ENTRY;
     /// The number of pages that each bitmap entry can track. This is determined by the size of the entry (e.g., 64 bits for a u64) and the size of the pages being tracked.
     pub const PAGES_PER_ENTRY: u64 = 64;
 
@@ -88,7 +88,7 @@ impl<'a> Bitmap<'a> {
 
     fn addr_for_index(&self, index: u64) -> VirtAddr {
         self.base
-            .checked_add(index as u64 * arch::TABLE_SIZE)
+            .checked_add(index as u64 * arch::L1_PAGE_SIZE)
             .expect("addr_for_index: index overflow")
     }
 
@@ -98,7 +98,7 @@ impl<'a> Bitmap<'a> {
 
     fn bitptr_for_addr(&self, addr: VirtAddr) -> Option<BitPtr> {
         let offset = addr.checked_sub(self.base.as_u64())?;
-        let page_index = offset.as_u64() / arch::TABLE_SIZE;
+        let page_index = offset.as_u64() / arch::L1_PAGE_SIZE;
         if page_index >= self.page_count as u64 {
             return None;
         }
@@ -265,7 +265,7 @@ mod tests {
             for i in 0..page_count {
                 let addr = bitmap.addr_for_index(i);
                 let expected_addr = base
-                    .checked_add(i as u64 * arch::TABLE_SIZE)
+                    .checked_add(i as u64 * arch::L1_PAGE_SIZE)
                     .expect("failed to calculate expected addr");
                 assert_eq!(addr, expected_addr);
             }
@@ -286,7 +286,7 @@ mod tests {
                     let expected_addr = bitmap
                         .base
                         .checked_add(
-                            (entry_index * 64 + bit_index as usize) as u64 * arch::TABLE_SIZE,
+                            (entry_index * 64 + bit_index as usize) as u64 * arch::L1_PAGE_SIZE,
                         )
                         .expect("failed to calculate expected addr");
                     assert_eq!(addr, expected_addr);

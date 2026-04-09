@@ -1,6 +1,6 @@
 //! A helper struct for iterating over memory map entries and calculating the total usable memory.
 use core::fmt::Debug;
-use core::ptr::Alignment;
+use core::mem::Alignment;
 use core::{mem, slice};
 
 use arrayvec::ArrayVec;
@@ -12,6 +12,7 @@ use crate::paging::limine::LimineEntry;
 /// A helper struct for iterating over memory map entries and calculating the total usable memory.
 #[allow(missing_debug_implementations)] // TODO: allowed to silence the warning for now
 pub struct EntryWalker<'a> {
+    /// The underlying entries provided from Limine
     pub entries: &'a [&'a LimineEntry],
     idx: usize,
     current: Option<LimineEntry>,

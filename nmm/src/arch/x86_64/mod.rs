@@ -3,7 +3,7 @@
 pub mod addr;
 pub(crate) mod api;
 
-use core::ptr::Alignment;
+use core::mem::Alignment;
 
 use bitflags::bitflags;
 
@@ -22,10 +22,8 @@ pub const PHYSICAL_ADDRESS_WIDTH: u8 = 52;
 pub const PHYSICAL_ADDRESS_MAX: u64 = (1 << PHYSICAL_ADDRESS_WIDTH) - 1;
 /// The number of bits used for indexing into page tables at each level.
 pub const TABLE_INDEX_BITS: usize = 9;
-/// The size of a page table in bytes for x86_64 architecture.
-pub const TABLE_SIZE: usize = 4096;
 /// The number of entries in a page table for x86_64 architecture.
-pub const ENTRY_COUNT: usize = TABLE_SIZE / core::mem::size_of::<u64>();
+pub const ENTRY_COUNT: usize = L1_PAGE_SIZE as usize / core::mem::size_of::<u64>();
 /// A page table entry for x86_64 architecture, represented as a 64-bit value.
 pub type PageEntryType = u64;
 /// The size of a level 1 page (4KB) for x86_64 architecture.

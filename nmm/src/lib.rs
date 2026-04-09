@@ -1,9 +1,8 @@
 //! nmm - Novos Memory Manager Library
 #![cfg_attr(not(test), no_std)]
 #![feature(ptr_alignment_type)]
-#![feature(trace_macros)]
 
-use core::ptr::Alignment;
+use core::mem::Alignment;
 
 use bitflags::bitflags;
 use cake::limine::memory_map;
@@ -103,11 +102,11 @@ pub unsafe fn load_recursive(
     index: paging::PageTableIndex,
     phys_addr: PhysAddr,
 ) -> Result<(), MemError> {
-    if (phys_addr.as_u64() & arch::TABLE_SIZE as u64 - 1) != 0 {
+    if (phys_addr.as_u64() & arch::L1_PAGE_SIZE as u64 - 1) != 0 {
         return Err(MemError::InvalidVirtRange {
             reason: InvalidVirtRangeReason::Unaligned,
             begin: VirtAddr::new(phys_addr.as_u64()),
-            size: arch::TABLE_SIZE as u64,
+            size: arch::L1_PAGE_SIZE as u64,
         });
     }
     assert!(
@@ -193,7 +192,7 @@ pub fn map_alloc(
     flags: MapFlags,
 ) -> Result<VirtAddr, MemError> {
     check_range_phys(phys_addr, byte_size)?;
-    let virt_addr = alloc_virtspace(byte_size, arch::TABLE_SIZE as usize)?;
+    let virt_addr = alloc_virtspace(byte_size, arch::L1_PAGE_SIZE as usize)?;
     unsafe { arch::map_unchecked(virt_addr, phys_addr, byte_size, flags) }?;
     Ok(virt_addr)
 }
@@ -279,7 +278,7 @@ const fn check_range_virt(virt_base: VirtAddr, byte_size: usize) -> Result<(), M
     };
 
     // Check page alignment, since `virt_base` is a VirtAddr, it's defined to be canonical.
-    if (virt_base.as_u64() % arch::TABLE_SIZE as u64) != 0 {
+    if (virt_base.as_u64() % arch::L1_PAGE_SIZE as u64) != 0 {
         return Err(MemError::InvalidVirtRange {
             reason: InvalidVirtRangeReason::Unaligned,
             begin: virt_base,

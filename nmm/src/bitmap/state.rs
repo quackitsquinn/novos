@@ -43,7 +43,7 @@ struct AllocationInfo {
 impl AllocationInfo {
     fn new(size: u64, align: Alignment) -> Self {
         let align = align.as_usize() as u64;
-        let page_align = align.div_ceil(arch::TABLE_SIZE);
+        let page_align = align.div_ceil(arch::L1_PAGE_SIZE);
         let entry_align = page_align.div_ceil(64);
         let needed_pages = bytes_to_pages(size);
         Self {
@@ -136,7 +136,7 @@ impl<'a, 'b> AllocationStateMachine<'a, 'b> {
             return Err(SkipStrategy::NextAligned); // This entry is fully allocated, so skip to the next aligned entry
         }
 
-        if info.size > Bitmap::BYTES_PER_ENTRY && info.align >= arch::TABLE_SIZE {
+        if info.size > Bitmap::BYTES_PER_ENTRY && info.align >= arch::L1_PAGE_SIZE {
             // We need to allocate more than one entry, so we check if this entry is fully free and properly aligned for the allocation. If so, we can start allocating.
             // TODO: Longer check when len > Bitmap::BYTES_PER_ENTRY but align < Bitmap::BYTES_PER_ENTRY
             if entry != 0 {
@@ -184,7 +184,7 @@ impl<'a, 'b> AllocationStateMachine<'a, 'b> {
                 if bit_index + info.needed_pages > 64 {
                     *state_ref = ScanState::Allocating {
                         start: BitPtr::new(index, bit_index as u8),
-                        remaining_size: info.size - (64 - bit_index) * arch::TABLE_SIZE,
+                        remaining_size: info.size - (64 - bit_index) * arch::L1_PAGE_SIZE,
                     }; // We will allocate the rest of this entry, but we still have remaining size to allocate}
                     return Err(SkipStrategy::Next);
                 }
@@ -271,7 +271,7 @@ fn rep_mask(mask: u64, n_bits: u64) -> u64 {
 ///
 ///
 fn bytes_to_pages(len: u64) -> u64 {
-    len.div_ceil(arch::TABLE_SIZE)
+    len.div_ceil(arch::L1_PAGE_SIZE)
 }
 
 #[cfg(test)]
@@ -323,9 +323,9 @@ mod tests {
         #[test]
         fn test_bytes_to_pages() {
             assert_eq!(bytes_to_pages(0), 0);
-            assert_eq!(bytes_to_pages(arch::TABLE_SIZE - 1), 1);
-            assert_eq!(bytes_to_pages(arch::TABLE_SIZE), 1);
-            assert_eq!(bytes_to_pages(arch::TABLE_SIZE + 1), 2);
+            assert_eq!(bytes_to_pages(arch::L1_PAGE_SIZE - 1), 1);
+            assert_eq!(bytes_to_pages(arch::L1_PAGE_SIZE), 1);
+            assert_eq!(bytes_to_pages(arch::L1_PAGE_SIZE + 1), 2);
         }
     }
 
@@ -359,7 +359,7 @@ mod tests {
             "Address is below bitmap base"
         );
         assert!(
-            addr.as_u64() + size <= bitmap.base.as_u64() + bitmap.page_count * arch::TABLE_SIZE,
+            addr.as_u64() + size <= bitmap.base.as_u64() + bitmap.page_count * arch::L1_PAGE_SIZE,
             "Address range exceeds bitmap bounds"
         );
         assert!(size > 0, "Size must be greater than 0");
@@ -372,7 +372,7 @@ mod tests {
             bitmap
                 .is_set(
                     bitmap.bitptr_for_addr(addr).expect("addr invalid bitptr"),
-                    size / arch::TABLE_SIZE
+                    size / arch::L1_PAGE_SIZE
                 )
                 .expect("ptr should not be out of range")
         )
@@ -382,11 +382,11 @@ mod tests {
     fn test_alloc_one_unalign() {
         let mut owner = OwnedBitmap::new(4, TEST_BASE);
         let mut bitmap = owner.bitmap();
-        let mut state_machine = state_machine(bitmap, arch::TABLE_SIZE, 1);
+        let mut state_machine = state_machine(bitmap, arch::L1_PAGE_SIZE, 1);
 
         let res = state_machine.do_step(0).expect("should not skip");
 
-        validate_allocation(state_machine.bitmap, res, TEST_BASE, arch::TABLE_SIZE, 1);
+        validate_allocation(state_machine.bitmap, res, TEST_BASE, arch::L1_PAGE_SIZE, 1);
     }
 
     #[test]
@@ -394,7 +394,7 @@ mod tests {
         let mut owner = OwnedBitmap::new(4, TEST_BASE);
         let mut bitmap = owner.bitmap();
         let mut state_machine =
-            state_machine(bitmap, arch::TABLE_SIZE, arch::TABLE_SIZE as usize * 64);
+            state_machine(bitmap, arch::L1_PAGE_SIZE, arch::L1_PAGE_SIZE as usize * 64);
 
         let res = state_machine.do_step(0);
 
@@ -410,9 +410,9 @@ mod tests {
         validate_allocation(
             state_machine.bitmap,
             res,
-            TEST_BASE + (arch::TABLE_SIZE as u64 * 64),
-            arch::TABLE_SIZE,
-            arch::TABLE_SIZE as usize * 64,
+            TEST_BASE + (arch::L1_PAGE_SIZE as u64 * 64),
+            arch::L1_PAGE_SIZE,
+            arch::L1_PAGE_SIZE as usize * 64,
         );
     }
 
@@ -421,7 +421,7 @@ mod tests {
         let mut owner = OwnedBitmap::new(4, TEST_BASE);
         let mut bitmap = owner.bitmap();
         let mut state_machine =
-            state_machine(bitmap, arch::TABLE_SIZE * 65, arch::TABLE_SIZE as usize);
+            state_machine(bitmap, arch::L1_PAGE_SIZE * 65, arch::L1_PAGE_SIZE as usize);
 
         let res = state_machine.do_step(0);
 
@@ -430,7 +430,7 @@ mod tests {
             state_machine.scan_state,
             ScanState::Allocating {
                 start: BitPtr::new(0, 0),
-                remaining_size: arch::TABLE_SIZE
+                remaining_size: arch::L1_PAGE_SIZE
             }
         );
 
@@ -441,8 +441,8 @@ mod tests {
             state_machine.bitmap,
             res.expect("should allocate"),
             TEST_BASE,
-            arch::TABLE_SIZE * 65,
-            arch::TABLE_SIZE as usize,
+            arch::L1_PAGE_SIZE * 65,
+            arch::L1_PAGE_SIZE as usize,
         );
     }
 
@@ -451,17 +451,20 @@ mod tests {
         let mut owner = OwnedBitmap::new(4, TEST_BASE);
         let mut bitmap = owner.bitmap();
         bitmap[0] = range_mask(9);
-        let mut state_machine =
-            state_machine(bitmap, arch::TABLE_SIZE / 2, arch::TABLE_SIZE as usize * 4);
+        let mut state_machine = state_machine(
+            bitmap,
+            arch::L1_PAGE_SIZE / 2,
+            arch::L1_PAGE_SIZE as usize * 4,
+        );
 
         let res = state_machine.do_step(0);
 
         validate_allocation(
             state_machine.bitmap,
             res.expect("should allocate"),
-            TEST_BASE + (12 * arch::TABLE_SIZE as u64),
-            arch::TABLE_SIZE / 2,
-            arch::TABLE_SIZE as usize * 4,
+            TEST_BASE + (12 * arch::L1_PAGE_SIZE as u64),
+            arch::L1_PAGE_SIZE / 2,
+            arch::L1_PAGE_SIZE as usize * 4,
         )
     }
 }

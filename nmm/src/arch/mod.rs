@@ -1,7 +1,6 @@
 //! Architecture-specific types and implementations for the memory manager.
 #[cfg(feature = "x86_64")]
 pub mod x86_64;
-use cake::limine::memory_map;
 #[cfg(feature = "x86_64")]
 use x86_64 as arch_impl;
 
@@ -37,8 +36,6 @@ pub const PHYSICAL_ADDRESS_MAX: u64 = arch_impl::PHYSICAL_ADDRESS_MAX;
 /// The number of bits used for indexing into page tables at each level.
 pub const TABLE_INDEX_BITS: usize = arch_impl::TABLE_INDEX_BITS;
 /// The size of a page table in bytes for x86_64 architecture.
-#[deprecated]
-pub const TABLE_SIZE: u64 = arch_impl::TABLE_SIZE as u64;
 /// The number of entries in a page table for x86_64 architecture.
 pub const ENTRY_COUNT: usize = arch_impl::ENTRY_COUNT;
 /// The size of a level 1 page (4KB) for x86_64 architecture.
