@@ -238,7 +238,7 @@ fn align_up(addr: u64, alignment: Alignment) -> u64 {
 #[cfg(test)]
 mod tests {
 
-    use std::{array, ptr::Alignment};
+    use std::{array, mem::Alignment};
 
     use cake::limine::memory_map::{Entry, EntryType};
 

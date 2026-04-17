@@ -13,7 +13,6 @@ use crate::{
         self, PhysAddr, VirtAddr,
         x86_64::{self, ArchError},
     },
-    bitmap::{BitPtr, Bitmap, register_global_bitmap},
     entry_walker::EntryWalker,
     paging::PageTableIndex,
 };
@@ -35,8 +34,8 @@ pub(crate) unsafe fn init_unchecked(
 
     // First, we need to bootstrap the virtual memory system by allocating however many pages we need to manage the scratch range.
     let scratch_pages = scratch_range.size / arch::L1_PAGE_SIZE as usize; // We can safely do this, since it's up to the caller to make sure the size is page-aligned.
-    let needed_pages = scratch_pages.div_ceil(Bitmap::MEMORY_PER_PAGE as usize);
-    let n_entries = (scratch_pages as usize).div_ceil(Bitmap::PAGES_PER_ENTRY as usize);
+    let needed_pages = todo!("scratch_pages.div_ceil(Bitmap::MEMORY_PER_PAGE as usize)");
+    let n_entries = todo!("(scratch_pages as usize).div_ceil(Bitmap::PAGES_PER_ENTRY as usize)");
     let pml4 = unsafe { &mut *(root as *mut PageTable) };
     let mut offset_table = unsafe { Offset::new(pml4, *offset) };
     let slice_base: *mut u64 = scratch_range.base.as_mut_ptr();
@@ -70,12 +69,12 @@ pub(crate) unsafe fn init_unchecked(
 
     let u64_slice = unsafe { slice::from_raw_parts_mut(slice_base, n_entries) };
 
-    let mut bitmap = unsafe { Bitmap::init(u64_slice, scratch_pages as u64, scratch_range.base) };
+    // let mut bitmap = unsafe { Bitmap::init(u64_slice, scratch_pages as u64, scratch_range.base) };
 
     // Now that we have the scratch space mapped and the bitmap initialized, we can mark the pages we just mapped as allocated in the bitmap, since they are now in use by the memory manager.
-    unsafe { bitmap.set(BitPtr::new(0, 0), needed_pages as u64) }; // Mark the pages we just mapped as allocated in the bitmap.
+    // unsafe { bitmap.set(BitPtr::new(0, 0), needed_pages as u64) }; // Mark the pages we just mapped as allocated in the bitmap.
 
-    let _ = register_global_bitmap(bitmap); // The user is allowed to register their own bitmap if they want.
+    //let _ = register_global_bitmap(bitmap); // The user is allowed to register their own bitmap if they want.
 
     Ok(())
 }

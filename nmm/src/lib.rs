@@ -1,6 +1,7 @@
 //! nmm - Novos Memory Manager Library
 #![cfg_attr(not(test), no_std)]
 #![feature(ptr_alignment_type)]
+#![feature(portable_simd)]
 
 use core::mem::Alignment;
 
@@ -12,7 +13,7 @@ pub use pastey as _pastey;
 
 use crate::{
     arch::{PhysAddr, VirtAddr},
-    bitmap::GLOBAL_BITMAP,
+    //bitmap::GLOBAL_BITMAP,
     entry_walker::EntryWalker,
 };
 
@@ -165,10 +166,11 @@ pub fn alloc_virtspace(byte_size: usize, alignment: usize) -> Result<VirtAddr, M
         return Err(MemError::OutOfMemory);
     }
 
-    let mut bitmap = GLOBAL_BITMAP.try_get().ok_or(MemError::Uninit)?;
-    bitmap
-        .alloc(byte_size, alignment)
-        .ok_or(MemError::OutOfMemory)
+    // let mut bitmap = GLOBAL_BITMAP.try_get().ok_or(MemError::Uninit)?;
+    // bitmap
+    //     .alloc(byte_size, alignment)
+    //     .ok_or(MemError::OutOfMemory)
+    todo!()
 }
 
 /// Frees a virtual address range of the specified size that was previously allocated with `alloc_virtspace`.
@@ -178,9 +180,8 @@ pub fn alloc_virtspace(byte_size: usize, alignment: usize) -> Result<VirtAddr, M
 /// as freeing a virtual address range that is still in use can lead to undefined behavior such as use-after-free or memory corruption.
 pub unsafe fn free_virtspace(virt_base: VirtAddr, byte_size: usize) -> Result<(), MemError> {
     check_range_virt(virt_base, byte_size)?;
-    let mut bitmap = GLOBAL_BITMAP.try_get().ok_or(MemError::Uninit)?;
-    unsafe { bitmap.free(virt_base, byte_size) }
-    Ok(())
+
+    todo!()
 }
 
 /// Maps a physical address range to a virtual address range of the specified size with the given flags, where the virtual address is allocated by the memory manager. This is a convenience function that combines `alloc_paged` and `map` into a single operation for ease of use.
