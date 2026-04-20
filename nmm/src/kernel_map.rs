@@ -46,12 +46,12 @@ macro_rules! kernel_map {
         $crate::_pastey::paste!{ pub mod [<$name:lower>] { // TODO: figure out how to allow for documenting these modules
             /// The start address of the section.
             pub const START: $crate::arch::VirtAddr = $base;
-            /// The start address of the section as a raw u64.
-            pub const START_RAW: u64 = START.as_u64();
             /// The size of the section.
             pub const SIZE: u64 = $size;
+            /// The start address of the section as a raw u64.
+            pub const START_RAW: u64 = START.as_u64();
             /// The end address of the section.
-            pub const END: $crate::arch::VirtAddr = $base.checked_add($size).expect("Kernel map section overflow");
+            pub const END: $crate::arch::VirtAddr = START.checked_add(SIZE).expect("Kernel map section overflow");
             /// The end address of the section as a raw u64.
             pub const END_RAW: u64 = END.as_u64();
             /// The virtual memory range of the section.
