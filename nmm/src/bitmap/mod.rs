@@ -1,7 +1,10 @@
+use core::mem::Alignment;
 use core::ops::BitOr;
 
-use core::simd::u64x4;
+use core::ops::{Index, IndexMut};
+use core::simd::{num::SimdUint, u64x4};
 
+mod allocate;
 mod bitptr;
 pub use bitptr::BitPtr;
 
@@ -55,6 +58,70 @@ impl<'a> Bitmap<'a> {
         }
     }
 
+    /// Returns a u64x4 SIMD vector containing 4 consecutive entries from the bitmap data, starting at the specified entry index.
+    ///
+    /// This is useful for SIMD operations on the bitmap data.
+    pub(crate) fn get_vec(&self, entry: usize) -> u64x4 {
+        let start = entry;
+        let end = start + 4;
+        let slice = &self.data[start..end];
+        u64x4::from_slice(slice)
+    }
+
+    /// Writes a u64x4 SIMD vector containing 4 consecutive entries to the bitmap data, starting at the specified entry index.
+    pub(crate) fn set_vec(&mut self, entry: usize, vec: u64x4) {
+        let start = entry;
+        let end = start + 4;
+        let slice = &mut self.data[start..end];
+        vec.copy_to_slice(slice);
+    }
+
+    /// Returns an iterator over the bitmap data in chunks of 4 entries, yielding each chunk as a u64x4 SIMD vector.
+    pub(crate) fn vec_chunks(&self) -> impl Iterator<Item = u64x4> {
+        self.data
+            .chunks_exact(4)
+            .map(|chunk| u64x4::from_slice(chunk))
+    }
+
+    /// Returns an iterator over the bitmap data in chunks of `align` bits. This will iterate over every entry if align < 64.
+    ///
+    /// Returns (index of chunk, chunk) pairs.
+    pub(crate) fn aligned_entries(&self, align: Alignment) -> impl Iterator<Item = (usize, u64)> {
+        let align = align.as_usize();
+        let ent_skip = (align / 64).max(1);
+        self.data
+            .chunks(ent_skip)
+            .enumerate()
+            .map(move |(i, chunk)| (i * ent_skip, chunk[0]))
+    }
+
+    /// Finds the first clear bit in the bitmap and returns a `BitPtr` pointing to it. If all bits are set, returns `None`.
+    pub fn first_clear(&self) -> Option<BitPtr> {
+        for (base, entry) in self.vec_chunks().enumerate() {
+            let trailing_ones = entry.trailing_ones();
+            if trailing_ones == u64x4::splat(64) {
+                continue;
+            }
+
+            let res = trailing_ones
+                .as_array()
+                .iter()
+                .enumerate()
+                .find_map(|(i, entry)| {
+                    if *entry == 64 {
+                        return None;
+                    }
+                    Some(BitPtr::new((base * 4 + i) as u64, *entry as u8))
+                });
+
+            if let Some(bit_ptr) = res {
+                return Some(bit_ptr);
+            }
+        }
+
+        None
+    }
+
     /// Sets or clears a range of bits in the bitmap, starting from the bit pointed to by `bit_ptr` and spanning `count` bits. If `value` is `true`, the bits will be set (marked as allocated); if `value` is `false`, the bits will be cleared (marked as free).
     pub fn set(&mut self, bit_ptr: BitPtr, count: u64) {
         self.mod_range(bit_ptr, count, u64::bitor, u64x4::bitor);
@@ -63,6 +130,11 @@ impl<'a> Bitmap<'a> {
     /// Clears a range of bits in the bitmap, starting from the bit pointed to by `bit_ptr` and spanning `count` bits. This marks the corresponding pages as free.
     pub fn clear(&mut self, bit_ptr: BitPtr, count: u64) {
         self.mod_range(bit_ptr, count, |a, b| a & !b, |a, b| a & !b);
+    }
+
+    /// Resets the entire bitmap, clearing all bits and marking all pages as free.
+    pub fn reset(&mut self) {
+        self.data.fill(0);
     }
 
     fn mod_range<Norm, Simd>(
@@ -139,7 +211,7 @@ impl<'a> Bitmap<'a> {
                 break;
             }
 
-            let src = u64x4::from_slice(&self.data[i..i + 4]);
+            let src = self.get_vec(i);
             let res = simd_mask_op(src, mask);
             #[cfg(test)]
             {
@@ -151,7 +223,7 @@ impl<'a> Bitmap<'a> {
                     println!("simd:   src_lane[{lane}]: {:064b}", src[lane]);
                 }
             }
-            res.copy_to_slice(&mut self.data[i..i + 4]);
+            self.set_vec(i, res);
 
             i = next;
         }
@@ -168,6 +240,20 @@ impl<'a> Bitmap<'a> {
             self.data[i] = mask_op(self.data[i], u64::MAX);
             i += 1;
         }
+    }
+}
+
+impl<'a> Index<usize> for Bitmap<'a> {
+    type Output = u64;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.data[index]
+    }
+}
+
+impl<'a> IndexMut<usize> for Bitmap<'a> {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.data[index]
     }
 }
 
@@ -208,6 +294,8 @@ pub const fn entry_mask(bit_offset: u8, size: u64) -> Result<u64, (u64, u64)> {
 
 #[cfg(test)]
 mod tests {
+    use std::simd::u64x4;
+
     use crate::bitmap::BitPtr;
 
     /// assert_eq but it prints the binary representation
@@ -260,6 +348,64 @@ mod tests {
         assert_eq!(super::entry_mask(1, 3), Ok(0b1110));
         assert_eq!(super::entry_mask(60, 5), Err((0b11111 << 60, 1)));
         assert_eq!(super::entry_mask(0, 128), Err((u64::MAX, 64)));
+    }
+
+    #[test]
+    fn test_get_vec() {
+        let mut data = [0u64; 64];
+        data.iter_mut().enumerate().for_each(|(i, x)| *x = i as u64);
+
+        let bitmap = unsafe { super::Bitmap::init(&mut data, 64 * 64, 0) };
+
+        let vec = bitmap.get_vec(0);
+        assert_eq!(vec, u64x4::from_array([0, 1, 2, 3]));
+
+        let vec = bitmap.get_vec(1);
+        assert_eq!(vec, u64x4::from_array([1, 2, 3, 4]));
+    }
+
+    #[test]
+    fn test_set_vec() {
+        let mut data = [0u64; 64];
+        let mut bitmap = unsafe { super::Bitmap::init(&mut data, 64 * 64, 0) };
+
+        let val = u64x4::splat(u64::MAX);
+        bitmap.set_vec(0, val);
+        assert_eq!(bitmap.get_vec(0), val);
+    }
+
+    #[test]
+    fn test_vec_chunks() {
+        let mut data = [0u64; 64];
+        data.iter_mut().enumerate().for_each(|(i, x)| *x = i as u64);
+
+        let bitmap = unsafe { super::Bitmap::init(&mut data, 64 * 64, 0) };
+
+        let mut chunks = bitmap.vec_chunks();
+
+        for i in (0..64).step_by(4) {
+            let chunk = chunks.next().unwrap();
+            assert_eq!(
+                chunk,
+                u64x4::from_array([i as u64, (i + 1) as u64, (i + 2) as u64, (i + 3) as u64])
+            );
+        }
+    }
+
+    #[test]
+    fn test_first_clear() {
+        let mut data = [0u64; 64];
+        let bitmap = unsafe { super::Bitmap::init(&mut data, 64 * 64, 0) };
+
+        assert_eq!(bitmap.first_clear(), Some(BitPtr::new(0, 0)));
+
+        bitmap.data[0] = u64::MAX;
+        assert_eq!(bitmap.first_clear(), Some(BitPtr::new(1, 0)));
+
+        for entry in bitmap.data.iter_mut() {
+            *entry = u64::MAX;
+        }
+        assert_eq!(bitmap.first_clear(), None);
     }
 
     #[test]

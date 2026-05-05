@@ -365,3 +365,27 @@ cake::encapsulate_macro!(
         };
     }
 );
+
+cake::encapsulate_macro!(
+    pub(crate) test_print,
+    _test_print_mod,
+    /// Expands to a print statement that is only included in test builds, allowing for debug printing in tests without affecting release builds.
+    macro_rules! test_print {
+        ($($arg:tt)*) => {
+            #[cfg(test)]
+            print!($($arg)*);
+        };
+    }
+);
+
+cake::encapsulate_macro!(
+    pub(crate) test_println,
+    _test_println_mod,
+    /// Expands to a print statement that is only included in test builds, allowing for debug printing in tests without affecting release builds.
+    macro_rules! test_println {
+        ($($arg:tt)*) => {
+            #[cfg(test)]
+            println!($($arg)*);
+        };
+    }
+);
