@@ -10,12 +10,12 @@ impl BitPtr {
     pub const ZERO: Self = BitPtr(0);
 
     /// Creates a new `BitPtr` from a given bitmap entry. The `entry` is shifted left by 8 bits to make room for the bit offset, which is set to 0.
-    pub fn entry(entry: u64) -> Self {
+    pub const fn entry(entry: u64) -> Self {
         BitPtr(entry << 8)
     }
 
     /// Creates a new `BitPtr` from a given bit index.
-    pub fn new(entry_index: u64, bit_offset: u8) -> Self {
+    pub const fn new(entry_index: u64, bit_offset: u8) -> Self {
         assert!(bit_offset < 64, "bit_offset must be less than 64");
         assert!(
             entry_index < (u64::MAX >> 8),
@@ -27,7 +27,7 @@ impl BitPtr {
     /// Creates a new `BitPtr` from a given bitmap entry and bit offset, wrapping the bit_offset and adding it to the entry index.
     ///
     /// `entry_index` will still panic if it overflows
-    pub fn new_wrapping(entry_index: u64, bit_offset: u64) -> Self {
+    pub const fn new_wrapping(entry_index: u64, bit_offset: u64) -> Self {
         let entries_from_bits = bit_offset / 64;
         let bit_offset = (bit_offset % 64) as u8;
         let entry_index = entry_index + entries_from_bits;
@@ -35,17 +35,17 @@ impl BitPtr {
     }
 
     /// Returns the index of the bitmap entry that this `BitPtr` points to.
-    pub fn entry_index(&self) -> u64 {
+    pub const fn entry_index(&self) -> u64 {
         self.0 >> 8
     }
 
     /// Returns the offset of the bit within the bitmap entry that this `BitPtr` points to.
-    pub fn bit_offset(&self) -> u8 {
+    pub const fn bit_offset(&self) -> u8 {
         (self.0 & 0xFF) as u8
     }
 
     /// Returns the overall bit index that this `BitPtr` points to, calculated as `entry_index * 64 + bit_offset`.
-    pub fn bit_index(&self) -> u64 {
+    pub const fn bit_index(&self) -> u64 {
         self.entry_index() * 64 + self.bit_offset() as u64
     }
 
@@ -72,7 +72,7 @@ impl BitPtr {
     }
 
     /// Checks if adding `n_bits` to the current bit offset would overflow into the next bitmap entry.
-    pub fn will_overflow(&self, n_bits: u64) -> bool {
+    pub const fn will_overflow(&self, n_bits: u64) -> bool {
         let bit_index = self.bit_offset() as u64 + n_bits;
         return bit_index > 64;
     }
