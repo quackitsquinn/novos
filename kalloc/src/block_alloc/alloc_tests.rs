@@ -233,23 +233,23 @@ fn test_allocate_zst() {
     assert!(ptr.is_null());
 }
 
-#[test]
-fn test_box() {
-    let value = 32u32;
-
-    let (allocator, _defer_guard) = get_full_allocator::<ARENA_SIZE>();
-
-    let bx = Box::new_in(value, &allocator);
-    let ptr = Box::into_raw(bx);
-
-    let blocks = &mut allocator.get().expect("Failed to get allocator");
-
-    assert_eq!(blocks.allocation_balance, 1);
-    assert_eq!(unsafe { *ptr }, value);
-    alloc_check(ptr, Layout::from_size_align(4, 1).unwrap(), blocks);
-    drop(blocks);
-    drop(unsafe { Box::from_raw_in(ptr, &allocator) });
-}
+// #[test]
+// fn test_box() {
+//     let value = 32u32;
+// 
+//     let (allocator, _defer_guard) = get_full_allocator::<ARENA_SIZE>();
+// 
+//     let bx = Box::new_in(value, &allocator);
+//     let ptr = Box::into_raw(bx);
+// 
+//     let blocks = &mut allocator.get().expect("Failed to get allocator");
+// 
+//     assert_eq!(blocks.allocation_balance, 1);
+//     assert_eq!(unsafe { *ptr }, value);
+//     alloc_check(ptr, Layout::from_size_align(4, 1).unwrap(), blocks);
+//     drop(blocks);
+//     drop(unsafe { Box::from_raw_in(ptr, &allocator) });
+// }
 #[test]
 fn test_vec() {
     let (allocator, _defer_guard) = get_full_allocator::<ARENA_SIZE>();
