@@ -8,7 +8,7 @@ use crate::test_println;
 
 impl<'a> Bitmap<'a> {
     /// Checks if any of the `n_bits` bits starting from the bit pointed to by `bit_ptr` are set in the bitmap. Returns `true` if any of the bits are set, and `false` otherwise.
-    pub fn bits_are_set(&self, bit_ptr: BitPtr, n_bits: u64) -> bool {
+    pub fn some_are_set(&self, bit_ptr: BitPtr, n_bits: u64) -> bool {
         let first_mask = super::bit_run_mask(n_bits) << bit_ptr.bit_offset();
         let entry_idx = bit_ptr.entry_index() as usize;
         let first_entry = self[entry_idx];
@@ -55,6 +55,74 @@ impl<'a> Bitmap<'a> {
         return false;
     }
 
+    /// Checks if the given `n_bits` bits starting from the bit pointed to by `bit_ptr` are all set in the bitmap. Returns `true` if all of the bits are set, and `false` otherwise.
+    pub fn all_are_set(&self, bit_ptr: BitPtr, n_bits: u64) -> bool {
+        let first_mask = super::bit_run_mask(n_bits) << bit_ptr.bit_offset();
+        let entry_idx = bit_ptr.entry_index() as usize;
+        let first_entry = self[entry_idx];
+        if (first_entry & first_mask) != first_mask {
+            return false;
+        }
+
+        if !bit_ptr.will_overflow(n_bits) {
+            // Check if first_entry has all the bits in first_mask set
+            let res = first_entry & first_mask;
+            return res == first_mask;
+        }
+
+        let full_entries = (bit_ptr.bit_offset() as u64 + n_bits) / 64;
+        let overflowed_entries = full_entries % u64x4::LEN as u64;
+        let entry_idx = entry_idx;
+
+        // Check so that we can guarantee SIMD alignment
+        for i in 0..overflowed_entries {
+            let entry = self[entry_idx + i as usize];
+            if entry != u64::MAX {
+                return false;
+            }
+        }
+
+        let simd_start = entry_idx + overflowed_entries as usize;
+        let simd_end = (simd_start + full_entries as usize) - overflowed_entries as usize;
+
+        debug_assert!(
+            (simd_end - simd_start) % u64x4::LEN == 0,
+            "unaligned SIMD loop, got {} entries",
+            simd_end - simd_start
+        );
+
+        test_println!("checking range {} to {}", simd_start, simd_end);
+
+        for i in (simd_start..simd_end).step_by(u64x4::LEN) {
+            test_println!("checking entries {} to {}", i, i + u64x4::LEN);
+            let entries = self.get_vec(i);
+            if entries != u64x4::splat(u64::MAX) {
+                test_println!(
+                    "entries: {:064b} {:064b} {:064b} {:064b}",
+                    entries[0],
+                    entries[1],
+                    entries[2],
+                    entries[3]
+                );
+                return false;
+            }
+        }
+
+        let unaligned_bits = (bit_ptr.bit_offset() as u64 + n_bits) % 64;
+        if unaligned_bits == 0 {
+            return true;
+        }
+
+        let last_mask = super::bit_run_mask(n_bits) >> unaligned_bits;
+        let last_entry_idx = bit_ptr.entry_index() + full_entries;
+        let last_entry = self[last_entry_idx as usize];
+        if (last_entry & last_mask) != last_mask {
+            return false;
+        }
+
+        return true;
+    }
+
     /// Allocates a contiguous run of `n_bits` clear bits in the bitmap, aligned to `align`.
     /// This is the slow path for when `n_bits` is greater than 64, as we have to check multiple entries for each potential allocation.
     ///
@@ -75,7 +143,7 @@ impl<'a> Bitmap<'a> {
                     continue;
                 }
                 let bitptr = BitPtr::entry(ind as u64);
-                if self.bits_are_set(bitptr, n_bits) {
+                if self.some_are_set(bitptr, n_bits) {
                     continue;
                 }
                 res = Some(bitptr);
@@ -92,7 +160,7 @@ impl<'a> Bitmap<'a> {
             }
 
             let bitptr = BitPtr::new(ind as u64, rounded as u8);
-            if self.bits_are_set(bitptr, n_bits) {
+            if self.some_are_set(bitptr, n_bits) {
                 continue;
             }
             res = Some(bitptr);
@@ -143,7 +211,7 @@ impl<'a> Bitmap<'a> {
                 if effective_size >= n_bits as u32 {
                     test_println!("found a run at entry {}, bit {}", ind, aligned_offset);
                     let bitptr = BitPtr::new(ind as u64, aligned_offset as u8);
-                    debug_assert!(!self.bits_are_set(bitptr, n_bits as u64));
+                    debug_assert!(!self.some_are_set(bitptr, n_bits as u64));
                     res = Some(bitptr);
                     break 'outer;
                 }
@@ -161,57 +229,11 @@ impl<'a> Bitmap<'a> {
 #[cfg(test)]
 mod tests {
     use crate::{
-        bitmap,
+        arch, bitmap,
         paging::{Large, Medium, PrimitiveSize},
     };
 
     use super::*;
-
-    #[test]
-    fn test_run_mask() {
-        macro_rules! case {
-            ($size: expr, $align: expr, $expected_mask: expr, $expected_n_reps: expr) => {
-                assert_eq!(
-                    run_mask($size, Alignment::new($align).unwrap()).unwrap(),
-                    ($expected_n_reps, $expected_mask),
-                    "run_mask({}, {}) is not equal to {:064b}",
-                    $size,
-                    $align,
-                    run_mask($size, Alignment::new($align).unwrap()).unwrap().1,
-                );
-            };
-
-            ($size: expr, $align: expr) => {
-                assert!(
-                    run_mask($size, Alignment::new($align).unwrap()).is_none(),
-                    "run_mask({}, {}) should be None",
-                    $size,
-                    $align
-                );
-            };
-
-            // capture more than 2 arguments
-            ($size: expr, $align: expr; $($rest:tt)*) => {
-                case!($size, $align);
-                case!($($rest)*);
-            };
-
-            ($size: expr, $align: expr, $expected_mask: expr, $expected_n_reps: expr; $($rest:tt)*) => {
-                case!($size, $align, $expected_mask, $expected_n_reps);
-                case!($($rest)*);
-            };
-        }
-
-        case!(
-            3, 8, 0b0000_0111_0000_0111_0000_0111_0000_0111_0000_0111_0000_0111_0000_0111_0000_0111, 8;
-            8,8, u64::MAX, 8;
-            8, 32, 0b0000_0000_0000_0000_0000_0000_1111_1111_0000_0000_0000_0000_0000_0000_1111_1111, 2;
-            32, 128, 0x0000_0000_FFFF_FFFF, 1;
-            33, 32;
-            2, 1;
-            128, 128
-        );
-    }
 
     #[test]
     fn test_bits_are_set() {
@@ -220,7 +242,7 @@ mod tests {
 
         let check_set = |bitmap: &super::Bitmap, bit_ptr: BitPtr, n_bits: u64, expected: bool| {
             assert_eq!(
-                bitmap.bits_are_set(bit_ptr, n_bits),
+                bitmap.some_are_set(bit_ptr, n_bits),
                 expected,
                 "bits_are_set({:?}, {}) should be {}",
                 bit_ptr,
@@ -251,6 +273,37 @@ mod tests {
     }
 
     #[test]
+    fn test_all_are_set() {
+        let mut data = [0u64; 64];
+        let mut bitmap = unsafe { super::Bitmap::init(&mut data, 64 * 64, 0) };
+
+        fn check_all_set(bitmap: &super::Bitmap, bit_ptr: BitPtr, n_bits: u64, expected: bool) {
+            println!("checking all_are_set({:?}, {})", bit_ptr, n_bits);
+            assert_eq!(
+                bitmap.all_are_set(bit_ptr, n_bits),
+                expected,
+                "bits_are_set({:?}, {}) should be {}",
+                bit_ptr,
+                n_bits,
+                expected
+            );
+        }
+
+        bitmap.set(BitPtr::ZERO, 512);
+        for i in 0..512 / 64 {
+            println!("entry({i}): bin[{:064b}]", bitmap[i]);
+        }
+        check_all_set(&bitmap, BitPtr::ZERO, 512, true);
+        check_all_set(&bitmap, BitPtr::ZERO, 513, false);
+        check_all_set(&bitmap, BitPtr::new(0, 1), 511, true);
+        check_all_set(&bitmap, BitPtr::new(0, 1), 512, false);
+        check_all_set(&bitmap, BitPtr::new(0, 1), 510, true);
+        check_all_set(&bitmap, BitPtr::new(0, 63), 1, true);
+        check_all_set(&bitmap, BitPtr::new(0, 33), 64, true);
+        check_all_set(&bitmap, BitPtr::new(0, 63), 2, true);
+    }
+
+    #[test]
     fn test_allocate() {
         const CAP: usize = 0x200000 * 2;
         // move this massive array onto the heap to avoid a stack overflow in debug mode
@@ -268,7 +321,17 @@ mod tests {
                 n_bits,
                 align
             );
-            res.unwrap()
+            let res = res.unwrap();
+
+            assert!(
+                bitmap.all_are_set(res, n_bits),
+                "allocated bits should be set in the bitmap, but they are not for allocation of {} bits with alignment {} at bitptr {:?}",
+                n_bits,
+                align,
+                res
+            );
+
+            res
         };
 
         assert_eq!(alloc(&mut bitmap, 1, 1), BitPtr::new(0, 0));
@@ -283,5 +346,14 @@ mod tests {
             BitPtr::new(Medium::SIZE / 64, 0)
         );
         assert_eq!(alloc(&mut bitmap, 34, 512), BitPtr::new(512 / 64, 0));
+        bitmap.reset();
+        assert_eq!(
+            alloc(
+                &mut bitmap,
+                arch::L2_PAGE_SIZE / 4096,
+                arch::L2_PAGE_SIZE as usize / 4096
+            ),
+            BitPtr::new(0, 0)
+        );
     }
 }

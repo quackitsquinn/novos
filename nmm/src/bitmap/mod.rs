@@ -6,7 +6,11 @@ use core::simd::{num::SimdUint, u64x4};
 
 mod allocate;
 mod bitptr;
+mod managers;
 pub use bitptr::BitPtr;
+pub use managers::virt::VirtualAddressManager;
+
+use crate::test_println;
 
 /// A bitmap primitive for tracking the allocation status of pages in the memory manager.
 pub struct Bitmap<'a> {
@@ -235,8 +239,7 @@ impl<'a> Bitmap<'a> {
         let (mut i, full_end) = rest.unwrap();
 
         while i <= full_end {
-            #[cfg(test)]
-            println!("Fallback at entry {}", i);
+            test_println!("Fallback at entry {}", i);
             self.data[i] = mask_op(self.data[i], u64::MAX);
             i += 1;
         }
