@@ -85,7 +85,8 @@ impl<T: AcpiTable> MappedTable<T> {
 
     /// Returns a pinned reference to the mapped ACPI table.
     pub fn table_pin(&self) -> Pin<&T> {
-        pin!(&self.table)
+        // pin!(&self.table)
+        todo!()
     }
 }
 

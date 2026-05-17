@@ -7,11 +7,23 @@ default-run = "boot"
 
 [workspace]
 # yes i stole the name for nmm from redox
-members = [ "cake", "kalloc", "kbuild","kernel", "kproc", "krun", "kserial", "kserial/kserial_derive", "kelp", "nmm"]
+members = [
+    "cake",
+    "kalloc",
+    "kbuild",
+    "kernel",
+    "kproc",
+    "krun",
+    "kserial",
+    "kserial/kserial_derive",
+    "kelp",
+    "nmm",
+    "re_analyzer",
+]
 
 [build-dependencies]
-kernel = {path = "kernel", artifact = "bin", target = "x86_64-unknown-none"}
-kbuild = {path = "kbuild"}
+kernel = { path = "kernel", artifact = "bin", target = "x86_64-unknown-none" }
+kbuild = { path = "kbuild" }
 
 [dependencies]
 backtrace = "0.3.74"
@@ -19,7 +31,7 @@ ctrlc = "3.4.5"
 lazy_static = "1.5.0"
 regex = "1.10.6"
 kserial = { path = "kserial" }
-kbuild = {path = "kbuild"}
+kbuild = { path = "kbuild" }
 jzon = "0.12.4"
 ovmf-prebuilt = "0.2.1"
 krun = { path = "krun" }
