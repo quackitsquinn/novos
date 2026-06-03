@@ -2,15 +2,34 @@
 
 pub mod addr;
 pub(crate) mod api;
+mod conv;
+mod mapper;
+mod recursive;
 
 use core::mem::Alignment;
 
 use bitflags::bitflags;
 
 pub use addr::{PhysAddr, VirtAddr};
-use x86_64::structures::paging::{FrameAllocator, PageSize, PhysFrame, mapper::MapToError};
 
-use crate::{MemError, entry_walker::EntryWalker};
+// This submodule exists purely to reduce name collisions as the internal implementation of x86_64
+// is very similar to nmm (as i roughly modeled nmm after x86_64 and redox's memory management),
+// so there are a lot of similar types and functions, and it would be very easy for them to collide if they were all in the same module.
+//
+// It's a bit verbose, but it's easier than dealing with the name collisions and weird compiler errors that would arise.
+mod arch_lib {
+    pub use x86_64::structures::paging::{
+        FrameAllocator, OffsetPageTable, PageSize, PhysFrame, RecursivePageTable, Size1GiB,
+        Size2MiB, Size4KiB, mapper::MapToError,
+    };
+}
+
+use crate::{
+    MapFlags, MemError,
+    arch::x86_64::conv::XFrameAllocator,
+    entry_walker::EntryWalker,
+    paging::{self, Frame, Large, Medium, Page, PrimitiveRangeManager, PrimitiveSize, Small},
+};
 
 /// The width of virtual addresses in bits for x86_64 architecture.
 pub const VIRTUAL_ADDRESS_WIDTH: u8 = 48;
@@ -60,6 +79,28 @@ bitflags! {
     }
 }
 
+/// An error that originate from architecture-specific operations in the memory manager. This is the error type for x86_64 architecture.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
+pub enum ArchError {
+    #[error("Parent page table entry is a huge page, cannot map to it")]
+    /// An error indicating that a mapping operation failed because the parent page table entry is a huge page, which cannot be used for mapping.
+    ParentEntryHugePage,
+}
+
+pub(crate) fn map_primitive<S, A>(
+    src: Frame<S>,
+    dst: Page<S>,
+    flags: MapFlags,
+    frame_allocator: &mut A,
+) -> Result<(), MemError>
+where
+    S: PrimitiveSize,
+    A: PrimitiveRangeManager<Frame<S>, S>,
+{
+    let mut alc = XFrameAllocator::new(frame_allocator);
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -90,39 +131,5 @@ mod tests {
             GLOBAL,
             NO_EXECUTE
         ));
-    }
-}
-
-unsafe impl<'a, S> FrameAllocator<S> for EntryWalker<'a>
-where
-    S: PageSize,
-{
-    fn allocate_frame(&mut self) -> Option<PhysFrame<S>> {
-        let val = self.next(S::SIZE, Alignment::new(S::SIZE as usize).unwrap())?;
-        Some(PhysFrame::containing_address(*val))
-    }
-}
-
-/// An error that originate from architecture-specific operations in the memory manager. This is the error type for x86_64 architecture.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
-#[non_exhaustive]
-pub enum ArchError {
-    #[error("Parent page table entry is a huge page, cannot map to it")]
-    /// An error indicating that a mapping operation failed because the parent page table entry is a huge page, which cannot be used for mapping.
-    ParentEntryHugePage,
-}
-
-impl<S> From<MapToError<S>> for MemError
-where
-    S: PageSize,
-{
-    fn from(value: MapToError<S>) -> Self {
-        match value {
-            MapToError::FrameAllocationFailed => MemError::OutOfMemory,
-            MapToError::ParentEntryHugePage => MemError::ArchError(ArchError::ParentEntryHugePage),
-            MapToError::PageAlreadyMapped(phys_frame) => {
-                MemError::AlreadyMapped(PhysAddr::new(phys_frame.start_address().as_u64()))
-            }
-        }
     }
 }

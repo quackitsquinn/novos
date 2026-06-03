@@ -1,7 +1,10 @@
+use crate::paging::{Large, Medium, Small};
 use crate::{align, arch::VirtAddr, paging::PrimitiveSize};
+use core::any::type_name;
+use core::fmt::Debug;
 
 /// A page on the current architecture.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Page<S: PrimitiveSize> {
     start_address: VirtAddr,
     _size_marker: core::marker::PhantomData<S>,
@@ -47,4 +50,23 @@ impl<S: PrimitiveSize> Page<S> {
     pub fn start_address(&self) -> VirtAddr {
         self.start_address
     }
+}
+
+impl<S: PrimitiveSize> Debug for Page<S> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_tuple("Page")
+            .field(&type_name::<S>())
+            .field(&self.start_address)
+            .finish()
+    }
+}
+/// An enum representing a virtual memory page of any size (small, medium, or large).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UnsizedPage {
+    /// A small page, typically 4KB in size for x86_64 architecture.
+    Small(Page<Small>),
+    /// A medium page, typically 2MB in size for x86_64 architecture.
+    Medium(Page<Medium>),
+    /// A large page, typically 1GB in size for x86_64 architecture.
+    Large(Page<Large>),
 }

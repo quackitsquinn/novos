@@ -40,7 +40,6 @@ pub(crate) unsafe fn init_unchecked(
     let mut offset_table = unsafe { Offset::new(pml4, *offset) };
     let slice_base: *mut u64 = scratch_range.base.as_mut_ptr();
     let mut next_page = *scratch_range.base;
-
     debug!(
         "NMM: mapping {} pages for scratch space [base: {:x}, size: {:x}]",
         needed_pages, next_page, scratch_range.size

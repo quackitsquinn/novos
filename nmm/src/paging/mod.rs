@@ -4,15 +4,19 @@ mod frame;
 pub mod index;
 pub(crate) mod limine;
 mod page;
+mod page_state;
 
 use core::any::TypeId;
 
-use cake::log::debug;
+use cake::{
+    Once,
+    log::{debug, trace},
+};
 pub use index::PageTableIndex;
 
-use crate::{NmmSealed, arch::PageEntryType, seal};
+use crate::{MapFlags, MemError, NmmSealed, arch::PageEntryType, seal};
 
-pub use frame::Frame;
+pub use frame::{Frame, UnsizedFrame};
 pub use page::Page;
 
 /// The virtual address type used by the current architecture.
@@ -122,4 +126,22 @@ impl<T> AllFrames for T where
         + PrimitiveRangeManager<Frame<Medium>, Medium>
         + PrimitiveRangeManager<Frame<Large>, Large>
 {
+}
+
+pub(crate) fn map_primitive<S, A>(
+    src: Frame<S>,
+    dst: Page<S>,
+    flags: MapFlags,
+    frame_allocator: &mut A,
+) -> Result<(), MemError>
+where
+    S: PrimitiveSize,
+    A: PrimitiveRangeManager<Frame<S>, S>,
+{
+    trace!(
+        "Mapping frame {:?} to page {:?} with flags {:?}",
+        src, dst, flags
+    );
+
+    crate::arch::map_primitive(src, dst, flags, frame_allocator)
 }

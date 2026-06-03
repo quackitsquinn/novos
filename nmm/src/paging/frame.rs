@@ -1,12 +1,14 @@
+use core::{any::type_name, fmt::Debug};
+
 use crate::{
     NmmSealed, align,
     arch::PhysAddr,
-    paging::{MemoryPrimitive, PrimitiveSize},
+    paging::{Large, Medium, MemoryPrimitive, PrimitiveSize, Small},
 };
 
 /// A physical memory frame on the current architecture.
 /// A frame represents a contiguous block of physical memory that can be mapped into the virtual address space with a page of the same size.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Frame<S: PrimitiveSize> {
     start_address: PhysAddr,
     _size_marker: core::marker::PhantomData<S>,
@@ -60,3 +62,23 @@ impl<S: PrimitiveSize> Frame<S> {
 
 impl<S: PrimitiveSize> NmmSealed for Frame<S> {}
 impl<S: PrimitiveSize> MemoryPrimitive<S> for Frame<S> {}
+
+impl<S: PrimitiveSize> Debug for Frame<S> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_tuple("Frame")
+            .field(&type_name::<S>())
+            .field(&self.start_address)
+            .finish()
+    }
+}
+
+/// An enum representing a physical memory frame of any size (small, medium, or large).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum UnsizedFrame {
+    /// A small frame, typically 4KB in size for x86_64 architecture.
+    Small(Frame<Small>),
+    /// A medium frame, typically 2MB in size for x86_64 architecture.
+    Medium(Frame<Medium>),
+    /// A large frame, typically 1GB in size for x86_64 architecture.
+    Large(Frame<Large>),
+}

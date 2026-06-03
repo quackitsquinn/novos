@@ -1,5 +1,5 @@
 use crate::{
-    MemError,
+    MapFlags, MemError,
     arch::{PhysAddr, VirtAddr},
 };
 
@@ -8,7 +8,13 @@ use crate::{
 /// This trait can be implemented by both the physical and virtual memory managers to manage their respective address spaces.
 pub trait AddressSpaceBuilder {
     /// Maps `size` bytes of memory starting at the virtual address `virt` to physical memory according to the specified `source`. The mapping should be page-aligned and can have various options for how the physical memory is allocated or copied.
-    fn map(&mut self, virt: VirtAddr, source: Source, size: u64) -> Result<(), MemError>;
+    fn map(
+        &mut self,
+        virt: VirtAddr,
+        source: Source,
+        size: u64,
+        map_flags: MapFlags,
+    ) -> Result<(), MemError>;
 }
 
 pub(crate) trait RemapInto {

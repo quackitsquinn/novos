@@ -7,7 +7,7 @@ use x86_64 as arch_impl;
 use crate::{
     MapFlags, MemError, VirtualMemoryRange,
     entry_walker::EntryWalker,
-    paging::{self},
+    paging::{self, Frame, Page, PrimitiveRangeManager, PrimitiveSize},
 };
 
 /// Physical address type for the current architecture.
@@ -93,4 +93,17 @@ pub(crate) unsafe fn unmap_unchecked(
 #[must_use = "The returned virtual address must be freed with `unmap` when it is no longer needed to avoid memory leaks and ensure proper resource management."]
 pub(crate) unsafe fn alloc_paged(byte_size: usize, flags: MapFlags) -> Result<VirtAddr, MemError> {
     unsafe { arch_impl::api::alloc_paged(byte_size, flags) }
+}
+
+pub(crate) fn map_primitive<S, A>(
+    src: Frame<S>,
+    dst: Page<S>,
+    flags: MapFlags,
+    frame_allocator: &mut A,
+) -> Result<(), MemError>
+where
+    S: PrimitiveSize,
+    A: PrimitiveRangeManager<Frame<S>, S>,
+{
+    arch_impl::map_primitive(src, dst, flags, frame_allocator)
 }
