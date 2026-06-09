@@ -15,6 +15,7 @@ use crate::{
     arch::{PhysAddr, VirtAddr},
     //bitmap::GLOBAL_BITMAP,
     entry_walker::EntryWalker,
+    paging::PageTable,
 };
 
 #[cfg(not(feature = "x86_64"))]
@@ -79,16 +80,11 @@ impl VirtualMemoryRange {
 ///   This range is used for virtual address allocation (e.g., for `alloc_virtspace`) and physical memory mapping (e.g., for `alloc_paged`),
 ///   as well as internal memory management state.
 pub unsafe fn init(
-    root: *mut (),
+    root: &'static mut PageTable,
     offset: VirtAddr,
     ranges: &'static [&'static memory_map::Entry],
     managed_range: VirtualMemoryRange,
 ) -> Result<(), MemError> {
-    assert!(
-        !root.is_null(),
-        "The root page table pointer must not be null."
-    );
-
     unsafe { arch::init_unchecked(root, offset, EntryWalker::new(ranges), managed_range) }
 }
 
@@ -99,7 +95,7 @@ pub unsafe fn init(
 /// The caller must ensure that the recursive mapping is a. present and b. pointing towards `phys_addr` before enabling it,
 /// as enabling a recursive mapping that is not properly set up can lead to undefined behavior when accessing the page tables through the recursive mapping.
 pub unsafe fn load_recursive(
-    root: *mut (),
+    root: &'static mut PageTable,
     index: paging::PageTableIndex,
     phys_addr: PhysAddr,
 ) -> Result<(), MemError> {
@@ -110,10 +106,6 @@ pub unsafe fn load_recursive(
             size: arch::L1_PAGE_SIZE as u64,
         });
     }
-    assert!(
-        !root.is_null(),
-        "The root page table pointer must not be null."
-    );
 
     unsafe { arch::init_load_recursive(root, index, phys_addr) }
 }
@@ -241,9 +233,6 @@ pub enum MemError {
         /// The size of the invalid range in bytes.
         size: u64,
     },
-    /// An error that originated from architecture-specific operations in the memory manager.
-    #[error("An architecture-specific error occurred during memory management operations: {0}")]
-    ArchError(#[from] arch::ArchError),
     /// The provided scratch space for initialization is too small to be used for the necessary virtual memory operations during initialization and `alloc_paged`.
     #[error(
         "The provided scratch space is too small: provided {provided} bytes, but at least {required} bytes are required."
@@ -256,12 +245,15 @@ pub enum MemError {
     },
     /// The required resources to complete the requested operation have not been initialized yet.
     #[error(
-        "The proper resources to complete the requested operation has not been initialized yet. \n This can occur if the global bitmap has not been initialized before calling an operation that relies on it, such as `alloc_virtspace`."
+        "The required resources to complete the requested operation have not been initialized yet: {0}"
     )]
-    Uninit,
+    Uninit(&'static str),
     /// The provided alignment value is invalid (e.g., not a power of two).
     #[error("The provided alignment is invalid: {0} is not a power of two.")]
     InvalidAlignment(usize),
+    /// An error that originated from architecture-specific operations in the memory manager.
+    #[error("An architecture-specific error occurred during memory management operations: {0}")]
+    ArchError(#[from] arch::ArchError),
 }
 
 const fn check_range_virt(virt_base: VirtAddr, byte_size: usize) -> Result<(), MemError> {

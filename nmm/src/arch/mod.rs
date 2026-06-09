@@ -7,7 +7,7 @@ use x86_64 as arch_impl;
 use crate::{
     MapFlags, MemError, VirtualMemoryRange,
     entry_walker::EntryWalker,
-    paging::{self, Frame, Page, PrimitiveRangeManager, PrimitiveSize},
+    paging::{self, Frame, Page, PageTable, PrimitiveRangeManager, PrimitiveSize},
 };
 
 /// Physical address type for the current architecture.
@@ -22,6 +22,9 @@ pub type PageEntryType = arch_impl::PageEntryType;
 /// An error that originate from architecture-specific operations in the memory manager. This is a wrapper around the architecture-specific error type,
 /// allowing for a unified error type across the memory manager while still preserving the ability to include architecture-specific error information when necessary.
 pub type ArchError = arch_impl::ArchError;
+/// Page table flags type for the current architecture.
+/// This needs a Impl and From implementation to convert from the architecture-agnostic `MapFlags` to the architecture-specific flags used in page table entries.
+pub type ArchEntryFlags = arch_impl::PageTableFlags;
 
 /// The start of the higher half in virtual address space.
 pub const HIGHER_HALF_START: VirtAddr = VirtAddr::HIGHER_HALF_START;
@@ -35,7 +38,6 @@ pub const PHYSICAL_ADDRESS_WIDTH: u8 = arch_impl::PHYSICAL_ADDRESS_WIDTH;
 pub const PHYSICAL_ADDRESS_MAX: u64 = arch_impl::PHYSICAL_ADDRESS_MAX;
 /// The number of bits used for indexing into page tables at each level.
 pub const TABLE_INDEX_BITS: usize = arch_impl::TABLE_INDEX_BITS;
-/// The size of a page table in bytes for x86_64 architecture.
 /// The number of entries in a page table for x86_64 architecture.
 pub const ENTRY_COUNT: usize = arch_impl::ENTRY_COUNT;
 /// The size of a level 1 page (4KB) for x86_64 architecture.
@@ -53,7 +55,7 @@ pub const L3_PAGE_SIZE: u64 = arch_impl::L3_PAGE_SIZE;
 
 #[inline(always)]
 pub(crate) unsafe fn init_unchecked(
-    root: *mut (),
+    root: &'static mut PageTable,
     offset: VirtAddr,
     ranges: EntryWalker<'static>,
     scratch_range: VirtualMemoryRange,
@@ -63,7 +65,7 @@ pub(crate) unsafe fn init_unchecked(
 
 #[inline(always)]
 pub(crate) unsafe fn init_load_recursive(
-    root: *mut (),
+    root: &'static mut PageTable,
     index: paging::PageTableIndex,
     phys_addr: PhysAddr,
 ) -> Result<(), MemError> {

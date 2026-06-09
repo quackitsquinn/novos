@@ -152,15 +152,3 @@ mod arch_lib {
 pub enum Mapper {
     Offset(arch_lib::OffsetPageTable<'static>),
 }
-
-macro_rules! macro_rulez {
-    ($tt:tt) => {
-        macro_rules! $tt
-    }
-}
-
-macro_rulez!( macro_rulez {
-    ($tt:tt) => {
-        macro_rules! $tt
-    }
-});

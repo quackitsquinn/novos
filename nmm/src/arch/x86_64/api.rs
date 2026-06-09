@@ -1,8 +1,7 @@
 use core::slice;
 
 use ::x86_64::structures::paging::{
-    FrameAllocator, Mapper, OffsetPageTable, Page, PageTable, PageTableFlags, Size4KiB,
-    mapper::MapToError,
+    FrameAllocator, Mapper, OffsetPageTable, Page, PageTableFlags, Size4KiB, mapper::MapToError,
 };
 use cake::{limine::memory_map, log::debug};
 use cfg_if::cfg_if;
@@ -14,13 +13,13 @@ use crate::{
         x86_64::{self, ArchError},
     },
     entry_walker::EntryWalker,
-    paging::PageTableIndex,
+    paging::{PageTable, PageTableIndex},
 };
 
 pub(crate) type Offset<'a> = OffsetPageTable<'a>;
 
 pub(crate) unsafe fn init_unchecked(
-    root: *mut (),
+    root: &'static mut PageTable,
     offset: VirtAddr,
     mut ranges: EntryWalker<'static>,
     scratch_range: VirtualMemoryRange,
@@ -37,7 +36,7 @@ pub(crate) unsafe fn init_unchecked(
     let needed_pages = todo!("scratch_pages.div_ceil(Bitmap::MEMORY_PER_PAGE as usize)");
     let n_entries = todo!("(scratch_pages as usize).div_ceil(Bitmap::PAGES_PER_ENTRY as usize)");
     let pml4 = unsafe { &mut *(root as *mut PageTable) };
-    let mut offset_table = unsafe { Offset::new(pml4, *offset) };
+    let mut offset_table = unsafe { Offset::new(pml4.into(), *offset) };
     let slice_base: *mut u64 = scratch_range.base.as_mut_ptr();
     let mut next_page = *scratch_range.base;
     debug!(
@@ -45,23 +44,23 @@ pub(crate) unsafe fn init_unchecked(
         needed_pages, next_page, scratch_range.size
     );
     for _ in 0..needed_pages {
-        let frame = ranges.allocate_frame().ok_or(MemError::OutOfMemory)?;
-        unsafe {
-            let flush = offset_table.map_to(
-                Page::<Size4KiB>::from_start_address(next_page).unwrap(),
-                frame,
-                PageTableFlags::PRESENT | PageTableFlags::WRITABLE | PageTableFlags::NO_EXECUTE,
-                &mut ranges,
-            )?;
+        // let frame = ranges.allocate_frame().ok_or(MemError::OutOfMemory)?;
+        // unsafe {
+        //     let flush = offset_table.map_to(
+        //         Page::<Size4KiB>::from_start_address(next_page).unwrap(),
+        //         frame,
+        //         PageTableFlags::PRESENT | PageTableFlags::WRITABLE | PageTableFlags::NO_EXECUTE,
+        //         &mut ranges,
+        //     )?;
 
-            cfg_if::cfg_if! {
-                if #[cfg(target_arch = "x86_64")] {
-                    flush.flush();
-                } else {
-                    flush.ignore();
-                }
-            };
-        };
+        //     cfg_if::cfg_if! {
+        //         if #[cfg(target_arch = "x86_64")] {
+        //             flush.flush();
+        //         } else {
+        //             flush.ignore();
+        //         }
+        //     };
+        // };
 
         next_page += arch::L1_PAGE_SIZE as u64;
     }
@@ -79,7 +78,7 @@ pub(crate) unsafe fn init_unchecked(
 }
 
 pub(crate) unsafe fn init_load_recursive(
-    _root: *mut (),
+    _root: &'static mut PageTable,
     _index: PageTableIndex,
     _phys_addr: PhysAddr,
 ) -> Result<(), MemError> {

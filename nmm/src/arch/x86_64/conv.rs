@@ -1,3 +1,5 @@
+use core::mem;
+
 use crate::{
     MapFlags, MemError,
     arch::{
@@ -5,14 +7,15 @@ use crate::{
         x86_64::{ArchError, PageTableFlags},
     },
     paging::{
-        Frame, Large, Medium, Page, PageTableIndex, PrimitiveRangeManager, PrimitiveSize, Small,
+        Frame, Large, Medium, Page, PageTable, PageTableIndex, PrimitiveRangeManager,
+        PrimitiveSize, Small,
     },
 };
 
 mod arch_lib {
     pub use x86_64::structures::paging::{
-        FrameAllocator, Page, PageSize, PageTableFlags, PageTableIndex, PhysFrame, Size1GiB,
-        Size2MiB, Size4KiB, mapper::MapToError,
+        FrameAllocator, Page, PageSize, PageTable, PageTableFlags, PageTableIndex, PhysFrame,
+        Size1GiB, Size2MiB, Size4KiB, mapper::MapToError,
     };
 }
 
@@ -159,20 +162,20 @@ impl Into<arch_lib::PageTableFlags> for PageTableFlags {
     }
 }
 
-impl Into<arch_lib::PageTableFlags> for MapFlags {
-    fn into(self) -> arch_lib::PageTableFlags {
-        let mut flags = arch_lib::PageTableFlags::PRESENT;
-        if self.contains(MapFlags::WRITABLE) {
-            flags |= arch_lib::PageTableFlags::WRITABLE;
+impl From<PageTableFlags> for MapFlags {
+    fn from(value: PageTableFlags) -> Self {
+        let mut flags = MapFlags::empty();
+        if value.contains(PageTableFlags::WRITABLE) {
+            flags |= MapFlags::WRITABLE;
         }
-        if self.contains(MapFlags::USER_ACCESSIBLE) {
-            flags |= arch_lib::PageTableFlags::USER_ACCESSIBLE;
+        if value.contains(PageTableFlags::USER_ACCESSIBLE) {
+            flags |= MapFlags::USER_ACCESSIBLE;
         }
-        if !self.contains(MapFlags::EXECUTABLE) {
-            flags |= arch_lib::PageTableFlags::NO_EXECUTE;
+        if !value.contains(PageTableFlags::NO_EXECUTE) {
+            flags |= MapFlags::EXECUTABLE;
         }
-        if self.contains(MapFlags::CACHE_DISABLE) {
-            flags |= arch_lib::PageTableFlags::NO_CACHE;
+        if value.contains(PageTableFlags::NO_CACHE) {
+            flags |= MapFlags::CACHE_DISABLE;
         }
         flags
     }
@@ -181,5 +184,21 @@ impl Into<arch_lib::PageTableFlags> for MapFlags {
 impl Into<arch_lib::PageTableIndex> for PageTableIndex {
     fn into(self) -> arch_lib::PageTableIndex {
         arch_lib::PageTableIndex::new(self.value())
+    }
+}
+
+impl Into<arch_lib::PageTable> for PageTable {
+    fn into(self) -> arch_lib::PageTable {
+        // SAFETY: Both structs are canonical representations of a page table,
+        // and therefore have the same memory layout.
+        unsafe { mem::transmute(self) }
+    }
+}
+
+impl From<arch_lib::PageTable> for PageTable {
+    fn from(val: arch_lib::PageTable) -> PageTable {
+        // SAFETY: Both structs are canonical representations of a page table,
+        // and therefore have the same memory layout.
+        unsafe { mem::transmute(val) }
     }
 }

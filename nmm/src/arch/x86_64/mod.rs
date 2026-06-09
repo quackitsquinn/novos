@@ -52,6 +52,8 @@ pub const L2_PAGE_SIZE: u64 = L1_PAGE_SIZE * ENTRY_COUNT as u64;
 /// The size of a level 3 page (1GB) for x86_64 architecture.
 pub const L3_PAGE_SIZE: u64 = L2_PAGE_SIZE * ENTRY_COUNT as u64;
 
+pub type ArchEntryFlags = PageTableFlags;
+
 bitflags! {
     /// Page table entry flags for x86_64 architecture.
     #[repr(transparent)]
@@ -99,6 +101,7 @@ where
     A: PrimitiveRangeManager<Frame<S>, S>,
 {
     let mut alc = XFrameAllocator::new(frame_allocator);
+    todo!()
 }
 
 #[cfg(test)]

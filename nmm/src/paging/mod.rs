@@ -3,8 +3,12 @@ pub mod builder;
 mod frame;
 pub mod index;
 pub(crate) mod limine;
+pub mod map;
 mod page;
 mod page_state;
+mod table;
+
+pub use table::{PageTable, PageTableEntry};
 
 use core::any::TypeId;
 
