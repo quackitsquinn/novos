@@ -1,4 +1,7 @@
 {
+    "rust-analyzer.cargo.allTargets": false,
+    "rust-analyzer.check.allTargets": false,
+    "rust-analyzer.cargo.targetDir": true,
     "rust-analyzer.check.overrideCommand": [
         "python3.12",
         "./tools/smart_check.py"

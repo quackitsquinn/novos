@@ -85,7 +85,9 @@ impl<T: AcpiTable> MappedTable<T> {
 
     /// Returns a pinned reference to the mapped ACPI table.
     pub fn table_pin(&self) -> Pin<&T> {
-        pin!(&self.table)
+        // SAFETY: The backing table is never moved or re-mapped while this MappedTable exists,
+        // so the pointer is stable and valid for the lifetime of this MappedTable
+        unsafe { Pin::new_unchecked(&*self.table) }
     }
 }
 

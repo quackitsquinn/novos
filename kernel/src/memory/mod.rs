@@ -4,6 +4,7 @@ use cake::log::info;
 use nmm::{
     VirtualMemoryRange,
     arch::{HIGHER_HALF_START, x86_64::VirtAddr},
+    paging::PageTable,
 };
 use x86_64::{
     VirtAddr as XVirtAddr,
@@ -43,7 +44,7 @@ fn init() -> Result<(), Infallible> {
     );
     unsafe {
         nmm::init(
-            pml4_vaddr,
+            &mut *(pml4_vaddr as *mut PageTable),
             VirtAddr::new_truncate(hhdm_offset),
             mem::transmute(memory_map),
             map::nmm_managed_range::RANGE,

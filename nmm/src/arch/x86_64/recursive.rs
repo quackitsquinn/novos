@@ -5,9 +5,107 @@
 
 mod arch_lib {
     pub use x86_64::structures::paging::{
-        PageSize, PageTable,
-        mapper::{MapToError, Mapper, RecursivePageTable as XRecursive, UnmapError},
+        FrameAllocator, Page, PageSize, PageTable, PageTableFlags, PageTableIndex, PhysFrame,
+        Size1GiB, Size2MiB, Size4KiB,
+        mapper::{
+            FlagUpdateError, MapToError, Mapper, MapperFlush, MapperFlushAll, TranslateError,
+            UnmapError,
+        },
     };
+
+    #[cfg(target_arch = "x86_64")]
+    pub use x86_64::structures::paging::RecursivePageTable as XRecursive;
+
+    #[cfg(not(target_arch = "x86_64"))]
+    mod recursive_spoof {
+        use super::*;
+
+        pub struct RecursivePageTable<'a> {
+            _phantom: core::marker::PhantomData<&'a ()>,
+        }
+
+        impl<'a> RecursivePageTable<'a> {
+            pub unsafe fn new_unchecked(
+                _table: &'a mut super::PageTable,
+                _recursive_index: super::PageTableIndex,
+            ) -> Self {
+                unimplemented!("Recursive page tables are only supported on x86_64 architecture");
+            }
+
+            pub fn level_4_table(&self) -> &super::PageTable {
+                unimplemented!("Recursive page tables are only supported on x86_64 architecture");
+            }
+
+            pub fn level_4_table_mut(&mut self) -> &mut super::PageTable {
+                unimplemented!("Recursive page tables are only supported on x86_64 architecture");
+            }
+        }
+
+        impl<'a, S> Mapper<S> for RecursivePageTable<'a>
+        where
+            S: PageSize,
+        {
+            unsafe fn map_to_with_table_flags<A>(
+                &mut self,
+                page: Page<S>,
+                frame: PhysFrame<S>,
+                flags: PageTableFlags,
+                parent_table_flags: PageTableFlags,
+                frame_allocator: &mut A,
+            ) -> Result<MapperFlush<S>, MapToError<S>>
+            where
+                Self: Sized,
+                A: FrameAllocator<Size4KiB> + ?Sized,
+            {
+                todo!()
+            }
+
+            fn unmap(
+                &mut self,
+                page: Page<S>,
+            ) -> Result<(PhysFrame<S>, MapperFlush<S>), UnmapError> {
+                todo!()
+            }
+
+            unsafe fn update_flags(
+                &mut self,
+                page: Page<S>,
+                flags: PageTableFlags,
+            ) -> Result<MapperFlush<S>, FlagUpdateError> {
+                todo!()
+            }
+
+            unsafe fn set_flags_p4_entry(
+                &mut self,
+                page: Page<S>,
+                flags: PageTableFlags,
+            ) -> Result<MapperFlushAll, FlagUpdateError> {
+                todo!()
+            }
+
+            unsafe fn set_flags_p3_entry(
+                &mut self,
+                page: Page<S>,
+                flags: PageTableFlags,
+            ) -> Result<MapperFlushAll, FlagUpdateError> {
+                todo!()
+            }
+
+            unsafe fn set_flags_p2_entry(
+                &mut self,
+                page: Page<S>,
+                flags: PageTableFlags,
+            ) -> Result<MapperFlushAll, FlagUpdateError> {
+                todo!()
+            }
+
+            fn translate_page(&self, page: Page<S>) -> Result<PhysFrame<S>, TranslateError> {
+                todo!()
+            }
+        }
+    }
+    #[cfg(not(target_arch = "x86_64"))]
+    pub use recursive_spoof::RecursivePageTable as XRecursive;
 }
 
 use x86_64::structures::paging::mapper::Mapper as _;
@@ -69,8 +167,9 @@ impl MemoryMapper<Small> for RecursivePageTable<'_> {
         let flags: PageTableFlags = flags.into();
 
         unsafe {
-            self.0
-                .map_to(page.into(), frame.into(), flags.into(), &mut x_fa)?
+            let _ = self
+                .0
+                .map_to(page.into(), frame.into(), flags.into(), &mut x_fa)?;
         };
 
         Ok(unsafe { Flush::new(page.start_address()) })
@@ -106,8 +205,9 @@ macro_rules! impl_memory_mapper_huge {
                 flags.insert(PageTableFlags::HUGE_PAGE);
 
                 unsafe {
-                    self.0
-                        .map_to(page.into(), frame.into(), flags.into(), &mut x_fa)?
+                    let _ = self
+                        .0
+                        .map_to(page.into(), frame.into(), flags.into(), &mut x_fa)?;
                 };
 
                 Ok(unsafe { Flush::new(page.start_address()) })

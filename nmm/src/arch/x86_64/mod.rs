@@ -20,8 +20,8 @@ pub use addr::{PhysAddr, VirtAddr};
 // It's a bit verbose, but it's easier than dealing with the name collisions and weird compiler errors that would arise.
 mod arch_lib {
     pub use x86_64::structures::paging::{
-        FrameAllocator, OffsetPageTable, PageSize, PhysFrame, RecursivePageTable, Size1GiB,
-        Size2MiB, Size4KiB, mapper::MapToError,
+        FrameAllocator, OffsetPageTable, PageSize, PhysFrame, Size1GiB, Size2MiB, Size4KiB,
+        mapper::MapToError,
     };
 }
 
