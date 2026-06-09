@@ -3,7 +3,7 @@
 //! This module acts mostly as a hack to get proper rust-analyzer support for x86_64::RecursivePageTable, plus as a way to somewhat normalize what the cross platform
 //! Mapping system will look like. Again, deeply cursed but there IS a not completely cursed reason for it.use std::marker;
 
-mod arch_crate {
+mod arch_lib {
     pub use x86_64::structures::paging::{
         PageSize, PageTable,
         mapper::{MapToError, Mapper, RecursivePageTable as XRecursive, UnmapError},
@@ -26,17 +26,14 @@ use crate::{
 };
 
 /// A x86_64 specific implementation of a recursive page table, wrapping the x86_64's crate implementation of a recursive page table.
-pub struct RecursivePageTable<'a>(arch_crate::XRecursive<'a>, PageTableIndex);
+pub struct RecursivePageTable<'a>(arch_lib::XRecursive<'a>, PageTableIndex);
 
 impl<'a> RecursivePageTable<'a> {
     /// Creates a new RecursivePageTable from a mutable reference to the level 4 page table and the recursive index.
     /// # Safety
     /// The caller must ensure that the provided page table is the actual level 4 page table, and that the recursive index is correctly set up in the page tables.
-    pub unsafe fn new(
-        table: &'a mut arch_crate::PageTable,
-        recursive_index: PageTableIndex,
-    ) -> Self {
-        let table = unsafe { arch_crate::XRecursive::new_unchecked(table, recursive_index.into()) };
+    pub unsafe fn new(table: &'a mut arch_lib::PageTable, recursive_index: PageTableIndex) -> Self {
+        let table = unsafe { arch_lib::XRecursive::new_unchecked(table, recursive_index.into()) };
         Self(table, recursive_index)
     }
     /// Returns the recursive index used for this recursive page table.
@@ -45,13 +42,13 @@ impl<'a> RecursivePageTable<'a> {
     }
 
     /// Returns a reference to the level 4 page table.
-    pub fn p4(&self) -> &arch_crate::PageTable {
+    pub fn p4(&self) -> &arch_lib::PageTable {
         let p4 = self.0.level_4_table();
         p4
     }
 
     /// Returns a mutable reference to the level 4 page table.
-    pub fn p4_mut(&mut self) -> &mut arch_crate::PageTable {
+    pub fn p4_mut(&mut self) -> &mut arch_lib::PageTable {
         let p4 = self.0.level_4_table_mut();
         p4
     }
