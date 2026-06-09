@@ -15,7 +15,7 @@ use crate::{
 mod arch_lib {
     pub use x86_64::structures::paging::{
         FrameAllocator, Page, PageSize, PageTable, PageTableFlags, PageTableIndex, PhysFrame,
-        Size1GiB, Size2MiB, Size4KiB, mapper::MapToError,
+        Size1GiB, Size2MiB, Size4KiB, mapper::MapToError, mapper::UnmapError,
     };
 }
 
@@ -119,6 +119,12 @@ macro_rules! into_arch_frame {
                 arch_lib::PhysFrame::from_start_address(*self.start_address()).unwrap()
             }
         }
+
+        impl From<arch_lib::PhysFrame<$x86_64_size>> for Frame<$size> {
+            fn from(value: arch_lib::PhysFrame<$x86_64_size>) -> Self {
+                Frame::from_start_address(PhysAddr::new(value.start_address().as_u64())).unwrap()
+            }
+        }
     };
 
     // recurse
@@ -200,5 +206,22 @@ impl From<arch_lib::PageTable> for PageTable {
         // SAFETY: Both structs are canonical representations of a page table,
         // and therefore have the same memory layout.
         unsafe { mem::transmute(val) }
+    }
+}
+
+impl MemError {
+    pub(crate) fn from_unmap_error<S>(error: arch_lib::UnmapError, page: Page<S>) -> Self
+    where
+        S: PrimitiveSize,
+    {
+        match error {
+            arch_lib::UnmapError::PageNotMapped => MemError::NotMapped(page.into()),
+            arch_lib::UnmapError::ParentEntryHugePage => {
+                MemError::ArchError(ArchError::ParentEntryHugePage)
+            }
+            arch_lib::UnmapError::InvalidFrameAddress(addr) => {
+                MemError::InvalidFrameAddress(addr.into())
+            }
+        }
     }
 }

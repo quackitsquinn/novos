@@ -15,7 +15,7 @@ use crate::{
     arch::{PhysAddr, VirtAddr},
     //bitmap::GLOBAL_BITMAP,
     entry_walker::EntryWalker,
-    paging::PageTable,
+    paging::{PageTable, page::UnsizedPage},
 };
 
 #[cfg(not(feature = "x86_64"))]
@@ -248,6 +248,13 @@ pub enum MemError {
         "The required resources to complete the requested operation have not been initialized yet: {0}"
     )]
     Uninit(&'static str),
+    /// The requested operation failed because the specified virtual address range is not currently mapped to any physical memory, and therefore cannot be unmapped or accessed.
+    /// The provided virtual address is included for reference.
+    #[error("The specified virtual address range is not currently mapped to any physical memory")]
+    NotMapped(UnsizedPage),
+    /// The requested operation failed because a needed entry in the page table points to an invalid frame address.
+    #[error("The page table entry points to an invalid frame address: {0:?}")]
+    InvalidFrameAddress(PhysAddr),
     /// The provided alignment value is invalid (e.g., not a power of two).
     #[error("The provided alignment is invalid: {0} is not a power of two.")]
     InvalidAlignment(usize),

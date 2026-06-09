@@ -7,7 +7,7 @@ use x86_64 as arch_impl;
 use crate::{
     MapFlags, MemError, VirtualMemoryRange,
     entry_walker::EntryWalker,
-    paging::{self, Frame, Page, PageTable, PrimitiveRangeManager, PrimitiveSize},
+    paging::{self, Frame, Page, PageTable, PrimitiveRangeManager, PrimitiveSize, Small},
 };
 
 /// Physical address type for the current architecture.
@@ -28,23 +28,23 @@ pub type ArchEntryFlags = arch_impl::PageTableFlags;
 
 /// The start of the higher half in virtual address space.
 pub const HIGHER_HALF_START: VirtAddr = VirtAddr::HIGHER_HALF_START;
-/// The width of virtual addresses in bits for x86_64 architecture.
+/// The width of virtual addresses in bits for the current architecture.
 pub const VIRTUAL_ADDRESS_WIDTH: u8 = arch_impl::VIRTUAL_ADDRESS_WIDTH;
-/// The maximum valid virtual address for x86_64 architecture.
+/// The maximum valid virtual address for the current architecture.
 pub const VIRTUAL_ADDRESS_MAX: u64 = arch_impl::VIRTUAL_ADDRESS_MAX;
-/// The width of physical addresses in bits for x86_64 architecture.
+/// The width of physical addresses in bits for the current architecture.
 pub const PHYSICAL_ADDRESS_WIDTH: u8 = arch_impl::PHYSICAL_ADDRESS_WIDTH;
-/// The maximum valid physical address for x86_64 architecture.
+/// The maximum valid physical address for the current architecture.
 pub const PHYSICAL_ADDRESS_MAX: u64 = arch_impl::PHYSICAL_ADDRESS_MAX;
 /// The number of bits used for indexing into page tables at each level.
 pub const TABLE_INDEX_BITS: usize = arch_impl::TABLE_INDEX_BITS;
-/// The number of entries in a page table for x86_64 architecture.
+/// The number of entries in a page table for the current architecture.
 pub const ENTRY_COUNT: usize = arch_impl::ENTRY_COUNT;
-/// The size of a level 1 page (4KB) for x86_64 architecture.
+/// The size of a level 1 page (4KB) for the current architecture.
 pub const L1_PAGE_SIZE: u64 = arch_impl::L1_PAGE_SIZE;
-/// The size of a level 2 page (2MB) for x86_64 architecture.
+/// The size of a level 2 page (2MB) for the current architecture.
 pub const L2_PAGE_SIZE: u64 = arch_impl::L2_PAGE_SIZE;
-/// The size of a level 3 page (1GB) for x86_64 architecture.
+/// The size of a level 3 page (1GB) for the current architecture.
 pub const L3_PAGE_SIZE: u64 = arch_impl::L3_PAGE_SIZE;
 
 // TODO: maybe support x86 in the future? would be cool to watch this run on a xp or 98 era machine
@@ -105,7 +105,11 @@ pub(crate) fn map_primitive<S, A>(
 ) -> Result<(), MemError>
 where
     S: PrimitiveSize,
-    A: PrimitiveRangeManager<Frame<S>, S>,
+    A: PrimitiveRangeManager<Frame<Small>, Small>,
 {
     arch_impl::map_primitive(src, dst, flags, frame_allocator)
+}
+
+pub(crate) unsafe fn do_flush(addr: VirtAddr) {
+    unsafe { arch_impl::do_flush(addr) }
 }

@@ -1,8 +1,10 @@
 use core::slice;
-
-use ::x86_64::structures::paging::{
-    FrameAllocator, Mapper, OffsetPageTable, Page, PageTableFlags, Size4KiB, mapper::MapToError,
-};
+mod arch_crate {
+    pub use ::x86_64::structures::paging::{
+        FrameAllocator, Mapper, OffsetPageTable, Page, PageTable, PageTableFlags, Size4KiB,
+        mapper::MapToError,
+    };
+}
 use cake::{limine::memory_map, log::debug};
 use cfg_if::cfg_if;
 
@@ -16,7 +18,7 @@ use crate::{
     paging::{PageTable, PageTableIndex},
 };
 
-pub(crate) type Offset<'a> = OffsetPageTable<'a>;
+pub(crate) type Offset<'a> = arch_crate::OffsetPageTable<'a>;
 
 pub(crate) unsafe fn init_unchecked(
     root: &'static mut PageTable,
@@ -35,8 +37,8 @@ pub(crate) unsafe fn init_unchecked(
     let scratch_pages = scratch_range.size / arch::L1_PAGE_SIZE as usize; // We can safely do this, since it's up to the caller to make sure the size is page-aligned.
     let needed_pages = todo!("scratch_pages.div_ceil(Bitmap::MEMORY_PER_PAGE as usize)");
     let n_entries = todo!("(scratch_pages as usize).div_ceil(Bitmap::PAGES_PER_ENTRY as usize)");
-    let pml4 = unsafe { &mut *(root as *mut PageTable) };
-    let mut offset_table = unsafe { Offset::new(pml4.into(), *offset) };
+    let pml4 = unsafe { &mut *(root as *mut _ as *mut arch_crate::PageTable) };
+    let mut offset_table = unsafe { Offset::new(pml4, *offset) };
     let slice_base: *mut u64 = scratch_range.base.as_mut_ptr();
     let mut next_page = *scratch_range.base;
     debug!(

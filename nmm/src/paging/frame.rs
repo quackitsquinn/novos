@@ -82,3 +82,21 @@ pub enum UnsizedFrame {
     /// A large frame, typically 1GB in size for x86_64 architecture.
     Large(Frame<Large>),
 }
+
+impl Into<UnsizedFrame> for Frame<Small> {
+    fn into(self) -> UnsizedFrame {
+        UnsizedFrame::Small(self)
+    }
+}
+
+impl Into<UnsizedFrame> for Frame<Medium> {
+    fn into(self) -> UnsizedFrame {
+        UnsizedFrame::Medium(self)
+    }
+}
+
+impl Into<UnsizedFrame> for Frame<Large> {
+    fn into(self) -> UnsizedFrame {
+        UnsizedFrame::Large(self)
+    }
+}

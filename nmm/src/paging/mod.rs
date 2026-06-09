@@ -1,10 +1,10 @@
 //! Contains the core types and structures related to paging, such as page table entries, page tables, and the layout of the page table hierarchy. It also defines the virtual and physical address types used by the architecture.
 pub mod builder;
-mod frame;
+pub mod frame;
 pub mod index;
 pub(crate) mod limine;
 pub mod map;
-mod page;
+pub mod page;
 mod page_state;
 mod table;
 
@@ -140,7 +140,7 @@ pub(crate) fn map_primitive<S, A>(
 ) -> Result<(), MemError>
 where
     S: PrimitiveSize,
-    A: PrimitiveRangeManager<Frame<S>, S>,
+    A: PrimitiveRangeManager<Frame<Small>, Small>,
 {
     trace!(
         "Mapping frame {:?} to page {:?} with flags {:?}",

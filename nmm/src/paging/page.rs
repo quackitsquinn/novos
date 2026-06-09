@@ -70,3 +70,18 @@ pub enum UnsizedPage {
     /// A large page, typically 1GB in size for x86_64 architecture.
     Large(Page<Large>),
 }
+
+impl<S> Into<UnsizedPage> for Page<S>
+where
+    S: PrimitiveSize,
+{
+    fn into(self) -> UnsizedPage {
+        // SAFETY: Page<S> is guaranteed to be valid for itself.
+        match S::SIZE {
+            Small::SIZE => UnsizedPage::Small(unsafe { Page::new_unchecked(self.start_address) }),
+            Medium::SIZE => UnsizedPage::Medium(unsafe { Page::new_unchecked(self.start_address) }),
+            Large::SIZE => UnsizedPage::Large(unsafe { Page::new_unchecked(self.start_address) }),
+            _ => panic!("Invalid page size"),
+        }
+    }
+}

@@ -6,6 +6,7 @@ mod conv;
 mod mapper;
 mod recursive;
 
+use core::arch::asm;
 use core::mem::Alignment;
 
 use bitflags::bitflags;
@@ -98,10 +99,14 @@ pub(crate) fn map_primitive<S, A>(
 ) -> Result<(), MemError>
 where
     S: PrimitiveSize,
-    A: PrimitiveRangeManager<Frame<S>, S>,
+    A: PrimitiveRangeManager<Frame<Small>, Small>,
 {
     let mut alc = XFrameAllocator::new(frame_allocator);
     todo!()
+}
+
+pub(crate) unsafe fn do_flush(addr: VirtAddr) {
+    unsafe { asm!("invlpg [{}]", in(reg) addr.as_u64(), options(nostack, preserves_flags)) };
 }
 
 #[cfg(test)]
