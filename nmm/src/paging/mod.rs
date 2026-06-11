@@ -137,7 +137,9 @@ impl<T> AllFrames for T where
 {
 }
 
-pub(crate) fn map_primitive<S, A>(
+/// Maps a memory primitive (such as a frame) to a page with the specified flags, using the provided frame allocator to allocate any necessary intermediate page tables.
+
+pub fn map_primitive<S, A>(
     src: Frame<S>,
     dst: Page<S>,
     flags: MapFlags,

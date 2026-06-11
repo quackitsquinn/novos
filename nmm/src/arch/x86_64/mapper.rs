@@ -16,6 +16,7 @@ use crate::{
 };
 
 /// The lowest level of mapper for x86_64.
+#[allow(missing_debug_implementations)]
 pub enum Mapper {
     /// An offset page table mapper for x86_64. This mapper uses a fixed offset to access the page tables, and is the most basic type of mapper.
     Offset(OffsetPageTable<'static>),

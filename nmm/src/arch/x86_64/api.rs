@@ -5,7 +5,10 @@ mod arch_crate {
         mapper::MapToError,
     };
 }
-use cake::{limine::memory_map, log::debug};
+use cake::{
+    limine::memory_map,
+    log::{debug, info},
+};
 use cfg_if::cfg_if;
 
 use crate::{
@@ -15,7 +18,7 @@ use crate::{
         x86_64::{self, ArchError, mapper::Mapper, set_mapper},
     },
     entry_walker::EntryWalker,
-    paging::{PageTable, PageTableIndex},
+    paging::{Page, PageTable, PageTableIndex, Small, map_primitive},
 };
 
 pub(crate) type Offset<'a> = arch_crate::OffsetPageTable<'a>;
@@ -23,7 +26,7 @@ pub(crate) type Offset<'a> = arch_crate::OffsetPageTable<'a>;
 pub(crate) unsafe fn init_unchecked(
     root: &'static mut PageTable,
     offset: VirtAddr,
-    mut _ranges: EntryWalker<'static>,
+    mut walker: EntryWalker<'static>,
     scratch_range: VirtualMemoryRange,
 ) -> Result<(), MemError> {
     if scratch_range.size < arch::L1_PAGE_SIZE as usize * 16 {
@@ -38,41 +41,21 @@ pub(crate) unsafe fn init_unchecked(
     let mapper = unsafe { Mapper::new_offset(root, offset) };
     unsafe { set_mapper(mapper) };
 
-    // First, we need to bootstrap the virtual memory system by allocating however many pages we need to manage the scratch range.
-    let scratch_pages = scratch_range.size / arch::L1_PAGE_SIZE as usize; // We can safely do this, since it's up to the caller to make sure the size is page-aligned.
-    let needed_pages = todo!("scratch_pages.div_ceil(Bitmap::MEMORY_PER_PAGE as usize)");
-    let n_entries = todo!("(scratch_pages as usize).div_ceil(Bitmap::PAGES_PER_ENTRY as usize)");
-    let pml4 = unsafe { &mut *(root as *mut _ as *mut arch_crate::PageTable) };
-    let mut offset_table = unsafe { Offset::new(pml4, *offset) };
-    let slice_base: *mut u64 = scratch_range.base.as_mut_ptr();
-    let mut next_page = *scratch_range.base;
-    debug!(
-        "NMM: mapping {} pages for scratch space [base: {:x}, size: {:x}]",
-        needed_pages, next_page, scratch_range.size
+    info!("Mapping first page of scratch range to test map_primitive...");
+    // Map the first page of the scratch range to test that the mapper is working correctly.
+    let test_page =
+        Page::<Small>::containing_address(scratch_range.base).ok_or(MemError::OutOfMemory)?;
+    let test_frame = walker.next_frame::<Small>().ok_or(MemError::OutOfMemory)?;
+
+    unsafe { map_primitive(test_frame, test_page, MapFlags::WRITABLE, &mut walker)? };
+
+    info!(
+        "Successfully mapped first page of scratch range. Writing to it to test that the mapping is working correctly..."
     );
-    for _ in 0..needed_pages {
-        // let frame = ranges.allocate_frame().ok_or(MemError::OutOfMemory)?;
-        // unsafe {
-        //     let flush = offset_table.map_to(
-        //         Page::<Size4KiB>::from_start_address(next_page).unwrap(),
-        //         frame,
-        //         PageTableFlags::PRESENT | PageTableFlags::WRITABLE | PageTableFlags::NO_EXECUTE,
-        //         &mut ranges,
-        //     )?;
-
-        //     cfg_if::cfg_if! {
-        //         if #[cfg(target_arch = "x86_64")] {
-        //             flush.flush();
-        //         } else {
-        //             flush.ignore();
-        //         }
-        //     };
-        // };
-
-        next_page += arch::L1_PAGE_SIZE as u64;
+    // Write to the mapped page to test that the mapping is working correctly.
+    unsafe {
+        *test_page.start_address().as_mut_ptr::<[u8; 4096]>() = [0xAAu8; 4096];
     }
-
-    let u64_slice = unsafe { slice::from_raw_parts_mut(slice_base, n_entries) };
 
     // let mut bitmap = unsafe { Bitmap::init(u64_slice, scratch_pages as u64, scratch_range.base) };
 

@@ -104,6 +104,7 @@ pub(crate) unsafe fn alloc_paged(byte_size: usize, flags: MapFlags) -> Result<Vi
     unsafe { arch_impl::api::alloc_paged(byte_size, flags) }
 }
 
+#[doc(hidden)]
 pub(crate) fn map_primitive<S, A>(
     src: Frame<S>,
     dst: Page<S>,
