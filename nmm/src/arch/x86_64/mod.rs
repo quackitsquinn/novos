@@ -4,7 +4,10 @@ pub mod addr;
 pub(crate) mod api;
 mod conv;
 mod mapper;
+mod offset;
 mod recursive;
+
+pub use mapper::Mapper;
 
 use core::arch::asm;
 use core::mem::Alignment;
@@ -12,6 +15,7 @@ use core::mem::Alignment;
 use bitflags::bitflags;
 
 pub use addr::{PhysAddr, VirtAddr};
+use cake::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 // This submodule exists purely to reduce name collisions as the internal implementation of x86_64
 // is very similar to nmm (as i roughly modeled nmm after x86_64 and redox's memory management),
@@ -27,9 +31,12 @@ mod arch_lib {
 
 use crate::{
     MapFlags, MemError,
-    arch::x86_64::conv::XFrameAllocator,
+    arch::x86_64::{conv::XFrameAllocator, offset::OffsetPageTable, recursive::RecursivePageTable},
     entry_walker::EntryWalker,
-    paging::{self, Frame, Large, Medium, Page, PrimitiveRangeManager, PrimitiveSize, Small},
+    paging::{
+        self, Frame, Large, Medium, Page, PrimitiveRangeManager, PrimitiveSize, Small,
+        map::MemoryMapper,
+    },
 };
 
 /// The width of virtual addresses in bits for x86_64 architecture.
@@ -91,6 +98,20 @@ pub enum ArchError {
     ParentEntryHugePage,
 }
 
+static ACTIVE_PAGETABLE: RwLock<Option<Mapper>> = RwLock::new(None);
+
+pub(crate) fn mapper_read() -> RwLockReadGuard<'static, Option<Mapper>> {
+    ACTIVE_PAGETABLE.read()
+}
+
+pub(crate) fn mapper_mut() -> RwLockWriteGuard<'static, Option<Mapper>> {
+    ACTIVE_PAGETABLE.write()
+}
+
+pub(crate) unsafe fn set_mapper(mapper: Mapper) {
+    *ACTIVE_PAGETABLE.write() = Some(mapper);
+}
+
 pub(crate) fn map_primitive<S, A>(
     src: Frame<S>,
     dst: Page<S>,
@@ -100,9 +121,14 @@ pub(crate) fn map_primitive<S, A>(
 where
     S: PrimitiveSize,
     A: PrimitiveRangeManager<Frame<Small>, Small>,
+    Mapper: MemoryMapper<S>,
 {
-    let mut alc = XFrameAllocator::new(frame_allocator);
-    todo!()
+    let mut mapper_guard = mapper_mut();
+    let mapper = mapper_guard
+        .as_mut()
+        .ok_or(MemError::Uninit("global memory mapper"))?;
+    mapper.map(dst, src, flags, frame_allocator)?;
+    Ok(())
 }
 
 pub(crate) unsafe fn do_flush(addr: VirtAddr) {

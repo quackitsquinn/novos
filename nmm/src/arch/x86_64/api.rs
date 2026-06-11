@@ -12,7 +12,7 @@ use crate::{
     MapFlags, MemError, VirtualMemoryRange,
     arch::{
         self, PhysAddr, VirtAddr,
-        x86_64::{self, ArchError},
+        x86_64::{self, ArchError, mapper::Mapper, set_mapper},
     },
     entry_walker::EntryWalker,
     paging::{PageTable, PageTableIndex},
@@ -23,7 +23,7 @@ pub(crate) type Offset<'a> = arch_crate::OffsetPageTable<'a>;
 pub(crate) unsafe fn init_unchecked(
     root: &'static mut PageTable,
     offset: VirtAddr,
-    mut ranges: EntryWalker<'static>,
+    mut _ranges: EntryWalker<'static>,
     scratch_range: VirtualMemoryRange,
 ) -> Result<(), MemError> {
     if scratch_range.size < arch::L1_PAGE_SIZE as usize * 16 {
@@ -32,6 +32,11 @@ pub(crate) unsafe fn init_unchecked(
             required: arch::L1_PAGE_SIZE as u64 * 16,
         });
     }
+
+    // Initialize the mapper and set it as the active mapper for the system. T
+    // his is necessary to perform any virtual memory operations, including mapping the scratch space.
+    let mapper = unsafe { Mapper::new_offset(root, offset) };
+    unsafe { set_mapper(mapper) };
 
     // First, we need to bootstrap the virtual memory system by allocating however many pages we need to manage the scratch range.
     let scratch_pages = scratch_range.size / arch::L1_PAGE_SIZE as usize; // We can safely do this, since it's up to the caller to make sure the size is page-aligned.

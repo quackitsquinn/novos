@@ -7,7 +7,7 @@ use crate::{
 #[repr(C)]
 #[cfg_attr(feature = "x86_64", repr(align(4096)))]
 pub struct PageTable {
-    pub entries: [PageTableEntry; arch::ENTRY_COUNT],
+    entries: [PageTableEntry; arch::ENTRY_COUNT],
 }
 
 impl PageTable {
@@ -23,6 +23,19 @@ impl PageTable {
         for entry in self.entries.iter_mut() {
             entry.value = 0;
         }
+    }
+
+    /// Returns a reference to the entries of this page table.
+    pub fn entries(&self) -> &[PageTableEntry; arch::ENTRY_COUNT] {
+        &self.entries
+    }
+
+    /// Returns a mutable reference to the entries of this page table.
+    ///
+    /// # Safety
+    /// The caller must ensure that any modifications to the entries do not violate memory safety, e.g. by writing invalid values or creating invalid mappings.
+    pub unsafe fn entries_mut(&mut self) -> &mut [PageTableEntry; arch::ENTRY_COUNT] {
+        &mut self.entries
     }
 }
 

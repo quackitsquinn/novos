@@ -1,5 +1,7 @@
 use core::mem;
 
+use x86_64::structures::paging::Size4KiB;
+
 use crate::{
     MapFlags, MemError,
     arch::{
@@ -9,13 +11,14 @@ use crate::{
     paging::{
         Frame, Large, Medium, Page, PageTable, PageTableIndex, PrimitiveRangeManager,
         PrimitiveSize, Small,
+        map::{Flush, MemoryMapper},
     },
 };
 
 mod arch_lib {
     pub use x86_64::structures::paging::{
         FrameAllocator, Page, PageSize, PageTable, PageTableFlags, PageTableIndex, PhysFrame,
-        Size1GiB, Size2MiB, Size4KiB, mapper::MapToError, mapper::UnmapError,
+        Size1GiB, Size2MiB, Size4KiB, mapper::MapToError, mapper::Mapper, mapper::UnmapError,
     };
 }
 
@@ -223,5 +226,35 @@ impl MemError {
                 MemError::InvalidFrameAddress(addr.into())
             }
         }
+    }
+}
+
+impl PageTable {
+    /// Converts a &PageTable reference to a &arch_lib::PageTable reference.
+    pub(crate) fn as_arch_ref(&self) -> &arch_lib::PageTable {
+        // SAFETY: Both structs are canonical representations of a page table,
+        // and therefore have the same memory layout.
+        unsafe { &*(self as *const _ as *const arch_lib::PageTable) }
+    }
+
+    /// Converts a &mut PageTable reference to a &mut arch_lib::PageTable reference.
+    pub(crate) fn as_arch_mut(&mut self) -> &mut arch_lib::PageTable {
+        // SAFETY: Both structs are canonical representations of a page table,
+        // and therefore have the same memory layout.
+        unsafe { &mut *(self as *mut _ as *mut arch_lib::PageTable) }
+    }
+
+    /// Converts a &arch_lib::PageTable reference to a &PageTable reference.
+    pub(crate) fn from_arch_ref(arch_table: &arch_lib::PageTable) -> &Self {
+        // SAFETY: Both structs are canonical representations of a page table,
+        // and therefore have the same memory layout.
+        unsafe { &*(arch_table as *const _ as *const Self) }
+    }
+
+    /// Converts a &mut arch_lib::PageTable reference to a &mut PageTable reference.
+    pub(crate) fn from_arch_mut(arch_table: &mut arch_lib::PageTable) -> &mut Self {
+        // SAFETY: Both structs are canonical representations of a page table,
+        // and therefore have the same memory layout.
+        unsafe { &mut *(arch_table as *mut _ as *mut Self) }
     }
 }

@@ -18,7 +18,12 @@ use cake::{
 };
 pub use index::PageTableIndex;
 
-use crate::{MapFlags, MemError, NmmSealed, arch::PageEntryType, seal};
+use crate::{
+    MapFlags, MemError, NmmSealed,
+    arch::{Mapper, PageEntryType},
+    paging::map::MemoryMapper,
+    seal,
+};
 
 pub use frame::{Frame, UnsizedFrame};
 pub use page::Page;
@@ -141,6 +146,7 @@ pub(crate) fn map_primitive<S, A>(
 where
     S: PrimitiveSize,
     A: PrimitiveRangeManager<Frame<Small>, Small>,
+    Mapper: MemoryMapper<S>,
 {
     trace!(
         "Mapping frame {:?} to page {:?} with flags {:?}",

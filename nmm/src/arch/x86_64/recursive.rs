@@ -117,7 +117,8 @@ use crate::{
         x86_64::{PageTableFlags, XFrameAllocator},
     },
     paging::{
-        Frame, Large, Medium, Page, PageTableIndex, PrimitiveRangeManager, Small, UnsizedFrame,
+        Frame, Large, Medium, Page, PageTable, PageTableIndex, PrimitiveRangeManager, Small,
+        UnsizedFrame,
         map::{Flush, MemoryMapper},
         page::UnsizedPage,
     },
@@ -130,8 +131,10 @@ impl<'a> RecursivePageTable<'a> {
     /// Creates a new RecursivePageTable from a mutable reference to the level 4 page table and the recursive index.
     /// # Safety
     /// The caller must ensure that the provided page table is the actual level 4 page table, and that the recursive index is correctly set up in the page tables.
-    pub unsafe fn new(table: &'a mut arch_lib::PageTable, recursive_index: PageTableIndex) -> Self {
-        let table = unsafe { arch_lib::XRecursive::new_unchecked(table, recursive_index.into()) };
+    pub unsafe fn new(table: &'a mut PageTable, recursive_index: PageTableIndex) -> Self {
+        let table = unsafe {
+            arch_lib::XRecursive::new_unchecked(table.as_arch_mut(), recursive_index.into())
+        };
         Self(table, recursive_index)
     }
     /// Returns the recursive index used for this recursive page table.

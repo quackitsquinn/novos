@@ -7,7 +7,10 @@ use x86_64 as arch_impl;
 use crate::{
     MapFlags, MemError, VirtualMemoryRange,
     entry_walker::EntryWalker,
-    paging::{self, Frame, Page, PageTable, PrimitiveRangeManager, PrimitiveSize, Small},
+    paging::{
+        self, Frame, Page, PageTable, PrimitiveRangeManager, PrimitiveSize, Small,
+        map::MemoryMapper,
+    },
 };
 
 /// Physical address type for the current architecture.
@@ -25,6 +28,10 @@ pub type ArchError = arch_impl::ArchError;
 /// Page table flags type for the current architecture.
 /// This needs a Impl and From implementation to convert from the architecture-agnostic `MapFlags` to the architecture-specific flags used in page table entries.
 pub type ArchEntryFlags = arch_impl::PageTableFlags;
+/// The API for architecture-specific operations in the memory manager.
+/// This is a wrapper around the architecture-specific API, allowing for a unified interface for architecture-specific operations while still preserving the
+/// ability to include architecture-specific implementations when necessary.
+pub type Mapper = arch_impl::Mapper;
 
 /// The start of the higher half in virtual address space.
 pub const HIGHER_HALF_START: VirtAddr = VirtAddr::HIGHER_HALF_START;
@@ -106,6 +113,7 @@ pub(crate) fn map_primitive<S, A>(
 where
     S: PrimitiveSize,
     A: PrimitiveRangeManager<Frame<Small>, Small>,
+    Mapper: MemoryMapper<S>,
 {
     arch_impl::map_primitive(src, dst, flags, frame_allocator)
 }
