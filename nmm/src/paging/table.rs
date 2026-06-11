@@ -4,8 +4,10 @@ use crate::{
     paging::{Frame, PrimitiveSize},
 };
 
+/// A page table, accurate to the current architecture.
 #[repr(C)]
 #[cfg_attr(feature = "x86_64", repr(align(4096)))]
+#[derive(Debug)]
 pub struct PageTable {
     entries: [PageTableEntry; arch::ENTRY_COUNT],
 }

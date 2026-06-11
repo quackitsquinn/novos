@@ -1,3 +1,5 @@
+use core::fmt::Debug;
+
 use x86_64::structures::paging::Mapper as _;
 
 use crate::{
@@ -42,6 +44,14 @@ impl<'a> OffsetPageTable<'a> {
     /// Returns a mutable reference to the level 4 page table.
     pub fn p4_mut(&mut self) -> &mut PageTable {
         PageTable::from_arch_mut(self.opt.level_4_table_mut())
+    }
+}
+
+impl Debug for OffsetPageTable<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("OffsetPageTable")
+            .field("phys_offset", &self.phys_offset())
+            .finish()
     }
 }
 

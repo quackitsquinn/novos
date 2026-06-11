@@ -53,6 +53,7 @@ pub const L2_PAGE_SIZE: u64 = L1_PAGE_SIZE * ENTRY_COUNT as u64;
 /// The size of a level 3 page (1GB) for x86_64 architecture.
 pub const L3_PAGE_SIZE: u64 = L2_PAGE_SIZE * ENTRY_COUNT as u64;
 
+/// Page table entry flags for x86_64 architecture. This is a bitflags struct that represents the various flags that can be set in a page table entry for x86_64 architecture.
 pub type ArchEntryFlags = PageTableFlags;
 
 bitflags! {
@@ -93,6 +94,7 @@ pub enum ArchError {
 
 static ACTIVE_PAGETABLE: RwLock<Option<Mapper>> = RwLock::new(None);
 
+#[allow(dead_code)] // TODO: evaluate later
 pub(crate) fn mapper_read() -> RwLockReadGuard<'static, Option<Mapper>> {
     ACTIVE_PAGETABLE.read()
 }

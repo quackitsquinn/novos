@@ -3,6 +3,19 @@
 //! This module acts mostly as a hack to get proper rust-analyzer support for x86_64::RecursivePageTable, plus as a way to somewhat normalize what the cross platform
 //! Mapping system will look like. Again, deeply cursed but there IS a not completely cursed reason for it.use std::marker;
 
+use core::fmt::Debug;
+
+use x86_64::structures::paging::mapper::Mapper as _;
+
+use crate::{
+    MapFlags, MemError,
+    arch::x86_64::{PageTableFlags, XFrameAllocator},
+    paging::{
+        Frame, Large, Medium, Page, PageTable, PageTableIndex, PrimitiveRangeManager, Small,
+        map::{Flush, MemoryMapper},
+    },
+};
+
 mod arch_lib {
     pub use x86_64::structures::paging::PageTable;
 
@@ -47,11 +60,11 @@ mod arch_lib {
         {
             unsafe fn map_to_with_table_flags<A>(
                 &mut self,
-                page: Page<S>,
-                frame: PhysFrame<S>,
-                flags: PageTableFlags,
-                parent_table_flags: PageTableFlags,
-                frame_allocator: &mut A,
+                _page: Page<S>,
+                _frame: PhysFrame<S>,
+                _flags: PageTableFlags,
+                _parent_table_flags: PageTableFlags,
+                _frame_allocator: &mut A,
             ) -> Result<MapperFlush<S>, MapToError<S>>
             where
                 Self: Sized,
@@ -62,44 +75,44 @@ mod arch_lib {
 
             fn unmap(
                 &mut self,
-                page: Page<S>,
+                _page: Page<S>,
             ) -> Result<(PhysFrame<S>, MapperFlush<S>), UnmapError> {
                 todo!()
             }
 
             unsafe fn update_flags(
                 &mut self,
-                page: Page<S>,
-                flags: PageTableFlags,
+                _page: Page<S>,
+                _flags: PageTableFlags,
             ) -> Result<MapperFlush<S>, FlagUpdateError> {
                 todo!()
             }
 
             unsafe fn set_flags_p4_entry(
                 &mut self,
-                page: Page<S>,
-                flags: PageTableFlags,
+                _page: Page<S>,
+                _flags: PageTableFlags,
             ) -> Result<MapperFlushAll, FlagUpdateError> {
                 todo!()
             }
 
             unsafe fn set_flags_p3_entry(
                 &mut self,
-                page: Page<S>,
-                flags: PageTableFlags,
+                _page: Page<S>,
+                _flags: PageTableFlags,
             ) -> Result<MapperFlushAll, FlagUpdateError> {
                 todo!()
             }
 
             unsafe fn set_flags_p2_entry(
                 &mut self,
-                page: Page<S>,
-                flags: PageTableFlags,
+                _page: Page<S>,
+                _flags: PageTableFlags,
             ) -> Result<MapperFlushAll, FlagUpdateError> {
                 todo!()
             }
 
-            fn translate_page(&self, page: Page<S>) -> Result<PhysFrame<S>, TranslateError> {
+            fn translate_page(&self, _page: Page<S>) -> Result<PhysFrame<S>, TranslateError> {
                 todo!()
             }
         }
@@ -107,17 +120,6 @@ mod arch_lib {
     #[cfg(not(target_arch = "x86_64"))]
     pub use recursive_spoof::RecursivePageTable as XRecursive;
 }
-
-use x86_64::structures::paging::mapper::Mapper as _;
-
-use crate::{
-    MapFlags, MemError,
-    arch::x86_64::{PageTableFlags, XFrameAllocator},
-    paging::{
-        Frame, Large, Medium, Page, PageTable, PageTableIndex, PrimitiveRangeManager, Small,
-        map::{Flush, MemoryMapper},
-    },
-};
 
 /// A x86_64 specific implementation of a recursive page table, wrapping the x86_64's crate implementation of a recursive page table.
 pub struct RecursivePageTable<'a>(arch_lib::XRecursive<'a>, PageTableIndex);
@@ -182,6 +184,14 @@ impl MemoryMapper<Small> for RecursivePageTable<'_> {
             Ok((frame, _)) => Ok((frame.into(), unsafe { Flush::new(page.start_address()) })),
             Err(e) => Err(MemError::from_unmap_error(e, page)),
         }
+    }
+}
+
+impl Debug for RecursivePageTable<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("RecursivePageTable")
+            .field("recursive_index", &self.recursive_index())
+            .finish()
     }
 }
 

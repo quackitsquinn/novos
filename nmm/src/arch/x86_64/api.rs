@@ -1,6 +1,3 @@
-mod arch_crate {
-    pub use ::x86_64::structures::paging::OffsetPageTable;
-}
 use cake::log::{debug, info};
 
 use crate::{
@@ -12,8 +9,6 @@ use crate::{
     entry_walker::EntryWalker,
     paging::{Page, PageTable, PageTableIndex, Small, map_primitive},
 };
-
-pub(crate) type Offset<'a> = arch_crate::OffsetPageTable<'a>;
 
 pub(crate) unsafe fn init_unchecked(
     root: &'static mut PageTable,

@@ -1,3 +1,5 @@
+//! This module defines the `Page` struct, which represents a virtual memory page of a specific size (small, medium, or large) on the current architecture.
+//! It also defines the `UnsizedPage` enum, which can represent a page of any size.
 use crate::paging::{Large, Medium, Small};
 use crate::{align, arch::VirtAddr, paging::PrimitiveSize};
 use core::any::type_name;

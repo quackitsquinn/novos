@@ -1,22 +1,17 @@
-use x86_64::structures::paging::Mapper as _;
-
 use crate::{
     MapFlags, MemError,
     arch::{
         VirtAddr,
-        x86_64::{
-            offset::OffsetPageTable, recursive::RecursivePageTable,
-        },
+        x86_64::{offset::OffsetPageTable, recursive::RecursivePageTable},
     },
     paging::{
-        Frame, Page, PageTable, PageTableIndex, PrimitiveRangeManager,
-        PrimitiveSize, Small,
+        Frame, Page, PageTable, PageTableIndex, PrimitiveRangeManager, PrimitiveSize, Small,
         map::{Flush, MemoryMapper},
     },
 };
 
 /// The lowest level of mapper for x86_64.
-#[allow(missing_debug_implementations)]
+#[derive(Debug)]
 pub enum Mapper {
     /// An offset page table mapper for x86_64. This mapper uses a fixed offset to access the page tables, and is the most basic type of mapper.
     Offset(OffsetPageTable<'static>),

@@ -1,11 +1,15 @@
+//! A trait for types that can map and unmap pages of a specific size. This is the main interface for mapping
+//! and unmapping pages in the memory manager, and it abstracts over the architecture-specific details of how
+//! page tables are manipulated to create mappings.
+
 use crate::{
     MapFlags, MemError,
     paging::{Frame, Page, PrimitiveRangeManager, PrimitiveSize, Small, VirtAddr},
 };
 
-/// A trait for types that can map and unmap pages of a specific size. T
-/// his is the main interface for mapping and unmapping pages in the memory manager, and it abstracts over
-/// the architecture-specific details of how page tables are manipulated to create mappings.
+/// A trait for types that can map and unmap pages of a specific size. This is the main interface for mapping
+/// and unmapping pages in the memory manager, and it abstracts over the architecture-specific details of how
+/// page tables are manipulated to create mappings.
 pub trait MemoryMapper<S: PrimitiveSize> {
     /// Maps the given page to the given frame with the specified flags, using the provided frame allocator
     /// for any necessary allocations of page tables.

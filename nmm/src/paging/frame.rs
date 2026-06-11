@@ -1,3 +1,5 @@
+//! This module defines the `Frame` struct, which represents a physical memory frame of a specific size (small, medium, or large) on the current architecture.
+//! It also defines the `UnsizedFrame` enum, which can represent a frame of any size.
 use core::{any::type_name, fmt::Debug};
 
 use crate::{

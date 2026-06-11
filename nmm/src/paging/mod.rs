@@ -5,11 +5,9 @@ pub mod index;
 pub(crate) mod limine;
 pub mod map;
 pub mod page;
-mod page_state;
 mod table;
 
 pub use table::{PageTable, PageTableEntry};
-
 
 use cake::log::trace;
 pub use index::PageTableIndex;

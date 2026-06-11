@@ -1,3 +1,4 @@
+//! Utility traits and types for building new address spaces. There currently is no implementation that uses these traits, however.
 use crate::{
     MapFlags, MemError,
     arch::{PhysAddr, VirtAddr},

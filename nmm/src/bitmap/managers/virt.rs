@@ -118,6 +118,7 @@ impl<'a> VirtualAddressManager<'a> {
     /// Resets the entire bitmap, marking all virtual address space as free.
     /// This is a potentially dangerous operation that should only be used in testing or when the caller is certain that all
     /// previously allocated virtual addresses are no longer in use.
+    #[allow(dead_code)] // only used for testing right now
     pub(crate) unsafe fn reset(&mut self) {
         self.bitmap.reset();
     }

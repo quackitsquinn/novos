@@ -1,6 +1,5 @@
 use core::mem;
 
-
 use crate::{
     MapFlags, MemError,
     arch::{
@@ -228,13 +227,6 @@ impl MemError {
 }
 
 impl PageTable {
-    /// Converts a &PageTable reference to a &arch_lib::PageTable reference.
-    pub(crate) fn as_arch_ref(&self) -> &arch_lib::PageTable {
-        // SAFETY: Both structs are canonical representations of a page table,
-        // and therefore have the same memory layout.
-        unsafe { &*(self as *const _ as *const arch_lib::PageTable) }
-    }
-
     /// Converts a &mut PageTable reference to a &mut arch_lib::PageTable reference.
     pub(crate) fn as_arch_mut(&mut self) -> &mut arch_lib::PageTable {
         // SAFETY: Both structs are canonical representations of a page table,
