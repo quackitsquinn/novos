@@ -47,7 +47,7 @@ pub(crate) unsafe fn init_unchecked(
         Page::<Small>::containing_address(scratch_range.base).ok_or(MemError::OutOfMemory)?;
     let test_frame = walker.next_frame::<Small>().ok_or(MemError::OutOfMemory)?;
 
-    unsafe { map_primitive(test_frame, test_page, MapFlags::WRITABLE, &mut walker)? };
+    map_primitive(test_frame, test_page, MapFlags::WRITABLE, &mut walker)?;
 
     info!(
         "Successfully mapped first page of scratch range. Writing to it to test that the mapping is working correctly..."

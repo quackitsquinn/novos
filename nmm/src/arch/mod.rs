@@ -105,19 +105,9 @@ pub(crate) unsafe fn alloc_paged(byte_size: usize, flags: MapFlags) -> Result<Vi
 }
 
 #[doc(hidden)]
-pub(crate) fn map_primitive<S, A>(
-    src: Frame<S>,
-    dst: Page<S>,
-    flags: MapFlags,
-    frame_allocator: &mut A,
-) -> Result<(), MemError>
-where
-    S: PrimitiveSize,
-    A: PrimitiveRangeManager<Frame<Small>, Small>,
-    Mapper: MemoryMapper<S>,
-{
-    arch_impl::map_primitive(src, dst, flags, frame_allocator)
-}
+pub(crate) use arch_impl::map_primitive;
+#[doc(hidden)]
+pub(crate) use arch_impl::unmap_primitive;
 
 pub(crate) unsafe fn do_flush(addr: VirtAddr) {
     unsafe { arch_impl::do_flush(addr) }

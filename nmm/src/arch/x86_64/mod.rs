@@ -35,7 +35,7 @@ use crate::{
     entry_walker::EntryWalker,
     paging::{
         self, Frame, Large, Medium, Page, PrimitiveRangeManager, PrimitiveSize, Small,
-        map::MemoryMapper,
+        map::{Flush, MemoryMapper},
     },
 };
 
@@ -117,7 +117,7 @@ pub(crate) fn map_primitive<S, A>(
     dst: Page<S>,
     flags: MapFlags,
     frame_allocator: &mut A,
-) -> Result<(), MemError>
+) -> Result<Flush, MemError>
 where
     S: PrimitiveSize,
     A: PrimitiveRangeManager<Frame<Small>, Small>,
@@ -127,8 +127,21 @@ where
     let mapper = mapper_guard
         .as_mut()
         .ok_or(MemError::Uninit("global memory mapper"))?;
-    mapper.map(dst, src, flags, frame_allocator)?;
-    Ok(())
+
+    mapper.map(dst, src, flags, frame_allocator)
+}
+
+pub(crate) unsafe fn unmap_primitive<S>(dst: Page<S>) -> Result<(Frame<S>, Flush), MemError>
+where
+    S: PrimitiveSize,
+    Mapper: MemoryMapper<S>,
+{
+    let mut mapper_guard = mapper_mut();
+    let mapper = mapper_guard
+        .as_mut()
+        .ok_or(MemError::Uninit("global memory mapper"))?;
+
+    unsafe { mapper.unmap(dst) }
 }
 
 pub(crate) unsafe fn do_flush(addr: VirtAddr) {

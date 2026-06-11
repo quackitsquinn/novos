@@ -21,7 +21,7 @@ pub use index::PageTableIndex;
 use crate::{
     MapFlags, MemError, NmmSealed,
     arch::{Mapper, PageEntryType},
-    paging::map::MemoryMapper,
+    paging::map::{Flush, MemoryMapper},
     seal,
 };
 
@@ -138,13 +138,13 @@ impl<T> AllFrames for T where
 }
 
 /// Maps a memory primitive (such as a frame) to a page with the specified flags, using the provided frame allocator to allocate any necessary intermediate page tables.
-
-pub fn map_primitive<S, A>(
+#[must_use = "The returned `Flush` should be flushed after the mapping operation to ensure that there are no stale mappings."]
+pub(crate) fn map_primitive<S, A>(
     src: Frame<S>,
     dst: Page<S>,
     flags: MapFlags,
     frame_allocator: &mut A,
-) -> Result<(), MemError>
+) -> Result<Flush, MemError>
 where
     S: PrimitiveSize,
     A: PrimitiveRangeManager<Frame<Small>, Small>,
@@ -156,4 +156,21 @@ where
     );
 
     crate::arch::map_primitive(src, dst, flags, frame_allocator)
+}
+
+/// Unmaps a page, returning the frame that was mapped to it before, or an error if the page was not mapped.
+///
+/// # Safety
+///
+/// The caller must ensure that there are no currently living references to the memory that was mapped to the page being unmapped,
+/// as accessing that memory afterwards is undefined behavior.
+#[must_use = "The returned `Flush` should be flushed after the mapping operation to ensure that there are no stale mappings."]
+pub(crate) unsafe fn unmap_primitive<S>(dst: Page<S>) -> Result<(Frame<S>, Flush), MemError>
+where
+    S: PrimitiveSize,
+    Mapper: MemoryMapper<S>,
+{
+    trace!("Unmapping page {:?}", dst);
+
+    unsafe { crate::arch::unmap_primitive(dst) }
 }
