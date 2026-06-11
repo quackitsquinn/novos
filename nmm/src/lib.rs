@@ -153,7 +153,7 @@ pub fn alloc_paged(byte_size: usize, flags: MapFlags) -> Result<VirtAddr, MemErr
 /// Allocates a virtual address range of the specified size without mapping it to any physical memory.
 #[must_use = "The returned virtual address must be freed with `free_virtspace` when it is no longer needed to avoid memory leaks and ensure proper resource management."]
 pub fn alloc_virtspace(byte_size: usize, alignment: usize) -> Result<VirtAddr, MemError> {
-    let alignment = Alignment::new(alignment).ok_or(MemError::InvalidAlignment(alignment))?;
+    let _alignment = Alignment::new(alignment).ok_or(MemError::InvalidAlignment(alignment))?;
     if byte_size > arch::VIRTUAL_ADDRESS_MAX as usize {
         return Err(MemError::OutOfMemory);
     }

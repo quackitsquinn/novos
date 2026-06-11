@@ -10,12 +10,8 @@ mod table;
 
 pub use table::{PageTable, PageTableEntry};
 
-use core::any::TypeId;
 
-use cake::{
-    Once,
-    log::{debug, trace},
-};
+use cake::log::trace;
 pub use index::PageTableIndex;
 
 use crate::{

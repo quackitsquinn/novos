@@ -1,7 +1,4 @@
-use core::{
-    cell::UnsafeCell,
-    sync::atomic::{AtomicU8, Ordering},
-};
+use core::sync::atomic::{AtomicU8, Ordering};
 
 use cake::Once;
 

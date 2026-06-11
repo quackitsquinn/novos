@@ -1,9 +1,9 @@
 use core::simd::u64x4;
-use core::{mem::Alignment, simd};
+use core::mem::Alignment;
 
 use crate::align;
 
-use crate::bitmap::{BitPtr, Bitmap, bitptr};
+use crate::bitmap::{BitPtr, Bitmap};
 use crate::test_println;
 
 impl<'a> Bitmap<'a> {

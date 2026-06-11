@@ -8,8 +8,7 @@ use crate::{
     MapFlags, MemError, VirtualMemoryRange,
     entry_walker::EntryWalker,
     paging::{
-        self, Frame, Page, PageTable, PrimitiveRangeManager, PrimitiveSize, Small,
-        map::MemoryMapper,
+        self, PageTable,
     },
 };
 

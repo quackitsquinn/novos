@@ -10,31 +10,24 @@ mod recursive;
 pub use mapper::Mapper;
 
 use core::arch::asm;
-use core::mem::Alignment;
 
 use bitflags::bitflags;
 
 pub use addr::{PhysAddr, VirtAddr};
-use cake::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use cake::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 // This submodule exists purely to reduce name collisions as the internal implementation of x86_64
 // is very similar to nmm (as i roughly modeled nmm after x86_64 and redox's memory management),
 // so there are a lot of similar types and functions, and it would be very easy for them to collide if they were all in the same module.
 //
 // It's a bit verbose, but it's easier than dealing with the name collisions and weird compiler errors that would arise.
-mod arch_lib {
-    pub use x86_64::structures::paging::{
-        FrameAllocator, OffsetPageTable, PageSize, PhysFrame, Size1GiB, Size2MiB, Size4KiB,
-        mapper::MapToError,
-    };
-}
+mod arch_lib {}
 
 use crate::{
     MapFlags, MemError,
-    arch::x86_64::{conv::XFrameAllocator, offset::OffsetPageTable, recursive::RecursivePageTable},
-    entry_walker::EntryWalker,
+    arch::x86_64::conv::XFrameAllocator,
     paging::{
-        self, Frame, Large, Medium, Page, PrimitiveRangeManager, PrimitiveSize, Small,
+        Frame, Page, PrimitiveRangeManager, PrimitiveSize, Small,
         map::{Flush, MemoryMapper},
     },
 };

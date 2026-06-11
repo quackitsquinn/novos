@@ -5,11 +5,11 @@ use crate::{
     arch::{
         VirtAddr,
         x86_64::{
-            PageTableFlags, XFrameAllocator, offset::OffsetPageTable, recursive::RecursivePageTable,
+            offset::OffsetPageTable, recursive::RecursivePageTable,
         },
     },
     paging::{
-        Frame, Large, Medium, Page, PageTable, PageTableIndex, PrimitiveRangeManager,
+        Frame, Page, PageTable, PageTableIndex, PrimitiveRangeManager,
         PrimitiveSize, Small,
         map::{Flush, MemoryMapper},
     },

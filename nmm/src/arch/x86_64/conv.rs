@@ -1,24 +1,22 @@
 use core::mem;
 
-use x86_64::structures::paging::Size4KiB;
 
 use crate::{
     MapFlags, MemError,
     arch::{
-        self, PhysAddr,
+        PhysAddr,
         x86_64::{ArchError, PageTableFlags},
     },
     paging::{
         Frame, Large, Medium, Page, PageTable, PageTableIndex, PrimitiveRangeManager,
         PrimitiveSize, Small,
-        map::{Flush, MemoryMapper},
     },
 };
 
 mod arch_lib {
     pub use x86_64::structures::paging::{
         FrameAllocator, Page, PageSize, PageTable, PageTableFlags, PageTableIndex, PhysFrame,
-        Size1GiB, Size2MiB, Size4KiB, mapper::MapToError, mapper::Mapper, mapper::UnmapError,
+        Size1GiB, Size2MiB, Size4KiB, mapper::MapToError, mapper::UnmapError,
     };
 }
 

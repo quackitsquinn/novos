@@ -1,6 +1,6 @@
 use crate::{
     MapFlags, MemError,
-    paging::{Frame, Large, Medium, Page, PrimitiveRangeManager, PrimitiveSize, Small, VirtAddr},
+    paging::{Frame, Page, PrimitiveRangeManager, PrimitiveSize, Small, VirtAddr},
 };
 
 /// A trait for types that can map and unmap pages of a specific size. T

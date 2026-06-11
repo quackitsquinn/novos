@@ -1,6 +1,6 @@
 use crate::{
     MapFlags,
-    arch::{self, VirtAddr, x86_64::PhysAddr},
+    arch::{self, x86_64::PhysAddr},
     paging::{Frame, PrimitiveSize},
 };
 

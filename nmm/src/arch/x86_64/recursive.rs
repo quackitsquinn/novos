@@ -4,21 +4,21 @@
 //! Mapping system will look like. Again, deeply cursed but there IS a not completely cursed reason for it.use std::marker;
 
 mod arch_lib {
-    pub use x86_64::structures::paging::{
-        FrameAllocator, Page, PageSize, PageTable, PageTableFlags, PageTableIndex, PhysFrame,
-        Size1GiB, Size2MiB, Size4KiB,
-        mapper::{
-            FlagUpdateError, MapToError, Mapper, MapperFlush, MapperFlushAll, TranslateError,
-            UnmapError,
-        },
-    };
+    pub use x86_64::structures::paging::PageTable;
 
     #[cfg(target_arch = "x86_64")]
     pub use x86_64::structures::paging::RecursivePageTable as XRecursive;
 
     #[cfg(not(target_arch = "x86_64"))]
     mod recursive_spoof {
-        use super::*;
+        use x86_64::structures::paging::{
+            FrameAllocator, Mapper, Page, PageSize, PageTable, PageTableFlags, PageTableIndex,
+            PhysFrame, Size4KiB,
+            mapper::{
+                FlagUpdateError, MapToError, MapperFlush, MapperFlushAll, TranslateError,
+                UnmapError,
+            },
+        };
 
         pub struct RecursivePageTable<'a> {
             _phantom: core::marker::PhantomData<&'a ()>,
@@ -26,8 +26,8 @@ mod arch_lib {
 
         impl<'a> RecursivePageTable<'a> {
             pub unsafe fn new_unchecked(
-                _table: &'a mut super::PageTable,
-                _recursive_index: super::PageTableIndex,
+                _table: &'a mut PageTable,
+                _recursive_index: PageTableIndex,
             ) -> Self {
                 unimplemented!("Recursive page tables are only supported on x86_64 architecture");
             }
@@ -112,15 +112,10 @@ use x86_64::structures::paging::mapper::Mapper as _;
 
 use crate::{
     MapFlags, MemError,
-    arch::{
-        self, ArchError,
-        x86_64::{PageTableFlags, XFrameAllocator},
-    },
+    arch::x86_64::{PageTableFlags, XFrameAllocator},
     paging::{
         Frame, Large, Medium, Page, PageTable, PageTableIndex, PrimitiveRangeManager, Small,
-        UnsizedFrame,
         map::{Flush, MemoryMapper},
-        page::UnsizedPage,
     },
 };
 

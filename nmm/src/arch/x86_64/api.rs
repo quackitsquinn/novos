@@ -1,21 +1,13 @@
-use core::slice;
 mod arch_crate {
-    pub use ::x86_64::structures::paging::{
-        FrameAllocator, Mapper, OffsetPageTable, Page, PageTable, PageTableFlags, Size4KiB,
-        mapper::MapToError,
-    };
+    pub use ::x86_64::structures::paging::OffsetPageTable;
 }
-use cake::{
-    limine::memory_map,
-    log::{debug, info},
-};
-use cfg_if::cfg_if;
+use cake::log::{debug, info};
 
 use crate::{
     MapFlags, MemError, VirtualMemoryRange,
     arch::{
         self, PhysAddr, VirtAddr,
-        x86_64::{self, ArchError, mapper::Mapper, set_mapper},
+        x86_64::{mapper::Mapper, set_mapper},
     },
     entry_walker::EntryWalker,
     paging::{Page, PageTable, PageTableIndex, Small, map_primitive},
@@ -55,6 +47,13 @@ pub(crate) unsafe fn init_unchecked(
     // Write to the mapped page to test that the mapping is working correctly.
     unsafe {
         *test_page.start_address().as_mut_ptr::<[u8; 4096]>() = [0xAAu8; 4096];
+    }
+
+    info!("Attempting to unmap the test page");
+    unsafe {
+        let (frame, flush) = arch::unmap_primitive(test_page)?;
+        flush.flush();
+        debug!("Successfully unmapped test page, got frame {:?}", frame);
     }
 
     // let mut bitmap = unsafe { Bitmap::init(u64_slice, scratch_pages as u64, scratch_range.base) };
