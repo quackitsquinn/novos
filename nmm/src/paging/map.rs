@@ -31,18 +31,40 @@ pub trait MemoryMapper<S: PrimitiveSize> {
 
 /// A wrapper type for a virtual address that needs to be flushed from the TLB after a mapping operation.
 /// This is used to ensure that the TLB is properly flushed after unmapping pages, which is necessary to prevent stale mappings from being used.
-pub struct Flush(VirtAddr);
+pub struct Flush(FlushInner);
 
 impl Flush {
-    /// Creates a new `Flush` for the given virtual address. The caller must ensure that the provided virtual address is the base address of the page that was unmapped, and that it is properly aligned to the page size.
-    pub unsafe fn new(addr: VirtAddr) -> Self {
-        Self(addr)
+    /// Creates a new `Flush` that indicates that all TLB entries should be flushed. This is used when unmapping large pages, where multiple TLB entries may be affected.
+    pub fn flush_all() -> Self {
+        Self(FlushInner::FlushAll)
     }
 
+    /// Creates a new `Flush` for the given virtual address.
+    ///
+    /// # Safety
+    ///
+    pub unsafe fn flush_page<S: PrimitiveSize>(page: Page<S>) -> Self {
+        Self(FlushInner::Flush(page.start_address()))
+    }
+
+    /// Flushes the TLB entry for the virtual address contained in this `Flush`, or flushes all TLB entries if this `Flush` indicates that all entries should be flushed.
     pub fn flush(self) {
-        // SAFETY: The caller must ensure that the provided virtual address is the base address of the page that was unmapped, and that it is properly aligned to the page size. If this is not the case, flushing the TLB with an invalid address could cause undefined behavior.
-        unsafe { crate::arch::do_flush(self.0) }
+        self.0.flush();
     }
 
     pub fn ignore(self) {}
+}
+
+enum FlushInner {
+    Flush(VirtAddr),
+    FlushAll,
+}
+
+impl FlushInner {
+    pub fn flush(self) {
+        match self {
+            Self::Flush(addr) => unsafe { crate::arch::do_flush(addr) },
+            Self::FlushAll => unsafe { crate::arch::do_flush_all() },
+        }
+    }
 }

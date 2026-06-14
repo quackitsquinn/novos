@@ -17,6 +17,10 @@ impl<S: PrimitiveSize> crate::paging::MemoryPrimitive<S> for Page<S> {}
 
 impl<S: PrimitiveSize> Page<S> {
     /// Creates a new `Page` from the given starting virtual address. The address must be aligned to the size of the page, otherwise this function will panic.
+    pub fn try_new_u64(start_address: u64) -> Option<Self> {
+        Self::try_new(VirtAddr::new(start_address))
+    }
+    /// Creates a new `Page` from the given starting virtual address. The address must be aligned to the size of the page, otherwise this function will panic.
     pub fn try_new(start_address: VirtAddr) -> Option<Self> {
         if align!(down, start_address.as_u64(), S::SIZE) == start_address.as_u64() {
             Some(unsafe { Self::new_unchecked(start_address) })

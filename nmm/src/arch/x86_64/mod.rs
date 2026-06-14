@@ -27,7 +27,7 @@ use crate::{
     MapFlags, MemError,
     arch::x86_64::conv::XFrameAllocator,
     paging::{
-        Frame, Page, PrimitiveRangeManager, PrimitiveSize, Small,
+        AllFrames, Frame, Page, PrimitiveRangeManager, PrimitiveSize, Small,
         map::{Flush, MemoryMapper},
     },
 };
@@ -140,7 +140,21 @@ where
 }
 
 pub(crate) unsafe fn do_flush(addr: VirtAddr) {
-    unsafe { asm!("invlpg [{}]", in(reg) addr.as_u64(), options(nostack, preserves_flags)) };
+    #[cfg(target_arch = "x86_64")]
+    unsafe {
+        asm!("invlpg [{}]", in(reg) addr.as_u64(), options(nostack, preserves_flags))
+    };
+}
+
+pub(crate) unsafe fn do_flush_all() {
+    #[cfg(target_arch = "x86_64")]
+    unsafe {
+        // Reload the CR3 register to flush the entire TLB.
+        asm!(
+            "mov rax, cr3; mov cr3, rax",
+            options(nostack, preserves_flags)
+        )
+    };
 }
 
 #[cfg(test)]

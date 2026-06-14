@@ -75,7 +75,7 @@ impl MemoryMapper<Small> for OffsetPageTable<'_> {
                 .map_to(page.into(), frame.into(), flags.into(), &mut x_fa)?;
         };
 
-        Ok(unsafe { Flush::new(page.start_address()) })
+        Ok(unsafe { Flush::flush_page(page) })
     }
 
     unsafe fn unmap(
@@ -84,7 +84,7 @@ impl MemoryMapper<Small> for OffsetPageTable<'_> {
     ) -> Result<(Frame<Small>, Flush), MemError> {
         let result = self.opt.unmap(page.into());
         match result {
-            Ok((frame, _)) => Ok((frame.into(), unsafe { Flush::new(page.start_address()) })),
+            Ok((frame, _)) => Ok((frame.into(), unsafe { Flush::flush_page(page) })),
             Err(e) => Err(MemError::from_unmap_error(e, page)),
         }
     }
@@ -113,7 +113,7 @@ macro_rules! impl_memory_mapper_huge {
                         .map_to(page.into(), frame.into(), flags.into(), &mut x_fa)?;
                 };
 
-                Ok(unsafe { Flush::new(page.start_address()) })
+                Ok(unsafe { Flush::flush_page(page) })
             }
 
             unsafe fn unmap(
@@ -122,9 +122,7 @@ macro_rules! impl_memory_mapper_huge {
             ) -> Result<(Frame<$size>, Flush), MemError> {
                 let result = self.opt.unmap(page.into());
                 match result {
-                    Ok((frame, _)) => {
-                        Ok((frame.into(), unsafe { Flush::new(page.start_address()) }))
-                    }
+                    Ok((frame, _)) => Ok((frame.into(), unsafe { Flush::flush_page(page) })),
                     Err(e) => Err(MemError::from_unmap_error(e, page)),
                 }
             }

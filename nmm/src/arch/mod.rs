@@ -7,9 +7,7 @@ use x86_64 as arch_impl;
 use crate::{
     MapFlags, MemError, VirtualMemoryRange,
     entry_walker::EntryWalker,
-    paging::{
-        self, PageTable,
-    },
+    paging::{self, PageTable},
 };
 
 /// Physical address type for the current architecture.
@@ -108,6 +106,5 @@ pub(crate) use arch_impl::map_primitive;
 #[doc(hidden)]
 pub(crate) use arch_impl::unmap_primitive;
 
-pub(crate) unsafe fn do_flush(addr: VirtAddr) {
-    unsafe { arch_impl::do_flush(addr) }
-}
+pub(crate) use arch_impl::do_flush;
+pub(crate) use arch_impl::do_flush_all;

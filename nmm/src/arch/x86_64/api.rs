@@ -7,7 +7,7 @@ use crate::{
         x86_64::{mapper::Mapper, set_mapper},
     },
     entry_walker::EntryWalker,
-    paging::{Page, PageTable, PageTableIndex, Small, map_primitive},
+    paging::{Large, Medium, Page, PageTable, PageTableIndex, PrimitiveSize, Small, map_primitive},
 };
 
 pub(crate) unsafe fn init_unchecked(
@@ -23,16 +23,11 @@ pub(crate) unsafe fn init_unchecked(
         });
     }
 
-    // Initialize the mapper and set it as the active mapper for the system. T
-    // his is necessary to perform any virtual memory operations, including mapping the scratch space.
-    let mapper = unsafe { Mapper::new_offset(root, offset) };
-    unsafe { set_mapper(mapper) };
-
-    info!("Mapping first page of scratch range to test map_primitive...");
     // Map the first page of the scratch range to test that the mapper is working correctly.
+    type Size = Large; // We can use a medium page here since the scratch range is guaranteed to be large enough to hold at least one medium page, and using a larger page size will allow us to test that the mapper can handle mapping larger pages correctly.
     let test_page =
-        Page::<Small>::containing_address(scratch_range.base).ok_or(MemError::OutOfMemory)?;
-    let test_frame = walker.next_frame::<Small>().ok_or(MemError::OutOfMemory)?;
+        Page::<Size>::containing_address(scratch_range.base).ok_or(MemError::OutOfMemory)?;
+    let test_frame = walker.next_frame::<Size>().ok_or(MemError::OutOfMemory)?;
 
     map_primitive(test_frame, test_page, MapFlags::WRITABLE, &mut walker)?;
 
@@ -41,7 +36,9 @@ pub(crate) unsafe fn init_unchecked(
     );
     // Write to the mapped page to test that the mapping is working correctly.
     unsafe {
-        *test_page.start_address().as_mut_ptr::<[u8; 4096]>() = [0xAAu8; 4096];
+        *test_page
+            .start_address()
+            .as_mut_ptr::<[u8; Size::SIZE as usize]>() = [0xAAu8; Size::SIZE as usize];
     }
 
     info!("Attempting to unmap the test page");
@@ -50,6 +47,13 @@ pub(crate) unsafe fn init_unchecked(
         flush.flush();
         debug!("Successfully unmapped test page, got frame {:?}", frame);
     }
+
+    // Initialize the mapper and set it as the active mapper for the system. T
+    // his is necessary to perform any virtual memory operations, including mapping the scratch space.
+    let mapper = unsafe { Mapper::new_offset(root, offset) };
+    unsafe { set_mapper(mapper) };
+
+    info!("Mapping first page of scratch range to test map_primitive...");
 
     // let mut bitmap = unsafe { Bitmap::init(u64_slice, scratch_pages as u64, scratch_range.base) };
 

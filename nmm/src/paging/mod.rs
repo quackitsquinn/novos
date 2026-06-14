@@ -7,6 +7,8 @@ pub mod map;
 pub mod page;
 mod table;
 
+use std::ops;
+
 pub use table::{PageTable, PageTableEntry};
 
 use cake::log::trace;
@@ -35,6 +37,49 @@ pub type Table = [PageEntryType; crate::arch::ENTRY_COUNT];
 /// in the paging system.
 #[allow(private_bounds)] // intentionally seal this
 pub trait MemoryPrimitive<S: PrimitiveSize>: NmmSealed {}
+
+/// Helper trait to make AddressSpace's definition a little less gross
+trait AddrSpaceMath:
+    ops::Add<u64, Output = Self>
+    + ops::Sub<u64, Output = Self>
+    + ops::AddAssign<u64>
+    + ops::SubAssign<u64>
+    + ops::Add<Self>
+    + ops::Sub<Self>
+    + ops::AddAssign<Self>
+    + ops::SubAssign<Self>
+{
+}
+/// Address space primitives, e.g. `VirtAddr` and `PhysAddr`.
+///
+/// This is used for generic functions that can work with either virtual or physical addresses.
+pub trait AddressSpace:
+    NmmSealed + Sized + Copy + core::fmt::Debug + Eq + PartialEq + Ord + PartialOrd + AddrSpaceMath
+{
+    /// Tries to create a new address space from the given value.
+    /// The value must be valid for the current architecture's address space, otherwise this function will return `None`.
+    fn try_new(val: u64) -> Option<Self>;
+
+    /// Tries to create a new address space from the given pointer.
+    /// The pointer value must be valid for the current architecture's address space, otherwise this function will return `None`.
+    fn try_from_ptr<T>(ptr: *const T) -> Option<Self> {
+        Self::try_new(ptr as usize as u64)
+    }
+
+    /// Creates a new address space from the given pointer.
+    /// The pointer value must be valid for the current architecture's address space, otherwise this function will panic.
+    fn from_ptr<T>(ptr: *const T) -> Self {
+        Self::try_from_ptr(ptr)
+            .expect("AddressSpace::from_ptr: pointer value is invalid for this address space")
+    }
+    /// Creates a new address space from the given value.
+    /// The value must be valid for the current architecture's address space, otherwise this function will panic.
+    fn new(val: u64) -> Self {
+        Self::try_new(val).expect("AddressSpace::new: value is invalid for this address space")
+    }
+    /// Returns the starting virtual address of the address space.
+    fn as_u64(&self) -> u64;
+}
 
 /// A trait representing a page size for the current architecture.
 #[allow(private_bounds)]
