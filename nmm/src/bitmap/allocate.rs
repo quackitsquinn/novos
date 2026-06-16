@@ -1,5 +1,5 @@
-use core::simd::u64x4;
 use core::mem::Alignment;
+use core::simd::u64x4;
 
 use crate::align;
 

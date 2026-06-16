@@ -6,6 +6,7 @@ use crate::{
 
 use core::ops;
 
+/// Physical address type for the current architecture.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct PhysAddr(u64);
 

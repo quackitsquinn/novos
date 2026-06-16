@@ -8,8 +8,6 @@ mod recursive;
 
 pub use mapper::Mapper;
 
-use core::arch::asm;
-
 use bitflags::bitflags;
 
 use cake::{RwLock, RwLockReadGuard, RwLockWriteGuard};
@@ -140,21 +138,31 @@ where
 }
 
 pub(crate) unsafe fn do_flush(addr: VirtAddr) {
-    #[cfg(target_arch = "x86_64")]
-    unsafe {
-        asm!("invlpg [{}]", in(reg) addr.as_u64(), options(nostack, preserves_flags))
-    };
+    cfg_if::cfg_if! {
+        if #[cfg(target_arch = "x86_64")] {
+            unsafe {
+                core::arch::asm!("invlpg [{}]", in(reg) addr.as_u64(), options(nostack, preserves_flags))
+            };
+        } else {
+            let _ = addr; // Avoid unused variable warning on unsupported architectures.
+        }
+    }
 }
 
 pub(crate) unsafe fn do_flush_all() {
-    #[cfg(target_arch = "x86_64")]
-    unsafe {
-        // Reload the CR3 register to flush the entire TLB.
-        asm!(
-            "mov rax, cr3; mov cr3, rax",
-            options(nostack, preserves_flags)
-        )
-    };
+    cfg_if::cfg_if! {
+        if #[cfg(target_arch = "x86_64")] {
+            unsafe {
+                // Reload the CR3 register to flush the entire TLB.
+                core::arch::asm!(
+                    "mov rax, cr3; mov cr3, rax",
+                    options(nostack, preserves_flags)
+                )
+            };
+        } else {
+            // No-op on unsupported architectures.
+        }
+    }
 }
 
 pub(crate) fn validate_virt_addr(addr: u64) -> bool {
