@@ -90,14 +90,14 @@ seal!(Small, Medium, Large);
 #[allow(private_bounds)] // intentionally seal this
 pub const trait MemoryPrimitive<Ps: PrimitiveSize>: NmmSealed {
     /// The address space type associated with this memory primitive (e.g., `VirtAddr` for pages, `PhysAddr` for frames).
-    type AddressSpace: Address;
+    type AddressType: Address;
 
     /// Returns the starting address of this memory primitive as the appropriate address space type (e.g., `VirtAddr` for pages, `PhysAddr` for frames).
-    fn start_address(&self) -> Self::AddressSpace;
+    fn start_address(&self) -> Self::AddressType;
 }
 
 /// Helper trait to make AddressSpace's definition a little less gross
-const trait AddrSpaceMath:
+const trait AddressMath:
     Sized
     + [const] ops::Add<u64, Output = Self>
     + [const] ops::Sub<u64, Output = Self>
@@ -110,7 +110,7 @@ const trait AddrSpaceMath:
 {
 }
 
-impl<T> AddrSpaceMath for T where
+impl<T> AddressMath for T where
     T: Sized
         + ops::Add<u64, Output = Self>
         + ops::Sub<u64, Output = Self>
@@ -126,8 +126,9 @@ impl<T> AddrSpaceMath for T where
 /// Address space primitives, e.g. `VirtAddr` and `PhysAddr`.
 ///
 /// This is used for generic functions that can work with either virtual or physical addresses.
+#[allow(private_bounds)]
 pub const trait Address:
-    NmmSealed + Copy + core::fmt::Debug + Eq + PartialEq + Ord + PartialOrd + AddrSpaceMath
+    NmmSealed + Copy + core::fmt::Debug + Eq + PartialEq + Ord + PartialOrd + AddressMath
 {
     /// Tries to create a new address from the given value.
     /// The value must be valid for the current architecture's address, otherwise this function will return `None`.
@@ -151,7 +152,7 @@ pub const trait Address:
         primitive: P,
     ) -> Option<Self>
     where
-        P::AddressSpace: [const] Address,
+        P::AddressType: [const] Address,
     {
         let primitive_addr = primitive.start_address();
         Self::try_new(primitive_addr.as_u64())

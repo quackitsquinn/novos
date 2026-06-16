@@ -63,7 +63,7 @@ impl<S: PrimitiveSize> Frame<S> {
 
 impl<S: PrimitiveSize> NmmSealed for Frame<S> {}
 impl<S: PrimitiveSize> const MemoryPrimitive<S> for Frame<S> {
-    type AddressSpace = PhysAddr;
+    type AddressType = PhysAddr;
 
     /// Returns the starting physical address of the frame.
     fn start_address(&self) -> PhysAddr {

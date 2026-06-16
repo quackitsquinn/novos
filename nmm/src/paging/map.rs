@@ -31,6 +31,7 @@ pub trait MemoryMapper<S: PrimitiveSize> {
 
 /// A wrapper type for a virtual address that needs to be flushed from the TLB after a mapping operation.
 /// This is used to ensure that the TLB is properly flushed after unmapping pages, which is necessary to prevent stale mappings from being used.
+#[must_use = "The returned `Flush` should be flushed after the mapping operation to ensure that there are no stale mappings."]
 pub struct Flush(FlushInner);
 
 impl Flush {
@@ -52,6 +53,7 @@ impl Flush {
         self.0.flush();
     }
 
+    /// Ignores this `Flush`.
     pub fn ignore(self) {}
 }
 
