@@ -1,8 +1,9 @@
 use core::{alloc::Layout, mem::Alignment};
 
 use crate::{
-    arch::{self, VirtAddr},
+    arch,
     bitmap::{BitPtr, Bitmap},
+    paging::{Address, AddressExt, VirtAddr},
     test_println,
 };
 
@@ -44,7 +45,7 @@ impl<'a> VirtualAddressManager<'a> {
 
     fn bitptr_to_virtaddr(base: u64, bitptr: BitPtr) -> VirtAddr {
         let addr: *const u8 = bitptr.as_ptr(base as *mut _, Self::BIT_SIZE);
-        VirtAddr::from_ptr(addr)
+        VirtAddr::from_ptr(addr).expect("invalid virtaddr")
     }
 
     const fn virtaddr_to_bitptr(base: u64, addr: VirtAddr) -> Option<BitPtr> {

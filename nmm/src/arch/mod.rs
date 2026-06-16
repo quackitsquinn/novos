@@ -7,15 +7,9 @@ use x86_64 as arch_impl;
 use crate::{
     MapFlags, MemError, VirtualMemoryRange,
     entry_walker::EntryWalker,
-    paging::{self, PageTable},
+    paging::{self, PageTable, PhysAddr, VirtAddr},
 };
 
-/// Physical address type for the current architecture.
-/// Currently, this is an alias for `arch::PhysAddr`.
-pub type PhysAddr = arch_impl::PhysAddr;
-/// Virtual address type for the current architecture.
-/// Currently, this is an alias for `arch::VirtAddr`.
-pub type VirtAddr = arch_impl::VirtAddr;
 /// Page table entry type for the current architecture.
 /// Currently, this is an alias for `arch::PageEntryType`.
 pub type PageEntryType = arch_impl::PageEntryType;
@@ -31,7 +25,7 @@ pub type ArchEntryFlags = arch_impl::PageTableFlags;
 pub type Mapper = arch_impl::Mapper;
 
 /// The start of the higher half in virtual address space.
-pub const HIGHER_HALF_START: VirtAddr = VirtAddr::HIGHER_HALF_START;
+pub const HIGHER_HALF_START: VirtAddr = arch_impl::HIGHER_HALF_START;
 /// The width of virtual addresses in bits for the current architecture.
 pub const VIRTUAL_ADDRESS_WIDTH: u8 = arch_impl::VIRTUAL_ADDRESS_WIDTH;
 /// The maximum valid virtual address for the current architecture.
@@ -108,3 +102,16 @@ pub(crate) use arch_impl::unmap_primitive;
 
 pub(crate) use arch_impl::do_flush;
 pub(crate) use arch_impl::do_flush_all;
+
+pub(crate) use arch_impl::canonicalize_phys;
+pub(crate) use arch_impl::canonicalize_virt;
+
+/// Validates that the given physical address is valid for the current architecture.
+pub const fn is_valid_phys(addr: u64) -> bool {
+    canonicalize_phys(addr) == addr
+}
+
+/// Validates that the given virtual address is valid for the current architecture.
+pub const fn is_valid_virt(addr: u64) -> bool {
+    canonicalize_virt(addr) == addr
+}

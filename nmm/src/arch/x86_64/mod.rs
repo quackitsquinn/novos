@@ -1,6 +1,5 @@
 //! Architecture-specific types and implementations for x86_64.
 
-pub mod addr;
 pub(crate) mod api;
 mod conv;
 mod mapper;
@@ -13,7 +12,6 @@ use core::arch::asm;
 
 use bitflags::bitflags;
 
-pub use addr::{PhysAddr, VirtAddr};
 use cake::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 // This submodule exists purely to reduce name collisions as the internal implementation of x86_64
@@ -27,7 +25,7 @@ use crate::{
     MapFlags, MemError,
     arch::x86_64::conv::XFrameAllocator,
     paging::{
-        AllFrames, Frame, Page, PrimitiveRangeManager, PrimitiveSize, Small,
+        Address, Frame, Page, PrimitiveRangeManager, PrimitiveSize, Small, VirtAddr,
         map::{Flush, MemoryMapper},
     },
 };
@@ -36,6 +34,8 @@ use crate::{
 pub const VIRTUAL_ADDRESS_WIDTH: u8 = 48;
 /// The maximum valid virtual address for x86_64 architecture.
 pub const VIRTUAL_ADDRESS_MAX: u64 = (1 << VIRTUAL_ADDRESS_WIDTH) - 1;
+/// The start of the higher half in virtual address space for x86_64 architecture.
+pub const HIGHER_HALF_START: VirtAddr = VirtAddr::new(0xFFFF800000000000);
 /// The width of physical addresses in bits for x86_64 architecture.
 pub const PHYSICAL_ADDRESS_WIDTH: u8 = 52;
 /// The maximum valid physical address for x86_64 architecture.
@@ -155,6 +155,24 @@ pub(crate) unsafe fn do_flush_all() {
             options(nostack, preserves_flags)
         )
     };
+}
+
+pub(crate) fn validate_virt_addr(addr: u64) -> bool {
+    // Check if the address is within the valid range for x86_64 virtual addresses.
+    addr <= VIRTUAL_ADDRESS_MAX
+}
+
+pub const fn canonicalize_phys(addr: u64) -> u64 {
+    // taken from the x86_64 crate
+    addr % (1 << 52)
+}
+
+pub const fn canonicalize_virt(addr: u64) -> u64 {
+    // taken from the x86_64 crate
+
+    // By doing the right shift as a signed operation (on a i64), it will
+    // sign extend the value, repeating the leftmost bit.
+    ((addr << 16) as i64 >> 16) as u64
 }
 
 #[cfg(test)]

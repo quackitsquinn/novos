@@ -6,6 +6,7 @@ use cake::log::info;
 use cake::{Once, OnceMutex};
 use modular_bitfield::prelude::*;
 use nmm::MapFlags;
+use nmm::paging::AddressExt;
 
 use crate::{
     acpi,

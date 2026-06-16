@@ -1,7 +1,7 @@
 //! Utility traits and types for building new address spaces. There currently is no implementation that uses these traits, however.
 use crate::{
     MapFlags, MemError,
-    arch::{PhysAddr, VirtAddr},
+    paging::{PhysAddr, VirtAddr},
 };
 
 /// The `AddressSpaceBuilder` trait defines the interface for building a new address space, such as when creating a new page table hierarchy for a process.

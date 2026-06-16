@@ -2,13 +2,10 @@ use core::mem;
 
 use crate::{
     MapFlags, MemError,
-    arch::{
-        PhysAddr,
-        x86_64::{ArchError, PageTableFlags},
-    },
+    arch::x86_64::{ArchError, PageTableFlags},
     paging::{
-        Frame, Large, Medium, Page, PageTable, PageTableIndex, PrimitiveRangeManager,
-        PrimitiveSize, Small,
+        Address, Frame, Large, Medium, Page, PageTable, PageTableIndex, PhysAddr,
+        PrimitiveRangeManager, PrimitiveSize, Small, VirtAddr,
     },
 };
 
@@ -17,6 +14,9 @@ mod arch_lib {
         FrameAllocator, Page, PageSize, PageTable, PageTableFlags, PageTableIndex, PhysFrame,
         Size1GiB, Size2MiB, Size4KiB, mapper::MapToError, mapper::UnmapError,
     };
+
+    pub use x86_64::PhysAddr;
+    pub use x86_64::VirtAddr;
 }
 
 pub(super) struct XFrameAllocator<'a, S: PrimitiveSize, T>
@@ -46,7 +46,7 @@ where
 {
     fn allocate_frame(&mut self) -> Option<arch_lib::PhysFrame<arch_lib::Size4KiB>> {
         let frame = self.frame_range_manager.allocate_range()?;
-        Some(arch_lib::PhysFrame::from_start_address(*frame.start_address()).unwrap())
+        Some(frame.into())
     }
 }
 
@@ -56,7 +56,7 @@ where
 {
     fn allocate_frame(&mut self) -> Option<arch_lib::PhysFrame<arch_lib::Size2MiB>> {
         let frame = self.frame_range_manager.allocate_range()?;
-        Some(arch_lib::PhysFrame::from_start_address(*frame.start_address()).unwrap())
+        Some(frame.into())
     }
 }
 
@@ -66,7 +66,7 @@ where
 {
     fn allocate_frame(&mut self) -> Option<arch_lib::PhysFrame<arch_lib::Size1GiB>> {
         let frame = self.frame_range_manager.allocate_range()?;
-        Some(arch_lib::PhysFrame::from_start_address(*frame.start_address()).unwrap())
+        Some(frame.into())
     }
 }
 
@@ -91,7 +91,7 @@ macro_rules! into_arch_page {
     ($x86_64_size: path, $size: path) => {
         impl Into<arch_lib::Page<$x86_64_size>> for Page<$size> {
             fn into(self) -> arch_lib::Page<$x86_64_size> {
-                arch_lib::Page::from_start_address(*self.start_address()).unwrap()
+                arch_lib::Page::from_start_address(self.start_address().into()).unwrap()
             }
         }
     };
@@ -116,7 +116,7 @@ macro_rules! into_arch_frame {
     ($x86_64_size: path, $size: path) => {
         impl Into<arch_lib::PhysFrame<$x86_64_size>> for Frame<$size> {
             fn into(self) -> arch_lib::PhysFrame<$x86_64_size> {
-                arch_lib::PhysFrame::from_start_address(*self.start_address()).unwrap()
+                arch_lib::PhysFrame::from_start_address(self.start_address().into()).unwrap()
             }
         }
 
@@ -206,6 +206,30 @@ impl From<arch_lib::PageTable> for PageTable {
         // SAFETY: Both structs are canonical representations of a page table,
         // and therefore have the same memory layout.
         unsafe { mem::transmute(val) }
+    }
+}
+
+impl Into<arch_lib::VirtAddr> for VirtAddr {
+    fn into(self) -> arch_lib::VirtAddr {
+        unsafe { arch_lib::VirtAddr::new_unsafe(self.as_u64()) }
+    }
+}
+
+impl Into<arch_lib::PhysAddr> for PhysAddr {
+    fn into(self) -> arch_lib::PhysAddr {
+        unsafe { arch_lib::PhysAddr::new_unsafe(self.as_u64()) }
+    }
+}
+
+impl From<arch_lib::PhysAddr> for PhysAddr {
+    fn from(val: arch_lib::PhysAddr) -> Self {
+        unsafe { PhysAddr::new_unchecked(val.as_u64()) }
+    }
+}
+
+impl From<arch_lib::VirtAddr> for VirtAddr {
+    fn from(val: arch_lib::VirtAddr) -> Self {
+        unsafe { VirtAddr::new_unchecked(val.as_u64()) }
     }
 }
 

@@ -3,11 +3,14 @@ use cake::log::{debug, info};
 use crate::{
     MapFlags, MemError, VirtualMemoryRange,
     arch::{
-        self, PhysAddr, VirtAddr,
+        self,
         x86_64::{mapper::Mapper, set_mapper},
     },
     entry_walker::EntryWalker,
-    paging::{Large, Medium, Page, PageTable, PageTableIndex, PrimitiveSize, Small, map_primitive},
+    paging::{
+        AddressExt, Large, Medium, Page, PageTable, PageTableIndex, PhysAddr, PrimitiveSize, Small,
+        VirtAddr, map_primitive,
+    },
 };
 
 pub(crate) unsafe fn init_unchecked(

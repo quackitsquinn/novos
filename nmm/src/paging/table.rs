@@ -1,7 +1,6 @@
 use crate::{
-    MapFlags,
-    arch::{self, x86_64::PhysAddr},
-    paging::{Frame, PrimitiveSize},
+    MapFlags, arch,
+    paging::{Address, Frame, PhysAddr, PrimitiveSize},
 };
 
 /// A page table, accurate to the current architecture.

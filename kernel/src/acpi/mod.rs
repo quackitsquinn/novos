@@ -10,6 +10,7 @@ use cake::{MutexGuard, Once};
 use cake::{OnceMutex, Owned};
 pub use mapped_table::MappedTable;
 use nmm::MapFlags;
+use nmm::paging::AddressExt;
 use x86_64::{PhysAddr, structures::paging::PageTableFlags};
 
 use crate::{acpi::sdt::TableHeader, declare_module};

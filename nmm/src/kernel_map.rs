@@ -1,5 +1,5 @@
 //! A module for defining the layout of the kernel's virtual address space. This is used for documentation and debugging purposes, and will eventually be used for KASLR.
-use crate::arch::VirtAddr;
+use crate::paging::VirtAddr;
 
 /// A fancy macro for defining the layout of the kernel's virtual address space.
 #[macro_export]
@@ -19,18 +19,19 @@ macro_rules! kernel_map {
 
         /// The kernel map modules, which define the start and size of each section of the kernel map as constants.
         pub mod map {
+            use $crate::paging::Address;
 
             $crate::kernel_map!(gen_modules @munch $crate::kernel_map!(read_start $start), $($rest)*);
         }
     };
     (read_start higher_half) => {
-        $crate::arch::VirtAddr::HIGHER_HALF_START
+        $crate::paging::VirtAddr::HIGHER_HALF_OFFSET
     };
     (read_start (higher_half + $size:tt $($unit:ident)?)) => {
-        $crate::arch::VirtAddr::HIGHER_HALF_START.checked_add($crate::kernel_map!(size $size $($unit)?)).expect("Kernel map section overflow")
+        $crate::paging::VirtAddr::HIGHER_HALF_OFFSET.checked_add($crate::kernel_map!(size $size $($unit)?)).expect("Kernel map section overflow")
     };
     (read_start $rest:tt) => {
-       $crate::arch::VirtAddr::new($rest)
+       $crate::paging::VirtAddr::new($rest)
     };
 
 
@@ -44,14 +45,15 @@ macro_rules! kernel_map {
 
     (gen_module $name:ident, $base: expr, $size: expr) => {
         $crate::_pastey::paste!{ pub mod [<$name:lower>] { // TODO: figure out how to allow for documenting these modules
+            use $crate::paging::Address;
             /// The start address of the section.
-            pub const START: $crate::arch::VirtAddr = $base;
+            pub const START: $crate::paging::VirtAddr = $base;
             /// The size of the section.
             pub const SIZE: u64 = $size;
             /// The start address of the section as a raw u64.
             pub const START_RAW: u64 = START.as_u64();
             /// The end address of the section.
-            pub const END: $crate::arch::VirtAddr = START.checked_add(SIZE).expect("Kernel map section overflow");
+            pub const END: $crate::paging::VirtAddr = START.checked_add(SIZE).expect("Kernel map section overflow");
             /// The end address of the section as a raw u64.
             pub const END_RAW: u64 = END.as_u64();
             /// The virtual memory range of the section.
@@ -69,13 +71,13 @@ macro_rules! kernel_map {
 
     (gen_modules @munch $start:expr, $name:ident = $size:tt $($size_unit: ident)?; align $alignment:tt $($align_unit: ident)?, $($rest:tt)*) => {
         $crate::kernel_map!(gen_module $name,
-            $crate::arch::VirtAddr::new_truncate(
+            $crate::paging::VirtAddr::new_truncate(
                 $crate::align!(up, $start.as_u64(), $crate::kernel_map!(size $alignment $($align_unit)?))),
                 $crate::kernel_map!(size $size $($size_unit)?)
 
         );
         $crate::kernel_map!(gen_modules @munch
-            $crate::arch::VirtAddr::new_truncate(
+            $crate::paging::VirtAddr::new_truncate(
                 $crate::align!(up, $start.as_u64(), $crate::kernel_map!(size $alignment $($align_unit)?)) + $crate::kernel_map!(size $size $($size_unit)?) )
                 .checked_add($size).expect("overflow"),
                 $($rest)*

@@ -6,7 +6,10 @@ use core::{
 
 use acpi::{AcpiError, AcpiTable, sdt::SdtHeader};
 use cake::Owned;
-use nmm::{MapFlags, arch::VirtAddr};
+use nmm::{
+    MapFlags,
+    paging::{AddressExt, VirtAddr},
+};
 use x86_64::{PhysAddr, structures::paging::PageTableFlags};
 
 /// A mapped ACPI table.
@@ -94,7 +97,7 @@ impl<T: AcpiTable> MappedTable<T> {
 impl<T: AcpiTable> Drop for MappedTable<T> {
     fn drop(&mut self) {
         let addr = Owned::as_ptr(&self.table);
-        unsafe { nmm::unmap(VirtAddr::from_ptr(addr), self.sdt.length as usize) };
+        unsafe { nmm::unmap(VirtAddr::from_ptr(addr).unwrap(), self.sdt.length as usize) };
     }
 }
 

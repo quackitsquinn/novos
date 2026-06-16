@@ -5,7 +5,7 @@ use acpi::{
     sdt::{SdtHeader, Signature},
 };
 use cake::Owned;
-use nmm::MapFlags;
+use nmm::{MapFlags, paging::AddressExt};
 use x86_64::{PhysAddr, structures::paging::PageTableFlags};
 
 use crate::acpi::MappedTable;

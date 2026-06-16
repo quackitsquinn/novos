@@ -3,8 +3,8 @@ use core::{convert::Infallible, mem};
 use cake::log::info;
 use nmm::{
     VirtualMemoryRange,
-    arch::{HIGHER_HALF_START, x86_64::VirtAddr},
-    paging::PageTable,
+    arch::HIGHER_HALF_START,
+    paging::{Address, PageTable, VirtAddr},
 };
 use x86_64::{
     VirtAddr as XVirtAddr,

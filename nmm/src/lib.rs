@@ -2,6 +2,9 @@
 #![cfg_attr(not(test), no_std)]
 #![feature(ptr_alignment_type)]
 #![feature(portable_simd)]
+#![feature(const_trait_impl)]
+#![feature(const_ops)]
+#![feature(const_destruct)]
 
 use core::mem::Alignment;
 
@@ -12,10 +15,9 @@ use cake::limine::memory_map;
 pub use pastey as _pastey;
 
 use crate::{
-    arch::{PhysAddr, VirtAddr},
     //bitmap::GLOBAL_BITMAP,
     entry_walker::EntryWalker,
-    paging::{PageTable, page::UnsizedPage},
+    paging::{Address, PageTable, PhysAddr, UnsizedPage, VirtAddr},
 };
 
 #[cfg(not(feature = "x86_64"))]

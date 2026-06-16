@@ -26,7 +26,7 @@ impl<'a> OffsetPageTable<'a> {
     /// # Safety
     /// The caller must ensure that the provided page table is the actual level 4 page table, and that the recursive index is correctly set up in the page tables.
     pub unsafe fn new(table: &'a mut PageTable, offset: VirtAddr) -> Self {
-        let table = unsafe { arch_lib::OffsetPageTable::new(table.as_arch_mut(), *offset) };
+        let table = unsafe { arch_lib::OffsetPageTable::new(table.as_arch_mut(), offset.into()) };
         Self { opt: table }
     }
     /// Returns the recursive index used for this recursive page table.

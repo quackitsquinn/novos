@@ -1,13 +1,13 @@
 //! Contains the core types and structures related to paging, such as page table entries, page tables, and the layout of the page table hierarchy. It also defines the virtual and physical address types used by the architecture.
 pub mod builder;
-pub mod frame;
 pub mod index;
 pub(crate) mod limine;
 pub mod map;
-pub mod page;
+pub mod primitives;
 mod table;
 
-use std::ops;
+use core::marker::Destruct;
+use core::ops;
 
 pub use table::{PageTable, PageTableEntry};
 
@@ -21,13 +21,13 @@ use crate::{
     seal,
 };
 
-pub use frame::{Frame, UnsizedFrame};
-pub use page::Page;
+pub use primitives::{Frame, UnsizedFrame};
+pub use primitives::{Page, UnsizedPage};
 
 /// The virtual address type used by the current architecture.
-pub type VirtAddr = crate::arch::VirtAddr;
+pub type VirtAddr = primitives::VirtAddr;
 /// The physical address type used by the current architecture.
-pub type PhysAddr = crate::arch::PhysAddr;
+pub type PhysAddr = primitives::PhysAddr;
 
 /// The type used for page table entries in the current architecture.
 pub type Table = [PageEntryType; crate::arch::ENTRY_COUNT];
@@ -36,50 +36,115 @@ pub type Table = [PageEntryType; crate::arch::ENTRY_COUNT];
 /// This trait is sealed to prevent external implementations, ensuring that only the intended types (like `Page` and `Frame`) can be used as memory primitives
 /// in the paging system.
 #[allow(private_bounds)] // intentionally seal this
-pub trait MemoryPrimitive<S: PrimitiveSize>: NmmSealed {}
+pub const trait MemoryPrimitive<Ps: PrimitiveSize>: NmmSealed {
+    /// The address space type associated with this memory primitive (e.g., `VirtAddr` for pages, `PhysAddr` for frames).
+    type AddressSpace: Address;
+
+    /// Returns the starting address of this memory primitive as the appropriate address space type (e.g., `VirtAddr` for pages, `PhysAddr` for frames).
+    fn start_address(&self) -> Self::AddressSpace;
+}
 
 /// Helper trait to make AddressSpace's definition a little less gross
-trait AddrSpaceMath:
-    ops::Add<u64, Output = Self>
-    + ops::Sub<u64, Output = Self>
-    + ops::AddAssign<u64>
-    + ops::SubAssign<u64>
-    + ops::Add<Self>
-    + ops::Sub<Self>
-    + ops::AddAssign<Self>
-    + ops::SubAssign<Self>
+const trait AddrSpaceMath:
+    Sized
+    + [const] ops::Add<u64, Output = Self>
+    + [const] ops::Sub<u64, Output = Self>
+    + [const] ops::AddAssign<u64>
+    + [const] ops::SubAssign<u64>
+    + [const] ops::Add<Self>
+    + [const] ops::Sub<Self>
+    + [const] ops::AddAssign<Self>
+    + [const] ops::SubAssign<Self>
 {
 }
+
+impl<T> AddrSpaceMath for T where
+    T: Sized
+        + ops::Add<u64, Output = Self>
+        + ops::Sub<u64, Output = Self>
+        + ops::AddAssign<u64>
+        + ops::SubAssign<u64>
+        + ops::Add<Self>
+        + ops::Sub<Self>
+        + ops::AddAssign<Self>
+        + ops::SubAssign<Self>
+{
+}
+
 /// Address space primitives, e.g. `VirtAddr` and `PhysAddr`.
 ///
 /// This is used for generic functions that can work with either virtual or physical addresses.
-pub trait AddressSpace:
-    NmmSealed + Sized + Copy + core::fmt::Debug + Eq + PartialEq + Ord + PartialOrd + AddrSpaceMath
+pub const trait Address:
+    NmmSealed + Copy + core::fmt::Debug + Eq + PartialEq + Ord + PartialOrd + AddrSpaceMath
 {
-    /// Tries to create a new address space from the given value.
-    /// The value must be valid for the current architecture's address space, otherwise this function will return `None`.
+    /// Tries to create a new address from the given value.
+    /// The value must be valid for the current architecture's address, otherwise this function will return `None`.
     fn try_new(val: u64) -> Option<Self>;
 
-    /// Tries to create a new address space from the given pointer.
-    /// The pointer value must be valid for the current architecture's address space, otherwise this function will return `None`.
-    fn try_from_ptr<T>(ptr: *const T) -> Option<Self> {
-        Self::try_new(ptr as usize as u64)
+    /// Creates a new address from the given value.
+    /// The value must be valid for the current architecture's address, otherwise this function will panic.
+    fn new(val: u64) -> Self {
+        Self::try_new(val).expect("AddressSpace::new: value is invalid for this address")
     }
 
-    /// Creates a new address space from the given pointer.
-    /// The pointer value must be valid for the current architecture's address space, otherwise this function will panic.
-    fn from_ptr<T>(ptr: *const T) -> Self {
-        Self::try_from_ptr(ptr)
-            .expect("AddressSpace::from_ptr: pointer value is invalid for this address space")
+    /// Creates a new address from the given value, truncating any bits beyond the architecture's bit width.
+    fn new_truncate(val: u64) -> Self;
+
+    /// Creates a new address from the given value without checking for validity.
+    unsafe fn new_unchecked(val: u64) -> Self;
+
+    /// Creates a new address from the given memory primitive.
+    ///  The starting address of the primitive will be used as the value for the address.
+    fn from_primitive<P: [const] MemoryPrimitive<S> + [const] Destruct, S: PrimitiveSize>(
+        primitive: P,
+    ) -> Option<Self>
+    where
+        P::AddressSpace: [const] Address,
+    {
+        let primitive_addr = primitive.start_address();
+        Self::try_new(primitive_addr.as_u64())
     }
-    /// Creates a new address space from the given value.
-    /// The value must be valid for the current architecture's address space, otherwise this function will panic.
-    fn new(val: u64) -> Self {
-        Self::try_new(val).expect("AddressSpace::new: value is invalid for this address space")
+
+    /// Adds `rhs` to this address, returning a new address if the result is valid for the current architecture's address, or `None` if the result is invalid.
+    fn checked_add(&self, rhs: u64) -> Option<Self> {
+        match self.as_u64().checked_add(rhs) {
+            Some(val) => Self::try_new(val),
+            None => None,
+        }
     }
-    /// Returns the starting virtual address of the address space.
+
+    /// Returns the value of this address as a `u64`.
     fn as_u64(&self) -> u64;
 }
+
+/// Non-const additions to `Address` types.
+pub trait AddressExt: Address {
+    /// Creates a new address using `ptr` as the value for the address.
+    fn from_ptr<T>(ptr: *const T) -> Option<Self> {
+        Self::try_new(ptr as u64)
+    }
+
+    /// Creates a new address using `ptr` as the value for the address.
+    fn from_mut_ptr<T>(ptr: *mut T) -> Option<Self> {
+        Self::try_new(ptr as u64)
+    }
+
+    /// Returns the value of this address as a pointer of the given type.
+    ///
+    /// The returned pointer is not guaranteed to be valid for dereferencing, and the caller must ensure that any dereferencing of the returned pointer is safe.
+    fn as_ptr<T>(&self) -> *const T {
+        (self.as_u64() as usize) as *const T
+    }
+
+    /// Returns the value of this address as a pointer of the given type.
+    ///
+    /// The returned pointer is not guaranteed to be valid for dereferencing, and the caller must ensure that any dereferencing of the returned pointer is safe.
+    fn as_mut_ptr<T>(&self) -> *mut T {
+        (self.as_u64() as usize) as *mut T
+    }
+}
+
+impl<T: Address> AddressExt for T {}
 
 /// A trait representing a page size for the current architecture.
 #[allow(private_bounds)]
@@ -110,6 +175,7 @@ impl PrimitiveSize for Large {
 seal!(Small, Medium, Large);
 
 /// A trait for managing ranges of memory primitives, such as pages. This is used for allocating and deallocating pages of different sizes, and can be implemented by both the physical and virtual memory managers to manage their respective address spaces.
+// I wish we didn't also have to specify the address space here..
 #[allow(private_bounds)] // intentionally seal this
 pub trait PrimitiveRangeManager<T: MemoryPrimitive<S>, S: PrimitiveSize> {
     /// Allocates a range of memory of the specified size and alignment, returning the starting address of the allocated range.

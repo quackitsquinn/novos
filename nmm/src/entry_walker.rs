@@ -7,8 +7,8 @@ use arrayvec::ArrayVec;
 use cake::limine::memory_map::{Entry, EntryType};
 use cake::log::error;
 
-use crate::arch::PhysAddr;
 use crate::paging::limine::LimineEntry;
+use crate::paging::{Address, PhysAddr};
 use crate::paging::{Frame, PrimitiveRangeManager, PrimitiveSize};
 
 /// A helper struct for iterating over memory map entries and calculating the total usable memory.

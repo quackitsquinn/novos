@@ -4,8 +4,7 @@ use core::{any::type_name, fmt::Debug};
 
 use crate::{
     NmmSealed, align,
-    arch::PhysAddr,
-    paging::{Large, Medium, MemoryPrimitive, PrimitiveSize, Small},
+    paging::{Address, Large, Medium, MemoryPrimitive, PhysAddr, PrimitiveSize, Small},
 };
 
 /// A physical memory frame on the current architecture.
@@ -63,7 +62,14 @@ impl<S: PrimitiveSize> Frame<S> {
 }
 
 impl<S: PrimitiveSize> NmmSealed for Frame<S> {}
-impl<S: PrimitiveSize> MemoryPrimitive<S> for Frame<S> {}
+impl<S: PrimitiveSize> const MemoryPrimitive<S> for Frame<S> {
+    type AddressSpace = PhysAddr;
+
+    /// Returns the starting physical address of the frame.
+    fn start_address(&self) -> PhysAddr {
+        self.start_address
+    }
+}
 
 impl<S: PrimitiveSize> Debug for Frame<S> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
