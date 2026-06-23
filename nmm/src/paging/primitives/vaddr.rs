@@ -1,6 +1,9 @@
 use crate::{
     arch,
-    paging::{Address, primitives::impl_ops},
+    paging::{
+        Address,
+        primitives::{PageClass, Primitive, impl_ops},
+    },
     seal,
 };
 
@@ -17,6 +20,10 @@ impl_ops!(blanket VirtAddr);
 impl VirtAddr {
     /// The start of the higher half in virtual address space.
     pub const HIGHER_HALF_OFFSET: Self = arch::HIGHER_HALF_START;
+}
+
+impl Primitive for VirtAddr {
+    type Class = PageClass;
 }
 
 impl const Address for VirtAddr {

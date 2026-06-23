@@ -334,6 +334,7 @@ bitflags! {
 ///   ```
 #[macro_export]
 macro_rules! align {
+    // TODO: $value: lit cases so the alignment check isn't at runtime for constant values?
     (up, $value: expr, $alignment: expr) => {
         // bit fiddling method requires pow2
         {

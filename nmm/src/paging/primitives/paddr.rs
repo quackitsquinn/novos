@@ -1,6 +1,9 @@
 use crate::{
     arch,
-    paging::{Address, primitives::impl_ops},
+    paging::{
+        Address,
+        primitives::{FrameClass, Primitive, impl_ops},
+    },
     seal,
 };
 
@@ -13,6 +16,10 @@ pub struct PhysAddr(u64);
 seal!(PhysAddr);
 
 impl_ops!(blanket PhysAddr);
+
+impl Primitive for PhysAddr {
+    type Class = FrameClass;
+}
 
 impl const Address for PhysAddr {
     fn try_new(val: u64) -> Option<Self> {

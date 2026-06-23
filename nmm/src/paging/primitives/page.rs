@@ -1,5 +1,6 @@
 //! This module defines the `Page` struct, which represents a virtual memory page of a specific size (small, medium, or large) on the current architecture.
 //! It also defines the `UnsizedPage` enum, which can represent a page of any size.
+use crate::paging::primitives::{PageClass, Primitive};
 use crate::paging::{Address, Large, Medium, Small, VirtAddr};
 use crate::{align, paging::PrimitiveSize};
 use core::any::type_name;
@@ -13,22 +14,34 @@ pub struct Page<S: PrimitiveSize> {
 }
 
 impl<S: PrimitiveSize> crate::NmmSealed for Page<S> {}
-impl<S: PrimitiveSize> const crate::paging::MemoryPrimitive<S> for Page<S> {
+impl<S: PrimitiveSize> Primitive for Page<S> {
+    type Class = PageClass;
+}
+
+impl<S: PrimitiveSize> const crate::paging::MemoryFragment<S> for Page<S> {
     type AddressType = VirtAddr;
 
     fn start_address(&self) -> VirtAddr {
         self.start_address
     }
+
+    fn containing_address(addr: Self::AddressType) -> Self {
+        unsafe { Self::new_unchecked(VirtAddr::new_truncate(align!(down, addr.as_u64(), S::SIZE))) }
+    }
+
+    fn from_start_address(start_address: Self::AddressType) -> Option<Self> {
+        Self::try_new(start_address)
+    }
 }
 
 impl<S: PrimitiveSize> Page<S> {
     /// Attempts to create a new `Page` from the given starting virtual address. The address must be aligned to the size of the page, otherwise this function will return `None`.
-    pub fn try_new_u64(start_address: u64) -> Option<Self> {
+    pub const fn try_new_u64(start_address: u64) -> Option<Self> {
         Self::try_new(VirtAddr::new(start_address))
     }
 
     /// Creates a new `Page` from the given starting virtual address. The address must be aligned to the size of the page, otherwise this function will panic.
-    pub fn try_new(start_address: VirtAddr) -> Option<Self> {
+    pub const fn try_new(start_address: VirtAddr) -> Option<Self> {
         if align!(down, start_address.as_u64(), S::SIZE) == start_address.as_u64() {
             Some(unsafe { Self::new_unchecked(start_address) })
         } else {
@@ -40,7 +53,7 @@ impl<S: PrimitiveSize> Page<S> {
     ///
     /// # Safety
     /// The caller must ensure that the `start_address` is aligned to the size of the page.
-    pub unsafe fn new_unchecked(start_address: VirtAddr) -> Self {
+    pub const unsafe fn new_unchecked(start_address: VirtAddr) -> Self {
         Self {
             start_address,
             _size_marker: core::marker::PhantomData,
@@ -48,19 +61,12 @@ impl<S: PrimitiveSize> Page<S> {
     }
 
     /// Creates a new `Page` from the given starting virtual address.
-    pub fn from_start_address(start_address: VirtAddr) -> Option<Self> {
+    pub const fn from_start_address(start_address: VirtAddr) -> Option<Self> {
         Self::try_new(start_address)
     }
 
-    /// Creates a new `Page` that contains the given virtual address. The starting address of the page will be the largest aligned address that is less than or equal to the given address.
-    pub fn containing_address(addr: VirtAddr) -> Option<Self> {
-        unsafe { Self::new_unchecked(VirtAddr::new(align!(down, addr.as_u64(), S::SIZE))) }
-            .try_into()
-            .ok()
-    }
-
     /// Returns the starting virtual address of the page.
-    pub fn start_address(&self) -> VirtAddr {
+    pub const fn start_address(&self) -> VirtAddr {
         self.start_address
     }
 }

@@ -8,8 +8,8 @@ use crate::{
     },
     entry_walker::EntryWalker,
     paging::{
-        AddressExt, Large, Page, PageTable, PageTableIndex, PhysAddr, PrimitiveSize, VirtAddr,
-        map_primitive,
+        AddressExt, Large, Medium, MemoryFragment, Page, PageTable, PageTableIndex, PhysAddr,
+        PrimitiveSize, VirtAddr, map_primitive,
     },
 };
 
@@ -27,12 +27,11 @@ pub(crate) unsafe fn init_unchecked(
     }
 
     // Map the first page of the scratch range to test that the mapper is working correctly.
-    type Size = Large; // We can use a medium page here since the scratch range is guaranteed to be large enough to hold at least one medium page, and using a larger page size will allow us to test that the mapper can handle mapping larger pages correctly.
-    let test_page =
-        Page::<Size>::containing_address(scratch_range.base).ok_or(MemError::OutOfMemory)?;
+    type Size = Medium; // We can use a medium page here since the scratch range is guaranteed to be large enough to hold at least one medium page, and using a larger page size will allow us to test that the mapper can handle mapping larger pages correctly.
+    let test_page = Page::<Size>::containing_address(scratch_range.base);
     let test_frame = walker.next_frame::<Size>().ok_or(MemError::OutOfMemory)?;
 
-    map_primitive(test_frame, test_page, MapFlags::WRITABLE, &mut walker)?;
+    map_primitive(test_frame, test_page, MapFlags::WRITABLE, &mut walker)?.flush();
 
     info!(
         "Successfully mapped first page of scratch range. Writing to it to test that the mapping is working correctly..."

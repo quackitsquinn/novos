@@ -2,6 +2,8 @@
 //! and unmapping pages in the memory manager, and it abstracts over the architecture-specific details of how
 //! page tables are manipulated to create mappings.
 
+use core::fmt;
+
 use crate::{
     MapFlags, MemError,
     paging::{Frame, Page, PrimitiveRangeManager, PrimitiveSize, Small, VirtAddr},
@@ -67,6 +69,15 @@ impl FlushInner {
         match self {
             Self::Flush(addr) => unsafe { crate::arch::do_flush(addr) },
             Self::FlushAll => unsafe { crate::arch::do_flush_all() },
+        }
+    }
+}
+
+impl fmt::Debug for Flush {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.0 {
+            FlushInner::Flush(addr) => write!(f, "Flush({:?})", addr),
+            FlushInner::FlushAll => write!(f, "FlushAll"),
         }
     }
 }

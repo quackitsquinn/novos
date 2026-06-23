@@ -4,7 +4,10 @@ use core::{any::type_name, fmt::Debug};
 
 use crate::{
     NmmSealed, align,
-    paging::{Address, Large, Medium, MemoryPrimitive, PhysAddr, PrimitiveSize, Small},
+    paging::{
+        Address, Large, Medium, MemoryFragment, PhysAddr, PrimitiveSize, Small,
+        primitives::{FrameClass, Primitive},
+    },
 };
 
 /// A physical memory frame on the current architecture.
@@ -17,13 +20,13 @@ pub struct Frame<S: PrimitiveSize> {
 
 impl<S: PrimitiveSize> Frame<S> {
     /// Creates a new `Frame` from the given starting physical address. The address must be aligned to the size of the frame, otherwise this function will panic.
-    pub fn new(start_address: PhysAddr) -> Self {
+    pub const fn new(start_address: PhysAddr) -> Self {
         Self::try_new(start_address)
             .expect("Frame::new: start_address is not aligned to frame size")
     }
 
     /// Tries to create a new `Frame` from the given starting physical address. Returns `None` if the address is not aligned to the size of the frame.
-    pub fn try_new(start_address: PhysAddr) -> Option<Self> {
+    pub const fn try_new(start_address: PhysAddr) -> Option<Self> {
         if align!(down, start_address.as_u64(), S::SIZE) == start_address.as_u64() {
             Some(unsafe { Self::new_unchecked(start_address) })
         } else {
@@ -36,7 +39,7 @@ impl<S: PrimitiveSize> Frame<S> {
     /// # Safety
     ///
     /// The caller must ensure that the `start_address` is aligned to the size of the frame.
-    pub unsafe fn new_unchecked(start_address: PhysAddr) -> Self {
+    pub const unsafe fn new_unchecked(start_address: PhysAddr) -> Self {
         Self {
             start_address,
             _size_marker: core::marker::PhantomData,
@@ -44,26 +47,31 @@ impl<S: PrimitiveSize> Frame<S> {
     }
 
     /// Creates a new `Frame` from the given starting physical address.
-    pub fn from_start_address(start_address: PhysAddr) -> Option<Self> {
+    pub const fn from_start_address(start_address: PhysAddr) -> Option<Self> {
         Self::try_new(start_address)
     }
 
-    /// Creates a new `Frame` that contains the given physical address. The starting address of the frame will be the largest aligned address that is less than or equal to the given address.
-    pub fn containing_address(addr: PhysAddr) -> Option<Self> {
-        unsafe { Self::new_unchecked(PhysAddr::new(align!(down, addr.as_u64(), S::SIZE))) }
-            .try_into()
-            .ok()
-    }
-
     /// Returns the starting physical address of the frame.
-    pub fn start_address(&self) -> PhysAddr {
+    pub const fn start_address(&self) -> PhysAddr {
         self.start_address
     }
 }
 
 impl<S: PrimitiveSize> NmmSealed for Frame<S> {}
-impl<S: PrimitiveSize> const MemoryPrimitive<S> for Frame<S> {
+impl<S: PrimitiveSize> Primitive for Frame<S> {
+    type Class = FrameClass;
+}
+
+impl<S: PrimitiveSize> const MemoryFragment<S> for Frame<S> {
     type AddressType = PhysAddr;
+
+    fn from_start_address(start_address: Self::AddressType) -> Option<Self> {
+        Self::try_new(start_address)
+    }
+
+    fn containing_address(addr: Self::AddressType) -> Self {
+        unsafe { Self::new_unchecked(PhysAddr::new(align!(down, addr.as_u64(), S::SIZE))) }
+    }
 
     /// Returns the starting physical address of the frame.
     fn start_address(&self) -> PhysAddr {
