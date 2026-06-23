@@ -4,8 +4,6 @@ pub mod paddr;
 pub mod page;
 pub mod vaddr;
 
-use core::{marker::Destruct, ops};
-
 pub use address::{Address, AddressExt};
 use cake::encapsulate_macro;
 pub use frame::{Frame, UnsizedFrame};

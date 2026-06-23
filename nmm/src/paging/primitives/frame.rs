@@ -6,7 +6,7 @@ use crate::{
     NmmSealed, align,
     paging::{
         Address, Large, Medium, MemoryFragment, PhysAddr, PrimitiveSize, Small,
-        primitives::{FrameClass, Primitive},
+        primitives::Primitive,
     },
 };
 

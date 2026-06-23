@@ -8,7 +8,7 @@ use crate::{
     },
     entry_walker::EntryWalker,
     paging::{
-        AddressExt, Large, Medium, MemoryFragment, Page, PageTable, PageTableIndex, PhysAddr,
+        AddressExt, Medium, MemoryFragment, Page, PageTable, PageTableIndex, PhysAddr,
         PrimitiveSize, VirtAddr, map_primitive,
     },
 };

@@ -1,8 +1,9 @@
+//! Virtual address type for the current architecture.
 use crate::{
     arch,
     paging::{
         Address,
-        primitives::{PageClass, Primitive, impl_ops},
+        primitives::{Primitive, impl_ops},
     },
     seal,
 };

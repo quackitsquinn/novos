@@ -7,8 +7,6 @@ pub mod map;
 pub mod primitives;
 mod table;
 
-use core::marker::Destruct;
-use core::ops;
 
 pub use table::{PageTable, PageTableEntry};
 
@@ -16,14 +14,13 @@ use cake::log::trace;
 pub use index::PageTableIndex;
 
 use crate::{
-    MapFlags, MemError, NmmSealed, align,
+    MapFlags, MemError,
     arch::{Mapper, PageEntryType},
     paging::{
         fragment::GreedyFragmentMapper,
         map::{Flush, MemoryMapper},
-        primitives::{AnyPrimitive, FrameClass, PageClass, PrimitiveClass},
+        primitives::{AnyPrimitive, PageClass},
     },
-    seal,
 };
 
 pub use primitives::{Address, AddressExt};

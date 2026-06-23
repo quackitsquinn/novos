@@ -1,9 +1,8 @@
+//! Generic address type for the current architecture, used for both virtual and physical addresses.
+
 use core::{marker::Destruct, ops};
 
-use crate::{
-    NmmSealed,
-    paging::{MemoryFragment, PrimitiveSize, primitives::Primitive},
-};
+use crate::paging::{MemoryFragment, PrimitiveSize, primitives::Primitive};
 
 /// Helper trait to make AddressSpace's definition a little less gross
 const trait AddressMath:

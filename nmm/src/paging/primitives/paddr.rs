@@ -1,8 +1,9 @@
+//! Physical address type for the current architecture.
 use crate::{
     arch,
     paging::{
         Address,
-        primitives::{FrameClass, Primitive, impl_ops},
+        primitives::{Primitive, impl_ops},
     },
     seal,
 };
