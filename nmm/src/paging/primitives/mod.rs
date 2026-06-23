@@ -85,9 +85,8 @@ impl PrimitiveSize for Large {
 }
 
 /// A memory primitive.
-pub trait Primitive: NmmSealed + Sized + Copy + core::fmt::Debug + Eq + PartialEq {
-    type Class: PrimitiveClass;
-}
+#[allow(private_bounds)] // intentionally seal this
+pub trait Primitive: NmmSealed + Sized + Copy + core::fmt::Debug + Eq + PartialEq {}
 
 seal!(Small, Medium, Large);
 

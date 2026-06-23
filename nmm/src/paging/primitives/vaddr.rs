@@ -22,9 +22,7 @@ impl VirtAddr {
     pub const HIGHER_HALF_OFFSET: Self = arch::HIGHER_HALF_START;
 }
 
-impl Primitive for VirtAddr {
-    type Class = PageClass;
-}
+impl Primitive for VirtAddr {}
 
 impl const Address for VirtAddr {
     fn try_new(val: u64) -> Option<Self> {

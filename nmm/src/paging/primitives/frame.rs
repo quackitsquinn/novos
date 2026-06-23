@@ -58,9 +58,7 @@ impl<S: PrimitiveSize> Frame<S> {
 }
 
 impl<S: PrimitiveSize> NmmSealed for Frame<S> {}
-impl<S: PrimitiveSize> Primitive for Frame<S> {
-    type Class = FrameClass;
-}
+impl<S: PrimitiveSize> Primitive for Frame<S> {}
 
 impl<S: PrimitiveSize> const MemoryFragment<S> for Frame<S> {
     type AddressType = PhysAddr;

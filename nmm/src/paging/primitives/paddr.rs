@@ -17,9 +17,7 @@ seal!(PhysAddr);
 
 impl_ops!(blanket PhysAddr);
 
-impl Primitive for PhysAddr {
-    type Class = FrameClass;
-}
+impl Primitive for PhysAddr {}
 
 impl const Address for PhysAddr {
     fn try_new(val: u64) -> Option<Self> {
