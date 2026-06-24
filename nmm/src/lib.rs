@@ -131,7 +131,7 @@ pub fn map(
 ) -> Result<(), MemError> {
     check_range_virt(virt_base, byte_size)?;
     check_range_phys(phys_base, byte_size)?;
-    unsafe { arch::map_unchecked(virt_base, phys_base, byte_size, flags) }
+    todo!()
 }
 
 /// Unmaps a virtual address range of the specified size starting from the given virtual base address
@@ -144,15 +144,15 @@ pub fn map(
 /// The caller must ensure that unmapped memory is completely unused and will not be accessed after being unmapped to avoid issues such as use-after-free or memory corruption.
 pub unsafe fn unmap(virt_base: VirtAddr, byte_size: usize) -> Result<(), MemError> {
     check_range_virt(virt_base, byte_size)?;
-    unsafe { arch::unmap_unchecked(virt_base, byte_size) }
+    todo!()
 }
 
 /// Maps `byte_size` bytes of memory, returning the base virtual address of the mapped region. The physical memory for this mapping is allocated by the memory manager, and the mapping is created with the specified flags.
 ///
 /// `byte_size` will always be rounded up to the nearest page size, so the actual mapped size may be larger than the requested size.
 #[must_use = "The returned virtual address must be freed with `unmap` when it is no longer needed to avoid memory leaks and ensure proper resource management."]
-pub fn alloc_paged(byte_size: usize, flags: MapFlags) -> Result<VirtAddr, MemError> {
-    unsafe { arch::alloc_paged(byte_size, flags) }
+pub fn alloc_anon(byte_size: usize, flags: MapFlags) -> Result<VirtAddr, MemError> {
+    todo!()
 }
 
 /// Allocates a virtual address range of the specified size without mapping it to any physical memory.
@@ -184,14 +184,14 @@ pub unsafe fn free_virtspace(virt_base: VirtAddr, byte_size: usize) -> Result<()
 /// Maps a physical address range to a virtual address range of the specified size with the given flags, where the virtual address is allocated by the memory manager. This is a convenience function that combines `alloc_paged` and `map` into a single operation for ease of use.
 #[must_use = "The returned virtual address must be freed with `unmap` when it is no longer needed to avoid memory leaks and ensure proper resource management."]
 // TODO: how to handle freeing the virtspace allocated by this function?
-pub fn map_alloc(
+pub fn map_phys(
     phys_addr: PhysAddr,
     byte_size: usize,
     flags: MapFlags,
 ) -> Result<VirtAddr, MemError> {
     check_range_phys(phys_addr, byte_size)?;
     let virt_addr = alloc_virtspace(byte_size, arch::L1_PAGE_SIZE as usize)?;
-    unsafe { arch::map_unchecked(virt_addr, phys_addr, byte_size, flags) }?;
+    map(virt_addr, phys_addr, byte_size, flags)?;
     Ok(virt_addr)
 }
 

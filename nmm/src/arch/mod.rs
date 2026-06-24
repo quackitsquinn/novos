@@ -51,49 +51,8 @@ pub const L3_PAGE_SIZE: u64 = arch_impl::L3_PAGE_SIZE;
 // so the functions shouldn't just instantly dip into the architecture-specific implementations,
 // but should have some shared code for common functionality, and then call into the architecture-specific implementations for the parts that are different between architectures. This will allow for more code reuse and less duplication between architectures, while still allowing for the necessary differences in implementation.
 
-#[inline(always)]
-pub(crate) unsafe fn init_unchecked(
-    root: &'static mut PageTable,
-    offset: VirtAddr,
-    ranges: EntryWalker<'static>,
-    scratch_range: VirtualMemoryRange,
-) -> Result<(), MemError> {
-    unsafe { arch_impl::api::init_unchecked(root, offset, ranges, scratch_range) }
-}
-
-#[inline(always)]
-pub(crate) unsafe fn init_load_recursive(
-    root: &'static mut PageTable,
-    index: paging::PageTableIndex,
-    phys_addr: PhysAddr,
-) -> Result<(), MemError> {
-    unsafe { arch_impl::api::init_load_recursive(root, index, phys_addr) }
-}
-
-#[inline(always)]
-pub(crate) unsafe fn map_unchecked(
-    virt_base: VirtAddr,
-    phys_base: PhysAddr,
-    byte_size: usize,
-    flags: MapFlags,
-) -> Result<(), MemError> {
-    unsafe { arch_impl::api::map_unchecked(virt_base, phys_base, byte_size, flags) }
-}
-
-#[inline(always)]
-pub(crate) unsafe fn unmap_unchecked(
-    virt_base: VirtAddr,
-    byte_size: usize,
-) -> Result<(), MemError> {
-    unsafe { arch_impl::api::unmap_unchecked(virt_base, byte_size) }
-}
-
-/// Maps `byte_size` bytes of memory, returning the base virtual address of the mapped region. The physical memory for this mapping is allocated by the memory manager, and the mapping is created with the specified flags.
-#[inline(always)]
-#[must_use = "The returned virtual address must be freed with `unmap` when it is no longer needed to avoid memory leaks and ensure proper resource management."]
-pub(crate) unsafe fn alloc_paged(byte_size: usize, flags: MapFlags) -> Result<VirtAddr, MemError> {
-    unsafe { arch_impl::api::alloc_paged(byte_size, flags) }
-}
+pub(crate) use arch_impl::api::init_load_recursive;
+pub(crate) use arch_impl::api::init_unchecked;
 
 #[doc(hidden)]
 pub(crate) use arch_impl::map_primitive;

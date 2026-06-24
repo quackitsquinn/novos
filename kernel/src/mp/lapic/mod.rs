@@ -59,7 +59,7 @@ impl Lapic {
         self.base.call_once(|| base);
         info!("LAPIC base address: {:#x}", base);
         let phys_addr = x86_64::PhysAddr::new(base);
-        let map = nmm::map_alloc(
+        let map = nmm::map_phys(
             phys_addr.into(),
             1024,
             MapFlags::CACHE_DISABLE | MapFlags::WRITABLE,
