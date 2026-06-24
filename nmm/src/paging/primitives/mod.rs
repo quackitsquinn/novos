@@ -106,21 +106,17 @@ pub const trait MemoryFragment<Ps: PrimitiveSize>: Primitive {
     fn start_address(&self) -> Self::AddressType;
 }
 
-/// A trait representing a family of memory primitives (e.g., pages or frames) that can be used in paging,
+/// A trait representing a family of memory fragments (e.g., pages or frames) that can be used in paging,
 ///  where each primitive has an associated address space type (e.g., `VirtAddr` for pages, `PhysAddr` for frames).
 #[allow(private_bounds)] // intentionally seal this
 pub const trait PrimitiveClass:
     NmmSealed + Sized + Copy + core::fmt::Debug + Eq + PartialEq
 {
-    /// The address space type associated with this family of memory primitives (e.g., `VirtAddr` for pages, `PhysAddr` for frames).
+    /// The address space type associated with this family of memory fragments (e.g., `VirtAddr` for pages, `PhysAddr` for frames).
     type Addr: Address;
 
-    /// The small memory primitive type in this family (e.g., `Page<Small>` for pages, `Frame<Small>` for frames).
-    type Small: MemoryFragment<Small, AddressType = Self::Addr>;
-    /// The medium memory primitive type in this family (e.g., `Page<Medium>` for pages, `Frame<Medium>` for frames).
-    type Medium: MemoryFragment<Medium, AddressType = Self::Addr>;
-    /// The large memory primitive type in this family (e.g., `Page<Large>` for pages, `Frame<Large>` for frames).
-    type Large: MemoryFragment<Large, AddressType = Self::Addr>;
+    /// The memory fragments type associated with this family of memory fragments (e.g., `Page<S>` for pages, `Frame<S>` for frames).
+    type Fragment<S: PrimitiveSize>: MemoryFragment<S, AddressType = Self::Addr> + Primitive;
 }
 
 /// The primitives used for virtual addresses and pages.
@@ -128,9 +124,7 @@ pub const trait PrimitiveClass:
 pub struct PageClass;
 impl PrimitiveClass for PageClass {
     type Addr = VirtAddr;
-    type Small = Page<Small>;
-    type Medium = Page<Medium>;
-    type Large = Page<Large>;
+    type Fragment<S: PrimitiveSize> = Page<S>;
 }
 
 /// The primitives used for physical addresses and frames.
@@ -138,9 +132,7 @@ impl PrimitiveClass for PageClass {
 pub struct FrameClass;
 impl PrimitiveClass for FrameClass {
     type Addr = PhysAddr;
-    type Small = Frame<Small>;
-    type Medium = Frame<Medium>;
-    type Large = Frame<Large>;
+    type Fragment<S: PrimitiveSize> = Frame<S>;
 }
 
 seal!(PageClass, FrameClass);
@@ -153,11 +145,11 @@ where
     C: PrimitiveClass,
 {
     /// A small memory primitive, typically 4KB in size for x86_64 architecture.
-    Small(C::Small),
+    Small(C::Fragment<Small>),
     /// A medium memory primitive, typically 2MB in size for x86_64 architecture.
-    Medium(C::Medium),
+    Medium(C::Fragment<Medium>),
     /// A large memory primitive, typically 1GB in size for x86_64 architecture.
-    Large(C::Large),
+    Large(C::Fragment<Large>),
 }
 
 impl<C> AnyPrimitive<C>

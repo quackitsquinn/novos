@@ -29,18 +29,18 @@ where
 
         if aligned_base % Large::SIZE == 0 && len >= Large::SIZE {
             return AnyPrimitive::Large(
-                Class::Large::from_start_address(Class::Addr::new(aligned_base)).unwrap(),
+                Class::Fragment::from_start_address(Class::Addr::new(aligned_base)).unwrap(),
             );
         }
 
         if aligned_base % Medium::SIZE == 0 && len >= Medium::SIZE {
             return AnyPrimitive::Medium(
-                Class::Medium::from_start_address(Class::Addr::new(aligned_base)).unwrap(),
+                Class::Fragment::from_start_address(Class::Addr::new(aligned_base)).unwrap(),
             );
         }
 
         AnyPrimitive::Small(
-            Class::Small::from_start_address(Class::Addr::new(aligned_base)).unwrap(),
+            Class::Fragment::from_start_address(Class::Addr::new(aligned_base)).unwrap(),
         )
     }
 
