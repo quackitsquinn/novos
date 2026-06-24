@@ -7,7 +7,6 @@ pub mod map;
 pub mod primitives;
 mod table;
 
-
 pub use table::{PageTable, PageTableEntry};
 
 use cake::log::trace;
@@ -23,10 +22,10 @@ use crate::{
     },
 };
 
+pub use primitives::Frame;
+pub use primitives::Page;
 pub use primitives::{Address, AddressExt};
-pub use primitives::{Frame, UnsizedFrame};
 pub use primitives::{Large, Medium, MemoryFragment, PrimitiveSize, Small};
-pub use primitives::{Page, UnsizedPage};
 pub use primitives::{PhysAddr, VirtAddr};
 
 /// The type used for page table entries in the current architecture.

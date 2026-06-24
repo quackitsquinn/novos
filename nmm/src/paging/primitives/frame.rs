@@ -1,12 +1,12 @@
 //! This module defines the `Frame` struct, which represents a physical memory frame of a specific size (small, medium, or large) on the current architecture.
 //! It also defines the `UnsizedFrame` enum, which can represent a frame of any size.
-use core::{any::type_name, fmt::Debug};
+use core::{any::type_name, fmt::Debug, mem::transmute};
 
 use crate::{
     NmmSealed, align,
     paging::{
         Address, Large, Medium, MemoryFragment, PhysAddr, PrimitiveSize, Small,
-        primitives::Primitive,
+        primitives::{AnyPrimitive, FrameClass, Primitive},
     },
 };
 
@@ -86,31 +86,14 @@ impl<S: PrimitiveSize> Debug for Frame<S> {
     }
 }
 
-/// An enum representing a physical memory frame of any size (small, medium, or large).
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum UnsizedFrame {
-    /// A small frame, typically 4KB in size for x86_64 architecture.
-    Small(Frame<Small>),
-    /// A medium frame, typically 2MB in size for x86_64 architecture.
-    Medium(Frame<Medium>),
-    /// A large frame, typically 1GB in size for x86_64 architecture.
-    Large(Frame<Large>),
-}
-
-impl Into<UnsizedFrame> for Frame<Small> {
-    fn into(self) -> UnsizedFrame {
-        UnsizedFrame::Small(self)
-    }
-}
-
-impl Into<UnsizedFrame> for Frame<Medium> {
-    fn into(self) -> UnsizedFrame {
-        UnsizedFrame::Medium(self)
-    }
-}
-
-impl Into<UnsizedFrame> for Frame<Large> {
-    fn into(self) -> UnsizedFrame {
-        UnsizedFrame::Large(self)
+impl<S: PrimitiveSize> From<Frame<S>> for AnyPrimitive<FrameClass> {
+    fn from(frame: Frame<S>) -> Self {
+        // SAFETY: We know that Fragment<Small> == Frame<Small> and so on, so we can safely transmute between them.
+        match S::SIZE {
+            Small::SIZE => AnyPrimitive::Small(unsafe { transmute(frame) }),
+            Medium::SIZE => AnyPrimitive::Medium(unsafe { transmute(frame) }),
+            Large::SIZE => AnyPrimitive::Large(unsafe { transmute(frame) }),
+            _ => unreachable!("Invalid frame size"),
+        }
     }
 }

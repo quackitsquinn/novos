@@ -6,9 +6,9 @@ pub mod vaddr;
 
 pub use address::{Address, AddressExt};
 use cake::encapsulate_macro;
-pub use frame::{Frame, UnsizedFrame};
+pub use frame::Frame;
 pub use paddr::PhysAddr;
-pub use page::{Page, UnsizedPage};
+pub use page::Page;
 pub use vaddr::VirtAddr;
 
 use crate::{NmmSealed, seal};
@@ -174,3 +174,8 @@ where
         }
     }
 }
+
+/// Type alias for a memory primitive of unknown size that is specifically a page.
+pub type AnyPage = AnyPrimitive<PageClass>;
+/// Type alias for a memory primitive of unknown size that is specifically a frame.
+pub type AnyFrame = AnyPrimitive<FrameClass>;

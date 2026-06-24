@@ -1,10 +1,11 @@
 //! This module defines the `Page` struct, which represents a virtual memory page of a specific size (small, medium, or large) on the current architecture.
 //! It also defines the `UnsizedPage` enum, which can represent a page of any size.
-use crate::paging::primitives::Primitive;
+use crate::paging::primitives::{AnyPrimitive, PageClass, Primitive};
 use crate::paging::{Address, Large, Medium, Small, VirtAddr};
 use crate::{align, paging::PrimitiveSize};
 use core::any::type_name;
 use core::fmt::Debug;
+use core::mem::transmute;
 
 /// A page on the current architecture.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -77,28 +78,15 @@ impl<S: PrimitiveSize> Debug for Page<S> {
             .finish()
     }
 }
-/// An enum representing a virtual memory page of any size (small, medium, or large).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum UnsizedPage {
-    /// A small page, typically 4KB in size for x86_64 architecture.
-    Small(Page<Small>),
-    /// A medium page, typically 2MB in size for x86_64 architecture.
-    Medium(Page<Medium>),
-    /// A large page, typically 1GB in size for x86_64 architecture.
-    Large(Page<Large>),
-}
 
-impl<S> Into<UnsizedPage> for Page<S>
-where
-    S: PrimitiveSize,
-{
-    fn into(self) -> UnsizedPage {
-        // SAFETY: Page<S> is guaranteed to be valid for itself.
+impl<S: PrimitiveSize> From<Page<S>> for AnyPrimitive<PageClass> {
+    fn from(frame: Page<S>) -> Self {
+        // SAFETY: We know that Fragment<Small> == Page<Small> and so on, so we can safely transmute between them.
         match S::SIZE {
-            Small::SIZE => UnsizedPage::Small(unsafe { Page::new_unchecked(self.start_address) }),
-            Medium::SIZE => UnsizedPage::Medium(unsafe { Page::new_unchecked(self.start_address) }),
-            Large::SIZE => UnsizedPage::Large(unsafe { Page::new_unchecked(self.start_address) }),
-            _ => panic!("Invalid page size"),
+            Small::SIZE => AnyPrimitive::Small(unsafe { transmute(frame) }),
+            Medium::SIZE => AnyPrimitive::Medium(unsafe { transmute(frame) }),
+            Large::SIZE => AnyPrimitive::Large(unsafe { transmute(frame) }),
+            _ => unreachable!("Invalid frame size"),
         }
     }
 }
