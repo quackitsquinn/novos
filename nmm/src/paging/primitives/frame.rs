@@ -79,10 +79,12 @@ impl<S: PrimitiveSize> const MemoryFragment<S> for Frame<S> {
 
 impl<S: PrimitiveSize> Debug for Frame<S> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_tuple("Frame")
-            .field(&type_name::<S>())
-            .field(&self.start_address)
-            .finish()
+        write!(
+            f,
+            "Frame<{}> {{ start_address: {:#x} }}",
+            S::NAME,
+            self.start_address.as_u64()
+        )
     }
 }
 

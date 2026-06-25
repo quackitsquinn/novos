@@ -61,6 +61,8 @@ encapsulate_macro!(
 pub trait PrimitiveSize: NmmSealed + Sized + Copy + core::fmt::Debug + Eq + PartialEq {
     /// The size of a page for this page size type, in bytes.
     const SIZE: u64;
+    /// The name of this page size type, as a string.
+    const NAME: &'static str;
 }
 
 /// Marker type for small pages, typically 4KB in size for x86_64 architecture.
@@ -68,18 +70,21 @@ pub trait PrimitiveSize: NmmSealed + Sized + Copy + core::fmt::Debug + Eq + Part
 pub struct Small;
 impl PrimitiveSize for Small {
     const SIZE: u64 = crate::arch::L1_PAGE_SIZE;
+    const NAME: &'static str = "Small";
 }
 /// Marker type for medium pages, typically 2MB in size for x86_64 architecture.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Medium;
 impl PrimitiveSize for Medium {
     const SIZE: u64 = crate::arch::L2_PAGE_SIZE;
+    const NAME: &'static str = "Medium";
 }
 /// Marker type for large pages, typically 1GB in size for x86_64 architecture.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Large;
 impl PrimitiveSize for Large {
     const SIZE: u64 = crate::arch::L3_PAGE_SIZE;
+    const NAME: &'static str = "Large";
 }
 
 /// A memory primitive.

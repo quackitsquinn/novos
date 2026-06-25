@@ -72,10 +72,12 @@ impl<S: PrimitiveSize> Page<S> {
 
 impl<S: PrimitiveSize> Debug for Page<S> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_tuple("Page")
-            .field(&type_name::<S>())
-            .field(&self.start_address)
-            .finish()
+        write!(
+            f,
+            "Page<{}> {{ start_address: {:#x} }}",
+            S::NAME,
+            self.start_address.as_u64()
+        )
     }
 }
 
