@@ -4,7 +4,7 @@ use core::{marker::Destruct, ops};
 
 use crate::paging::{MemoryFragment, PrimitiveSize, primitives::Primitive};
 
-/// Helper trait to make AddressSpace's definition a little less gross
+/// Helper trait to make the `Address definition a little less gross
 const trait AddressMath:
     Sized
     + [const] ops::Add<u64, Output = Self>

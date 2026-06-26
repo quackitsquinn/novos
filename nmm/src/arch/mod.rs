@@ -47,10 +47,6 @@ pub const L3_PAGE_SIZE: u64 = arch_impl::L3_PAGE_SIZE;
 
 // TODO: maybe support x86 in the future? would be cool to watch this run on a xp or 98 era machine
 
-// TODO: This functions will probably have more shared code between architectures than the public API,
-// so the functions shouldn't just instantly dip into the architecture-specific implementations,
-// but should have some shared code for common functionality, and then call into the architecture-specific implementations for the parts that are different between architectures. This will allow for more code reuse and less duplication between architectures, while still allowing for the necessary differences in implementation.
-
 pub(crate) use arch_impl::api::init_load_recursive;
 pub(crate) use arch_impl::api::init_unchecked;
 

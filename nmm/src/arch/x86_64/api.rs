@@ -1,15 +1,16 @@
 use cake::log::{debug, info};
 
 use crate::{
-    MapFlags, MemError, VirtualMemoryRange,
+    MapFlags, MemError, VirtualMemoryRange, align,
     arch::{
-        self,
+        self, L1_PAGE_SIZE,
         x86_64::{mapper::Mapper, set_mapper},
     },
+    bitmap::{BitPtr, Bitmap},
     entry_walker::EntryWalker,
     paging::{
-        AddressExt, Medium, MemoryFragment, Page, PageTable, PageTableIndex, PhysAddr,
-        PrimitiveSize, VirtAddr, map_primitive,
+        Address, AddressExt, Medium, MemoryFragment, Page, PageTable, PageTableIndex, PhysAddr,
+        PrimitiveSize, VirtAddr, map_from, map_primitive,
     },
 };
 
@@ -26,44 +27,37 @@ pub(crate) unsafe fn init_unchecked(
         });
     }
 
-    // Map the first page of the scratch range to test that the mapper is working correctly.
-    type Size = Medium; // We can use a medium page here since the scratch range is guaranteed to be large enough to hold at least one medium page, and using a larger page size will allow us to test that the mapper can handle mapping larger pages correctly.
-    let test_page = Page::<Size>::containing_address(scratch_range.base);
-    let test_frame = walker.next_frame::<Size>().ok_or(MemError::OutOfMemory)?;
-
-    map_primitive(test_frame, test_page, MapFlags::WRITABLE, &mut walker)?.flush();
-
-    info!(
-        "Successfully mapped first page of scratch range. Writing to it to test that the mapping is working correctly..."
-    );
-    // Write to the mapped page to test that the mapping is working correctly.
-    unsafe {
-        *test_page
-            .start_address()
-            .as_mut_ptr::<[u8; Size::SIZE as usize]>() = [0xAAu8; Size::SIZE as usize];
-    }
-
-    info!("Attempting to unmap the test page");
-    unsafe {
-        let (frame, flush) = arch::unmap_primitive(test_page)?;
-        flush.flush();
-        debug!("Successfully unmapped test page, got frame {:?}", frame);
-    }
-
-    // Initialize the mapper and set it as the active mapper for the system. T
-    // his is necessary to perform any virtual memory operations, including mapping the scratch space.
+    // Initialize the mapper and set it as the active mapper for the system.
+    // This is necessary to perform any virtual memory operations, including mapping the scratch space.
     let mapper = unsafe { Mapper::new_offset(root, offset) };
     unsafe { set_mapper(mapper) };
 
-    info!("Mapping first page of scratch range to test map_primitive...");
+    // Always make sure the number of bytes will be aligned to u64
+    let n_pages = (scratch_range.size as u64).div_ceil(L1_PAGE_SIZE);
+    let n_bytes = align!(up, n_pages / 8, core::mem::size_of::<u64>() as u64);
+    let n_entries = n_bytes / core::mem::size_of::<u64>() as u64;
 
-    // let mut bitmap = unsafe { Bitmap::init(u64_slice, scratch_pages as u64, scratch_range.base) };
+    info!(
+        "Mapping scratch space: base={:#x}, size={} bytes, pages={}, entries={}",
+        scratch_range.base.as_u64(),
+        n_bytes,
+        n_pages,
+        n_entries
+    );
+    unsafe {
+        map_from(scratch_range.base, n_bytes, MapFlags::WRITABLE, &mut walker)?;
+    }
 
-    // Now that we have the scratch space mapped and the bitmap initialized, we can mark the pages we just mapped as allocated in the bitmap, since they are now in use by the memory manager.
-    // unsafe { bitmap.set(BitPtr::new(0, 0), needed_pages as u64) }; // Mark the pages we just mapped as allocated in the bitmap.
+    let entries = unsafe {
+        core::slice::from_raw_parts_mut(scratch_range.base.as_mut_ptr::<u64>(), n_entries as usize)
+    };
+    let mut bitmap = Bitmap::init(entries, n_pages, scratch_range.base.as_u64());
 
-    //let _ = register_global_bitmap(bitmap); // The user is allowed to register their own bitmap if they want.
+    // Now that we have the scratch space mapped and the bitmap initialized, we can mark the pages we just mapped as allocated in the bitmap,
+    // since they are now in use by the memory manager.
+    bitmap.set(BitPtr::new(0, 0), n_pages as u64); // Mark the pages we just mapped as allocated in the bitmap.
 
+    panic!("woah!");
     Ok(())
 }
 

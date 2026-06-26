@@ -4,6 +4,8 @@ pub mod paddr;
 pub mod page;
 pub mod vaddr;
 
+use core::mem::transmute_copy;
+
 pub use address::{Address, AddressExt};
 use cake::encapsulate_macro;
 pub use frame::Frame;
@@ -111,8 +113,7 @@ pub const trait MemoryFragment<Ps: PrimitiveSize>: Primitive {
     fn start_address(&self) -> Self::AddressType;
 }
 
-/// A trait representing a family of memory fragments (e.g., pages or frames) that can be used in paging,
-///  where each primitive has an associated address space type (e.g., `VirtAddr` for pages, `PhysAddr` for frames).
+/// A trait representing a family of memory primitives (e.g., pages, frames, and virt/phys addresses) that can be used in paging,
 #[allow(private_bounds)] // intentionally seal this
 pub const trait PrimitiveClass:
     NmmSealed + Sized + Copy + core::fmt::Debug + Eq + PartialEq
@@ -121,7 +122,7 @@ pub const trait PrimitiveClass:
     type Addr: Address;
 
     /// The memory fragments type associated with this family of memory fragments (e.g., `Page<S>` for pages, `Frame<S>` for frames).
-    type Fragment<S: PrimitiveSize>: MemoryFragment<S, AddressType = Self::Addr> + Primitive;
+    type Fragment<S: PrimitiveSize>: MemoryFragment<S, AddressType = Self::Addr>;
 }
 
 /// The primitives used for virtual addresses and pages.
@@ -176,6 +177,51 @@ where
             AnyPrimitive::Small(_) => Small::SIZE,
             AnyPrimitive::Medium(_) => Medium::SIZE,
             AnyPrimitive::Large(_) => Large::SIZE,
+        }
+    }
+
+    /// Returns Self as C::Fragment<S> if S::SIZE is less than or equal to the size of self.
+    pub fn downsize_as<S: PrimitiveSize>(self) -> C::Fragment<S> {
+        // SAFETY: C::Fragment<S> is the same type as C::Fragment<...>
+        match self {
+            AnyPrimitive::Small(p) => {
+                return unsafe { transmute_copy(&p) };
+            }
+            AnyPrimitive::Medium(p) if S::SIZE <= Medium::SIZE => {
+                return unsafe { transmute_copy(&p) };
+            }
+            AnyPrimitive::Large(p) if S::SIZE == Large::SIZE => {
+                return unsafe { transmute_copy(&p) };
+            }
+            _ => {
+                panic!(
+                    "AnyPrimitive::downsize_as: Fragment {:?} is too large for size {}",
+                    self,
+                    S::NAME
+                )
+            }
+        }
+    }
+
+    pub fn unwrap_as<S: PrimitiveSize>(self) -> C::Fragment<S> {
+        // SAFETY: C::Fragment<S> is the same type as C::Fragment
+        match self {
+            AnyPrimitive::Small(p) if S::SIZE == Small::SIZE => {
+                return unsafe { transmute_copy(&p) };
+            }
+            AnyPrimitive::Medium(p) if S::SIZE == Medium::SIZE => {
+                return unsafe { transmute_copy(&p) };
+            }
+            AnyPrimitive::Large(p) if S::SIZE == Large::SIZE => {
+                return unsafe { transmute_copy(&p) };
+            }
+            _ => {
+                panic!(
+                    "AnyPrimitive::unwrap_as: Found {:?}, expected {:?}",
+                    self,
+                    S::NAME
+                )
+            }
         }
     }
 }

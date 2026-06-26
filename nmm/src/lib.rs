@@ -131,7 +131,7 @@ pub fn map(
 ) -> Result<(), MemError> {
     check_range_virt(virt_base, byte_size)?;
     check_range_phys(phys_base, byte_size)?;
-    todo!()
+    unsafe { paging::map_unchecked(virt_base, phys_base, byte_size, flags) }
 }
 
 /// Unmaps a virtual address range of the specified size starting from the given virtual base address
@@ -158,7 +158,7 @@ pub fn alloc_anon(byte_size: usize, flags: MapFlags) -> Result<VirtAddr, MemErro
 /// Allocates a virtual address range of the specified size without mapping it to any physical memory.
 #[must_use = "The returned virtual address must be freed with `free_virtspace` when it is no longer needed to avoid memory leaks and ensure proper resource management."]
 pub fn alloc_virtspace(byte_size: usize, alignment: usize) -> Result<VirtAddr, MemError> {
-    let _alignment = Alignment::new(alignment).ok_or(MemError::InvalidAlignment(alignment))?;
+    let alignment = Alignment::new(alignment).ok_or(MemError::InvalidAlignment(alignment))?;
     if byte_size > arch::VIRTUAL_ADDRESS_MAX as usize {
         return Err(MemError::OutOfMemory);
     }
@@ -191,7 +191,7 @@ pub fn map_phys(
 ) -> Result<VirtAddr, MemError> {
     check_range_phys(phys_addr, byte_size)?;
     let virt_addr = alloc_virtspace(byte_size, arch::L1_PAGE_SIZE as usize)?;
-    map(virt_addr, phys_addr, byte_size, flags)?;
+    unsafe { paging::map_unchecked(virt_addr, phys_addr, byte_size, flags) }?;
     Ok(virt_addr)
 }
 

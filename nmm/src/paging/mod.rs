@@ -137,7 +137,7 @@ where
     unsafe { crate::arch::unmap_primitive(dst) }
 }
 
-pub(crate) unsafe fn map_from<D, F>(
+pub(crate) unsafe fn map_from<D>(
     base: VirtAddr,
     len: u64,
     flags: MapFlags,
@@ -219,4 +219,13 @@ where
     }
 
     Ok(())
+}
+
+pub(crate) unsafe fn map_unchecked(
+    virt_base: VirtAddr,
+    phys_base: PhysAddr,
+    byte_size: usize,
+    flags: MapFlags,
+) -> Result<(), MemError> {
+    todo!()
 }

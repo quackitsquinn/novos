@@ -12,13 +12,6 @@ use bitflags::bitflags;
 
 use cake::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
-// This submodule exists purely to reduce name collisions as the internal implementation of x86_64
-// is very similar to nmm (as i roughly modeled nmm after x86_64 and redox's memory management),
-// so there are a lot of similar types and functions, and it would be very easy for them to collide if they were all in the same module.
-//
-// It's a bit verbose, but it's easier than dealing with the name collisions and weird compiler errors that would arise.
-mod arch_lib {}
-
 use crate::{
     MapFlags, MemError,
     arch::x86_64::conv::XFrameAllocator,
@@ -165,17 +158,12 @@ pub(crate) unsafe fn do_flush_all() {
     }
 }
 
-pub(crate) fn validate_virt_addr(addr: u64) -> bool {
-    // Check if the address is within the valid range for x86_64 virtual addresses.
-    addr <= VIRTUAL_ADDRESS_MAX
-}
-
-pub const fn canonicalize_phys(addr: u64) -> u64 {
+pub(crate) const fn canonicalize_phys(addr: u64) -> u64 {
     // taken from the x86_64 crate
     addr % (1 << 52)
 }
 
-pub const fn canonicalize_virt(addr: u64) -> u64 {
+pub(crate) const fn canonicalize_virt(addr: u64) -> u64 {
     // taken from the x86_64 crate
 
     // By doing the right shift as a signed operation (on a i64), it will
