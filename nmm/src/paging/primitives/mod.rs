@@ -1,4 +1,5 @@
 //! Various paging primitives, including pages, frames, and addresses.
+//!
 pub mod address;
 pub mod frame;
 pub mod paddr;

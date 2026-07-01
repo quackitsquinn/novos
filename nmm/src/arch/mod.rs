@@ -5,7 +5,7 @@ pub mod x86_64;
 use x86_64 as arch_impl;
 
 use crate::{
-    MapFlags, MemError, VirtualMemoryRange,
+    MapFlags, MemError,
     entry_walker::EntryWalker,
     paging::{self, PageTable, PhysAddr, VirtAddr},
 };

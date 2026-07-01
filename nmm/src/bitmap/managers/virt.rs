@@ -3,7 +3,7 @@ use core::{alloc::Layout, mem::Alignment};
 use crate::{
     arch,
     bitmap::{BitPtr, Bitmap},
-    paging::{Address, AddressExt, VirtAddr},
+    paging::{Address, AddressExt, VirtAddr, primitives::MemoryRange},
     test_println,
 };
 
@@ -23,9 +23,9 @@ impl<'a> VirtualMemoryManager<'a> {
     /// The size of the bitmap in bits is determined by the `size` parameter, which specifies the total size of the virtual address space to manage in bytes.
     ///
     ///
-    pub unsafe fn init(bitmap_data: &'a mut [u64], base: VirtAddr, size: u64) -> Self {
+    pub unsafe fn init(bitmap_data: &'a mut [u64], range: MemoryRange<VirtAddr>) -> Self {
         Self {
-            bitmap: Bitmap::init(bitmap_data, Self::bytes_to_bits(size), base.as_u64()),
+            bitmap: Bitmap::init(bitmap_data, Self::bytes_to_bits(range.size()), range.size()),
         }
     }
 
@@ -74,6 +74,7 @@ impl<'a> VirtualMemoryManager<'a> {
     /// The `n_bytes` parameter specifies the total size of the virtual address range to allocate in bytes, and the `align` parameter specifies the required alignment of the starting virtual address.
     #[must_use = "the allocated virtual address must be used or deallocated to avoid memory leaks"]
     pub fn allocate(&mut self, layout: Layout) -> Option<VirtAddr> {
+        // TODO: Result<VirtAddr, MemError> instead of Option
         let n_bits = Self::bytes_to_bits(layout.size() as u64);
         let bit_align = Self::align_to_bit_align(layout.alignment());
 
@@ -218,8 +219,12 @@ mod tests {
         let mut bitmap_data = [0u64; CAP as usize];
         let base = VirtAddr::new(0x10000000);
         let base_u64 = base.as_u64();
-        let mut manager =
-            unsafe { VirtualMemoryManager::init(&mut bitmap_data, base, 0x1000 * (64 * CAP)) };
+        let mut manager = unsafe {
+            VirtualMemoryManager::init(
+                &mut bitmap_data,
+                MemoryRange::new_len(base, 0x1000 * (64 * CAP)),
+            )
+        };
 
         let test = |manager: &mut VirtualMemoryManager,
                     size_bytes: u64,

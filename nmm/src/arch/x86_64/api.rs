@@ -6,7 +6,7 @@ use crate::{
         self, L1_PAGE_SIZE,
         x86_64::{mapper::Mapper, set_mapper},
     },
-    bitmap::{BitPtr, Bitmap},
+    bitmap::{BitPtr, Bitmap, PhysicalMemoryManager, VirtualMemoryManager},
     entry_walker::EntryWalker,
     paging::{
         Address, AddressExt, FragmentSize, Medium, MemoryFragment, Page, PageTable, PageTableIndex,
@@ -59,12 +59,8 @@ pub(crate) unsafe fn init_unchecked(
             n_entries as usize,
         )
     };
-    let mut bitmap = Bitmap::init(entries, n_pages, scratch_range.start().as_u64());
-
-    // Now that we have the scratch space mapped and the bitmap initialized, we can mark the pages we just mapped as allocated in the bitmap,
-    // since they are now in use by the memory manager.
-    bitmap.set(BitPtr::new(0, 0), n_pages as u64); // Mark the pages we just mapped as allocated in the bitmap.
-
+    let mut vmm = unsafe { VirtualMemoryManager::init(entries, scratch_range) };
+    let mut pmm = unsafe { PhysicalMemoryManager::init(&mut walker, &mut vmm)? };
     panic!("woah!");
     Ok(())
 }

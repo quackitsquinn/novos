@@ -2,6 +2,7 @@
 #![cfg_attr(not(test), no_std)]
 #![feature(ptr_alignment_type)]
 #![feature(portable_simd)]
+// const traits are incredibly useful, but they require a loot of nightly features to be enabled, so we enable them all here.
 #![feature(const_trait_impl)]
 #![feature(const_ops)]
 #![feature(const_destruct)]

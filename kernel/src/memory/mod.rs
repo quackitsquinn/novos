@@ -2,7 +2,6 @@ use core::{convert::Infallible, mem};
 
 use cake::log::info;
 use nmm::{
-    VirtualMemoryRange,
     arch::HIGHER_HALF_START,
     paging::{Address, PageTable, VirtAddr},
 };

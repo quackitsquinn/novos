@@ -23,6 +23,7 @@ use crate::{
 };
 
 pub use primitives::Frame;
+pub use primitives::MemoryRange;
 pub use primitives::Page;
 pub use primitives::{Address, AddressExt};
 pub use primitives::{FragmentSize, Large, Medium, MemoryFragment, Small};

@@ -57,7 +57,7 @@ macro_rules! kernel_map {
             /// The end address of the section as a raw u64.
             pub const END_RAW: u64 = END.as_u64();
             /// The virtual memory range of the section.
-            pub const RANGE: $crate::VirtualMemoryRange = $crate::VirtualMemoryRange::new(START, SIZE as usize);
+            pub const RANGE: $crate::paging::MemoryRange::<$crate::paging::VirtAddr> = $crate::paging::MemoryRange::new_len(START, SIZE);
         }}
 
     };
