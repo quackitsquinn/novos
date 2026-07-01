@@ -2,7 +2,7 @@
 
 use core::{marker::Destruct, ops};
 
-use crate::paging::{MemoryFragment, PrimitiveSize, primitives::Primitive};
+use crate::paging::{FragmentSize, MemoryFragment, primitives::Primitive};
 
 /// Helper trait to make the `Address definition a little less gross
 const trait AddressMath:
@@ -54,7 +54,7 @@ pub const trait Address: Primitive + Ord + PartialOrd + AddressMath {
 
     /// Creates a new address from the given memory primitive.
     ///  The starting address of the primitive will be used as the value for the address.
-    fn from_primitive<P: [const] MemoryFragment<S> + [const] Destruct, S: PrimitiveSize>(
+    fn from_primitive<P: [const] MemoryFragment<S> + [const] Destruct, S: FragmentSize>(
         primitive: P,
     ) -> Option<Self>
     where

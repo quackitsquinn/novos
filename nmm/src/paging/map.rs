@@ -6,13 +6,13 @@ use core::fmt;
 
 use crate::{
     MapFlags, MemError,
-    paging::{Frame, Page, PrimitiveRangeManager, PrimitiveSize, Small, VirtAddr},
+    paging::{FragmentManager, FragmentSize, Frame, Page, Small, VirtAddr},
 };
 
 /// A trait for types that can map and unmap pages of a specific size. This is the main interface for mapping
 /// and unmapping pages in the memory manager, and it abstracts over the architecture-specific details of how
 /// page tables are manipulated to create mappings.
-pub trait MemoryMapper<S: PrimitiveSize> {
+pub trait MemoryMapper<S: FragmentSize> {
     /// Maps the given page to the given frame with the specified flags, using the provided frame allocator
     /// for any necessary allocations of page tables.
     ///
@@ -25,7 +25,7 @@ pub trait MemoryMapper<S: PrimitiveSize> {
         allocator: &mut A,
     ) -> Result<Flush, MemError>
     where
-        A: PrimitiveRangeManager<Frame<Small>, Small>;
+        A: FragmentManager<Frame<Small>, Small>;
 
     /// Unmaps the given page, returning the frame that was mapped to it before, or an error if the page was not mapped.
     unsafe fn unmap(&mut self, page: Page<S>) -> Result<(Frame<S>, Flush), MemError>;
@@ -46,7 +46,7 @@ impl Flush {
     ///
     /// # Safety
     ///
-    pub unsafe fn flush_page<S: PrimitiveSize>(page: Page<S>) -> Self {
+    pub unsafe fn flush_page<S: FragmentSize>(page: Page<S>) -> Self {
         Self(FlushInner::Flush(page.start_address()))
     }
 

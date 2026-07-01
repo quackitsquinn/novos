@@ -4,8 +4,8 @@ use crate::{
     MapFlags, MemError,
     arch::x86_64::{ArchError, PageTableFlags},
     paging::{
-        Address, Frame, Large, Medium, Page, PageTable, PageTableIndex, PhysAddr,
-        PrimitiveRangeManager, PrimitiveSize, Small, VirtAddr,
+        Address, FragmentManager, FragmentSize, Frame, Large, Medium, Page, PageTable,
+        PageTableIndex, PhysAddr, Small, VirtAddr,
     },
 };
 
@@ -19,9 +19,9 @@ mod arch_lib {
     pub use x86_64::VirtAddr;
 }
 
-pub(super) struct XFrameAllocator<'a, S: PrimitiveSize, T>
+pub(super) struct XFrameAllocator<'a, S: FragmentSize, T>
 where
-    T: PrimitiveRangeManager<Frame<S>, S>,
+    T: FragmentManager<Frame<S>, S>,
 {
     frame_range_manager: &'a mut T,
     _size_marker: core::marker::PhantomData<S>,
@@ -29,8 +29,8 @@ where
 
 impl<'a, S, T> XFrameAllocator<'a, S, T>
 where
-    S: PrimitiveSize,
-    T: PrimitiveRangeManager<Frame<S>, S>,
+    S: FragmentSize,
+    T: FragmentManager<Frame<S>, S>,
 {
     pub fn new(frame_range_manager: &'a mut T) -> Self {
         Self {
@@ -42,30 +42,30 @@ where
 
 unsafe impl<'a, T> arch_lib::FrameAllocator<arch_lib::Size4KiB> for XFrameAllocator<'a, Small, T>
 where
-    T: PrimitiveRangeManager<Frame<Small>, Small>,
+    T: FragmentManager<Frame<Small>, Small>,
 {
     fn allocate_frame(&mut self) -> Option<arch_lib::PhysFrame<arch_lib::Size4KiB>> {
-        let frame = self.frame_range_manager.allocate_range()?;
+        let frame = self.frame_range_manager.allocate_fragment()?;
         Some(frame.into())
     }
 }
 
 unsafe impl<'a, T> arch_lib::FrameAllocator<arch_lib::Size2MiB> for XFrameAllocator<'a, Medium, T>
 where
-    T: PrimitiveRangeManager<Frame<Medium>, Medium>,
+    T: FragmentManager<Frame<Medium>, Medium>,
 {
     fn allocate_frame(&mut self) -> Option<arch_lib::PhysFrame<arch_lib::Size2MiB>> {
-        let frame = self.frame_range_manager.allocate_range()?;
+        let frame = self.frame_range_manager.allocate_fragment()?;
         Some(frame.into())
     }
 }
 
 unsafe impl<'a, T> arch_lib::FrameAllocator<arch_lib::Size1GiB> for XFrameAllocator<'a, Large, T>
 where
-    T: PrimitiveRangeManager<Frame<Large>, Large>,
+    T: FragmentManager<Frame<Large>, Large>,
 {
     fn allocate_frame(&mut self) -> Option<arch_lib::PhysFrame<arch_lib::Size1GiB>> {
-        let frame = self.frame_range_manager.allocate_range()?;
+        let frame = self.frame_range_manager.allocate_fragment()?;
         Some(frame.into())
     }
 }
@@ -236,7 +236,7 @@ impl From<arch_lib::VirtAddr> for VirtAddr {
 impl MemError {
     pub(crate) fn from_unmap_error<S>(error: arch_lib::UnmapError, page: Page<S>) -> Self
     where
-        S: PrimitiveSize,
+        S: FragmentSize,
     {
         match error {
             arch_lib::UnmapError::PageNotMapped => MemError::NotMapped(page.into()),

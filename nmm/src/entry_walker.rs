@@ -9,7 +9,7 @@ use cake::log::error;
 
 use crate::paging::limine::LimineEntry;
 use crate::paging::{Address, PhysAddr};
-use crate::paging::{Frame, PrimitiveRangeManager, PrimitiveSize};
+use crate::paging::{FragmentManager, FragmentSize, Frame};
 
 /// A helper struct for iterating over memory map entries and calculating the total usable memory.
 #[allow(missing_debug_implementations)] // TODO: allowed to silence the warning for now
@@ -232,7 +232,7 @@ impl<'a> EntryWalker<'a> {
     }
 
     /// Returns the next usable frame of the specified size, or `None` if there are no more usable entries.
-    pub fn next_frame<S: PrimitiveSize>(&mut self) -> Option<Frame<S>> {
+    pub fn next_frame<S: FragmentSize>(&mut self) -> Option<Frame<S>> {
         let addr = self.next(S::SIZE, Alignment::new(S::SIZE as usize).unwrap())?;
         Some(Frame::new(addr))
     }
@@ -243,15 +243,15 @@ fn align_up(addr: u64, alignment: Alignment) -> u64 {
     (addr + align - 1) & !(align - 1)
 }
 
-impl<S> PrimitiveRangeManager<Frame<S>, S> for EntryWalker<'_>
+impl<S> FragmentManager<Frame<S>, S> for EntryWalker<'_>
 where
-    S: PrimitiveSize,
+    S: FragmentSize,
 {
-    fn allocate_range(&mut self) -> Option<Frame<S>> {
+    fn allocate_fragment(&mut self) -> Option<Frame<S>> {
         self.next_frame()
     }
 
-    fn deallocate_range(&mut self, _primitive: Frame<S>) {
+    fn deallocate_fragment(&mut self, _primitive: Frame<S>) {
         // We don't need to do anything here since the EntryWalker is only used for initial bootstrapping and we won't be deallocating any frames during that process, but we need to implement this method to satisfy the PrimitiveRangeManager trait.
         error!("EntryWalker<..>::deallocate_range called");
     }

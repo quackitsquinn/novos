@@ -1,23 +1,23 @@
 //! This module defines the `Page` struct, which represents a virtual memory page of a specific size (small, medium, or large) on the current architecture.
 //! It also defines the `UnsizedPage` enum, which can represent a page of any size.
-use crate::paging::primitives::{AnyPrimitive, PageClass, Primitive};
+use crate::paging::primitives::{AnyFragment, PageClass, Primitive};
 use crate::paging::{Address, Large, Medium, Small, VirtAddr};
-use crate::{align, paging::PrimitiveSize};
+use crate::{align, paging::FragmentSize};
 use core::any::type_name;
 use core::fmt::Debug;
 use core::mem::transmute;
 
 /// A page on the current architecture.
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub struct Page<S: PrimitiveSize> {
+pub struct Page<S: FragmentSize> {
     start_address: VirtAddr,
     _size_marker: core::marker::PhantomData<S>,
 }
 
-impl<S: PrimitiveSize> crate::NmmSealed for Page<S> {}
-impl<S: PrimitiveSize> Primitive for Page<S> {}
+impl<S: FragmentSize> crate::NmmSealed for Page<S> {}
+impl<S: FragmentSize> Primitive for Page<S> {}
 
-impl<S: PrimitiveSize> const crate::paging::MemoryFragment<S> for Page<S> {
+impl<S: FragmentSize> const crate::paging::MemoryFragment<S> for Page<S> {
     type AddressType = VirtAddr;
 
     fn start_address(&self) -> VirtAddr {
@@ -33,7 +33,7 @@ impl<S: PrimitiveSize> const crate::paging::MemoryFragment<S> for Page<S> {
     }
 }
 
-impl<S: PrimitiveSize> Page<S> {
+impl<S: FragmentSize> Page<S> {
     /// Attempts to create a new `Page` from the given starting virtual address. The address must be aligned to the size of the page, otherwise this function will return `None`.
     pub const fn try_new_u64(start_address: u64) -> Option<Self> {
         Self::try_new(VirtAddr::new(start_address))
@@ -70,7 +70,7 @@ impl<S: PrimitiveSize> Page<S> {
     }
 }
 
-impl<S: PrimitiveSize> Debug for Page<S> {
+impl<S: FragmentSize> Debug for Page<S> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(
             f,
@@ -81,13 +81,13 @@ impl<S: PrimitiveSize> Debug for Page<S> {
     }
 }
 
-impl<S: PrimitiveSize> From<Page<S>> for AnyPrimitive<PageClass> {
+impl<S: FragmentSize> From<Page<S>> for AnyFragment<PageClass> {
     fn from(frame: Page<S>) -> Self {
         // SAFETY: We know that Fragment<Small> == Page<Small> and so on, so we can safely transmute between them.
         match S::SIZE {
-            Small::SIZE => AnyPrimitive::Small(unsafe { transmute(frame) }),
-            Medium::SIZE => AnyPrimitive::Medium(unsafe { transmute(frame) }),
-            Large::SIZE => AnyPrimitive::Large(unsafe { transmute(frame) }),
+            Small::SIZE => AnyFragment::Small(unsafe { transmute(frame) }),
+            Medium::SIZE => AnyFragment::Medium(unsafe { transmute(frame) }),
+            Large::SIZE => AnyFragment::Large(unsafe { transmute(frame) }),
             _ => unreachable!("Invalid frame size"),
         }
     }

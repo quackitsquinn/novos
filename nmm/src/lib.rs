@@ -19,7 +19,7 @@ use crate::{
     entry_walker::EntryWalker,
     paging::{
         Address, PageTable, PhysAddr, VirtAddr,
-        primitives::{AnyPrimitive, PageClass},
+        primitives::{AnyFragment, PageClass},
     },
 };
 
@@ -256,7 +256,7 @@ pub enum MemError {
     /// The requested operation failed because the specified virtual address range is not currently mapped to any physical memory, and therefore cannot be unmapped or accessed.
     /// The provided virtual address is included for reference.
     #[error("The specified virtual address range is not currently mapped to any physical memory")]
-    NotMapped(AnyPrimitive<PageClass>),
+    NotMapped(AnyFragment<PageClass>),
     /// The requested operation failed because a needed entry in the page table points to an invalid frame address.
     #[error("The page table entry points to an invalid frame address: {0:?}")]
     InvalidFrameAddress(PhysAddr),

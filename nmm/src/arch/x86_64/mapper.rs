@@ -5,7 +5,7 @@ use crate::{
         x86_64::{offset::OffsetPageTable, recursive::RecursivePageTable},
     },
     paging::{
-        Frame, Page, PageTable, PageTableIndex, PrimitiveRangeManager, PrimitiveSize, Small,
+        FragmentManager, FragmentSize, Frame, Page, PageTable, PageTableIndex, Small,
         map::{Flush, MemoryMapper},
     },
 };
@@ -43,7 +43,7 @@ impl Mapper {
 
 impl<S> MemoryMapper<S> for Mapper
 where
-    S: PrimitiveSize,
+    S: FragmentSize,
     RecursivePageTable<'static>: MemoryMapper<S>,
     OffsetPageTable<'static>: MemoryMapper<S>,
 {
@@ -55,7 +55,7 @@ where
         allocator: &mut A,
     ) -> Result<Flush, MemError>
     where
-        A: PrimitiveRangeManager<Frame<Small>, Small>,
+        A: FragmentManager<Frame<Small>, Small>,
     {
         match self {
             Mapper::Offset(mapper) => mapper.map(page, frame, flags, allocator),

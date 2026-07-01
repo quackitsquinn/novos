@@ -1,3 +1,4 @@
+//! Various paging primitives, including pages, frames, and addresses.
 pub mod address;
 pub mod frame;
 pub mod paddr;
@@ -60,7 +61,7 @@ encapsulate_macro!(
 
 /// A trait representing a page size for the current architecture.
 #[allow(private_bounds)]
-pub trait PrimitiveSize: NmmSealed + Sized + Copy + core::fmt::Debug + Eq + PartialEq {
+pub trait FragmentSize: NmmSealed + Sized + Copy + core::fmt::Debug + Eq + PartialEq {
     /// The size of a page for this page size type, in bytes.
     const SIZE: u64;
     /// The name of this page size type, as a string.
@@ -70,21 +71,21 @@ pub trait PrimitiveSize: NmmSealed + Sized + Copy + core::fmt::Debug + Eq + Part
 /// Marker type for small pages, typically 4KB in size for x86_64 architecture.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Small;
-impl PrimitiveSize for Small {
+impl FragmentSize for Small {
     const SIZE: u64 = crate::arch::L1_PAGE_SIZE;
     const NAME: &'static str = "Small";
 }
 /// Marker type for medium pages, typically 2MB in size for x86_64 architecture.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Medium;
-impl PrimitiveSize for Medium {
+impl FragmentSize for Medium {
     const SIZE: u64 = crate::arch::L2_PAGE_SIZE;
     const NAME: &'static str = "Medium";
 }
 /// Marker type for large pages, typically 1GB in size for x86_64 architecture.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Large;
-impl PrimitiveSize for Large {
+impl FragmentSize for Large {
     const SIZE: u64 = crate::arch::L3_PAGE_SIZE;
     const NAME: &'static str = "Large";
 }
@@ -97,7 +98,7 @@ seal!(Small, Medium, Large);
 
 /// A trait that represents both Page and Frame types, allowing for generic functions that can work with either type of memory primitive.
 #[allow(private_bounds)] // intentionally seal this
-pub const trait MemoryFragment<Ps: PrimitiveSize>: Primitive {
+pub const trait MemoryFragment<Ps: FragmentSize>: Primitive {
     /// The address space type associated with this memory primitive (e.g., `VirtAddr` for pages, `PhysAddr` for frames).
     type AddressType: Address;
 
@@ -122,7 +123,7 @@ pub const trait PrimitiveClass:
     type Addr: Address;
 
     /// The memory fragments type associated with this family of memory fragments (e.g., `Page<S>` for pages, `Frame<S>` for frames).
-    type Fragment<S: PrimitiveSize>: MemoryFragment<S, AddressType = Self::Addr>;
+    type Fragment<S: FragmentSize>: MemoryFragment<S, AddressType = Self::Addr>;
 }
 
 /// The primitives used for virtual addresses and pages.
@@ -130,7 +131,7 @@ pub const trait PrimitiveClass:
 pub struct PageClass;
 impl PrimitiveClass for PageClass {
     type Addr = VirtAddr;
-    type Fragment<S: PrimitiveSize> = Page<S>;
+    type Fragment<S: FragmentSize> = Page<S>;
 }
 
 /// The primitives used for physical addresses and frames.
@@ -138,7 +139,7 @@ impl PrimitiveClass for PageClass {
 pub struct FrameClass;
 impl PrimitiveClass for FrameClass {
     type Addr = PhysAddr;
-    type Fragment<S: PrimitiveSize> = Frame<S>;
+    type Fragment<S: FragmentSize> = Frame<S>;
 }
 
 seal!(PageClass, FrameClass);
@@ -146,7 +147,7 @@ seal!(PageClass, FrameClass);
 /// A memory primitive of unknown size.
 /// This is used for functions that need to work with memory primitives of any size, but don't need to know the specific size of the primitive.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum AnyPrimitive<C>
+pub enum AnyFragment<C>
 where
     C: PrimitiveClass,
 {
@@ -158,39 +159,39 @@ where
     Large(C::Fragment<Large>),
 }
 
-impl<C> AnyPrimitive<C>
+impl<C> AnyFragment<C>
 where
     C: PrimitiveClass,
 {
     /// Returns the starting address of this memory primitive as the appropriate address space type (e.g., `VirtAddr` for pages, `PhysAddr` for frames).
     pub fn start_address(&self) -> C::Addr {
         match self {
-            AnyPrimitive::Small(prim) => prim.start_address(),
-            AnyPrimitive::Medium(prim) => prim.start_address(),
-            AnyPrimitive::Large(prim) => prim.start_address(),
+            AnyFragment::Small(prim) => prim.start_address(),
+            AnyFragment::Medium(prim) => prim.start_address(),
+            AnyFragment::Large(prim) => prim.start_address(),
         }
     }
 
     /// Returns the size of this memory primitive in bytes.
     pub fn size(&self) -> u64 {
         match self {
-            AnyPrimitive::Small(_) => Small::SIZE,
-            AnyPrimitive::Medium(_) => Medium::SIZE,
-            AnyPrimitive::Large(_) => Large::SIZE,
+            AnyFragment::Small(_) => Small::SIZE,
+            AnyFragment::Medium(_) => Medium::SIZE,
+            AnyFragment::Large(_) => Large::SIZE,
         }
     }
 
     /// Returns Self as C::Fragment<S> if S::SIZE is less than or equal to the size of self.
-    pub fn downsize_as<S: PrimitiveSize>(self) -> C::Fragment<S> {
+    pub fn downsize_as<S: FragmentSize>(self) -> C::Fragment<S> {
         // SAFETY: C::Fragment<S> is the same type as C::Fragment<...>
         match self {
-            AnyPrimitive::Small(p) => {
+            AnyFragment::Small(p) => {
                 return unsafe { transmute_copy(&p) };
             }
-            AnyPrimitive::Medium(p) if S::SIZE <= Medium::SIZE => {
+            AnyFragment::Medium(p) if S::SIZE <= Medium::SIZE => {
                 return unsafe { transmute_copy(&p) };
             }
-            AnyPrimitive::Large(p) if S::SIZE == Large::SIZE => {
+            AnyFragment::Large(p) if S::SIZE == Large::SIZE => {
                 return unsafe { transmute_copy(&p) };
             }
             _ => {
@@ -203,16 +204,16 @@ where
         }
     }
 
-    pub fn unwrap_as<S: PrimitiveSize>(self) -> C::Fragment<S> {
+    pub fn unwrap_as<S: FragmentSize>(self) -> C::Fragment<S> {
         // SAFETY: C::Fragment<S> is the same type as C::Fragment<_>
         match self {
-            AnyPrimitive::Small(p) if S::SIZE == Small::SIZE => {
+            AnyFragment::Small(p) if S::SIZE == Small::SIZE => {
                 return unsafe { transmute_copy(&p) };
             }
-            AnyPrimitive::Medium(p) if S::SIZE == Medium::SIZE => {
+            AnyFragment::Medium(p) if S::SIZE == Medium::SIZE => {
                 return unsafe { transmute_copy(&p) };
             }
-            AnyPrimitive::Large(p) if S::SIZE == Large::SIZE => {
+            AnyFragment::Large(p) if S::SIZE == Large::SIZE => {
                 return unsafe { transmute_copy(&p) };
             }
             _ => {
@@ -227,6 +228,6 @@ where
 }
 
 /// Type alias for a memory primitive of unknown size that is specifically a page.
-pub type AnyPage = AnyPrimitive<PageClass>;
+pub type AnyPage = AnyFragment<PageClass>;
 /// Type alias for a memory primitive of unknown size that is specifically a frame.
-pub type AnyFrame = AnyPrimitive<FrameClass>;
+pub type AnyFrame = AnyFragment<FrameClass>;

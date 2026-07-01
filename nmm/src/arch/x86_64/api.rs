@@ -9,8 +9,8 @@ use crate::{
     bitmap::{BitPtr, Bitmap},
     entry_walker::EntryWalker,
     paging::{
-        Address, AddressExt, Medium, MemoryFragment, Page, PageTable, PageTableIndex, PhysAddr,
-        PrimitiveSize, VirtAddr, map_from, map_primitive,
+        Address, AddressExt, FragmentSize, Medium, MemoryFragment, Page, PageTable, PageTableIndex,
+        PhysAddr, VirtAddr, map_from, map_primitive,
     },
 };
 

@@ -18,84 +18,57 @@ use crate::{
     paging::{
         fragment::{GreedyFragmentMapper, JointFragmentMapper},
         map::{Flush, MemoryMapper},
-        primitives::{AnyPrimitive, PageClass},
+        primitives::{AnyFragment, FrameClass, PageClass, PrimitiveClass},
     },
 };
 
 pub use primitives::Frame;
 pub use primitives::Page;
 pub use primitives::{Address, AddressExt};
-pub use primitives::{Large, Medium, MemoryFragment, PrimitiveSize, Small};
+pub use primitives::{FragmentSize, Large, Medium, MemoryFragment, Small};
 pub use primitives::{PhysAddr, VirtAddr};
 
 /// The type used for page table entries in the current architecture.
 pub type Table = [PageEntryType; crate::arch::ENTRY_COUNT];
 
-/// A trait for managing ranges of memory primitives, such as pages. This is used for allocating and deallocating pages of different sizes, and can be implemented by both the physical and virtual memory managers to manage their respective address spaces.
+/// A trait for managing ranges of memory primitives, such as pages. T
 // I wish we didn't also have to specify the address space here..
 #[allow(private_bounds)] // intentionally seal this
-pub trait PrimitiveRangeManager<T: MemoryFragment<S>, S: PrimitiveSize> {
+pub trait FragmentManager<T: MemoryFragment<S>, S: FragmentSize> {
     /// Allocates a range of memory of the specified size and alignment, returning the starting address of the allocated range.
-    fn allocate_range(&mut self) -> Option<T>;
+    fn allocate_fragment(&mut self) -> Option<T>;
     /// Deallocates a previously allocated range of memory, given the starting address and size of the range.
-    fn deallocate_range(&mut self, primitive: T);
+    fn deallocate_fragment(&mut self, primitive: T);
 }
 
-/// A marker trait for types that implement `PrimitiveRangeManager<Page<S>>` for all page sizes.
-pub trait AllPages:
-    PrimitiveRangeManager<Page<Small>, Small>
-    + PrimitiveRangeManager<Page<Medium>, Medium>
-    + PrimitiveRangeManager<Page<Large>, Large>
+/// A trait for managing ranges of memory primitives of all sizes (small, medium, and large).
+pub trait FullManager<C: PrimitiveClass>:
+    FragmentManager<C::Fragment<Small>, Small>
+    + FragmentManager<C::Fragment<Medium>, Medium>
+    + FragmentManager<C::Fragment<Large>, Large>
 {
-    /// Allocates a small page (4KB on x86_64) and returns it, or `None` if no small pages are available.
-    fn allocate_small(&mut self) -> Option<Page<Small>> {
-        self.allocate_range()
+    /// Allocates a small memory primitive (typically 4KB in size for x86_64 architecture).
+    fn allocate_small(&mut self) -> Option<C::Fragment<Small>> {
+        self.allocate_fragment()
     }
 
-    /// Allocates a medium page (2MB on x86_64) and returns it, or `None` if no medium pages are available.
-    fn allocate_medium(&mut self) -> Option<Page<Medium>> {
-        self.allocate_range()
+    /// Allocates a medium memory primitive (typically 2MB in size for x86_64 architecture).
+    fn allocate_medium(&mut self) -> Option<C::Fragment<Medium>> {
+        self.allocate_fragment()
     }
 
-    /// Allocates a large page (1GB on x86_64) and returns it, or `None` if no large pages are available.
-    fn allocate_large(&mut self) -> Option<Page<Large>> {
-        self.allocate_range()
-    }
-}
-
-impl<T: PrimitiveSize> AllPages for T where
-    T: PrimitiveRangeManager<Page<Small>, Small>
-        + PrimitiveRangeManager<Page<Medium>, Medium>
-        + PrimitiveRangeManager<Page<Large>, Large>
-{
-}
-
-/// A marker trait for types that implement `PrimitiveRangeManager<Frame<S>>` for all page sizes.
-pub trait AllFrames:
-    PrimitiveRangeManager<Frame<Small>, Small>
-    + PrimitiveRangeManager<Frame<Medium>, Medium>
-    + PrimitiveRangeManager<Frame<Large>, Large>
-{
-    /// Allocates a small frame (4KB on x86_64) and returns it, or `None` if no small frames are available.
-    fn allocate_small(&mut self) -> Option<Frame<Small>> {
-        self.allocate_range()
-    }
-
-    /// Allocates a medium frame (2MB on x86_64) and returns it, or `None` if no medium frames are available.
-    fn allocate_medium(&mut self) -> Option<Frame<Medium>> {
-        self.allocate_range()
-    }
-
-    /// Allocates a large frame (1GB on x86_64) and returns it, or `None` if no large frames are available.
-    fn allocate_large(&mut self) -> Option<Frame<Large>> {
-        self.allocate_range()
+    /// Allocates a large memory primitive (typically 1GB in size for x86_64 architecture).
+    fn allocate_large(&mut self) -> Option<C::Fragment<Large>> {
+        self.allocate_fragment()
     }
 }
 
-impl<T> AllFrames for T where
-    T: PrimitiveRangeManager<Frame<Small>, Small>
-        + PrimitiveRangeManager<Frame<Medium>, Medium>
-        + PrimitiveRangeManager<Frame<Large>, Large>
+impl<C, T> FullManager<C> for T
+where
+    C: PrimitiveClass,
+    T: FragmentManager<C::Fragment<Small>, Small>
+        + FragmentManager<C::Fragment<Medium>, Medium>
+        + FragmentManager<C::Fragment<Large>, Large>,
 {
 }
 
@@ -108,8 +81,8 @@ pub(crate) fn map_primitive<S, A>(
     frame_allocator: &mut A,
 ) -> Result<Flush, MemError>
 where
-    S: PrimitiveSize,
-    A: PrimitiveRangeManager<Frame<Small>, Small>,
+    S: FragmentSize,
+    A: FragmentManager<Frame<Small>, Small>,
     Mapper: MemoryMapper<S>,
 {
     trace!(
@@ -129,7 +102,7 @@ where
 #[must_use = "The returned `Flush` should be flushed after the mapping operation to ensure that there are no stale mappings."]
 pub(crate) unsafe fn unmap_primitive<S>(dst: Page<S>) -> Result<(Frame<S>, Flush), MemError>
 where
-    S: PrimitiveSize,
+    S: FragmentSize,
     Mapper: MemoryMapper<S>,
 {
     trace!("Unmapping page {:?}", dst);
@@ -144,7 +117,7 @@ pub(crate) unsafe fn map_from<D>(
     data_allocator: &mut D,
 ) -> Result<(), MemError>
 where
-    D: AllFrames,
+    D: FullManager<FrameClass>,
 {
     trace!(
         "Mapping from base address {:?} with length {:?} and flags {:?}",
@@ -154,19 +127,19 @@ where
     let mapper = GreedyFragmentMapper::<PageClass>::new(base, len);
     for frag in mapper {
         match frag {
-            AnyPrimitive::Small(prim) => {
+            AnyFragment::Small(prim) => {
                 let frame = data_allocator
                     .allocate_small()
                     .ok_or(MemError::OutOfMemory)?;
                 map_primitive(frame, prim, flags, data_allocator)?.flush();
             }
-            AnyPrimitive::Medium(prim) => {
+            AnyFragment::Medium(prim) => {
                 let frame = data_allocator
                     .allocate_medium()
                     .ok_or(MemError::OutOfMemory)?;
                 map_primitive(frame, prim, flags, data_allocator)?.flush();
             }
-            AnyPrimitive::Large(prim) => {
+            AnyFragment::Large(prim) => {
                 let frame = data_allocator
                     .allocate_large()
                     .ok_or(MemError::OutOfMemory)?;
@@ -186,8 +159,8 @@ pub(crate) unsafe fn map_from_with_allocator<D, F>(
     frame_allocator: &mut F,
 ) -> Result<(), MemError>
 where
-    D: AllFrames,
-    F: PrimitiveRangeManager<Frame<Small>, Small>,
+    D: FullManager<FrameClass>,
+    F: FragmentManager<Frame<Small>, Small>,
 {
     trace!(
         "Mapping from base address {:?} with length {:?} and flags {:?}",
@@ -197,19 +170,19 @@ where
     let mapper = GreedyFragmentMapper::<PageClass>::new(base, len);
     for frag in mapper {
         match frag {
-            AnyPrimitive::Small(prim) => {
+            AnyFragment::Small(prim) => {
                 let frame = data_allocator
                     .allocate_small()
                     .ok_or(MemError::OutOfMemory)?;
                 map_primitive(frame, prim, flags, frame_allocator)?.flush();
             }
-            AnyPrimitive::Medium(prim) => {
+            AnyFragment::Medium(prim) => {
                 let frame = data_allocator
                     .allocate_medium()
                     .ok_or(MemError::OutOfMemory)?;
                 map_primitive(frame, prim, flags, frame_allocator)?.flush();
             }
-            AnyPrimitive::Large(prim) => {
+            AnyFragment::Large(prim) => {
                 let frame = data_allocator
                     .allocate_large()
                     .ok_or(MemError::OutOfMemory)?;
@@ -229,19 +202,19 @@ pub(crate) unsafe fn map_raw<F>(
     frame_alloc: &mut F,
 ) -> Result<(), MemError>
 where
-    F: PrimitiveRangeManager<Frame<Small>, Small>,
+    F: FragmentManager<Frame<Small>, Small>,
 {
     let mapper = JointFragmentMapper::new(virt_base, phys_base, byte_size as u64);
 
     for pair in mapper {
         match pair {
-            (AnyPrimitive::Small(page_prim), AnyPrimitive::Small(phys_prim)) => {
+            (AnyFragment::Small(page_prim), AnyFragment::Small(phys_prim)) => {
                 map_primitive(phys_prim, page_prim, flags, frame_alloc)?.flush();
             }
-            (AnyPrimitive::Medium(page_prim), AnyPrimitive::Medium(phys_prim)) => {
+            (AnyFragment::Medium(page_prim), AnyFragment::Medium(phys_prim)) => {
                 map_primitive(phys_prim, page_prim, flags, frame_alloc)?.flush();
             }
-            (AnyPrimitive::Large(page_prim), AnyPrimitive::Large(phys_prim)) => {
+            (AnyFragment::Large(page_prim), AnyFragment::Large(phys_prim)) => {
                 map_primitive(phys_prim, page_prim, flags, frame_alloc)?.flush();
             }
             _ => unreachable!("non-matched fragments produced by mapper"),

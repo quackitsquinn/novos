@@ -230,7 +230,7 @@ impl<'a> Bitmap<'a> {
 mod tests {
     use crate::{
         arch, bitmap,
-        paging::{Large, Medium, PrimitiveSize},
+        paging::{FragmentSize, Large, Medium},
     };
 
     use super::*;

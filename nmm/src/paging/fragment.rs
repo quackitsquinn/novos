@@ -3,17 +3,15 @@ use cake::log::info;
 use crate::{
     align,
     paging::{
-        Large, Medium, PhysAddr, PrimitiveSize, Small, VirtAddr,
-        primitives::{
-            Address, AnyPrimitive, FrameClass, MemoryFragment, PageClass, PrimitiveClass,
-        },
+        FragmentSize, Large, Medium, PhysAddr, Small, VirtAddr,
+        primitives::{Address, AnyFragment, FrameClass, MemoryFragment, PageClass, PrimitiveClass},
     },
     test_println,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct GreedyFragmentMapper<Class: PrimitiveClass> {
-    base_prim: AnyPrimitive<Class>,
+    base_prim: AnyFragment<Class>,
     len: u64,
     remain: u64,
 }
@@ -30,28 +28,28 @@ where
         }
     }
 
-    fn next_prim(base: Class::Addr, len: u64) -> AnyPrimitive<Class> {
+    fn next_prim(base: Class::Addr, len: u64) -> AnyFragment<Class> {
         let aligned_base = align!(down, base.as_u64(), Small::SIZE);
 
         if aligned_base % Large::SIZE == 0 && len >= Large::SIZE {
-            return AnyPrimitive::Large(
+            return AnyFragment::Large(
                 Class::Fragment::from_start_address(Class::Addr::new(aligned_base)).unwrap(),
             );
         }
 
         if aligned_base % Medium::SIZE == 0 && len >= Medium::SIZE {
-            return AnyPrimitive::Medium(
+            return AnyFragment::Medium(
                 Class::Fragment::from_start_address(Class::Addr::new(aligned_base)).unwrap(),
             );
         }
 
-        AnyPrimitive::Small(
+        AnyFragment::Small(
             Class::Fragment::from_start_address(Class::Addr::new(aligned_base)).unwrap(),
         )
     }
 
     /// Returns the next memory primitive without advancing the iterator.
-    pub fn peek_next_fragment(&self) -> Option<AnyPrimitive<Class>> {
+    pub fn peek_next_fragment(&self) -> Option<AnyFragment<Class>> {
         if self.remain == 0 {
             return None;
         }
@@ -59,7 +57,7 @@ where
     }
 
     /// Returns the next memory primitive and advances the iterator.
-    pub fn next_fragment(&mut self) -> Option<AnyPrimitive<Class>> {
+    pub fn next_fragment(&mut self) -> Option<AnyFragment<Class>> {
         if self.remain == 0 {
             return None;
         }
@@ -75,8 +73,8 @@ where
 
     pub fn try_take_same<C: PrimitiveClass>(
         &mut self,
-        prim: AnyPrimitive<C>,
-    ) -> Option<AnyPrimitive<Class>> {
+        prim: AnyFragment<C>,
+    ) -> Option<AnyFragment<Class>> {
         if self.remain == 0 {
             return None;
         }
@@ -85,13 +83,13 @@ where
         let start_addr = self.base_prim.start_address();
 
         match prim {
-            AnyPrimitive::Small(_) => {
+            AnyFragment::Small(_) => {
                 let start = start.downsize_as();
                 self.remain = self.remain.saturating_sub(Small::SIZE);
                 self.base_prim = Self::next_prim(start_addr + Small::SIZE, self.remain);
-                Some(AnyPrimitive::Small(start))
+                Some(AnyFragment::Small(start))
             }
-            AnyPrimitive::Medium(_) => {
+            AnyFragment::Medium(_) => {
                 // Don't allocate a huge amount of extra memory if the remaining size could fit in a small page.
                 if self.remain <= Small::SIZE {
                     return None;
@@ -99,9 +97,9 @@ where
                 let start = start.downsize_as();
                 self.remain = self.remain.saturating_sub(Medium::SIZE);
                 self.base_prim = Self::next_prim(start_addr + Medium::SIZE, self.remain);
-                Some(AnyPrimitive::Medium(start))
+                Some(AnyFragment::Medium(start))
             }
-            AnyPrimitive::Large(_) => {
+            AnyFragment::Large(_) => {
                 // Don't allocate a huge amount of extra memory if the remaining size could fit in a small or medium page.
                 if self.remain <= Medium::SIZE {
                     return None;
@@ -109,7 +107,7 @@ where
                 let start = start.downsize_as();
                 self.remain = self.remain.saturating_sub(Large::SIZE);
                 self.base_prim = Self::next_prim(start_addr + Large::SIZE, self.remain);
-                Some(AnyPrimitive::Large(start))
+                Some(AnyFragment::Large(start))
             }
         }
     }
@@ -119,7 +117,7 @@ impl<Class> Iterator for GreedyFragmentMapper<Class>
 where
     Class: PrimitiveClass,
 {
-    type Item = AnyPrimitive<Class>;
+    type Item = AnyFragment<Class>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.next_fragment()
@@ -142,15 +140,15 @@ impl JointFragmentMapper {
 }
 
 impl Iterator for JointFragmentMapper {
-    type Item = (AnyPrimitive<PageClass>, AnyPrimitive<FrameClass>);
+    type Item = (AnyFragment<PageClass>, AnyFragment<FrameClass>);
 
     fn next(&mut self) -> Option<Self::Item> {
         let page_frag = self.page_mapper.peek_next_fragment()?;
         let frame_frag = self.frame_mapper.peek_next_fragment()?;
         match (page_frag, frame_frag) {
-            (AnyPrimitive::Small(_), AnyPrimitive::Small(_))
-            | (AnyPrimitive::Medium(_), AnyPrimitive::Medium(_))
-            | (AnyPrimitive::Large(_), AnyPrimitive::Large(_)) => {
+            (AnyFragment::Small(_), AnyFragment::Small(_))
+            | (AnyFragment::Medium(_), AnyFragment::Medium(_))
+            | (AnyFragment::Large(_), AnyFragment::Large(_)) => {
                 return Some((
                     self.page_mapper.next().unwrap(),
                     self.frame_mapper.next().unwrap(),
@@ -186,15 +184,15 @@ impl Iterator for JointFragmentMapper {
 #[cfg(test)]
 mod test {
     use crate::paging::{
-        Address, Frame, Large, Medium, Page, PhysAddr, PrimitiveSize, Small, VirtAddr,
+        Address, FragmentSize, Frame, Large, Medium, Page, PhysAddr, Small, VirtAddr,
         fragment::{GreedyFragmentMapper, JointFragmentMapper},
-        primitives::{AnyPage, AnyPrimitive, FrameClass, PageClass},
+        primitives::{AnyFragment, AnyPage, FrameClass, PageClass},
     };
 
     fn test_create_base_prim() {
-        use crate::paging::primitives::{AnyPrimitive, PrimitiveClass, Small};
+        use crate::paging::primitives::{AnyFragment, PrimitiveClass, Small};
 
-        let test = |base: u64, len: u64, expected_base: AnyPrimitive<FrameClass>| {
+        let test = |base: u64, len: u64, expected_base: AnyFragment<FrameClass>| {
             let prim = GreedyFragmentMapper::<FrameClass>::next_prim(PhysAddr::new(base), len);
             assert_eq!(prim, expected_base);
         };
@@ -202,21 +200,21 @@ mod test {
         test(
             Small::SIZE,
             Small::SIZE,
-            AnyPrimitive::Small(
+            AnyFragment::Small(
                 Frame::<Small>::from_start_address(PhysAddr::new(Small::SIZE)).unwrap(),
             ),
         );
         test(
             Medium::SIZE,
             Medium::SIZE,
-            AnyPrimitive::Medium(
+            AnyFragment::Medium(
                 Frame::<Medium>::from_start_address(PhysAddr::new(Medium::SIZE)).unwrap(),
             ),
         );
         test(
             Large::SIZE,
             Large::SIZE,
-            AnyPrimitive::Large(
+            AnyFragment::Large(
                 Frame::<Large>::from_start_address(PhysAddr::new(Large::SIZE)).unwrap(),
             ),
         );
@@ -224,21 +222,21 @@ mod test {
         test(
             Small::SIZE + 1,
             Small::SIZE,
-            AnyPrimitive::Small(
+            AnyFragment::Small(
                 Frame::<Small>::from_start_address(PhysAddr::new(Small::SIZE)).unwrap(),
             ),
         );
         test(
             Medium::SIZE + 1,
             Medium::SIZE,
-            AnyPrimitive::Medium(
+            AnyFragment::Medium(
                 Frame::<Medium>::from_start_address(PhysAddr::new(Medium::SIZE)).unwrap(),
             ),
         );
         test(
             Large::SIZE + 1,
             Large::SIZE,
-            AnyPrimitive::Large(
+            AnyFragment::Large(
                 Frame::<Large>::from_start_address(PhysAddr::new(Large::SIZE)).unwrap(),
             ),
         );
@@ -254,25 +252,25 @@ mod test {
 
         assert_eq!(
             mapper.next(),
-            Some(AnyPrimitive::Large(
+            Some(AnyFragment::Large(
                 Page::<Large>::from_start_address(VirtAddr::new(0)).unwrap()
             ))
         );
         assert_eq!(
             mapper.next(),
-            Some(AnyPrimitive::Large(
+            Some(AnyFragment::Large(
                 Page::<Large>::from_start_address(VirtAddr::new(Large::SIZE)).unwrap()
             ))
         );
         assert_eq!(
             mapper.next(),
-            Some(AnyPrimitive::Large(
+            Some(AnyFragment::Large(
                 Page::<Large>::from_start_address(VirtAddr::new(2 * Large::SIZE)).unwrap()
             ))
         );
         assert_eq!(
             mapper.next(),
-            Some(AnyPrimitive::Medium(
+            Some(AnyFragment::Medium(
                 Page::<Medium>::from_start_address(VirtAddr::new(3 * Large::SIZE)).unwrap()
             ))
         );
@@ -298,19 +296,19 @@ mod test {
 
         assert_eq!(
             mapper.next(),
-            Some(AnyPrimitive::Medium(
+            Some(AnyFragment::Medium(
                 Page::from_start_address(VirtAddr::new(0)).unwrap()
             ))
         );
 
         let mut mapper = new(0, Medium::SIZE);
 
-        let page = AnyPrimitive::Small(Page::<Small>::try_new_u64(0).unwrap());
+        let page = AnyFragment::Small(Page::<Small>::try_new_u64(0).unwrap());
         assert_eq!(mapper.try_take_same(page), Some(page));
         for i in 0..(Medium::SIZE / Small::SIZE) - 1 {
             assert_eq!(
                 mapper.next(),
-                Some(AnyPrimitive::Small(
+                Some(AnyFragment::Small(
                     Page::<Small>::try_new_u64((i + 1) * Small::SIZE).unwrap()
                 ))
             );
@@ -328,17 +326,17 @@ mod test {
         assert_eq!(
             mapper.next(),
             Some((
-                AnyPrimitive::Large(Page::<Large>::from_start_address(VirtAddr::new(0)).unwrap()),
-                AnyPrimitive::Large(Frame::<Large>::from_start_address(PhysAddr::new(0)).unwrap())
+                AnyFragment::Large(Page::<Large>::from_start_address(VirtAddr::new(0)).unwrap()),
+                AnyFragment::Large(Frame::<Large>::from_start_address(PhysAddr::new(0)).unwrap())
             ))
         );
         assert_eq!(
             mapper.next(),
             Some((
-                AnyPrimitive::Large(
+                AnyFragment::Large(
                     Page::<Large>::from_start_address(VirtAddr::new(Large::SIZE)).unwrap()
                 ),
-                AnyPrimitive::Large(
+                AnyFragment::Large(
                     Frame::<Large>::from_start_address(PhysAddr::new(Large::SIZE)).unwrap()
                 )
             ))
@@ -346,10 +344,10 @@ mod test {
         assert_eq!(
             mapper.next(),
             Some((
-                AnyPrimitive::Large(
+                AnyFragment::Large(
                     Page::<Large>::from_start_address(VirtAddr::new(2 * Large::SIZE)).unwrap()
                 ),
-                AnyPrimitive::Large(
+                AnyFragment::Large(
                     Frame::<Large>::from_start_address(PhysAddr::new(2 * Large::SIZE)).unwrap()
                 )
             ))
@@ -357,10 +355,10 @@ mod test {
         assert_eq!(
             mapper.next(),
             Some((
-                AnyPrimitive::Medium(
+                AnyFragment::Medium(
                     Page::<Medium>::from_start_address(VirtAddr::new(3 * Large::SIZE)).unwrap()
                 ),
-                AnyPrimitive::Medium(
+                AnyFragment::Medium(
                     Frame::<Medium>::from_start_address(PhysAddr::new(3 * Large::SIZE)).unwrap()
                 )
             ))
@@ -377,10 +375,10 @@ mod test {
             assert_eq!(
                 mapper.next(),
                 Some((
-                    AnyPrimitive::Small(
+                    AnyFragment::Small(
                         Page::from_start_address(VirtAddr::new(i * Small::SIZE)).unwrap()
                     ),
-                    AnyPrimitive::Small(
+                    AnyFragment::Small(
                         Frame::from_start_address(PhysAddr::new(0x2000 + (i * Small::SIZE)))
                             .unwrap()
                     )

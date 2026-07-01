@@ -1,6 +1,6 @@
 use crate::{
     MapFlags, arch,
-    paging::{Address, Frame, PhysAddr, PrimitiveSize},
+    paging::{Address, FragmentSize, Frame, PhysAddr},
 };
 
 /// A page table, accurate to the current architecture.
@@ -49,7 +49,7 @@ pub struct PageTableEntry {
 
 impl PageTableEntry {
     /// Creates a new page table entry with the given physical frame and flags.
-    pub fn new<S: PrimitiveSize>(phys: Frame<S>, flags: arch::ArchEntryFlags) -> Self {
+    pub fn new<S: FragmentSize>(phys: Frame<S>, flags: arch::ArchEntryFlags) -> Self {
         let addr = phys.start_address().as_u64();
         Self {
             value: addr | flags.bits(),

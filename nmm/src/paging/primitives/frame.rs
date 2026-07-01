@@ -5,20 +5,20 @@ use core::{any::type_name, fmt::Debug, mem::transmute};
 use crate::{
     NmmSealed, align,
     paging::{
-        Address, Large, Medium, MemoryFragment, PhysAddr, PrimitiveSize, Small,
-        primitives::{AnyPrimitive, FrameClass, Primitive},
+        Address, FragmentSize, Large, Medium, MemoryFragment, PhysAddr, Small,
+        primitives::{AnyFragment, FrameClass, Primitive},
     },
 };
 
 /// A physical memory frame on the current architecture.
 /// A frame represents a contiguous block of physical memory that can be mapped into the virtual address space with a page of the same size.
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub struct Frame<S: PrimitiveSize> {
+pub struct Frame<S: FragmentSize> {
     start_address: PhysAddr,
     _size_marker: core::marker::PhantomData<S>,
 }
 
-impl<S: PrimitiveSize> Frame<S> {
+impl<S: FragmentSize> Frame<S> {
     /// Creates a new `Frame` from the given starting physical address. The address must be aligned to the size of the frame, otherwise this function will panic.
     pub const fn new(start_address: PhysAddr) -> Self {
         Self::try_new(start_address)
@@ -57,10 +57,10 @@ impl<S: PrimitiveSize> Frame<S> {
     }
 }
 
-impl<S: PrimitiveSize> NmmSealed for Frame<S> {}
-impl<S: PrimitiveSize> Primitive for Frame<S> {}
+impl<S: FragmentSize> NmmSealed for Frame<S> {}
+impl<S: FragmentSize> Primitive for Frame<S> {}
 
-impl<S: PrimitiveSize> const MemoryFragment<S> for Frame<S> {
+impl<S: FragmentSize> const MemoryFragment<S> for Frame<S> {
     type AddressType = PhysAddr;
 
     fn from_start_address(start_address: Self::AddressType) -> Option<Self> {
@@ -77,7 +77,7 @@ impl<S: PrimitiveSize> const MemoryFragment<S> for Frame<S> {
     }
 }
 
-impl<S: PrimitiveSize> Debug for Frame<S> {
+impl<S: FragmentSize> Debug for Frame<S> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(
             f,
@@ -88,13 +88,13 @@ impl<S: PrimitiveSize> Debug for Frame<S> {
     }
 }
 
-impl<S: PrimitiveSize> From<Frame<S>> for AnyPrimitive<FrameClass> {
+impl<S: FragmentSize> From<Frame<S>> for AnyFragment<FrameClass> {
     fn from(frame: Frame<S>) -> Self {
         // SAFETY: We know that Fragment<Small> == Frame<Small> and so on, so we can safely transmute between them.
         match S::SIZE {
-            Small::SIZE => AnyPrimitive::Small(unsafe { transmute(frame) }),
-            Medium::SIZE => AnyPrimitive::Medium(unsafe { transmute(frame) }),
-            Large::SIZE => AnyPrimitive::Large(unsafe { transmute(frame) }),
+            Small::SIZE => AnyFragment::Small(unsafe { transmute(frame) }),
+            Medium::SIZE => AnyFragment::Medium(unsafe { transmute(frame) }),
+            Large::SIZE => AnyFragment::Large(unsafe { transmute(frame) }),
             _ => unreachable!("Invalid frame size"),
         }
     }

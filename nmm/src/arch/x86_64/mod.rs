@@ -16,7 +16,7 @@ use crate::{
     MapFlags, MemError,
     arch::x86_64::conv::XFrameAllocator,
     paging::{
-        Address, Frame, Page, PrimitiveRangeManager, PrimitiveSize, Small, VirtAddr,
+        Address, FragmentManager, FragmentSize, Frame, Page, Small, VirtAddr,
         map::{Flush, MemoryMapper},
     },
 };
@@ -105,8 +105,8 @@ pub(crate) fn map_primitive<S, A>(
     frame_allocator: &mut A,
 ) -> Result<Flush, MemError>
 where
-    S: PrimitiveSize,
-    A: PrimitiveRangeManager<Frame<Small>, Small>,
+    S: FragmentSize,
+    A: FragmentManager<Frame<Small>, Small>,
     Mapper: MemoryMapper<S>,
 {
     let mut mapper_guard = mapper_mut();
@@ -119,7 +119,7 @@ where
 
 pub(crate) unsafe fn unmap_primitive<S>(dst: Page<S>) -> Result<(Frame<S>, Flush), MemError>
 where
-    S: PrimitiveSize,
+    S: FragmentSize,
     Mapper: MemoryMapper<S>,
 {
     let mut mapper_guard = mapper_mut();

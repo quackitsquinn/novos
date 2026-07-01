@@ -6,7 +6,7 @@ use crate::{
     MapFlags, MemError,
     arch::x86_64::{PageTableFlags, XFrameAllocator},
     paging::{
-        Frame, Large, Medium, Page, PageTable, PrimitiveRangeManager, Small, VirtAddr,
+        FragmentManager, Frame, Large, Medium, Page, PageTable, Small, VirtAddr,
         map::{Flush, MemoryMapper},
     },
 };
@@ -64,7 +64,7 @@ impl MemoryMapper<Small> for OffsetPageTable<'_> {
         allocator: &mut A,
     ) -> Result<Flush, MemError>
     where
-        A: PrimitiveRangeManager<Frame<Small>, Small>,
+        A: FragmentManager<Frame<Small>, Small>,
     {
         let mut x_fa = XFrameAllocator::new(allocator);
         let flags: PageTableFlags = flags.into();
@@ -101,7 +101,7 @@ macro_rules! impl_memory_mapper_huge {
                 allocator: &mut A,
             ) -> Result<Flush, MemError>
             where
-                A: PrimitiveRangeManager<Frame<Small>, Small>,
+                A: FragmentManager<Frame<Small>, Small>,
             {
                 let mut x_fa = XFrameAllocator::new(allocator);
                 let mut flags: PageTableFlags = flags.into();
