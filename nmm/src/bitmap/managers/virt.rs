@@ -9,11 +9,11 @@ use crate::{
 
 /// A memory manager for virtual addresses, which internally is based on a bitmap to track allocated and free virtual address space.
 #[derive(Debug)]
-pub struct VirtualAddressManager<'a> {
+pub struct VirtualMemoryManager<'a> {
     bitmap: Bitmap<'a>,
 }
 
-impl<'a> VirtualAddressManager<'a> {
+impl<'a> VirtualMemoryManager<'a> {
     const BIT_SIZE: u64 = arch::L1_PAGE_SIZE;
 
     /// Initializes the `VirtualAddressManager` with the given bitmap data and base address. The bitmap data is a mutable slice of `u64` values that will be used to track allocated and free virtual address space, and the base address is the starting virtual address that the bitmap will manage.
@@ -133,7 +133,7 @@ mod tests {
     fn test_bytes_to_bits() {
         fn test(bytes: u64, expected_bits: u64) {
             assert_eq!(
-                VirtualAddressManager::bytes_to_bits(bytes),
+                VirtualMemoryManager::bytes_to_bits(bytes),
                 expected_bits,
                 "bytes_to_bits({}) should be {}",
                 bytes,
@@ -154,7 +154,7 @@ mod tests {
             let expected_bit_align = Alignment::new(expected_bit_align as usize)
                 .expect("given expected_bit_align must be a power of two");
             assert_eq!(
-                VirtualAddressManager::align_to_bit_align(align),
+                VirtualMemoryManager::align_to_bit_align(align),
                 expected_bit_align,
                 "align_to_bit_align({:?}) should be {:?}",
                 align,
@@ -173,7 +173,7 @@ mod tests {
         fn test(base: u64, bit_offset: u64, expected_addr: u64) {
             let bitptr = BitPtr::new_wrapping(0, bit_offset);
             assert_eq!(
-                VirtualAddressManager::bitptr_to_virtaddr(base, bitptr).as_u64(),
+                VirtualMemoryManager::bitptr_to_virtaddr(base, bitptr).as_u64(),
                 expected_addr,
                 "bitptr_to_virtaddr({}, {:?}) should be {}",
                 base,
@@ -196,7 +196,7 @@ mod tests {
             let addr = VirtAddr::new(addr);
             let expected_bitptr = expected_bit_offset.map(|offset| BitPtr::new_wrapping(0, offset));
             assert_eq!(
-                VirtualAddressManager::virtaddr_to_bitptr(base, addr),
+                VirtualMemoryManager::virtaddr_to_bitptr(base, addr),
                 expected_bitptr,
                 "virtaddr_to_bitptr({}, {:?}) should be {:?}",
                 base,
@@ -219,9 +219,9 @@ mod tests {
         let base = VirtAddr::new(0x10000000);
         let base_u64 = base.as_u64();
         let mut manager =
-            unsafe { VirtualAddressManager::init(&mut bitmap_data, base, 0x1000 * (64 * CAP)) };
+            unsafe { VirtualMemoryManager::init(&mut bitmap_data, base, 0x1000 * (64 * CAP)) };
 
-        let test = |manager: &mut VirtualAddressManager,
+        let test = |manager: &mut VirtualMemoryManager,
                     size_bytes: u64,
                     align: u64,
                     deallocate: bool|
@@ -233,8 +233,8 @@ mod tests {
                 0,
                 "allocated address should be properly aligned"
             );
-            let bits = VirtualAddressManager::bytes_to_bits(size_bytes);
-            let bitptr = VirtualAddressManager::virtaddr_to_bitptr(manager.bitmap.base_addr, addr)
+            let bits = VirtualMemoryManager::bytes_to_bits(size_bytes);
+            let bitptr = VirtualMemoryManager::virtaddr_to_bitptr(manager.bitmap.base_addr, addr)
                 .expect("allocated address must be within the managed virtual address space and properly aligned");
             assert!(
                 manager.bitmap.all_are_set(bitptr, bits),
@@ -251,10 +251,10 @@ mod tests {
 
         // This also covers a previous deallocation bug where a bit gets falsely cleared when deallocating another independent allocation.
         let checked_dealloc =
-            |manager: &mut VirtualAddressManager, addr: VirtAddr, layout: Layout| {
+            |manager: &mut VirtualMemoryManager, addr: VirtAddr, layout: Layout| {
                 assert!(
                     manager.bitmap.all_are_set(
-                        VirtualAddressManager::virtaddr_to_bitptr(manager.bitmap.base_addr, addr)
+                        VirtualMemoryManager::virtaddr_to_bitptr(manager.bitmap.base_addr, addr)
                             .unwrap(),
                         1
                     ),

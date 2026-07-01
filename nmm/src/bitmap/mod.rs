@@ -8,7 +8,7 @@ mod allocate;
 mod bitptr;
 mod managers;
 pub use bitptr::BitPtr;
-pub use managers::virt::VirtualAddressManager;
+pub use managers::virt::VirtualMemoryManager;
 
 use crate::test_println;
 

@@ -1,7 +1,7 @@
 use core::fmt::Alignment;
 
 use crate::{
-    bitmap::{Bitmap, VirtualAddressManager},
+    bitmap::{Bitmap, VirtualMemoryManager},
     entry_walker::EntryWalker,
 };
 
@@ -10,7 +10,7 @@ pub struct PhysicalMemoryManager {
 }
 
 impl PhysicalMemoryManager {
-    pub unsafe fn init(_entry_walker: &mut EntryWalker, _vmm: &mut VirtualAddressManager) -> Self {
+    pub unsafe fn init(_entry_walker: &mut EntryWalker, _vmm: &mut VirtualMemoryManager) -> Self {
         todo!(
             "pending some sort of page based allocation primitives, not entirely sure how it would work."
         )
