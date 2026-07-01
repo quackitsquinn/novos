@@ -20,7 +20,7 @@ impl_ops!(blanket PhysAddr);
 
 impl Primitive for PhysAddr {}
 
-impl const Address for PhysAddr {
+const impl Address for PhysAddr {
     fn try_new(val: u64) -> Option<Self> {
         if arch::is_valid_phys(val) {
             Some(PhysAddr(val))

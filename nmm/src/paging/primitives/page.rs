@@ -17,7 +17,7 @@ pub struct Page<S: FragmentSize> {
 impl<S: FragmentSize> crate::NmmSealed for Page<S> {}
 impl<S: FragmentSize> Primitive for Page<S> {}
 
-impl<S: FragmentSize> const crate::paging::MemoryFragment<S> for Page<S> {
+const impl<S: FragmentSize> crate::paging::MemoryFragment<S> for Page<S> {
     type AddressType = VirtAddr;
 
     fn start_address(&self) -> VirtAddr {

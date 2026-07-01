@@ -25,7 +25,7 @@ impl VirtAddr {
 
 impl Primitive for VirtAddr {}
 
-impl const Address for VirtAddr {
+const impl Address for VirtAddr {
     fn try_new(val: u64) -> Option<Self> {
         if arch::is_valid_virt(val) {
             Some(VirtAddr(val))

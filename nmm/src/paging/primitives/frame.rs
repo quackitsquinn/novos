@@ -60,7 +60,7 @@ impl<S: FragmentSize> Frame<S> {
 impl<S: FragmentSize> NmmSealed for Frame<S> {}
 impl<S: FragmentSize> Primitive for Frame<S> {}
 
-impl<S: FragmentSize> const MemoryFragment<S> for Frame<S> {
+const impl<S: FragmentSize> MemoryFragment<S> for Frame<S> {
     type AddressType = PhysAddr;
 
     fn from_start_address(start_address: Self::AddressType) -> Option<Self> {
