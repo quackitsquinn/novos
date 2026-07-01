@@ -16,7 +16,7 @@ use crate::{
     MapFlags, MemError,
     arch::{Mapper, PageEntryType},
     paging::{
-        fragment::GreedyFragmentMapper,
+        fragment::{GreedyFragmentMapper, JointFragmentMapper},
         map::{Flush, MemoryMapper},
         primitives::{AnyPrimitive, PageClass},
     },
@@ -215,6 +215,36 @@ where
                     .ok_or(MemError::OutOfMemory)?;
                 map_primitive(frame, prim, flags, frame_allocator)?.flush();
             }
+        }
+    }
+
+    Ok(())
+}
+
+pub(crate) unsafe fn map_raw<F>(
+    virt_base: VirtAddr,
+    phys_base: PhysAddr,
+    byte_size: usize,
+    flags: MapFlags,
+    frame_alloc: &mut F,
+) -> Result<(), MemError>
+where
+    F: PrimitiveRangeManager<Frame<Small>, Small>,
+{
+    let mapper = JointFragmentMapper::new(virt_base, phys_base, byte_size as u64);
+
+    for pair in mapper {
+        match pair {
+            (AnyPrimitive::Small(page_prim), AnyPrimitive::Small(phys_prim)) => {
+                map_primitive(phys_prim, page_prim, flags, frame_alloc)?.flush();
+            }
+            (AnyPrimitive::Medium(page_prim), AnyPrimitive::Medium(phys_prim)) => {
+                map_primitive(phys_prim, page_prim, flags, frame_alloc)?.flush();
+            }
+            (AnyPrimitive::Large(page_prim), AnyPrimitive::Large(phys_prim)) => {
+                map_primitive(phys_prim, page_prim, flags, frame_alloc)?.flush();
+            }
+            _ => unreachable!("non-matched fragments produced by mapper"),
         }
     }
 

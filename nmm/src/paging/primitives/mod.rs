@@ -204,7 +204,7 @@ where
     }
 
     pub fn unwrap_as<S: PrimitiveSize>(self) -> C::Fragment<S> {
-        // SAFETY: C::Fragment<S> is the same type as C::Fragment
+        // SAFETY: C::Fragment<S> is the same type as C::Fragment<_>
         match self {
             AnyPrimitive::Small(p) if S::SIZE == Small::SIZE => {
                 return unsafe { transmute_copy(&p) };
