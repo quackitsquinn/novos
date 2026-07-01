@@ -17,11 +17,10 @@ use cake::limine::memory_map;
 pub use pastey as _pastey;
 
 use crate::{
-    //bitmap::GLOBAL_BITMAP,
     entry_walker::EntryWalker,
     paging::{
         Address, PageTable, PhysAddr, VirtAddr,
-        primitives::{AnyFragment, PageClass},
+        primitives::{AnyFragment, MemoryRange, PageClass},
     },
 };
 
@@ -33,47 +32,6 @@ pub mod bitmap;
 pub mod entry_walker;
 pub mod kernel_map;
 pub mod paging;
-
-/// A range of virtual memory, guaranteed to be valid for the architecture (e.g., canonical for x86_64) and properly aligned to page boundaries. This is used for managing virtual address space and ensuring that allocated virtual addresses are valid and usable for mapping physical memory.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[deprecated]
-pub struct VirtualMemoryRange {
-    pub(crate) base: VirtAddr,
-    pub(crate) size: usize,
-}
-
-impl VirtualMemoryRange {
-    /// Creates a new `VirtualMemoryRange` with the given base address and size, validating that the range is valid for the architecture.
-    /// This includes checks for overflow, alignment, and canonical form (if applicable).
-    pub const fn new(base: VirtAddr, size: usize) -> Self {
-        match check_range_virt(base, size) {
-            Ok(()) => (),
-            Err(e) => match e {
-                MemError::InvalidVirtRange { reason, .. } => match reason {
-                    InvalidVirtRangeReason::Overflow => panic!("Virtual memory range overflow"),
-                    InvalidVirtRangeReason::NonCanonical => {
-                        panic!("Virtual memory range is not canonical")
-                    }
-                    InvalidVirtRangeReason::Unaligned => {
-                        panic!("Virtual memory range is not aligned to page size:")
-                    }
-                },
-                _ => unreachable!(), // check_range_virt can only return InvalidVirtRange errors
-            },
-        }
-        Self { base, size }
-    }
-
-    /// Returns the base virtual address of the range.
-    pub fn base(&self) -> VirtAddr {
-        self.base
-    }
-
-    /// Returns the size of the virtual memory range in bytes.
-    pub fn size(&self) -> usize {
-        self.size
-    }
-}
 
 /// Initializes the memory manager.
 ///
@@ -91,7 +49,7 @@ pub unsafe fn init(
     root: &'static mut PageTable,
     offset: VirtAddr,
     ranges: &'static [&'static memory_map::Entry],
-    managed_range: VirtualMemoryRange,
+    managed_range: MemoryRange<VirtAddr>,
 ) -> Result<(), MemError> {
     unsafe { arch::init_unchecked(root, offset, EntryWalker::new(ranges), managed_range) }
 }
@@ -109,7 +67,7 @@ pub unsafe fn load_recursive(
 ) -> Result<(), MemError> {
     if (phys_addr.as_u64() & arch::L1_PAGE_SIZE as u64 - 1) != 0 {
         return Err(MemError::InvalidVirtRange {
-            reason: InvalidVirtRangeReason::Unaligned,
+            reason: InvalidRangeReason::Unaligned,
             begin: VirtAddr::new(phys_addr.as_u64()),
             size: arch::L1_PAGE_SIZE as u64,
         });
@@ -201,12 +159,12 @@ pub fn map_phys(
 /// The reason why a virtual address range was rejected as invalid.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum InvalidVirtRangeReason {
-    /// The virtual address range would overflow when calculating the end address (i.e., `virt_base + byte_size` would overflow).
+pub enum InvalidRangeReason {
+    /// The address range would overflow when calculating the end address (i.e., `virt_base + byte_size` would overflow).
     Overflow,
-    /// The virtual address range is not canonical for the architecture (e.g., on x86_64, the upper bits beyond the architecture's virtual address width are not all 0s or all 1s).
+    /// The address range is not canonical for the architecture (e.g., on x86_64, the upper bits beyond the architecture's address width are not all 0s or all 1s).
     NonCanonical,
-    /// The virtual address range is not aligned to the required page size (i.e., `virt_base` is not a multiple of the page size, or `byte_size` is not a multiple of the page size).
+    /// The address range is not aligned to the required page size (i.e., `virt_base` is not a multiple of the page size, or `byte_size` is not a multiple of the page size).
     Unaligned,
 }
 
@@ -227,7 +185,7 @@ pub enum MemError {
     #[error("The provided virtual address range is invalid: {begin:?} with size {size} bytes")]
     InvalidVirtRange {
         /// The specific reason why the virtual address range is considered invalid (e.g., overflow, unaligned, etc.).
-        reason: InvalidVirtRangeReason,
+        reason: InvalidRangeReason,
         /// The starting virtual address of the invalid range.
         begin: VirtAddr,
         /// The size of the invalid range in bytes.
@@ -236,6 +194,8 @@ pub enum MemError {
     /// The provided physical address range is invalid, such as being out of bounds for the architecture or overflowing when calculating the end address.
     #[error("The provided physical address range is invalid: {begin:?} with size {size} bytes")]
     InvalidPhysRange {
+        /// The specific reason why the physical address range is considered invalid (e.g., overflow, unaligned, etc.).
+        reason: InvalidRangeReason,
         /// The starting physical address of the invalid range.
         begin: PhysAddr,
         /// The size of the invalid range in bytes.
@@ -278,34 +238,31 @@ const fn check_range_virt(virt_base: VirtAddr, byte_size: usize) -> Result<(), M
         Some(_) => (),
         None => {
             return Err(MemError::InvalidVirtRange {
-                reason: InvalidVirtRangeReason::Overflow,
+                reason: InvalidRangeReason::Overflow,
                 begin: virt_base,
                 size: byte_size as u64,
             });
         }
     };
 
-    // Check page alignment, since `virt_base` is a VirtAddr, it's defined to be canonical.
-    if (virt_base.as_u64() % arch::L1_PAGE_SIZE as u64) != 0 {
-        return Err(MemError::InvalidVirtRange {
-            reason: InvalidVirtRangeReason::Unaligned,
-            begin: virt_base,
-            size: byte_size as u64,
-        });
-    }
-
     Ok(())
 }
 
 fn check_range_phys(phys_base: PhysAddr, byte_size: usize) -> Result<(), MemError> {
     // Check for overflow in the address range
-    phys_base
-        .checked_add(byte_size as u64)
-        .ok_or(MemError::InvalidPhysRange {
-            begin: phys_base,
-            size: byte_size as u64,
-        })
-        .map(|_| ())
+    let val = phys_base.checked_add(byte_size as u64);
+    match val {
+        Some(_) => (),
+        None => {
+            return Err(MemError::InvalidPhysRange {
+                reason: InvalidRangeReason::Overflow,
+                begin: phys_base,
+                size: byte_size as u64,
+            });
+        }
+    };
+
+    Ok(())
 }
 
 bitflags! {

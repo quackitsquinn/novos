@@ -1,7 +1,7 @@
 use cake::log::{debug, info};
 
 use crate::{
-    MapFlags, MemError, VirtualMemoryRange, align,
+    MapFlags, MemError, align,
     arch::{
         self, L1_PAGE_SIZE,
         x86_64::{mapper::Mapper, set_mapper},
@@ -10,7 +10,7 @@ use crate::{
     entry_walker::EntryWalker,
     paging::{
         Address, AddressExt, FragmentSize, Medium, MemoryFragment, Page, PageTable, PageTableIndex,
-        PhysAddr, VirtAddr, map_from, map_primitive,
+        PhysAddr, VirtAddr, map_from, map_primitive, primitives::MemoryRange,
     },
 };
 
@@ -18,11 +18,11 @@ pub(crate) unsafe fn init_unchecked(
     root: &'static mut PageTable,
     offset: VirtAddr,
     mut walker: EntryWalker<'static>,
-    scratch_range: VirtualMemoryRange,
+    scratch_range: MemoryRange<VirtAddr>,
 ) -> Result<(), MemError> {
-    if scratch_range.size < arch::L1_PAGE_SIZE as usize * 16 {
+    if scratch_range.size() < arch::L1_PAGE_SIZE * 16 {
         return Err(MemError::ScratchSpaceTooSmall {
-            provided: scratch_range.size as u64,
+            provided: scratch_range.size() as u64,
             required: arch::L1_PAGE_SIZE as u64 * 16,
         });
     }
@@ -33,25 +33,33 @@ pub(crate) unsafe fn init_unchecked(
     unsafe { set_mapper(mapper) };
 
     // Always make sure the number of bytes will be aligned to u64
-    let n_pages = (scratch_range.size as u64).div_ceil(L1_PAGE_SIZE);
+    let n_pages = (scratch_range.size() as u64).div_ceil(L1_PAGE_SIZE);
     let n_bytes = align!(up, n_pages / 8, core::mem::size_of::<u64>() as u64);
     let n_entries = n_bytes / core::mem::size_of::<u64>() as u64;
 
     info!(
         "Mapping scratch space: base={:#x}, size={} bytes, pages={}, entries={}",
-        scratch_range.base.as_u64(),
+        scratch_range.start().as_u64(),
         n_bytes,
         n_pages,
         n_entries
     );
     unsafe {
-        map_from(scratch_range.base, n_bytes, MapFlags::WRITABLE, &mut walker)?;
+        map_from(
+            scratch_range.start(),
+            n_bytes,
+            MapFlags::WRITABLE,
+            &mut walker,
+        )?;
     }
 
     let entries = unsafe {
-        core::slice::from_raw_parts_mut(scratch_range.base.as_mut_ptr::<u64>(), n_entries as usize)
+        core::slice::from_raw_parts_mut(
+            scratch_range.start().as_mut_ptr::<u64>(),
+            n_entries as usize,
+        )
     };
-    let mut bitmap = Bitmap::init(entries, n_pages, scratch_range.base.as_u64());
+    let mut bitmap = Bitmap::init(entries, n_pages, scratch_range.start().as_u64());
 
     // Now that we have the scratch space mapped and the bitmap initialized, we can mark the pages we just mapped as allocated in the bitmap,
     // since they are now in use by the memory manager.
