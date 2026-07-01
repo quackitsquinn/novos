@@ -5,6 +5,8 @@
 #![feature(const_trait_impl)]
 #![feature(const_ops)]
 #![feature(const_destruct)]
+#![feature(const_cmp)]
+#![feature(derive_const)]
 
 use core::mem::Alignment;
 
@@ -34,6 +36,7 @@ pub mod paging;
 
 /// A range of virtual memory, guaranteed to be valid for the architecture (e.g., canonical for x86_64) and properly aligned to page boundaries. This is used for managing virtual address space and ensuring that allocated virtual addresses are valid and usable for mapping physical memory.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[deprecated]
 pub struct VirtualMemoryRange {
     pub(crate) base: VirtAddr,
     pub(crate) size: usize,

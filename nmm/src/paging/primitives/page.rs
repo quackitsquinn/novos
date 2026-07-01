@@ -8,7 +8,7 @@ use core::fmt::Debug;
 use core::mem::transmute;
 
 /// A page on the current architecture.
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Page<S: FragmentSize> {
     start_address: VirtAddr,
     _size_marker: core::marker::PhantomData<S>,

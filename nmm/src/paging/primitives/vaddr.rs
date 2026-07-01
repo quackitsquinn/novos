@@ -11,7 +11,8 @@ use crate::{
 use core::ops;
 
 /// Virtual address type for the current architecture.
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+#[derive(Clone, Copy, Hash, Debug)]
+#[derive_const(PartialEq, Eq, PartialOrd, Ord)]
 pub struct VirtAddr(u64);
 
 seal!(VirtAddr);

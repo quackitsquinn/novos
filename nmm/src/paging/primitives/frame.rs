@@ -12,7 +12,7 @@ use crate::{
 
 /// A physical memory frame on the current architecture.
 /// A frame represents a contiguous block of physical memory that can be mapped into the virtual address space with a page of the same size.
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Frame<S: FragmentSize> {
     start_address: PhysAddr,
     _size_marker: core::marker::PhantomData<S>,

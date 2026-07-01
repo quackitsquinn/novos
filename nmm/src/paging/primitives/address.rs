@@ -15,19 +15,23 @@ const trait AddressMath:
     + [const] ops::Sub<Self>
     + [const] ops::AddAssign<Self>
     + [const] ops::SubAssign<Self>
+    + [const] Ord
+    + [const] PartialOrd
 {
 }
 
-impl<T> AddressMath for T where
+const impl<T> AddressMath for T where
     T: Sized
-        + ops::Add<u64, Output = Self>
-        + ops::Sub<u64, Output = Self>
-        + ops::AddAssign<u64>
-        + ops::SubAssign<u64>
-        + ops::Add<Self>
-        + ops::Sub<Self>
-        + ops::AddAssign<Self>
-        + ops::SubAssign<Self>
+        + [const] ops::Add<u64, Output = Self>
+        + [const] ops::Sub<u64, Output = Self>
+        + [const] ops::AddAssign<u64>
+        + [const] ops::SubAssign<u64>
+        + [const] ops::Add<Self>
+        + [const] ops::Sub<Self>
+        + [const] ops::AddAssign<Self>
+        + [const] ops::SubAssign<Self>
+        + [const] Ord
+        + [const] PartialOrd
 {
 }
 
@@ -35,7 +39,7 @@ impl<T> AddressMath for T where
 ///
 /// This is used for generic functions that can work with either virtual or physical addresses.
 #[allow(private_bounds)]
-pub const trait Address: Primitive + Ord + PartialOrd + AddressMath {
+pub const trait Address: Primitive + [const] AddressMath {
     /// Tries to create a new address from the given value.
     /// The value must be valid for the current architecture's address, otherwise this function will return `None`.
     fn try_new(val: u64) -> Option<Self>;

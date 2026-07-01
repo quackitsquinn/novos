@@ -21,14 +21,14 @@ encapsulate_macro!(
     _impl_op_mod,
     macro_rules! impl_ops {
     (single $op: tt, $op_trait: ident, $op_fn_name: ident, $newtype: ident ) => {
-        impl ops::$op_trait<u64> for $newtype {
+        const impl ops::$op_trait<u64> for $newtype {
             type Output = Self;
             fn $op_fn_name(self, rhs: u64) -> Self {
                 Self(self.0.$op_fn_name(rhs))
             }
         }
 
-        impl ops::$op_trait<Self> for $newtype {
+        const impl ops::$op_trait<Self> for $newtype {
             type Output = Self;
             fn $op_fn_name(self, rhs: Self) -> Self {
                 Self(self.0.$op_fn_name(rhs.0))
@@ -37,13 +37,13 @@ encapsulate_macro!(
     };
 
     (assign $op: tt, $op_trait: ident, $op_fn_name: ident, $newtype: ident) => {
-        impl ops::$op_trait<u64> for $newtype {
+        const impl ops::$op_trait<u64> for $newtype {
             fn $op_fn_name(&mut self, rhs: u64) {
                 self.0.$op_fn_name(rhs);
             }
         }
 
-        impl ops::$op_trait<Self> for $newtype {
+        const impl ops::$op_trait<Self> for $newtype {
             fn $op_fn_name(&mut self, rhs: Self) {
                 self.0.$op_fn_name(rhs.0);
             }
@@ -231,3 +231,69 @@ where
 pub type AnyPage = AnyFragment<PageClass>;
 /// Type alias for a memory primitive of unknown size that is specifically a frame.
 pub type AnyFrame = AnyFragment<FrameClass>;
+
+/// A range of memory.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct MemoryRange<A>
+where
+    A: Address,
+{
+    start: A,
+    end: A,
+}
+
+impl<A> MemoryRange<A>
+where
+    A: const Address,
+{
+    /// Creates a new MemoryRange from the given start and end addresses.
+    pub const fn new(start: A, end: A) -> Self {
+        Self::try_new(start, end).expect("MemoryRange::new: `start` is greater than `end`")
+    }
+
+    /// Attempts to create a new MemoryRange from the given start and end addresses.
+    /// Returns `None` if the start address is greater than the end address
+    pub const fn try_new(start: A, end: A) -> Option<Self> {
+        if start < end {
+            Some(Self { start, end })
+        } else {
+            None
+        }
+    }
+
+    /// Creates a new MemoryRange from the given start address and length in bytes.
+    /// Returns `None` if the resulting end address would overflow.
+    pub const fn try_new_len(start: A, length: u64) -> Option<Self> {
+        let end = A::try_new(start.as_u64() + length);
+        match end {
+            Some(end) => Self::try_new(start, end),
+            None => None,
+        }
+    }
+
+    /// Creates a new MemoryRange from the given start address and length in bytes.
+    /// Panics if the resulting end address would overflow.
+    pub const fn new_len(start: A, length: u64) -> Self {
+        Self::try_new_len(start, length).expect("MemoryRange::new_len: `start + length` overflowed")
+    }
+
+    /// Returns the starting address of this memory range.
+    pub const fn start(&self) -> A {
+        self.start
+    }
+
+    /// Returns the ending address of this memory range.
+    pub const fn end(&self) -> A {
+        self.end
+    }
+
+    /// Returns the starting address of this memory range.
+    pub const fn size(&self) -> u64 {
+        self.end.as_u64() - self.start.as_u64()
+    }
+}
+
+/// A range of physical memory.
+pub type PhysRange = MemoryRange<PhysAddr>;
+/// A range of virtual memory.
+pub type VirtRange = MemoryRange<VirtAddr>;
