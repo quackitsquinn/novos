@@ -3,11 +3,14 @@ use core::{
     mem::{Alignment, MaybeUninit},
 };
 
-use cake::limine::memory_map::EntryType;
+use cake::{limine::memory_map::EntryType, log::info};
 
 use crate::{
     MapFlags, MemError, align,
-    bitmap::{Bitmap, VirtualMemoryManager},
+    bitmap::{
+        Bitmap, VirtualMemoryManager,
+        managers::{align_in_bits, alignment_of, entries_for_bytes},
+    },
     entry_walker::EntryWalker,
     paging::{
         Address, AddressExt, FragmentSize, PhysAddr, Small, VirtAddr, map_from,
@@ -58,9 +61,21 @@ impl PhysicalMemoryManager {
             )?);
         }
 
-        Ok(Self {
-            bitmaps: unsafe { core::mem::transmute(bitmaps) },
-        })
+        let bitmaps = unsafe { core::mem::transmute::<_, &mut [BitmapEntry]>(bitmaps) };
+
+        bitmaps.sort_unstable_by_key(|e| e.free);
+
+        for bitmap in bitmaps.iter() {
+            info!(
+                "Initialized bitmap for range: start={:#x}, size={} bytes, alignment={:x?}, free frames={}",
+                bitmap.start.as_u64(),
+                bitmap.size(),
+                bitmap.byte_alignment(),
+                bitmap.free
+            );
+        }
+
+        Ok(Self { bitmaps })
     }
 
     fn allocate_bitmap(
@@ -68,12 +83,8 @@ impl PhysicalMemoryManager {
         walker: &mut EntryWalker,
         vmm: &mut VirtualMemoryManager,
     ) -> Result<BitmapEntry, crate::MemError> {
-        let needed_bytes = align!(
-            up,
-            Self::bytes_for_size(range.size()),
-            core::mem::size_of::<u64>() as u64
-        );
-        let needed_entries = needed_bytes.div_ceil(core::mem::size_of::<u64>() as u64);
+        let needed_entries = entries_for_bytes(range.size());
+        let needed_bytes = needed_entries * core::mem::size_of::<u64>() as u64;
         let virtual_start = vmm
             .allocate(Layout::from_size_align(needed_bytes as usize, 8).unwrap())
             .ok_or(MemError::OutOfMemory)?;
@@ -87,86 +98,42 @@ impl PhysicalMemoryManager {
         };
 
         Ok(BitmapEntry {
-            bitmap: Bitmap::init(
-                bitmap_slice,
-                range.size() / Small::SIZE,
-                range.start().as_u64(),
-            ),
-            alignment: Self::alignment_for(range.start()),
+            start: range.start(),
+            bitmap: Bitmap::init(bitmap_slice, range.size() / Small::SIZE),
+            bit_alignment: align_in_bits(alignment_of(range.start())),
             free: range.size() / Small::SIZE,
         })
-    }
-
-    const fn bits_for_size(size_bytes: u64) -> u64 {
-        size_bytes.div_ceil(Small::SIZE)
-    }
-
-    const fn bytes_for_size(size_bytes: u64) -> u64 {
-        let bits = Self::bits_for_size(size_bytes);
-        bits.div_ceil(8)
-    }
-
-    const fn alignment_for(addr: impl const Address) -> Alignment {
-        let addr = addr.as_u64();
-        if addr == 0 {
-            return Alignment::new(1).unwrap();
-        }
-
-        Alignment::new(1 << (addr.trailing_zeros())).unwrap()
     }
 }
 
 struct BitmapEntry {
-    // contains the base address of the range
+    // the bitmap that tracks the allocation of frames in this range
     bitmap: Bitmap<'static>,
+    // the start of this entry
+    start: PhysAddr,
     /// the max alignment that this bitmap can guarantee for it's allocations.
     ///
     /// there will be a way to configure how many entries in the manager that are aligned to higher alignments,
     /// which removes any alignment logic from the bitmap itself. ideally there will be ranges that do map well to higher alignments, but
     /// we can just align up to the next alignment boundary, which yes, does waste some memory, but it is simpler and removes the weird alignment logic that a unaligned
     /// bitmap would require.
-    alignment: Alignment,
+    bit_alignment: Alignment,
     /// the total number of free frames in this bitmap. used to skip bitmaps that are full.
     free: u64,
+}
+
+impl BitmapEntry {
+    fn size(&self) -> u64 {
+        self.bitmap.n_bits() * Small::SIZE
+    }
+
+    fn byte_alignment(&self) -> Alignment {
+        Alignment::new(self.bit_alignment.as_usize() * Small::SIZE as usize).unwrap()
+    }
 }
 
 #[cfg(test)]
 mod tests {
 
     use super::*;
-
-    #[test]
-    fn test_bits_for_size() {
-        assert_eq!(PhysicalMemoryManager::bits_for_size(4096), 1);
-        assert_eq!(PhysicalMemoryManager::bits_for_size(8192), 2);
-        assert_eq!(PhysicalMemoryManager::bits_for_size(4095), 1);
-        assert_eq!(PhysicalMemoryManager::bits_for_size(4097), 2);
-        assert_eq!(PhysicalMemoryManager::bits_for_size(0), 0);
-    }
-
-    #[test]
-    fn test_bytes_for_size() {
-        assert_eq!(PhysicalMemoryManager::bytes_for_size(4096), 1);
-        assert_eq!(PhysicalMemoryManager::bytes_for_size(8192), 1);
-        assert_eq!(PhysicalMemoryManager::bytes_for_size(4095), 1);
-        assert_eq!(PhysicalMemoryManager::bytes_for_size(4097), 1);
-        assert_eq!(PhysicalMemoryManager::bytes_for_size(0), 0);
-    }
-
-    #[test]
-    fn test_alignment_for() {
-        #[rustfmt::skip]
-        let cases = [(0, 1), (1,  1), (2,  2), (3,  1), (4,  4), (5,  1), (6,  2), (7,   1), (8,  8),
-                                       (9, 1), (10, 2), (11, 1), (12, 4), (13, 1), (14, 2), (15, 1), (16, 16), (17, 1)];
-        for (addr, expected) in cases {
-            let addr = VirtAddr::new(addr);
-            let alignment = PhysicalMemoryManager::alignment_for(addr);
-            assert_eq!(
-                alignment,
-                Alignment::new(expected).unwrap(),
-                "for address {:#x}",
-                addr.as_u64()
-            );
-        }
-    }
 }

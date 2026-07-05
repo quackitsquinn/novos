@@ -59,8 +59,14 @@ pub(crate) unsafe fn init_unchecked(
             n_entries as usize,
         )
     };
+
+    info!("Initializing virtual memory manager with scratch space");
     let mut vmm = unsafe { VirtualMemoryManager::init(entries, scratch_range) };
+    unsafe { vmm.mark_allocated(scratch_range.start(), n_bytes) }
+
+    info!("Initializing physical memory manager with scratch space");
     let mut pmm = unsafe { PhysicalMemoryManager::init(&mut walker, &mut vmm)? };
+    info!("Physical memory manager initialized successfully");
     panic!("woah!");
     Ok(())
 }

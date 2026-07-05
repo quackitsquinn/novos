@@ -121,8 +121,10 @@ where
     D: FullManager<FrameClass>,
 {
     trace!(
-        "Mapping from base address {:?} with length {:?} and flags {:?}",
-        base, len, flags
+        "Mapping from base address {:x?} with length {:?} and flags {:?}",
+        base.as_u64(),
+        len,
+        flags
     );
 
     let mapper = GreedyFragmentMapper::<PageClass>::new(base, len);

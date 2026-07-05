@@ -2,7 +2,10 @@ use core::{alloc::Layout, mem::Alignment};
 
 use crate::{
     arch,
-    bitmap::{BitPtr, Bitmap},
+    bitmap::{
+        BitPtr, Bitmap,
+        managers::{address_as_bit_index, align_in_bits, bit_index_as_address, n_pages_for_bytes},
+    },
     paging::{Address, AddressExt, VirtAddr, primitives::MemoryRange},
     test_println,
 };
@@ -11,6 +14,7 @@ use crate::{
 #[derive(Debug)]
 pub struct VirtualMemoryManager<'a> {
     bitmap: Bitmap<'a>,
+    base_addr: VirtAddr,
 }
 
 impl<'a> VirtualMemoryManager<'a> {
@@ -25,47 +29,9 @@ impl<'a> VirtualMemoryManager<'a> {
     ///
     pub unsafe fn init(bitmap_data: &'a mut [u64], range: MemoryRange<VirtAddr>) -> Self {
         Self {
-            bitmap: Bitmap::init(bitmap_data, Self::bytes_to_bits(range.size()), range.size()),
+            bitmap: Bitmap::init(bitmap_data, n_pages_for_bytes(range.size())),
+            base_addr: range.start(),
         }
-    }
-
-    const fn bytes_to_bits(n_bytes: u64) -> u64 {
-        (n_bytes + Self::BIT_SIZE - 1) / Self::BIT_SIZE
-    }
-
-    const fn align_to_bit_align(align: Alignment) -> Alignment {
-        let align = align.as_usize() as u64;
-        if align <= Self::BIT_SIZE {
-            return Alignment::new(1).unwrap();
-        }
-
-        let bit_align = align / Self::BIT_SIZE;
-        return Alignment::new(bit_align as usize).unwrap();
-    }
-
-    fn bitptr_to_virtaddr(base: u64, bitptr: BitPtr) -> VirtAddr {
-        let addr: *const u8 = bitptr.as_ptr(base as *mut _, Self::BIT_SIZE);
-        VirtAddr::from_ptr(addr).expect("invalid virtaddr")
-    }
-
-    const fn virtaddr_to_bitptr(base: u64, addr: VirtAddr) -> Option<BitPtr> {
-        let addr_u64 = addr.as_u64();
-        if addr_u64 < base {
-            return None;
-        }
-        let offset = addr_u64 - base;
-        if offset % Self::BIT_SIZE != 0 {
-            return None;
-        }
-        let bit_offset = offset / Self::BIT_SIZE;
-        Some(BitPtr::new_wrapping(0, bit_offset))
-    }
-
-    /// Returns the number of bitmap entries needed to manage a virtual address space of the given size in bytes.
-    pub const fn entries_to_fit(bytes: u64) -> u64 {
-        let bits = Self::bytes_to_bits(bytes);
-        let entries = bits.div_ceil(64);
-        entries
     }
 
     /// Allocates a range of virtual memory of the specified size and alignment, returning the starting virtual address of the allocated range.
@@ -75,23 +41,44 @@ impl<'a> VirtualMemoryManager<'a> {
     #[must_use = "the allocated virtual address must be used or deallocated to avoid memory leaks"]
     pub fn allocate(&mut self, layout: Layout) -> Option<VirtAddr> {
         // TODO: Result<VirtAddr, MemError> instead of Option
-        let n_bits = Self::bytes_to_bits(layout.size() as u64);
-        let bit_align = Self::align_to_bit_align(layout.alignment());
+        let n_bits = n_pages_for_bytes(layout.size() as u64);
+        let bit_align = align_in_bits(layout.alignment());
 
         let bitptr = self.bitmap.allocate(n_bits, bit_align)?;
-        Some(Self::bitptr_to_virtaddr(self.bitmap.base_addr, bitptr))
+        Some(bit_index_as_address(bitptr.bit_index(), self.base_addr))
     }
 
     /// Deallocates a previously allocated range of virtual memory starting at the given virtual address and spanning the specified number of bytes.
     ///
     pub unsafe fn deallocate(&mut self, addr: VirtAddr, layout: Layout) {
-        let n_bits = Self::bytes_to_bits(layout.size() as u64);
-        let bitptr = Self::virtaddr_to_bitptr(self.bitmap.base_addr, addr)
+        let n_bits = n_pages_for_bytes(layout.size() as u64);
+        let bitptr = address_as_bit_index(addr, self.base_addr)
             .expect("deallocated address must be within the managed virtual address space and properly aligned");
         test_println!("deallocating addr {:?}, bitptr: {:?}", addr, bitptr);
         debug_assert!(self.bitmap.some_are_set(bitptr, n_bits));
         self.bitmap.clear(bitptr, n_bits);
     }
+
+    /// Marks a range of virtual memory as allocated in the bitmap, starting at the given virtual address and spanning the specified number of bytes.
+    pub unsafe fn mark_allocated(&mut self, addr: VirtAddr, size_bytes: u64) {
+        let n_bits = n_pages_for_bytes(size_bytes);
+        let bitptr = address_as_bit_index(addr, self.base_addr).expect(
+            "address must be within the managed virtual address space and properly aligned",
+        );
+
+        self.bitmap.set(bitptr, n_bits);
+    }
+
+    /// Marks a range of virtual memory as unallocated in the bitmap, starting at the given virtual address and spanning the specified number of bytes.
+    pub unsafe fn mark_unallocated(&mut self, addr: VirtAddr, size_bytes: u64) {
+        let n_bits = n_pages_for_bytes(size_bytes);
+        let bitptr = address_as_bit_index(addr, self.base_addr).expect(
+            "address must be within the managed virtual address space and properly aligned",
+        );
+
+        self.bitmap.clear(bitptr, n_bits);
+    }
+
     #[cfg(test)]
     fn dump_entries(&self) {
         const CHUNK_SIZE: usize = 8;
@@ -131,89 +118,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_bytes_to_bits() {
-        fn test(bytes: u64, expected_bits: u64) {
-            assert_eq!(
-                VirtualMemoryManager::bytes_to_bits(bytes),
-                expected_bits,
-                "bytes_to_bits({}) should be {}",
-                bytes,
-                expected_bits
-            );
-        }
-        test(0, 0);
-        test(1, 1);
-        test(arch::L1_PAGE_SIZE, 1);
-        test(arch::L1_PAGE_SIZE + 1, 2);
-        test(arch::L1_PAGE_SIZE * 10, 10);
-    }
-
-    #[test]
-    fn test_align_to_bit_align() {
-        fn test(align: u64, expected_bit_align: u64) {
-            let align = Alignment::new(align as usize).expect("given align must be a power of two");
-            let expected_bit_align = Alignment::new(expected_bit_align as usize)
-                .expect("given expected_bit_align must be a power of two");
-            assert_eq!(
-                VirtualMemoryManager::align_to_bit_align(align),
-                expected_bit_align,
-                "align_to_bit_align({:?}) should be {:?}",
-                align,
-                expected_bit_align
-            );
-        }
-
-        test(1, 1);
-        test(arch::L1_PAGE_SIZE / 2, 1);
-        test(arch::L1_PAGE_SIZE, 1);
-        test(arch::L1_PAGE_SIZE * 2, 2);
-    }
-
-    #[test]
-    fn test_bitptr_to_virtaddr() {
-        fn test(base: u64, bit_offset: u64, expected_addr: u64) {
-            let bitptr = BitPtr::new_wrapping(0, bit_offset);
-            assert_eq!(
-                VirtualMemoryManager::bitptr_to_virtaddr(base, bitptr).as_u64(),
-                expected_addr,
-                "bitptr_to_virtaddr({}, {:?}) should be {}",
-                base,
-                bitptr,
-                expected_addr
-            );
-        }
-
-        test(0x1000, 0, 0x1000);
-        test(0x1000, 1, 0x1000 + arch::L1_PAGE_SIZE);
-        test(0x1000, 2, 0x1000 + 2 * arch::L1_PAGE_SIZE);
-        for i in 0..0x10_000 {
-            test(0x1000, i, 0x1000 + i * arch::L1_PAGE_SIZE);
-        }
-    }
-
-    #[test]
-    fn test_virtaddr_to_bitptr() {
-        fn test(base: u64, addr: u64, expected_bit_offset: Option<u64>) {
-            let addr = VirtAddr::new(addr);
-            let expected_bitptr = expected_bit_offset.map(|offset| BitPtr::new_wrapping(0, offset));
-            assert_eq!(
-                VirtualMemoryManager::virtaddr_to_bitptr(base, addr),
-                expected_bitptr,
-                "virtaddr_to_bitptr({}, {:?}) should be {:?}",
-                base,
-                addr,
-                expected_bitptr
-            );
-        }
-        test(0x1000, 0x1000, Some(0));
-        test(0x1000, 0x1000 + arch::L1_PAGE_SIZE, Some(1));
-        test(0x1000, 0x1000 + 2 * arch::L1_PAGE_SIZE, Some(2));
-        test(0x1000, 0x1000 + (arch::L1_PAGE_SIZE / 2), None);
-        test(0x1000, 0x0FFF, None);
-        test(0x1000, 0x10000, Some(15));
-    }
-
-    #[test]
     fn test_allocate_and_deallocate() {
         const CAP: u64 = 512;
         let mut bitmap_data = [0u64; CAP as usize];
@@ -238,8 +142,8 @@ mod tests {
                 0,
                 "allocated address should be properly aligned"
             );
-            let bits = VirtualMemoryManager::bytes_to_bits(size_bytes);
-            let bitptr = VirtualMemoryManager::virtaddr_to_bitptr(manager.bitmap.base_addr, addr)
+            let bits = n_pages_for_bytes(size_bytes);
+            let bitptr = address_as_bit_index(addr, manager.base_addr)
                 .expect("allocated address must be within the managed virtual address space and properly aligned");
             assert!(
                 manager.bitmap.all_are_set(bitptr, bits),
@@ -258,11 +162,9 @@ mod tests {
         let checked_dealloc =
             |manager: &mut VirtualMemoryManager, addr: VirtAddr, layout: Layout| {
                 assert!(
-                    manager.bitmap.all_are_set(
-                        VirtualMemoryManager::virtaddr_to_bitptr(manager.bitmap.base_addr, addr)
-                            .unwrap(),
-                        1
-                    ),
+                    manager
+                        .bitmap
+                        .all_are_set(address_as_bit_index(addr, manager.base_addr).unwrap(), 1),
                     "attempted to deallocate an address that is not currently allocated"
                 );
                 unsafe { manager.deallocate(addr, layout) };

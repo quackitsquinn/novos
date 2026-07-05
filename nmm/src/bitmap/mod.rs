@@ -15,8 +15,6 @@ use crate::test_println;
 
 /// A bitmap primitive for tracking the allocation status of pages in the memory manager.
 pub struct Bitmap<'a> {
-    /// The base address of the memory region that this bitmap is managing, in bytes. This isn't guaranteed to be an address and is up to the user to interpret.
-    base_addr: u64,
     /// The number of bits in the bitmap, which corresponds to the number of pages it can manage.
     n_bits: u64,
     /// A pointer to the bitmap data, which is a slice of u64 values where each bit represents the allocation status of a page.
@@ -26,7 +24,6 @@ pub struct Bitmap<'a> {
 impl<'a> core::fmt::Debug for Bitmap<'a> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("Bitmap")
-            .field("base_addr", &format_args!("{:#x}", self.base_addr))
             .field("n_bits", &self.n_bits)
             .finish()
     }
@@ -35,7 +32,7 @@ impl<'a> core::fmt::Debug for Bitmap<'a> {
 impl<'a> Bitmap<'a> {
     /// Initializes a bitmap with the given data slice, number of bits, and base address. The data slice must be large enough to hold at least `n_bits` bits (i.e., it must have a length of at least `n_bits / 64`).
     ///
-    pub fn init(data: &'a mut [u64], n_bits: u64, base_addr: u64) -> Self {
+    pub fn init(data: &'a mut [u64], n_bits: u64) -> Self {
         #[cfg(debug_assertions)]
         {
             assert!(
@@ -56,11 +53,7 @@ impl<'a> Bitmap<'a> {
                 "Data slice is too small to hold the specified number of bits"
             );
         }
-        Bitmap {
-            base_addr,
-            n_bits,
-            data,
-        }
+        Bitmap { n_bits, data }
     }
 
     /// Returns a u64x4 SIMD vector containing 4 consecutive entries from the bitmap data, starting at the specified entry index.
@@ -140,6 +133,12 @@ impl<'a> Bitmap<'a> {
     /// Resets the entire bitmap, clearing all bits and marking all pages as free.
     pub fn reset(&mut self) {
         self.data.fill(0);
+    }
+
+    /// Returns the number of bits in the bitmap, which corresponds to the number of pages it can manage.
+    #[inline]
+    pub fn n_bits(&self) -> u64 {
+        self.n_bits
     }
 
     fn mod_range<Norm, Simd>(
@@ -359,7 +358,7 @@ mod tests {
         let mut data = [0u64; 64];
         data.iter_mut().enumerate().for_each(|(i, x)| *x = i as u64);
 
-        let bitmap = unsafe { super::Bitmap::init(&mut data, 64 * 64, 0) };
+        let bitmap = unsafe { super::Bitmap::init(&mut data, 64 * 64) };
 
         let vec = bitmap.get_vec(0);
         assert_eq!(vec, u64x4::from_array([0, 1, 2, 3]));
@@ -371,7 +370,7 @@ mod tests {
     #[test]
     fn test_set_vec() {
         let mut data = [0u64; 64];
-        let mut bitmap = unsafe { super::Bitmap::init(&mut data, 64 * 64, 0) };
+        let mut bitmap = unsafe { super::Bitmap::init(&mut data, 64 * 64) };
 
         let val = u64x4::splat(u64::MAX);
         bitmap.set_vec(0, val);
@@ -383,7 +382,7 @@ mod tests {
         let mut data = [0u64; 64];
         data.iter_mut().enumerate().for_each(|(i, x)| *x = i as u64);
 
-        let bitmap = unsafe { super::Bitmap::init(&mut data, 64 * 64, 0) };
+        let bitmap = unsafe { super::Bitmap::init(&mut data, 64 * 64) };
 
         let mut chunks = bitmap.vec_chunks();
 
@@ -399,7 +398,7 @@ mod tests {
     #[test]
     fn test_first_clear() {
         let mut data = [0u64; 64];
-        let bitmap = unsafe { super::Bitmap::init(&mut data, 64 * 64, 0) };
+        let bitmap = unsafe { super::Bitmap::init(&mut data, 64 * 64) };
 
         assert_eq!(bitmap.first_clear(), Some(BitPtr::new(0, 0)));
 
@@ -415,7 +414,7 @@ mod tests {
     #[test]
     fn test_set() {
         let mut data = [0u64; 64];
-        let mut bitmap = unsafe { super::Bitmap::init(&mut data, 64 * 64, 0) };
+        let mut bitmap = unsafe { super::Bitmap::init(&mut data, 64 * 64) };
 
         macro_rules! case {
             ($entry_index:expr, $bit_offset:expr,  $count:expr, $blk:block) => {
@@ -477,7 +476,7 @@ mod tests {
     #[test]
     fn test_clear() {
         let mut data = [u64::MAX; 64];
-        let mut bitmap = unsafe { super::Bitmap::init(&mut data, 64 * 64, 0) };
+        let mut bitmap = unsafe { super::Bitmap::init(&mut data, 64 * 64) };
 
         // Since 99% of the functionality of clear is shared with set, we don't need to retest all the same cases.
         // We just want to make a few sanity checks to make sure the mask operation is correctly clearing bits instead of setting them.
