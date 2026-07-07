@@ -29,7 +29,7 @@ impl<'a> VirtualMemoryManager<'a> {
     ///
     pub unsafe fn init(bitmap_data: &'a mut [u64], range: MemoryRange<VirtAddr>) -> Self {
         Self {
-            bitmap: Bitmap::init(bitmap_data, n_pages_for_bytes(range.size())),
+            bitmap: Bitmap::init(bitmap_data, (n_pages_for_bytes(range.size()) % 64) as u8),
             base_addr: range.start(),
         }
     }

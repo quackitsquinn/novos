@@ -308,7 +308,7 @@ mod tests {
         const CAP: usize = 0x200000 * 2;
         // move this massive array onto the heap to avoid a stack overflow in debug mode
         let mut data = vec![0; CAP];
-        let mut bitmap = unsafe { super::Bitmap::init(&mut data, 64 * CAP as u64) };
+        let mut bitmap = unsafe { super::Bitmap::init(&mut data, 64) };
 
         let alloc = |bitmap: &mut super::Bitmap, n_bits: u64, align: usize| {
             let res = bitmap.allocate(

@@ -15,7 +15,7 @@ pub use paddr::PhysAddr;
 pub use page::Page;
 pub use vaddr::VirtAddr;
 
-use crate::{NmmSealed, seal};
+use crate::{NmmSealed, arch::L1_PAGE_SIZE, seal};
 
 encapsulate_macro!(
     impl_ops,
@@ -65,6 +65,8 @@ encapsulate_macro!(
 pub trait FragmentSize: NmmSealed + Sized + Copy + core::fmt::Debug + Eq + PartialEq {
     /// The size of a page for this page size type, in bytes.
     const SIZE: u64;
+    /// The number of bits in a page for this page size type.
+    const BITS: u64 = Self::SIZE / L1_PAGE_SIZE;
     /// The name of this page size type, as a string.
     const NAME: &'static str;
 }

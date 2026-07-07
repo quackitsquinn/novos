@@ -30,29 +30,27 @@ impl<'a> core::fmt::Debug for Bitmap<'a> {
 }
 
 impl<'a> Bitmap<'a> {
-    /// Initializes a bitmap with the given data slice, number of bits, and base address. The data slice must be large enough to hold at least `n_bits` bits (i.e., it must have a length of at least `n_bits / 64`).
+    /// Initializes a new bitmap with the given data slice and the number of bits in the last entry to use.
     ///
-    pub fn init(data: &'a mut [u64], n_bits: u64) -> Self {
-        #[cfg(debug_assertions)]
-        {
-            assert!(
-                n_bits <= data.len() as u64 * 64,
-                "Number of bits exceeds capacity of data slice ({} bits available, but {} bits requested)",
-                data.len() as u64 * 64,
-                n_bits
-            );
-            if n_bits < (data.len() as f64 * 64.0 * 0.75) as u64 {
-                use cake::log::warn;
-                warn!(
-                    "Bitmap is only using {}% of the capacity of the data slice. Consider reducing the size of the data slice to save memory.",
-                    (n_bits as f64 / (data.len() as f64 * 64.0)) * 100.0
-                );
-            }
-            assert!(
-                data.len() as u64 * 64 >= n_bits,
-                "Data slice is too small to hold the specified number of bits"
-            );
-        }
+    pub fn init(data: &'a mut [u64], remainder: u8) -> Self {
+        assert!(
+            remainder <= 64,
+            "Remainder must be less than or equal to 64"
+        );
+        let n_bits = (data.len() as u64 - 1) * 64 + remainder as u64;
+
+        assert!(
+            n_bits <= data.len() as u64 * 64,
+            "Number of bits exceeds capacity of data slice ({} bits available, but {} bits requested)",
+            data.len() as u64 * 64,
+            n_bits
+        );
+
+        assert!(
+            data.len() as u64 * 64 >= n_bits,
+            "Data slice is too small to hold the specified number of bits"
+        );
+
         Bitmap { n_bits, data }
     }
 

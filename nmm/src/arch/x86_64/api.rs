@@ -65,7 +65,7 @@ pub(crate) unsafe fn init_unchecked(
     unsafe { vmm.mark_allocated(scratch_range.start(), n_bytes) }
 
     info!("Initializing physical memory manager with scratch space");
-    let mut pmm = unsafe { PhysicalMemoryManager::init(&mut walker, &mut vmm)? };
+    let mut pmm = unsafe { PhysicalMemoryManager::init(walker, &mut vmm)? };
     info!("Physical memory manager initialized successfully");
     panic!("woah!");
     Ok(())

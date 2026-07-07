@@ -7,12 +7,13 @@ use arrayvec::ArrayVec;
 use cake::limine::memory_map::{Entry, EntryType};
 use cake::log::error;
 
+use crate::align;
 use crate::paging::limine::LimineEntry;
-use crate::paging::{Address, PhysAddr};
+use crate::paging::{Address, MemoryRange, PhysAddr};
 use crate::paging::{FragmentManager, FragmentSize, Frame};
 
 /// A helper struct for iterating over memory map entries and calculating the total usable memory.
-#[allow(missing_debug_implementations)] // TODO: allowed to silence the warning for now
+#[derive(Debug)]
 pub struct EntryWalker<'a> {
     /// The underlying entries provided from Limine
     pub entries: &'a [&'a LimineEntry],
@@ -106,7 +107,8 @@ impl<'a> EntryWalker<'a> {
         }
 
         // Aligns the given addr up to a multiple of the specified alignment. This is used to ensure that the returned physical address meets the alignment requirements for the allocation.
-        let align_up = |addr: u64| align_up(addr, alignment);
+
+        let align_up = |addr: u64| align!(up, addr, alignment.as_usize() as u64);
 
         for i in 0..self.extra_entries.len() {
             let entry = &mut self.extra_entries[i];
@@ -236,6 +238,17 @@ impl<'a> EntryWalker<'a> {
         let addr = self.next(S::SIZE, Alignment::new(S::SIZE as usize).unwrap())?;
         Some(Frame::new(addr))
     }
+
+    /// Returns an iterator over the usable memory ranges in the memory map entries.
+    pub fn used_regions(&self) -> impl Iterator<Item = MemoryRange<PhysAddr>> + '_ {
+        // This doesn't *need* to be 100% accurate, so we ignore `self.extra_entries` for now.
+        self.current
+            .as_ref()
+            .into_iter()
+            .chain((&self.entries[..self.idx - 1]).into_iter().copied())
+            .filter(|entry| matches!(entry.entry_type, EntryType::USABLE))
+            .map(|entry| MemoryRange::new_len(PhysAddr::new(entry.base), entry.length))
+    }
 }
 
 fn align_up(addr: u64, alignment: Alignment) -> u64 {
@@ -243,7 +256,7 @@ fn align_up(addr: u64, alignment: Alignment) -> u64 {
     (addr + align - 1) & !(align - 1)
 }
 
-impl<S> FragmentManager<Frame<S>, S> for EntryWalker<'_>
+unsafe impl<S> FragmentManager<Frame<S>, S> for EntryWalker<'_>
 where
     S: FragmentSize,
 {
