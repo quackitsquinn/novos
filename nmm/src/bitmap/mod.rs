@@ -39,14 +39,14 @@ impl<'a> Bitmap<'a> {
         );
         let n_bits = (data.len() as u64 - 1) * 64 + remainder as u64;
 
-        assert!(
+        debug_assert!(
             n_bits <= data.len() as u64 * 64,
             "Number of bits exceeds capacity of data slice ({} bits available, but {} bits requested)",
             data.len() as u64 * 64,
             n_bits
         );
 
-        assert!(
+        debug_assert!(
             data.len() as u64 * 64 >= n_bits,
             "Data slice is too small to hold the specified number of bits"
         );
@@ -356,7 +356,7 @@ mod tests {
         let mut data = [0u64; 64];
         data.iter_mut().enumerate().for_each(|(i, x)| *x = i as u64);
 
-        let bitmap = unsafe { super::Bitmap::init(&mut data, 64 * 64) };
+        let bitmap = unsafe { super::Bitmap::init(&mut data, 64) };
 
         let vec = bitmap.get_vec(0);
         assert_eq!(vec, u64x4::from_array([0, 1, 2, 3]));
@@ -368,7 +368,7 @@ mod tests {
     #[test]
     fn test_set_vec() {
         let mut data = [0u64; 64];
-        let mut bitmap = unsafe { super::Bitmap::init(&mut data, 64 * 64) };
+        let mut bitmap = unsafe { super::Bitmap::init(&mut data, 64) };
 
         let val = u64x4::splat(u64::MAX);
         bitmap.set_vec(0, val);
@@ -380,7 +380,7 @@ mod tests {
         let mut data = [0u64; 64];
         data.iter_mut().enumerate().for_each(|(i, x)| *x = i as u64);
 
-        let bitmap = unsafe { super::Bitmap::init(&mut data, 64 * 64) };
+        let bitmap = unsafe { super::Bitmap::init(&mut data, 64) };
 
         let mut chunks = bitmap.vec_chunks();
 
@@ -396,7 +396,7 @@ mod tests {
     #[test]
     fn test_first_clear() {
         let mut data = [0u64; 64];
-        let bitmap = unsafe { super::Bitmap::init(&mut data, 64 * 64) };
+        let bitmap = unsafe { super::Bitmap::init(&mut data, 64) };
 
         assert_eq!(bitmap.first_clear(), Some(BitPtr::new(0, 0)));
 
@@ -412,7 +412,7 @@ mod tests {
     #[test]
     fn test_set() {
         let mut data = [0u64; 64];
-        let mut bitmap = unsafe { super::Bitmap::init(&mut data, 64 * 64) };
+        let mut bitmap = unsafe { super::Bitmap::init(&mut data, 64) };
 
         macro_rules! case {
             ($entry_index:expr, $bit_offset:expr,  $count:expr, $blk:block) => {
@@ -474,7 +474,7 @@ mod tests {
     #[test]
     fn test_clear() {
         let mut data = [u64::MAX; 64];
-        let mut bitmap = unsafe { super::Bitmap::init(&mut data, 64 * 64) };
+        let mut bitmap = unsafe { super::Bitmap::init(&mut data, 64) };
 
         // Since 99% of the functionality of clear is shared with set, we don't need to retest all the same cases.
         // We just want to make a few sanity checks to make sure the mask operation is correctly clearing bits instead of setting them.

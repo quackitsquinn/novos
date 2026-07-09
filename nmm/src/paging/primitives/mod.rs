@@ -250,6 +250,7 @@ where
     A: const Address,
 {
     /// Creates a new MemoryRange from the given start and end addresses.
+    #[track_caller]
     pub const fn new(start: A, end: A) -> Self {
         Self::try_new(start, end).expect("MemoryRange::new: `start` is greater than `end`")
     }

@@ -238,7 +238,7 @@ mod tests {
     #[test]
     fn test_bits_are_set() {
         let mut data = [0u64; 64];
-        let mut bitmap = unsafe { super::Bitmap::init(&mut data, 64 * 64) };
+        let mut bitmap = unsafe { super::Bitmap::init(&mut data, 64) };
 
         let check_set = |bitmap: &super::Bitmap, bit_ptr: BitPtr, n_bits: u64, expected: bool| {
             assert_eq!(
@@ -275,7 +275,7 @@ mod tests {
     #[test]
     fn test_all_are_set() {
         let mut data = [0u64; 64];
-        let mut bitmap = unsafe { super::Bitmap::init(&mut data, 64 * 64) };
+        let mut bitmap = unsafe { super::Bitmap::init(&mut data, 64) };
 
         fn check_all_set(bitmap: &super::Bitmap, bit_ptr: BitPtr, n_bits: u64, expected: bool) {
             println!("checking all_are_set({:?}, {})", bit_ptr, n_bits);
