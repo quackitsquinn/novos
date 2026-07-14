@@ -85,11 +85,10 @@ impl PhysicalMemoryManager {
         for used in entry_walker.used_regions() {
             info!(
                 "Marking used region as allocated: start={:#x}, size={} bytes",
-                used.start().as_u64(),
-                used.size()
+                used.base, used.length
             );
 
-            unsafe { pmm.mark_allocated(used) };
+            unsafe { pmm.mark_allocated(used.into()) };
         }
 
         info!("entry_walker final state: {:#?}", entry_walker);

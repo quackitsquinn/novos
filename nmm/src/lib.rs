@@ -52,7 +52,7 @@ pub unsafe fn init(
     ranges: &'static [&'static memory_map::Entry],
     managed_range: MemoryRange<VirtAddr>,
 ) -> Result<(), MemError> {
-    unsafe { arch::init_unchecked(root, offset, EntryWalker::new(ranges), managed_range) }
+    unsafe { arch::init_unchecked(root, offset, EntryWalker::new(ranges)?, managed_range) }
 }
 
 /// Enables recursive paging at the specified page table index, loading the given physical address into the architecture-specific register for the page table base address.

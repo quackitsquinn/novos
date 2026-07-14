@@ -1,37 +1,59 @@
 //! A helper struct for iterating over memory map entries and calculating the total usable memory.
 use core::fmt::Debug;
-use core::mem::Alignment;
 use core::{mem, slice};
 
 use arrayvec::ArrayVec;
 use cake::limine::memory_map::{Entry, EntryType};
 use cake::log::error;
 
-use crate::align;
 use crate::paging::limine::LimineEntry;
-use crate::paging::{Address, MemoryRange, PhysAddr};
-use crate::paging::{FragmentManager, FragmentSize, Frame};
+use crate::paging::{Address, FragmentManager, FragmentSize, Frame, MemoryRange, PhysAddr};
+use crate::{MemError, align};
+
+const MAX_FRAGMENTS: usize = 0x40;
 
 /// A helper struct for iterating over memory map entries and calculating the total usable memory.
 #[derive(Debug)]
 pub struct EntryWalker<'a> {
     /// The underlying entries provided from Limine
     pub entries: &'a [&'a LimineEntry],
-    idx: usize,
-    current: Option<LimineEntry>,
-    // Contains entries that were skipped either due to alignment requirements or because they were too small, but may still be usable for smaller allocations
-    // TODO: tweak CAP
-    extra_entries: ArrayVec<ExtraEntry, 0x88>,
+    current: MemoryRegion,
+    current_idx: usize,
+    fragments: ArrayVec<MemoryRegion, MAX_FRAGMENTS>,
 }
 
+/// A struct representing a region of memory with a base address and length.
+///
+/// This is in a different format than MemoryRegion due to how Limine returns memory map entries.
 #[derive(Clone, Copy, PartialEq, Eq)]
 #[repr(C)]
-struct ExtraEntry {
-    base: u64,
-    length: u64,
+pub struct MemoryRegion {
+    /// The base address of the memory region.
+    pub base: u64,
+    /// The length of the memory region in bytes.
+    pub length: u64,
 }
 
-impl From<LimineEntry> for ExtraEntry {
+impl MemoryRegion {
+    #[inline]
+    fn align_for_with_offset<S: FragmentSize>(&self) -> Option<(PhysAddr, u64)> {
+        let aligned_base = align!(up, self.base, S::SIZE);
+        let offset = aligned_base - self.base;
+        if self.length >= S::SIZE + offset {
+            Some((PhysAddr::new(aligned_base), offset))
+        } else {
+            None
+        }
+    }
+}
+
+impl From<MemoryRegion> for MemoryRange<PhysAddr> {
+    fn from(region: MemoryRegion) -> Self {
+        MemoryRange::new_len(PhysAddr::new(region.base), region.length)
+    }
+}
+
+impl From<LimineEntry> for MemoryRegion {
     fn from(entry: LimineEntry) -> Self {
         // SAFETY: ExtraEntry has the same memory layout as the first 2 fields of Entry, so we can transmute it without any issues.
         // We only need the base and length fields for the extra entries, since the entry type is not relevant for them.
@@ -39,7 +61,7 @@ impl From<LimineEntry> for ExtraEntry {
     }
 }
 
-impl Debug for ExtraEntry {
+impl Debug for MemoryRegion {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("ExtraEntry")
             .field("base", &format_args!("{:#x}", self.base))
@@ -50,31 +72,36 @@ impl Debug for ExtraEntry {
 
 impl<'a> EntryWalker<'a> {
     /// Creates a new `EntryWalker` with the given slice of memory map entries.
-    pub fn new(entries: &'a [&'a Entry]) -> Self {
-        Self {
-            entries: unsafe {
-                // SAFETY: LimineEntry has the same memory layout as Entry.
-                slice::from_raw_parts(entries.as_ptr().cast(), entries.len())
-            },
-            idx: 0,
-            current: None,
-            extra_entries: ArrayVec::new(),
-        }
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the provided memory map entries are valid and that the layout described by the entries remains valid for the lifetime of the `EntryWalker`.
+    pub unsafe fn new(memory_map: &'a [&'a Entry]) -> Result<Self, MemError> {
+        let entries = unsafe {
+            slice::from_raw_parts(memory_map.as_ptr() as *const &LimineEntry, memory_map.len())
+        };
+
+        Self::from_limine_entries(entries)
     }
 
     /// Creates a new `EntryWalker` with the given slice of Limine memory map entries.
-    #[cfg(test)]
-    pub(crate) fn from_limine_entries(entries: &'a [&'a LimineEntry]) -> Self {
-        Self {
+    pub(crate) fn from_limine_entries(entries: &'a [&'a LimineEntry]) -> Result<Self, MemError> {
+        let (current_idx, current) = entries
+            .iter()
+            .enumerate()
+            .find(|e| e.1.entry_type == EntryType::USABLE)
+            .ok_or(MemError::OutOfMemory)?;
+
+        Ok(Self {
             entries,
-            idx: 0,
-            current: None,
-            extra_entries: ArrayVec::new(),
-        }
+            current: MemoryRegion::from(**current),
+            current_idx,
+            fragments: ArrayVec::new(),
+        })
     }
 
     /// Returns the amount of usable memory in bytes.
-    pub fn usable_memory(&mut self) -> u64 {
+    pub fn usable_memory(&self) -> u64 {
         let mut total = 0;
         for entry in self.entries {
             if matches!(
@@ -87,376 +114,244 @@ impl<'a> EntryWalker<'a> {
         total
     }
 
-    /// Attempts to take a chunk of memory of the specified length and alignment from the extra entries,
-    /// returning the base physical address of the allocated chunk if successful.
-    ///
-    /// If a suitable entry is found, it updates the entry to reflect the allocated portion and returns the base physical address of the allocated chunk.
-    /// If no suitable entry is found, it returns `None`.
-    fn try_take_reserved(&mut self, len: u64, alignment: Alignment) -> Option<PhysAddr> {
-        if self.extra_entries.is_empty() || self.extra_entries[0].length < len {
-            #[cfg(test)]
-            eprintln!(
-                "early return 0: no entries or first entry too small:  {} || {}",
-                self.extra_entries.is_empty(),
-                match self.extra_entries.first() {
-                    Some(entry) => format!("entry length {:#x} < len {:#x}", entry.length, len),
-                    None => "no entries".to_string(),
-                }
-            );
+    fn current_region(&self) -> Result<MemoryRegion, MemError> {
+        if self.current_idx >= self.entries.len() {
+            return Err(MemError::OutOfMemory);
+        }
+
+        Ok(self.current)
+    }
+
+    fn advance_region(&mut self) -> Result<MemoryRegion, MemError> {
+        if self.current.length != 0 {
+            self.fragments.push(self.current);
+            self.fragments.sort_unstable_by_key(|r| r.length);
+        }
+        self.current_idx += 1;
+        while self.current_idx < self.entries.len() {
+            let entry = self.entries[self.current_idx];
+            if entry.entry_type == EntryType::USABLE {
+                self.current = MemoryRegion::from(*entry);
+                return Ok(self.current);
+            }
+            self.current_idx += 1;
+        }
+
+        Err(MemError::OutOfMemory)
+    }
+
+    fn fragment_for<S: FragmentSize>(&mut self) -> Option<Frame<S>> {
+        if self.fragments.is_empty() {
             return None;
         }
 
-        // Aligns the given addr up to a multiple of the specified alignment. This is used to ensure that the returned physical address meets the alignment requirements for the allocation.
-
-        let align_up = |addr: u64| align!(up, addr, alignment.as_usize() as u64);
-
-        for i in 0..self.extra_entries.len() {
-            let entry = &mut self.extra_entries[i];
-            if entry.length < len {
-                #[cfg(test)]
-                eprintln!(
-                    "early return 1: entry {} too small: {} < {}",
-                    i, entry.length, len
-                );
-                // The array is guaranteed to be sorted by length in descending order, so if the first entry is too small, all entries are too small
-                return None;
-            }
-
-            let aligned_base = align_up(entry.base);
-            let end = entry.base + entry.length;
-            if aligned_base + len > end {
-                #[cfg(test)]
-                eprintln!(
-                    "continue: entry {} can't fit allocation with alignment: aligned base {:#x} + len {:#x} >= end {:#x}",
-                    i, aligned_base, len, end
-                );
-                // TODO: might be able to just return None here?
-                continue;
-            }
-
-            // This entry can fit the allocation, so we take it and update the entry to reflect the allocated portion
-            let allocated_base = aligned_base;
-            let allocated_end = allocated_base + len;
-            let old_base = entry.base;
-            entry.base = allocated_end;
-            entry.length = end - allocated_end;
-            let entry = *entry; // Copy the entry so we can drop the mutable borrow before we potentially insert a new extra entry for the gap between the original base and the aligned base, since that would require a mutable borrow of self.extra_entries
-            if entry.length == 0 {
-                // If the entry is now empty, we can remove it from the list
-                self.extra_entries.remove(i);
-            }
-            if aligned_base > old_base {
-                // If there is a gap between the original base and the aligned base, we can add an extra entry for that gap
-                self.extra_entries.push(ExtraEntry {
-                    base: old_base,
-                    length: aligned_base - old_base,
-                });
-                self.extra_entries
-                    .sort_unstable_by_key(|v| u64::MAX - v.length);
-            }
-
-            return Some(PhysAddr::new(allocated_base));
+        if self.fragments.last().unwrap().length < S::SIZE {
+            return None;
         }
 
-        // The inversion will swap the order into descending order, so the longest entries will be at ind 0.
-        self.extra_entries
-            .sort_unstable_by_key(|v| u64::MAX - v.length);
-
-        #[cfg(test)]
-        eprintln!(
-            "late return: no suitable entry found for {:#x}:{:#x}\nextra entries: {:?}",
-            len,
-            alignment.as_usize(),
-            self.extra_entries
-        );
-
-        None
-    }
-
-    /// Returns the next usable memory map entry, or `None` if there are no more usable entries.
-    /// This method iterates through the memory map entries, skipping non-usable entries and returning each usable entry until all entries have been processed.
-    ///
-    /// This will overwrite `self.current` with the next entry.
-    fn next_entry(&mut self) -> Option<LimineEntry> {
-        for i in self.idx..self.entries.len() {
-            let entry = *self.entries[i];
-            self.idx = i + 1;
-            if matches!(entry.entry_type, EntryType::USABLE) {
-                self.current = Some(entry);
-                return Some(entry);
+        for i in 0..self.fragments.len() {
+            let fragment = self.fragments[i];
+            let (aligned_base, offset) = match fragment.align_for_with_offset::<S>() {
+                Some(aligned) => aligned,
+                None => continue,
+            };
+            let new_base = aligned_base + S::SIZE;
+            let new_length = fragment.length - S::SIZE - offset;
+            if new_length == 0 {
+                self.fragments.remove(i);
+            } else {
+                self.fragments[i] = MemoryRegion {
+                    base: new_base.as_u64(),
+                    length: new_length,
+                };
             }
+            return Some(Frame::new(aligned_base));
         }
         None
     }
 
-    /// Returns the current entry if there is one, or the next usable entry if there isn't.
-    fn get_entry(&mut self) -> Option<LimineEntry> {
-        if let Some(entry) = self.current {
-            Some(entry)
-        } else {
-            self.next_entry()
-        }
+    /// Returns an iterator over the used regions of memory.
+    pub fn used_regions(&self) -> impl Iterator<Item = MemoryRegion> {
+        todo!();
+        #[allow(unreachable_code)] // todo doesn't conform to impl returns
+        core::iter::empty()
     }
 
-    /// Returns the next usable physical address, or `None` if there are no more usable entries.
-    /// This method iterates through the memory map entries, skipping non-usable entries and returning the starting physical address of each usable entry until all entries have been processed.
-    //
-    pub fn next(&mut self, len: u64, alignment: Alignment) -> Option<PhysAddr> {
-        // First, if there are any extra entries, try to take from them first
-        if let Some(addr) = self.try_take_reserved(len, alignment) {
-            return Some(addr);
-        }
-
-        // If there are no extra entries, we need to get
-        let mut current_entry = self.get_entry()?;
-        let end = current_entry.base + current_entry.length;
-        let aligned_base = align_up(current_entry.base, alignment);
-        let aligned_end = aligned_base + len;
-
-        if current_entry.length < len || aligned_end > end {
-            // This entry is too small, so we skip it and try the next one
-            self.extra_entries.push(current_entry.into());
-            self.current = None;
-            return self.next(len, alignment);
-        }
-
-        if aligned_base > current_entry.base {
-            // If there is a gap between the original base and the aligned base, we can add an extra entry for that gap
-            self.extra_entries.push(current_entry.into());
-        }
-
-        current_entry.base += len;
-        current_entry.length -= len;
-
-        self.current = Some(current_entry);
-
-        return Some(PhysAddr::new(aligned_base));
+    /// Allocates a frame of the given size from the available memory regions.
+    pub fn allocate_for<S: FragmentSize>(&mut self) -> Result<Frame<S>, MemError> {
+        self.allocate_fragment()
     }
-
-    /// Returns the next usable frame of the specified size, or `None` if there are no more usable entries.
-    pub fn next_frame<S: FragmentSize>(&mut self) -> Option<Frame<S>> {
-        let addr = self.next(S::SIZE, Alignment::new(S::SIZE as usize).unwrap())?;
-        Some(Frame::new(addr))
-    }
-
-    /// Returns an iterator over the usable memory ranges in the memory map entries.
-    pub fn used_regions(&self) -> impl Iterator<Item = MemoryRange<PhysAddr>> + '_ {
-        // This doesn't *need* to be 100% accurate, so we ignore `self.extra_entries` for now.
-        self.current
-            .as_ref()
-            .into_iter()
-            .chain((&self.entries[..self.idx - 1]).into_iter().copied())
-            .filter(|entry| matches!(entry.entry_type, EntryType::USABLE))
-            .map(|entry| MemoryRange::new_len(PhysAddr::new(entry.base), entry.length))
-    }
-}
-
-fn align_up(addr: u64, alignment: Alignment) -> u64 {
-    let align = alignment.as_usize() as u64;
-    (addr + align - 1) & !(align - 1)
 }
 
 unsafe impl<S> FragmentManager<Frame<S>, S> for EntryWalker<'_>
 where
     S: FragmentSize,
 {
-    fn allocate_fragment(&mut self) -> Option<Frame<S>> {
-        self.next_frame()
+    fn allocate_fragment(&mut self) -> Result<Frame<S>, MemError> {
+        // Check if we have any fragments that can fit the requested size
+        if let Some(frame) = self.fragment_for::<S>() {
+            return Ok(frame);
+        }
+
+        let region = self.current_region()?;
+        let (aligned, offset) = match region.align_for_with_offset::<S>() {
+            Some(aligned) => aligned,
+            None => {
+                self.advance_region()?;
+                return self.allocate_fragment();
+            }
+        };
+
+        let new_base = aligned + S::SIZE;
+        let new_length = region.length - S::SIZE - offset;
+        if new_length == 0 {
+            // It's important that we tell the walker that this region is now fully used, so we can advance to the next one.
+            self.current.length = 0;
+            // We don't care if the walker runs out of usable regions, since it doesn't affect us.
+            let _ = self.advance_region();
+        } else {
+            self.current = MemoryRegion {
+                base: new_base.as_u64(),
+                length: new_length,
+            };
+        }
+
+        Ok(Frame::new(aligned))
     }
 
     fn deallocate_fragment(&mut self, _primitive: Frame<S>) {
         // We don't need to do anything here since the EntryWalker is only used for initial bootstrapping and we won't be deallocating any frames during that process, but we need to implement this method to satisfy the PrimitiveRangeManager trait.
-        error!("EntryWalker<..>::deallocate_range called");
+        error!("EntryWalker<{}>::deallocate_range called", S::NAME);
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use cake::limine::memory_map::EntryType;
+    use x86_64::structures::paging::frame;
 
-    use std::{array, mem::Alignment};
-
-    use cake::limine::memory_map::{Entry, EntryType};
-
-    use super::*;
-
-    #[test]
-    fn test_usable_memory() {
-        let entries = &[
-            &make_entry(0x0, 0xF, EntryType::USABLE),
-            &make_entry(0x10, 0x10, EntryType::RESERVED),
-            &make_entry(0x20, 0xF0, EntryType::BOOTLOADER_RECLAIMABLE),
-            &make_entry(0x40, 0xF00, EntryType::ACPI_RECLAIMABLE),
-        ];
-        let mut walker = EntryWalker::from_limine_entries(entries);
-        assert_eq!(walker.usable_memory(), 0xFFF);
-    }
+    use crate::{
+        MemError,
+        arch::{L1_PAGE_SIZE, L2_PAGE_SIZE, L3_PAGE_SIZE},
+        entry_walker::EntryWalker,
+        paging::{
+            Address, FragmentManager, Frame, FullManager, Large, Medium, Small, limine::LimineEntry,
+        },
+    };
 
     #[test]
-    fn test_align_up() {
-        assert_eq!(
-            super::align_up(0x1000, Alignment::new(0x1000).unwrap()),
-            0x1000
-        );
-        assert_eq!(
-            super::align_up(0x1001, Alignment::new(0x1000).unwrap()),
-            0x2000
-        );
-        assert_eq!(
-            super::align_up(0x1FFF, Alignment::new(0x1000).unwrap()),
-            0x2000
-        );
-        assert_eq!(
-            super::align_up(0x2000, Alignment::new(0x1000).unwrap()),
-            0x2000
-        );
-    }
+    fn test_region_alignment() {
+        use super::*;
 
-    fn make_entry(base: u64, length: u64, entry_type: EntryType) -> LimineEntry {
-        LimineEntry {
-            base,
-            length,
-            entry_type,
-        }
-    }
-
-    fn extra_entry(base: u64, length: u64) -> ExtraEntry {
-        ExtraEntry { base, length }
-    }
-
-    #[test]
-    fn test_try_take_reserved() {
-        #[rustfmt::skip]
-        let entries = &[
-            extra_entry(0x1000, 0x1000), 
-            extra_entry(0x3000, 0x1000)
-        ];
-
-        let mut walker = EntryWalker {
-            entries: &[],
-            idx: 0,
-            current: None,
-            extra_entries: ArrayVec::try_from(&entries[..]).expect("Failed to create ArrayVec"),
-        };
-
-        // Take half of the first entry, which should succeed and leave an extra entry with the remaining half
-        let addr = walker.try_take_reserved(0x800, Alignment::new(0x1000).unwrap());
-        assert_eq!(addr, Some(PhysAddr::new(0x1000)));
-        // Attempt to take the second half, but the high alignment forces it to take the second entry instead.
-        let addr = walker.try_take_reserved(0x800, Alignment::new(0x1000).unwrap());
-        assert_eq!(addr, Some(PhysAddr::new(0x3000)));
-        // Try to take another 0x1000 aligned chunk of memory, which will fail since the remaining halves of both entries are only 0x800 in size, and the alignment requirements
-        // can't be met
-        let addr = walker.try_take_reserved(0x800, Alignment::new(0x1000).unwrap());
-        assert_eq!(addr, None);
-        // Take the remaining half of the first entry, which should succeed and remove the entry from the list since it's now empty
-        let addr = walker.try_take_reserved(0x800, Alignment::new(0x800).unwrap());
-        assert_eq!(addr, Some(PhysAddr::new(0x1800)));
-
-        // Finally, take the remaining half of the second entry, which should succeed and remove the entry from the list since it's now empty
-        let addr = walker.try_take_reserved(0x800, Alignment::new(0x800).unwrap());
-        assert_eq!(addr, Some(PhysAddr::new(0x3800)));
-        assert!(walker.extra_entries.is_empty());
-    }
-
-    #[test]
-    fn test_try_take_reserved_no_align_leak() {
-        let entries = &[
-            extra_entry(0x0, 0x400000), // A 4 MiB entry
-        ];
-
-        let mut walker = EntryWalker {
-            entries: &[],
-            idx: 0,
-            current: None,
-            extra_entries: ArrayVec::try_from(&entries[..]).expect("Failed to create ArrayVec"),
-        };
-
-        // Take a 4kib chunk first, which should succeed and leave an extra entry with the remaining 4 MiB - 4 KiB
-        let addr = walker.try_take_reserved(0x1000, Alignment::new(0x1000).unwrap());
-        assert_eq!(addr, Some(PhysAddr::new(0x0)));
-        assert_eq!(walker.extra_entries.len(), 1);
-
-        // Take a 2Mib aligned 2Mib chunk, which should be offset by 2Mib for alignment
-        let addr = walker.try_take_reserved(0x200000, Alignment::new(0x200000).unwrap());
-        assert_eq!(addr, Some(PhysAddr::new(0x200000)));
-        assert_eq!(walker.extra_entries.len(), 1);
-
-        // We should be able to take another 511 4kib chunks, ensuring that the alignment requirements for the 2Mib chunk didn't cause us to lose any usable memory,
-        // since the original entry was large enough to accommodate both the 2Mib chunk and the 511 4kib chunks even with the alignment requirements
-        for i in 0..511 {
-            let addr = walker.try_take_reserved(0x1000, Alignment::new(0x1000).unwrap());
-            assert_eq!(addr, Some(PhysAddr::new(0x1000 * (i + 1))));
-            if i != 510 {
-                assert_eq!(walker.extra_entries.len(), 1, "{}", i);
-            } else {
-                assert!(walker.extra_entries.is_empty());
+        fn test<S: FragmentSize>(base: u64, length: u64, expected: Option<(u64, u64)>) {
+            let region = MemoryRegion { base, length };
+            let result = region.align_for_with_offset::<S>();
+            match (result, expected) {
+                (Some((aligned, offset)), Some((expected_aligned, expected_offset))) => {
+                    assert_eq!(aligned.as_u64(), expected_aligned);
+                    assert_eq!(offset, expected_offset);
+                }
+                (None, None) => {}
+                _ => panic!(
+                    "Expected {:?} but got {:?} for base: {:#x}, length: {:#x}",
+                    expected, result, base, length
+                ),
             }
         }
+
+        test::<Small>(L1_PAGE_SIZE, L1_PAGE_SIZE, Some((L1_PAGE_SIZE, 0)));
+        test::<Small>(
+            L1_PAGE_SIZE + 1,
+            L1_PAGE_SIZE * 2,
+            Some((L1_PAGE_SIZE * 2, L1_PAGE_SIZE - 1)),
+        );
+        test::<Small>(L1_PAGE_SIZE, L1_PAGE_SIZE - 1, None);
+        test::<Medium>(L2_PAGE_SIZE, L2_PAGE_SIZE, Some((L2_PAGE_SIZE, 0)));
+        test::<Medium>(
+            L2_PAGE_SIZE + 1,
+            L2_PAGE_SIZE * 2,
+            Some((L2_PAGE_SIZE * 2, L2_PAGE_SIZE - 1)),
+        );
+        test::<Medium>(L2_PAGE_SIZE + 1, L2_PAGE_SIZE, None);
+        test::<Large>(L3_PAGE_SIZE, L3_PAGE_SIZE, Some((L3_PAGE_SIZE, 0)));
+        test::<Large>(
+            L3_PAGE_SIZE + 1,
+            L3_PAGE_SIZE * 2,
+            Some((L3_PAGE_SIZE * 2, L3_PAGE_SIZE - 1)),
+        );
+        test::<Large>(L3_PAGE_SIZE + 1, L3_PAGE_SIZE, None);
+    }
+
+    fn create_entries(entries: &[(u64, u64, EntryType)]) -> Vec<LimineEntry> {
+        entries
+            .iter()
+            .map(|&(base, length, entry_type)| LimineEntry {
+                base,
+                length,
+                entry_type,
+            })
+            .collect()
     }
 
     #[test]
-    fn test_next_entry() {
-        let entries = &[
-            &make_entry(0x0, 0x0F, EntryType::RESERVED),
-            &make_entry(0x10, 0x10, EntryType::USABLE),
-            &make_entry(0x20, 0xF0, EntryType::RESERVED),
-            &make_entry(0x40, 0xF00, EntryType::BOOTLOADER_RECLAIMABLE),
-        ];
-        let mut walker = EntryWalker::from_limine_entries(entries);
-        assert_eq!(walker.next_entry(), Some(*entries[1]));
-        assert_eq!(walker.next_entry(), None);
-        if walker.next_entry().is_some() {
-            panic!("Expected no more entries");
-        }
+    fn test_walker_usable_memory() {
+        let entries = create_entries(&[
+            (0x1000, 0x1000, EntryType::USABLE),
+            (0x2000, 0x1000, EntryType::RESERVED),
+            (0x3000, 0x1000, EntryType::USABLE),
+            (0x4000, 0x1000, EntryType::ACPI_RECLAIMABLE),
+            (0x5000, 0x1000, EntryType::BOOTLOADER_RECLAIMABLE),
+            (0x6000, 0x1000, EntryType::KERNEL_AND_MODULES),
+        ]);
+        let refs: Vec<&LimineEntry> = entries.iter().collect();
+        let walker = unsafe { EntryWalker::from_limine_entries(&refs).unwrap() };
+        assert_eq!(walker.usable_memory(), 0x4000);
     }
 
     #[test]
-    fn test_next_skip_reserved() {
-        let entries = &[
-            &make_entry(0x0, 0x20, EntryType::RESERVED),
-            &make_entry(0x20, 0x20, EntryType::ACPI_NVS),
-            &make_entry(0x40, 0x20, EntryType::ACPI_RECLAIMABLE),
-            &make_entry(0x60, 0x20, EntryType::FRAMEBUFFER),
-            &make_entry(0x80, 0x20, EntryType::EXECUTABLE_AND_MODULES),
-            &make_entry(0xA0, 0x20, EntryType::BAD_MEMORY),
-            &make_entry(0xC0, 0x20, EntryType::BOOTLOADER_RECLAIMABLE),
-            &make_entry(0xE0, 0x20, EntryType::USABLE),
-        ];
+    fn test_walker_allocate_basic_oom() {
+        let entries = create_entries(&[
+            (0x1000, 0x1000, EntryType::USABLE),
+            (0x2000, 0x1000, EntryType::RESERVED),
+            (0x3000, 0x1000, EntryType::USABLE),
+        ]);
+        let refs: Vec<&LimineEntry> = entries.iter().collect();
+        let mut walker = unsafe { EntryWalker::from_limine_entries(&refs).unwrap() };
 
-        let mut walker = EntryWalker::from_limine_entries(entries);
-        assert_eq!(
-            walker.next(0x10, Alignment::new(0x10).unwrap()),
-            Some(PhysAddr::new(0xE0))
-        );
+        let frame1: Frame<Small> = walker.allocate_for().unwrap();
+        assert_eq!(frame1.start_address().as_u64(), 0x1000);
+
+        let frame2: Frame<Small> = walker.allocate_for().unwrap();
+        assert_eq!(frame2.start_address().as_u64(), 0x3000);
+
+        assert_eq!(walker.allocate_for::<Small>(), Err(MemError::OutOfMemory));
     }
 
     #[test]
-    fn test_next_simple() {
-        let entries = &[
-            &make_entry(0x0, 0x20, EntryType::RESERVED),
-            &make_entry(0x20, 0x20, EntryType::USABLE),
-        ];
+    fn test_walker_allocate_higher_alignment() {
+        let entries = create_entries(&[
+            (0x1000, 0x3000, EntryType::USABLE),
+            (L2_PAGE_SIZE, L2_PAGE_SIZE, EntryType::USABLE),
+            (L2_PAGE_SIZE * 2 + 0x2000, 0x1000, EntryType::USABLE),
+        ]);
+        let refs: Vec<&LimineEntry> = entries.iter().collect();
+        let mut walker = unsafe { EntryWalker::from_limine_entries(&refs).unwrap() };
 
-        let mut walker = EntryWalker::from_limine_entries(entries);
-        assert_eq!(
-            walker.next(0x10, Alignment::new(0x10).unwrap()),
-            Some(PhysAddr::new(0x20))
-        );
-    }
+        let frame1: Frame<Small> = walker.allocate_for().unwrap();
+        assert_eq!(frame1.start_address().as_u64(), 0x1000);
 
-    #[test]
-    fn test_next_alignment() {
-        let entries = &[&make_entry(0x1, 0x20, EntryType::USABLE)];
+        let frame2: Frame<Medium> = walker.allocate_for().unwrap();
+        assert_eq!(frame2.start_address().as_u64(), L2_PAGE_SIZE);
 
-        let mut walker = EntryWalker::from_limine_entries(entries);
-        assert_eq!(
-            walker.next(0x10, Alignment::new(0x10).unwrap()),
-            Some(PhysAddr::new(0x10))
-        );
-        assert!(!walker.extra_entries.is_empty(),);
-        assert_eq!(
-            walker.next(0xF, Alignment::new(0x1).unwrap()),
-            Some(PhysAddr::new(0x1)),
-        );
+        let frame3: Frame<Small> = walker.allocate_for().unwrap();
+        assert_eq!(frame3.start_address().as_u64(), 0x2000);
+
+        let frame4: Frame<Small> = walker.allocate_for().unwrap();
+        assert_eq!(frame4.start_address().as_u64(), 0x3000);
+
+        let frame5: Frame<Small> = walker.allocate_for().unwrap();
+        assert_eq!(frame5.start_address().as_u64(), L2_PAGE_SIZE * 2 + 0x2000);
+
+        assert_eq!(walker.allocate_for::<Medium>(), Err(MemError::OutOfMemory));
     }
 }
