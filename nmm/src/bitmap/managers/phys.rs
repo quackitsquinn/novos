@@ -194,15 +194,15 @@ unsafe impl<S> FragmentManager<Frame<S>, S> for PhysicalMemoryManager
 where
     S: FragmentSize,
 {
-    fn allocate_fragment(&mut self) -> Option<Frame<S>> {
+    fn allocate_fragment(&mut self) -> Result<Frame<S>, MemError> {
         for bitmap in self.bitmaps_for::<S>() {
             if let Some(bitptr) = bitmap.bitmap.allocate(S::BITS, bitmap.bit_alignment) {
                 bitmap.free -= S::BITS;
                 let addr = bit_index_as_address(bitptr.bit_index(), bitmap.start);
-                return Some(Frame::new(addr));
+                return Ok(Frame::new(addr));
             }
         }
-        None
+        Err(MemError::OutOfMemory)
     }
 
     fn deallocate_fragment(&mut self, primitive: Frame<S>) {

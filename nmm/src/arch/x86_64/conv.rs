@@ -1,4 +1,6 @@
-use core::mem;
+use core::{error, mem};
+
+use cake::log::error;
 
 use crate::{
     MapFlags, MemError,
@@ -45,7 +47,13 @@ where
     T: FragmentManager<Frame<Small>, Small>,
 {
     fn allocate_frame(&mut self) -> Option<arch_lib::PhysFrame<arch_lib::Size4KiB>> {
-        let frame = self.frame_range_manager.allocate_fragment()?;
+        let frame = match self.frame_range_manager.allocate_fragment() {
+            Ok(frame) => frame,
+            Err(err) => {
+                error!("Internal allocation error in XFrameAllocator: {:?}", err);
+                return None;
+            }
+        };
         Some(frame.into())
     }
 }
@@ -55,7 +63,13 @@ where
     T: FragmentManager<Frame<Medium>, Medium>,
 {
     fn allocate_frame(&mut self) -> Option<arch_lib::PhysFrame<arch_lib::Size2MiB>> {
-        let frame = self.frame_range_manager.allocate_fragment()?;
+        let frame = match self.frame_range_manager.allocate_fragment() {
+            Ok(frame) => frame,
+            Err(err) => {
+                error!("Internal allocation error in XFrameAllocator: {:?}", err);
+                return None;
+            }
+        };
         Some(frame.into())
     }
 }
@@ -65,7 +79,13 @@ where
     T: FragmentManager<Frame<Large>, Large>,
 {
     fn allocate_frame(&mut self) -> Option<arch_lib::PhysFrame<arch_lib::Size1GiB>> {
-        let frame = self.frame_range_manager.allocate_fragment()?;
+        let frame = match self.frame_range_manager.allocate_fragment() {
+            Ok(frame) => frame,
+            Err(err) => {
+                error!("Internal allocation error in XFrameAllocator: {:?}", err);
+                return None;
+            }
+        };
         Some(frame.into())
     }
 }

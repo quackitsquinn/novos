@@ -37,7 +37,7 @@ pub type Table = [PageEntryType; crate::arch::ENTRY_COUNT];
 #[allow(private_bounds)] // intentionally seal this
 pub unsafe trait FragmentManager<T: MemoryFragment<S>, S: FragmentSize> {
     /// Allocates a range of memory of the specified size and alignment, returning the starting address of the allocated range.
-    fn allocate_fragment(&mut self) -> Option<T>;
+    fn allocate_fragment(&mut self) -> Result<T, MemError>;
     /// Deallocates a previously allocated range of memory, given the starting address and size of the range.
     fn deallocate_fragment(&mut self, primitive: T);
 }
@@ -49,17 +49,17 @@ pub trait FullManager<C: PrimitiveClass>:
     + FragmentManager<C::Fragment<Large>, Large>
 {
     /// Allocates a small memory primitive (typically 4KB in size for x86_64 architecture).
-    fn allocate_small(&mut self) -> Option<C::Fragment<Small>> {
+    fn allocate_small(&mut self) -> Result<C::Fragment<Small>, MemError> {
         self.allocate_fragment()
     }
 
     /// Allocates a medium memory primitive (typically 2MB in size for x86_64 architecture).
-    fn allocate_medium(&mut self) -> Option<C::Fragment<Medium>> {
+    fn allocate_medium(&mut self) -> Result<C::Fragment<Medium>, MemError> {
         self.allocate_fragment()
     }
 
     /// Allocates a large memory primitive (typically 1GB in size for x86_64 architecture).
-    fn allocate_large(&mut self) -> Option<C::Fragment<Large>> {
+    fn allocate_large(&mut self) -> Result<C::Fragment<Large>, MemError> {
         self.allocate_fragment()
     }
 }
@@ -131,21 +131,15 @@ where
     for frag in mapper {
         match frag {
             AnyFragment::Small(prim) => {
-                let frame = data_allocator
-                    .allocate_small()
-                    .ok_or(MemError::OutOfMemory)?;
+                let frame = data_allocator.allocate_small()?;
                 map_primitive(frame, prim, flags, data_allocator)?.flush();
             }
             AnyFragment::Medium(prim) => {
-                let frame = data_allocator
-                    .allocate_medium()
-                    .ok_or(MemError::OutOfMemory)?;
+                let frame = data_allocator.allocate_medium()?;
                 map_primitive(frame, prim, flags, data_allocator)?.flush();
             }
             AnyFragment::Large(prim) => {
-                let frame = data_allocator
-                    .allocate_large()
-                    .ok_or(MemError::OutOfMemory)?;
+                let frame = data_allocator.allocate_large()?;
                 map_primitive(frame, prim, flags, data_allocator)?.flush();
             }
         }
@@ -174,21 +168,15 @@ where
     for frag in mapper {
         match frag {
             AnyFragment::Small(prim) => {
-                let frame = data_allocator
-                    .allocate_small()
-                    .ok_or(MemError::OutOfMemory)?;
+                let frame = data_allocator.allocate_small()?;
                 map_primitive(frame, prim, flags, frame_allocator)?.flush();
             }
             AnyFragment::Medium(prim) => {
-                let frame = data_allocator
-                    .allocate_medium()
-                    .ok_or(MemError::OutOfMemory)?;
+                let frame = data_allocator.allocate_medium()?;
                 map_primitive(frame, prim, flags, frame_allocator)?.flush();
             }
             AnyFragment::Large(prim) => {
-                let frame = data_allocator
-                    .allocate_large()
-                    .ok_or(MemError::OutOfMemory)?;
+                let frame = data_allocator.allocate_large()?;
                 map_primitive(frame, prim, flags, frame_allocator)?.flush();
             }
         }
