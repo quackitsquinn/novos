@@ -171,15 +171,62 @@ impl<'a> EntryWalker<'a> {
     }
 
     /// Returns an iterator over the used regions of memory.
-    pub fn used_regions(&self) -> impl Iterator<Item = MemoryRegion> {
-        todo!();
-        #[allow(unreachable_code)] // todo doesn't conform to impl returns
-        core::iter::empty()
+    pub fn used_regions(&self) -> UsedRegions<'_> {
+        UsedRegions::new(self)
     }
 
     /// Allocates a frame of the given size from the available memory regions.
     pub fn allocate_for<S: FragmentSize>(&mut self) -> Result<Frame<S>, MemError> {
         self.allocate_fragment()
+    }
+}
+
+/// An iterator over the used regions of memory.
+#[derive(Debug)]
+pub struct UsedRegions<'a> {
+    walker: &'a EntryWalker<'a>,
+    partial: Option<MemoryRegion>,
+    index: usize,
+}
+
+impl<'a> UsedRegions<'a> {
+    /// Creates a new `UsedRegions` iterator for the given `EntryWalker`.
+    pub fn new(walker: &'a EntryWalker<'a>) -> Self {
+        let partial = match walker.current_region() {
+            Ok(region) => {
+                let full = walker.entries[walker.current_idx];
+                Some(MemoryRegion {
+                    base: full.base,
+                    length: region.base - full.base,
+                })
+            }
+            Err(_) => None,
+        };
+        Self {
+            walker,
+            index: 0,
+            partial,
+        }
+    }
+}
+
+impl Iterator for UsedRegions<'_> {
+    type Item = MemoryRegion;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(partial) = self.partial.take() {
+            return Some(partial);
+        }
+
+        while self.index < self.walker.current_idx {
+            let entry = self.walker.entries[self.index];
+            self.index += 1;
+            if entry.entry_type == EntryType::USABLE {
+                return Some(MemoryRegion::from(*entry));
+            }
+        }
+
+        None
     }
 }
 
@@ -233,9 +280,10 @@ mod tests {
     use crate::{
         MemError,
         arch::{L1_PAGE_SIZE, L2_PAGE_SIZE, L3_PAGE_SIZE},
-        entry_walker::EntryWalker,
+        entry_walker::{EntryWalker, MemoryRegion},
         paging::{
-            Address, FragmentManager, Frame, FullManager, Large, Medium, Small, limine::LimineEntry,
+            Address, FragmentManager, Frame, FullManager, Large, Medium, PhysAddr, Small,
+            limine::LimineEntry,
         },
     };
 
@@ -353,5 +401,37 @@ mod tests {
         assert_eq!(frame5.start_address().as_u64(), L2_PAGE_SIZE * 2 + 0x2000);
 
         assert_eq!(walker.allocate_for::<Medium>(), Err(MemError::OutOfMemory));
+    }
+
+    #[test]
+    fn test_walker_used_regions() {
+        let entries = create_entries(&[
+            (0x1000, 0x1000, EntryType::USABLE),
+            (0x2000, 0x1000, EntryType::RESERVED),
+            (0x3000, 0x2000, EntryType::USABLE),
+            (0x5000, 0x1000, EntryType::ACPI_RECLAIMABLE),
+        ]);
+        let refs: Vec<&LimineEntry> = entries.iter().collect();
+        let mut walker = unsafe { EntryWalker::from_limine_entries(&refs).unwrap() };
+        assert_eq!(
+            walker.allocate_for::<Small>(),
+            Ok(Frame::new(PhysAddr::new(0x1000)))
+        );
+        assert_eq!(
+            walker.allocate_for::<Small>(),
+            Ok(Frame::new(PhysAddr::new(0x3000)))
+        );
+
+        let used_regions: Vec<MemoryRegion> = walker.used_regions().collect();
+        println!("Used regions: {:?}", used_regions);
+        assert_eq!(used_regions.len(), 2);
+        assert!(used_regions.contains(&MemoryRegion {
+            base: 0x1000,
+            length: 0x1000
+        }));
+        assert!(used_regions.contains(&MemoryRegion {
+            base: 0x3000,
+            length: 0x1000
+        }));
     }
 }
