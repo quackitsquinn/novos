@@ -70,14 +70,14 @@ mod arch_lib {
                 Self: Sized,
                 A: FrameAllocator<Size4KiB> + ?Sized,
             {
-                todo!()
+                unimplemented!()
             }
 
             fn unmap(
                 &mut self,
                 _page: Page<S>,
             ) -> Result<(PhysFrame<S>, MapperFlush<S>), UnmapError> {
-                todo!()
+                unimplemented!()
             }
 
             unsafe fn update_flags(
@@ -85,7 +85,7 @@ mod arch_lib {
                 _page: Page<S>,
                 _flags: PageTableFlags,
             ) -> Result<MapperFlush<S>, FlagUpdateError> {
-                todo!()
+                unimplemented!()
             }
 
             unsafe fn set_flags_p4_entry(
@@ -93,7 +93,7 @@ mod arch_lib {
                 _page: Page<S>,
                 _flags: PageTableFlags,
             ) -> Result<MapperFlushAll, FlagUpdateError> {
-                todo!()
+                unimplemented!()
             }
 
             unsafe fn set_flags_p3_entry(
@@ -101,7 +101,7 @@ mod arch_lib {
                 _page: Page<S>,
                 _flags: PageTableFlags,
             ) -> Result<MapperFlushAll, FlagUpdateError> {
-                todo!()
+                unimplemented!()
             }
 
             unsafe fn set_flags_p2_entry(
@@ -109,11 +109,11 @@ mod arch_lib {
                 _page: Page<S>,
                 _flags: PageTableFlags,
             ) -> Result<MapperFlushAll, FlagUpdateError> {
-                todo!()
+                unimplemented!()
             }
 
             fn translate_page(&self, _page: Page<S>) -> Result<PhysFrame<S>, TranslateError> {
-                todo!()
+                unimplemented!()
             }
         }
     }

@@ -83,53 +83,6 @@ pub enum ArchError {
     ParentEntryHugePage,
 }
 
-static ACTIVE_PAGETABLE: RwLock<Option<Mapper>> = RwLock::new(None);
-
-#[allow(dead_code)] // TODO: evaluate later
-pub(crate) fn mapper_read() -> RwLockReadGuard<'static, Option<Mapper>> {
-    ACTIVE_PAGETABLE.read()
-}
-
-pub(crate) fn mapper_mut() -> RwLockWriteGuard<'static, Option<Mapper>> {
-    ACTIVE_PAGETABLE.write()
-}
-
-pub(crate) unsafe fn set_mapper(mapper: Mapper) {
-    *ACTIVE_PAGETABLE.write() = Some(mapper);
-}
-
-pub(crate) fn map_primitive<S, A>(
-    src: Frame<S>,
-    dst: Page<S>,
-    flags: MapFlags,
-    frame_allocator: &mut A,
-) -> Result<Flush, MemError>
-where
-    S: FragmentSize,
-    A: FragmentManager<Frame<Small>, Small>,
-    Mapper: MemoryMapper<S>,
-{
-    let mut mapper_guard = mapper_mut();
-    let mapper = mapper_guard
-        .as_mut()
-        .ok_or(MemError::Uninit("global memory mapper"))?;
-
-    mapper.map(dst, src, flags, frame_allocator)
-}
-
-pub(crate) unsafe fn unmap_primitive<S>(dst: Page<S>) -> Result<(Frame<S>, Flush), MemError>
-where
-    S: FragmentSize,
-    Mapper: MemoryMapper<S>,
-{
-    let mut mapper_guard = mapper_mut();
-    let mapper = mapper_guard
-        .as_mut()
-        .ok_or(MemError::Uninit("global memory mapper"))?;
-
-    unsafe { mapper.unmap(dst) }
-}
-
 pub(crate) unsafe fn do_flush(addr: VirtAddr) {
     cfg_if::cfg_if! {
         if #[cfg(target_arch = "x86_64")] {

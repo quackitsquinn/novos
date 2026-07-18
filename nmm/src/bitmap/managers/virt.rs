@@ -1,7 +1,7 @@
 use core::{alloc::Layout, mem::Alignment};
 
 use crate::{
-    arch,
+    MemError, arch,
     bitmap::{
         BitPtr, Bitmap,
         managers::{address_as_bit_index, align_in_bits, bit_index_as_address, n_pages_for_bytes},
@@ -46,6 +46,26 @@ impl<'a> VirtualMemoryManager<'a> {
 
         let bitptr = self.bitmap.allocate(n_bits, bit_align)?;
         Some(bit_index_as_address(bitptr.bit_index(), self.base_addr))
+    }
+
+    pub unsafe fn try_deallocate(
+        &mut self,
+        addr: VirtAddr,
+        layout: Layout,
+    ) -> Result<(), MemError> {
+        let n_bits = n_pages_for_bytes(layout.size() as u64);
+        let bitptr =
+            address_as_bit_index(addr, self.base_addr).ok_or(MemError::UnmanagedVirtual(addr))?;
+
+        #[cfg(debug_assertions)]
+        if !self.bitmap.all_are_set(bitptr, n_bits) {
+            return Err(MemError::Other(
+                "attempted to deallocate an address that is not fully allocated",
+            ));
+        }
+
+        self.bitmap.clear(bitptr, n_bits);
+        Ok(())
     }
 
     /// Deallocates a previously allocated range of virtual memory starting at the given virtual address and spanning the specified number of bytes.

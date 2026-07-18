@@ -1,16 +1,17 @@
 use cake::log::{debug, info};
+use x86_64::registers::control::Cr3;
 
 use crate::{
     MapFlags, MemError, align,
-    arch::{
-        self, L1_PAGE_SIZE,
-        x86_64::{mapper::Mapper, set_mapper},
-    },
+    arch::{self, L1_PAGE_SIZE, x86_64::mapper::Mapper},
     bitmap::{BitPtr, Bitmap, PhysicalMemoryManager, VirtualMemoryManager},
     entry_walker::EntryWalker,
     paging::{
-        Address, AddressExt, FragmentSize, Medium, MemoryFragment, Page, PageTable, PageTableIndex,
-        PhysAddr, VirtAddr, map_from, map_primitive, primitives::MemoryRange,
+        Address, AddressExt, FragmentSize, Frame, Medium, MemoryFragment, Page, PageTable,
+        PageTableIndex, PhysAddr, Small, VirtAddr,
+        asm::{self, AddressSpace},
+        map_from, map_primitive,
+        primitives::MemoryRange,
     },
 };
 
@@ -27,10 +28,19 @@ pub(crate) unsafe fn init_unchecked(
         });
     }
 
+    #[cfg(target_arch = "x86_64")]
+    let cr3: Frame<Small> = Cr3::read().0.into();
+    #[cfg(not(target_arch = "x86_64"))]
+    let cr3: Frame<Small> = todo!("Unsupported architecture for init_unchecked");
+
     // Initialize the mapper and set it as the active mapper for the system.
     // This is necessary to perform any virtual memory operations, including mapping the scratch space.
     let mapper = unsafe { Mapper::new_offset(root, offset) };
-    unsafe { set_mapper(mapper) };
+    unsafe {
+        asm::set_active(AddressSpace::without_vmm(mapper, cr3));
+    };
+
+    info!("Found {} bytes of usable memory", walker.usable_memory());
 
     // Always make sure the number of bytes will be aligned to u64
     let n_pages = (scratch_range.size() as u64).div_ceil(L1_PAGE_SIZE);
@@ -65,10 +75,17 @@ pub(crate) unsafe fn init_unchecked(
     unsafe { vmm.mark_allocated(scratch_range.start(), n_bytes) }
 
     info!("Initializing physical memory manager with scratch space");
-    let mut pmm = unsafe { PhysicalMemoryManager::init(walker, &mut vmm)? };
+    let pmm = unsafe { PhysicalMemoryManager::init(walker, &mut vmm)? };
     info!("Physical memory manager initialized successfully");
-    panic!("woah!");
-    Ok(())
+
+    {
+        let ads = asm::active();
+        ads.set_vmm(vmm);
+    }
+    asm::set_physical_memory_manager(pmm);
+
+    info!("Memory manager initialized successfully");
+    Err(MemError::Uninit("todo"))
 }
 
 pub(crate) unsafe fn init_load_recursive(

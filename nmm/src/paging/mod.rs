@@ -1,4 +1,5 @@
 //! Contains the core types and structures related to paging, such as page table entries, page tables, and the layout of the page table hierarchy. It also defines the virtual and physical address types used by the architecture.
+pub(crate) mod asm;
 pub mod builder;
 mod fragment;
 pub mod index;
@@ -91,7 +92,10 @@ where
         src, dst, flags
     );
 
-    crate::arch::map_primitive(src, dst, flags, frame_allocator)
+    let active_as = asm::active();
+    let mut mapper = active_as.mapper();
+
+    mapper.map(dst, src, flags, frame_allocator)
 }
 
 /// Unmaps a page, returning the frame that was mapped to it before, or an error if the page was not mapped.
@@ -108,7 +112,10 @@ where
 {
     trace!("Unmapping page {:?}", dst);
 
-    unsafe { crate::arch::unmap_primitive(dst) }
+    let active_as = asm::active();
+    let mut mapper = active_as.mapper();
+
+    unsafe { mapper.unmap(dst) }
 }
 
 pub(crate) unsafe fn map_from<D>(
@@ -221,5 +228,39 @@ pub(crate) unsafe fn map_unchecked(
     byte_size: usize,
     flags: MapFlags,
 ) -> Result<(), MemError> {
-    todo!()
+    let mut pmm = asm::physical_memory_manager();
+
+    unsafe { map_raw(virt_base, phys_base, byte_size, flags, &mut *pmm) }
+}
+
+pub(crate) unsafe fn unmap_unchecked(
+    virt_base: VirtAddr,
+    byte_size: usize,
+) -> Result<(), MemError> {
+    let mapper = GreedyFragmentMapper::<PageClass>::new(virt_base, byte_size as u64);
+
+    for frag in mapper {
+        match frag {
+            AnyFragment::Small(page_prim) => {
+                let (frame, flush) = unsafe { unmap_primitive(page_prim)? };
+                flush.flush();
+                let mut pmm = asm::physical_memory_manager();
+                pmm.deallocate_fragment(frame);
+            }
+            AnyFragment::Medium(page_prim) => {
+                let (frame, flush) = unsafe { unmap_primitive(page_prim)? };
+                flush.flush();
+                let mut pmm = asm::physical_memory_manager();
+                pmm.deallocate_fragment(frame);
+            }
+            AnyFragment::Large(page_prim) => {
+                let (frame, flush) = unsafe { unmap_primitive(page_prim)? };
+                flush.flush();
+                let mut pmm = asm::physical_memory_manager();
+                pmm.deallocate_fragment(frame);
+            }
+        }
+    }
+
+    Ok(())
 }

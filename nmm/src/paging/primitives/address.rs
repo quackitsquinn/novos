@@ -1,6 +1,6 @@
 //! Generic address type for the current architecture, used for both virtual and physical addresses.
 
-use core::{marker::Destruct, ops};
+use core::{marker::Destruct, mem::Alignment, ops};
 
 use crate::paging::{FragmentSize, MemoryFragment, primitives::Primitive};
 
@@ -78,6 +78,11 @@ pub const trait Address: Primitive + [const] AddressMath {
 
     /// Returns the value of this address as a `u64`.
     fn as_u64(&self) -> u64;
+
+    /// Returns the alignment of this address as an `Alignment` object.
+    fn alignment(&self) -> Alignment {
+        Alignment::new(1 << self.as_u64().trailing_zeros() as usize).unwrap()
+    }
 }
 
 /// Non-const additions to `Address` types.

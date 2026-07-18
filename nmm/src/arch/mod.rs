@@ -50,11 +50,6 @@ pub const L3_PAGE_SIZE: u64 = arch_impl::L3_PAGE_SIZE;
 pub(crate) use arch_impl::api::init_load_recursive;
 pub(crate) use arch_impl::api::init_unchecked;
 
-#[doc(hidden)]
-pub(crate) use arch_impl::map_primitive;
-#[doc(hidden)]
-pub(crate) use arch_impl::unmap_primitive;
-
 pub(crate) use arch_impl::do_flush;
 pub(crate) use arch_impl::do_flush_all;
 

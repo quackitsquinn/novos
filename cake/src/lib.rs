@@ -17,7 +17,7 @@ pub use self::limine_request::{
 };
 pub use fuse::Fuse;
 pub use module::KernelModule;
-pub use oncemut::OnceMutex;
+pub use oncemut::{OnceMutex, OnceMutexGuard};
 pub use oncerw::{OnceRwLock, OnceRwReadGuard, OnceRwWriteGuard};
 pub use owned::Owned;
 pub use resource::{ResourceGuard, ResourceMutex};
@@ -27,6 +27,8 @@ pub use lock_api;
 pub use log;
 pub use spin::lock_api::*;
 pub use spin::{Barrier, Lazy, Once};
+/// A type alias for a mapped mutex guard.
+pub type MappedMutexGuard<'a, T> = lock_api::MappedMutexGuard<'a, RawMutex, T>;
 
 /// Type aliases for a raw mutex.
 pub type RawMutex = spin::Mutex<()>;
