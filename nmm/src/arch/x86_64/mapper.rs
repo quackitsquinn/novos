@@ -5,8 +5,9 @@ use crate::{
         x86_64::{offset::OffsetPageTable, recursive::RecursivePageTable},
     },
     paging::{
-        FragmentManager, FragmentSize, Frame, Page, PageTable, PageTableIndex, Small,
-        map::{Flush, MemoryMapper},
+        EntryMappingFlags, FragmentManager, FragmentSize, Frame, Page, PageTable, PageTableIndex,
+        Small,
+        map::{Flush, MemoryMapper, Unmapped},
     },
 };
 
@@ -52,21 +53,19 @@ where
         page: Page<S>,
         frame: Frame<S>,
         flags: MapFlags,
+        mapping_flags: EntryMappingFlags,
         allocator: &mut A,
     ) -> Result<Flush, MemError>
     where
         A: FragmentManager<Frame<Small>, Small>,
     {
         match self {
-            Mapper::Offset(mapper) => mapper.map(page, frame, flags, allocator),
-            Mapper::Recursive(mapper) => mapper.map(page, frame, flags, allocator),
+            Mapper::Offset(mapper) => mapper.map(page, frame, flags, mapping_flags, allocator),
+            Mapper::Recursive(mapper) => mapper.map(page, frame, flags, mapping_flags, allocator),
         }
     }
 
-    unsafe fn unmap(
-        &mut self,
-        page: crate::paging::Page<S>,
-    ) -> Result<(crate::paging::Frame<S>, Flush), MemError> {
+    unsafe fn unmap(&mut self, page: crate::paging::Page<S>) -> Result<Unmapped<S>, MemError> {
         match self {
             Mapper::Offset(mapper) => unsafe { mapper.unmap(page) },
             Mapper::Recursive(mapper) => unsafe { mapper.unmap(page) },

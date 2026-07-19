@@ -124,6 +124,76 @@ pub(crate) const fn canonicalize_virt(addr: u64) -> u64 {
     ((addr << 16) as i64 >> 16) as u64
 }
 
+pub const PTE_FREE_BIT0: u64 = 1 << 9;
+
+cake::encapsulate_macro!(
+    impl_memory_mapper_for,
+    _mm_impl_for,
+    /// Implements the `MemoryMapper` trait for a given type and fragment size.
+    macro_rules! impl_memory_mapper_for {
+        ($ty: ty, $size:ident, $is_huge:literal) => {
+            impl MemoryMapper<$size> for $ty {
+                fn map<A>(
+                    &mut self,
+                    page: Page<$size>,
+                    frame: Frame<$size>,
+                    flags: MapFlags,
+                    mapping_flags: EntryMappingFlags,
+                    allocator: &mut A,
+                ) -> Result<Flush, MemError>
+                where
+                    A: FragmentManager<Frame<Small>, Small>,
+                {
+                    let mut x_fa = XFrameAllocator::new(allocator);
+                    let flags: PageTableFlags = flags.into();
+                    let flag_bits = flags.bits();
+                    let mapping_bits = mapping_flags.bits();
+                    let mut flags = PageTableFlags::from_bits_retain(flag_bits | mapping_bits);
+
+                    if $is_huge {
+                        flags.insert(PageTableFlags::HUGE_PAGE)
+                    };
+
+                    unsafe {
+                        let _ = self.inner.map_to(
+                            page.into(),
+                            frame.into(),
+                            flags.into(),
+                            &mut x_fa,
+                        )?;
+                    };
+
+                    Ok(unsafe { Flush::flush_page(page) })
+                }
+
+                unsafe fn unmap(
+                    &mut self,
+                    page: crate::paging::Page<$size>,
+                ) -> Result<Unmapped<$size>, MemError> {
+                    let flags = match self.inner.translate(page.start_address().into()) {
+                        arch_lib::TranslateResult::Mapped { flags, .. } => flags,
+                        arch_lib::TranslateResult::NotMapped => {
+                            return Err(MemError::NotMapped(page.into()));
+                        }
+                        arch_lib::TranslateResult::InvalidFrameAddress(addr) => {
+                            return Err(MemError::InvalidFrameAddress(addr.into()));
+                        }
+                    };
+                    let result = self.inner.unmap(page.into());
+                    match result {
+                        Ok((frame, _)) => Ok(Unmapped::new(
+                            frame.into(),
+                            Some(unsafe { Flush::flush_page(page) }),
+                            EntryMappingFlags::from_bits_truncate(flags.bits()),
+                        )),
+                        Err(e) => Err(MemError::from_unmap_error(e, page)),
+                    }
+                }
+            }
+        };
+    }
+);
+
 #[cfg(test)]
 mod tests {
 

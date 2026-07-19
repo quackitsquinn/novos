@@ -77,23 +77,31 @@ pub unsafe fn load_recursive(
     unsafe { arch::init_load_recursive(root, index, phys_addr) }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MapSource {
+    Direct(PhysAddr),
+    Anon,
+}
+
 /// Maps a virtual address range to a physical address range with the specified size
 ///
-/// - `virt_base` is the starting virtual address of the range to be mapped.
+/// - `dest` is the starting virtual address of the range to be mapped.
 /// - `phys_base` is the starting physical address of the range to be mapped.
 /// - `byte_size` is the size of the range to be mapped, in bytes.
 /// - `flags` are the mapping flags that specify the permissions and attributes of the mapping (e.g., read/write permissions, caching behavior).
 // I thought about making this unsafe since it can cause undefined behavior BUT
 // said undefined behavior requires dereferencing the mapped memory, so the safety is the caller's responsibility.
 pub fn map(
-    virt_base: VirtAddr,
-    phys_base: PhysAddr,
+    dest: VirtAddr,
+    src: MapSource,
     byte_size: usize,
     flags: MapFlags,
 ) -> Result<(), MemError> {
-    check_range_virt(virt_base, byte_size)?;
-    check_range_phys(phys_base, byte_size)?;
-    unsafe { paging::map_unchecked(virt_base, phys_base, byte_size, flags) }
+    check_range_virt(dest, byte_size)?;
+    if let MapSource::Direct(phys_base) = src {
+        check_range_phys(phys_base, byte_size)?;
+    }
+    unsafe { paging::map_unchecked(dest, src, byte_size, flags) }
 }
 
 /// Unmaps a virtual address range of the specified size starting from the given virtual base address
@@ -203,7 +211,7 @@ pub fn create_phys_mapping(
 ) -> Result<MemoryMapping, MemError> {
     check_range_phys(phys_base, byte_size)?;
     let virt_addr = reserve_virtual(make_layout_for_mapping(phys_base, byte_size))?;
-    unsafe { paging::map_unchecked(virt_addr, phys_base, byte_size, flags) }?;
+    unsafe { paging::map_unchecked(virt_addr, MapSource::Direct(phys_base), byte_size, flags) }?;
     Ok(MemoryMapping::new(virt_addr, phys_base, byte_size))
 }
 

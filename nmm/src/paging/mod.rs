@@ -8,17 +8,18 @@ pub mod map;
 pub mod primitives;
 mod table;
 
+use bitflags::bitflags;
 pub use table::{PageTable, PageTableEntry};
 
 use cake::log::trace;
 pub use index::PageTableIndex;
 
 use crate::{
-    MapFlags, MemError,
-    arch::{Mapper, PageEntryType},
+    MapFlags, MapSource, MemError,
+    arch::{self, Mapper, PageEntryType},
     paging::{
         fragment::{GreedyFragmentMapper, JointFragmentMapper},
-        map::{Flush, MemoryMapper},
+        map::{Flush, MemoryMapper, Unmapped},
         primitives::{AnyFragment, FrameClass, PageClass, PrimitiveClass},
     },
 };
@@ -80,6 +81,7 @@ pub(crate) fn map_primitive<S, A>(
     src: Frame<S>,
     dst: Page<S>,
     flags: MapFlags,
+    mapping_flags: EntryMappingFlags,
     frame_allocator: &mut A,
 ) -> Result<Flush, MemError>
 where
@@ -95,7 +97,7 @@ where
     let active_as = asm::active();
     let mut mapper = active_as.mapper();
 
-    mapper.map(dst, src, flags, frame_allocator)
+    mapper.map(dst, src, flags, mapping_flags, frame_allocator)
 }
 
 /// Unmaps a page, returning the frame that was mapped to it before, or an error if the page was not mapped.
@@ -105,7 +107,7 @@ where
 /// The caller must ensure that there are no currently living references to the memory that was mapped to the page being unmapped,
 /// as accessing that memory afterwards is undefined behavior.
 #[must_use = "The returned `Flush` should be flushed after the mapping operation to ensure that there are no stale mappings."]
-pub(crate) unsafe fn unmap_primitive<S>(dst: Page<S>) -> Result<(Frame<S>, Flush), MemError>
+pub(crate) unsafe fn unmap_primitive<S>(dst: Page<S>) -> Result<Unmapped<S>, MemError>
 where
     S: FragmentSize,
     Mapper: MemoryMapper<S>,
@@ -122,6 +124,7 @@ pub(crate) unsafe fn map_from<D>(
     base: VirtAddr,
     len: u64,
     flags: MapFlags,
+    mapping_flags: EntryMappingFlags,
     data_allocator: &mut D,
 ) -> Result<(), MemError>
 where
@@ -139,15 +142,15 @@ where
         match frag {
             AnyFragment::Small(prim) => {
                 let frame = data_allocator.allocate_small()?;
-                map_primitive(frame, prim, flags, data_allocator)?.flush();
+                map_primitive(frame, prim, flags, mapping_flags, data_allocator)?.flush();
             }
             AnyFragment::Medium(prim) => {
                 let frame = data_allocator.allocate_medium()?;
-                map_primitive(frame, prim, flags, data_allocator)?.flush();
+                map_primitive(frame, prim, flags, mapping_flags, data_allocator)?.flush();
             }
             AnyFragment::Large(prim) => {
                 let frame = data_allocator.allocate_large()?;
-                map_primitive(frame, prim, flags, data_allocator)?.flush();
+                map_primitive(frame, prim, flags, mapping_flags, data_allocator)?.flush();
             }
         }
     }
@@ -159,6 +162,7 @@ pub(crate) unsafe fn map_from_with_allocator<D, F>(
     base: VirtAddr,
     len: u64,
     flags: MapFlags,
+    mapping_flags: EntryMappingFlags,
     data_allocator: &mut D,
     frame_allocator: &mut F,
 ) -> Result<(), MemError>
@@ -176,15 +180,15 @@ where
         match frag {
             AnyFragment::Small(prim) => {
                 let frame = data_allocator.allocate_small()?;
-                map_primitive(frame, prim, flags, frame_allocator)?.flush();
+                map_primitive(frame, prim, flags, mapping_flags, frame_allocator)?.flush();
             }
             AnyFragment::Medium(prim) => {
                 let frame = data_allocator.allocate_medium()?;
-                map_primitive(frame, prim, flags, frame_allocator)?.flush();
+                map_primitive(frame, prim, flags, mapping_flags, frame_allocator)?.flush();
             }
             AnyFragment::Large(prim) => {
                 let frame = data_allocator.allocate_large()?;
-                map_primitive(frame, prim, flags, frame_allocator)?.flush();
+                map_primitive(frame, prim, flags, mapping_flags, frame_allocator)?.flush();
             }
         }
     }
@@ -192,11 +196,28 @@ where
     Ok(())
 }
 
+bitflags! {
+    /// The flags used for handling special cases in page table entries, such as anonymous mappings.
+    /// This is a bitflag where the positions of the bits are not formally defined, and above a couple entries even guaranteed to exist.
+    /// This may need to be refactored if we need more than a few flags (i believe the lower limit accounting for x86_64, aarch64, and riscv is 3 bits but it may be more idk)
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub struct EntryMappingFlags: u64 {
+        const MAP_ANON = arch::PTE_FREE_BIT0;
+    }
+}
+
+impl Default for EntryMappingFlags {
+    fn default() -> Self {
+        Self::empty()
+    }
+}
+
 pub(crate) unsafe fn map_raw<F>(
     virt_base: VirtAddr,
     phys_base: PhysAddr,
     byte_size: usize,
     flags: MapFlags,
+    mapping_flags: EntryMappingFlags,
     frame_alloc: &mut F,
 ) -> Result<(), MemError>
 where
@@ -207,13 +228,13 @@ where
     for pair in mapper {
         match pair {
             (AnyFragment::Small(page_prim), AnyFragment::Small(phys_prim)) => {
-                map_primitive(phys_prim, page_prim, flags, frame_alloc)?.flush();
+                map_primitive(phys_prim, page_prim, flags, mapping_flags, frame_alloc)?.flush();
             }
             (AnyFragment::Medium(page_prim), AnyFragment::Medium(phys_prim)) => {
-                map_primitive(phys_prim, page_prim, flags, frame_alloc)?.flush();
+                map_primitive(phys_prim, page_prim, flags, mapping_flags, frame_alloc)?.flush();
             }
             (AnyFragment::Large(page_prim), AnyFragment::Large(phys_prim)) => {
-                map_primitive(phys_prim, page_prim, flags, frame_alloc)?.flush();
+                map_primitive(phys_prim, page_prim, flags, mapping_flags, frame_alloc)?.flush();
             }
             _ => unreachable!("non-matched fragments produced by mapper"),
         }
@@ -223,14 +244,15 @@ where
 }
 
 pub(crate) unsafe fn map_unchecked(
-    virt_base: VirtAddr,
-    phys_base: PhysAddr,
+    dest: VirtAddr,
+    src: MapSource,
     byte_size: usize,
     flags: MapFlags,
 ) -> Result<(), MemError> {
     let mut pmm = asm::physical_memory_manager();
 
-    unsafe { map_raw(virt_base, phys_base, byte_size, flags, &mut *pmm) }
+    //unsafe { map_raw(dest, src, byte_size, flags, todo!(), &mut *pmm) }
+    todo!()
 }
 
 pub(crate) unsafe fn unmap_unchecked(
@@ -242,22 +264,22 @@ pub(crate) unsafe fn unmap_unchecked(
     for frag in mapper {
         match frag {
             AnyFragment::Small(page_prim) => {
-                let (frame, flush) = unsafe { unmap_primitive(page_prim)? };
-                flush.flush();
+                let mut ent = unsafe { unmap_primitive(page_prim)? };
+                ent.flush();
                 let mut pmm = asm::physical_memory_manager();
-                pmm.deallocate_fragment(frame);
+                pmm.deallocate_fragment(ent.frame);
             }
             AnyFragment::Medium(page_prim) => {
-                let (frame, flush) = unsafe { unmap_primitive(page_prim)? };
-                flush.flush();
+                let mut ent = unsafe { unmap_primitive(page_prim)? };
+                ent.flush();
                 let mut pmm = asm::physical_memory_manager();
-                pmm.deallocate_fragment(frame);
+                pmm.deallocate_fragment(ent.frame);
             }
             AnyFragment::Large(page_prim) => {
-                let (frame, flush) = unsafe { unmap_primitive(page_prim)? };
-                flush.flush();
+                let mut ent = unsafe { unmap_primitive(page_prim)? };
+                ent.flush();
                 let mut pmm = asm::physical_memory_manager();
-                pmm.deallocate_fragment(frame);
+                pmm.deallocate_fragment(ent.frame);
             }
         }
     }

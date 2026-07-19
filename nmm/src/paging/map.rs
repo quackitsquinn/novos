@@ -6,7 +6,7 @@ use core::fmt;
 
 use crate::{
     MapFlags, MemError,
-    paging::{FragmentManager, FragmentSize, Frame, Page, Small, VirtAddr},
+    paging::{EntryMappingFlags, FragmentManager, FragmentSize, Frame, Page, Small, VirtAddr},
 };
 
 /// A trait for types that can map and unmap pages of a specific size. This is the main interface for mapping
@@ -22,13 +22,34 @@ pub trait MemoryMapper<S: FragmentSize> {
         page: Page<S>,
         frame: Frame<S>,
         flags: MapFlags,
+        mapping_flags: EntryMappingFlags,
         allocator: &mut A,
     ) -> Result<Flush, MemError>
     where
         A: FragmentManager<Frame<Small>, Small>;
 
     /// Unmaps the given page, returning the frame that was mapped to it before, or an error if the page was not mapped.
-    unsafe fn unmap(&mut self, page: Page<S>) -> Result<(Frame<S>, Flush), MemError>;
+    unsafe fn unmap(&mut self, page: Page<S>) -> Result<Unmapped<S>, MemError>;
+}
+
+pub struct Unmapped<S: FragmentSize> {
+    pub frame: Frame<S>,
+    flush: Option<Flush>,
+    pub mapping_flags: EntryMappingFlags,
+}
+
+impl<S: FragmentSize> Unmapped<S> {
+    pub fn new(frame: Frame<S>, flush: Option<Flush>, mapping_flags: EntryMappingFlags) -> Self {
+        Self {
+            frame,
+            flush,
+            mapping_flags,
+        }
+    }
+
+    pub fn flush(&mut self) {
+        self.flush.take().map(|f| f.flush());
+    }
 }
 
 /// A wrapper type for a virtual address that needs to be flushed from the TLB after a mapping operation.

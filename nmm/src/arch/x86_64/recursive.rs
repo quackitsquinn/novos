@@ -5,19 +5,21 @@
 
 use core::fmt::Debug;
 
-use x86_64::structures::paging::mapper::Mapper as _;
+use x86_64::structures::paging::mapper::{Mapper as _, Translate as _};
 
 use crate::{
     MapFlags, MemError,
-    arch::x86_64::{PageTableFlags, XFrameAllocator},
+    arch::x86_64::{PageTableFlags, XFrameAllocator, impl_memory_mapper_for},
     paging::{
-        FragmentManager, Frame, Large, Medium, Page, PageTable, PageTableIndex, Small,
-        map::{Flush, MemoryMapper},
+        EntryMappingFlags, FragmentManager, Frame, Large, Medium, Page, PageTable, PageTableIndex,
+        Small,
+        map::{Flush, MemoryMapper, Unmapped},
     },
 };
 
 mod arch_lib {
     pub use x86_64::structures::paging::PageTable;
+    pub use x86_64::structures::paging::mapper::TranslateResult;
 
     #[cfg(target_arch = "x86_64")]
     pub use x86_64::structures::paging::RecursivePageTable as XRecursive;
@@ -122,7 +124,10 @@ mod arch_lib {
 }
 
 /// A x86_64 specific implementation of a recursive page table, wrapping the x86_64's crate implementation of a recursive page table.
-pub struct RecursivePageTable<'a>(arch_lib::XRecursive<'a>, PageTableIndex);
+pub struct RecursivePageTable<'a> {
+    inner: arch_lib::XRecursive<'a>,
+    recursive_index: PageTableIndex,
+}
 
 impl<'a> RecursivePageTable<'a> {
     /// Creates a new RecursivePageTable from a mutable reference to the level 4 page table and the recursive index.
@@ -132,58 +137,26 @@ impl<'a> RecursivePageTable<'a> {
         let table = unsafe {
             arch_lib::XRecursive::new_unchecked(table.as_arch_mut(), recursive_index.into())
         };
-        Self(table, recursive_index)
+        Self {
+            inner: table,
+            recursive_index,
+        }
     }
     /// Returns the recursive index used for this recursive page table.
     pub fn recursive_index(&self) -> PageTableIndex {
-        self.1
+        self.recursive_index
     }
 
     /// Returns a reference to the level 4 page table.
     pub fn p4(&self) -> &arch_lib::PageTable {
-        let p4 = self.0.level_4_table();
+        let p4 = self.inner.level_4_table();
         p4
     }
 
     /// Returns a mutable reference to the level 4 page table.
     pub fn p4_mut(&mut self) -> &mut arch_lib::PageTable {
-        let p4 = self.0.level_4_table_mut();
+        let p4 = self.inner.level_4_table_mut();
         p4
-    }
-}
-
-impl MemoryMapper<Small> for RecursivePageTable<'_> {
-    fn map<A>(
-        &mut self,
-        page: Page<Small>,
-        frame: Frame<Small>,
-        flags: MapFlags,
-        allocator: &mut A,
-    ) -> Result<Flush, MemError>
-    where
-        A: FragmentManager<Frame<Small>, Small>,
-    {
-        let mut x_fa = XFrameAllocator::new(allocator);
-        let flags: PageTableFlags = flags.into();
-
-        unsafe {
-            let _ = self
-                .0
-                .map_to(page.into(), frame.into(), flags.into(), &mut x_fa)?;
-        };
-
-        Ok(unsafe { Flush::flush_page(page) })
-    }
-
-    unsafe fn unmap(
-        &mut self,
-        page: crate::paging::Page<Small>,
-    ) -> Result<(Frame<Small>, Flush), MemError> {
-        let result = self.0.unmap(page.into());
-        match result {
-            Ok((frame, _)) => Ok((frame.into(), unsafe { Flush::flush_page(page) })),
-            Err(e) => Err(MemError::from_unmap_error(e, page)),
-        }
     }
 }
 
@@ -195,45 +168,6 @@ impl Debug for RecursivePageTable<'_> {
     }
 }
 
-macro_rules! impl_memory_mapper_huge {
-    ($size:ident) => {
-        impl MemoryMapper<$size> for RecursivePageTable<'_> {
-            fn map<A>(
-                &mut self,
-                page: Page<$size>,
-                frame: Frame<$size>,
-                flags: MapFlags,
-                allocator: &mut A,
-            ) -> Result<Flush, MemError>
-            where
-                A: FragmentManager<Frame<Small>, Small>,
-            {
-                let mut x_fa = XFrameAllocator::new(allocator);
-                let mut flags: PageTableFlags = flags.into();
-                flags.insert(PageTableFlags::HUGE_PAGE);
-
-                unsafe {
-                    let _ = self
-                        .0
-                        .map_to(page.into(), frame.into(), flags.into(), &mut x_fa)?;
-                };
-
-                Ok(unsafe { Flush::flush_page(page) })
-            }
-
-            unsafe fn unmap(
-                &mut self,
-                page: crate::paging::Page<$size>,
-            ) -> Result<(Frame<$size>, Flush), MemError> {
-                let result = self.0.unmap(page.into());
-                match result {
-                    Ok((frame, _)) => Ok((frame.into(), unsafe { Flush::flush_page(page) })),
-                    Err(e) => Err(MemError::from_unmap_error(e, page)),
-                }
-            }
-        }
-    };
-}
-
-impl_memory_mapper_huge!(Medium);
-impl_memory_mapper_huge!(Large);
+impl_memory_mapper_for!(RecursivePageTable<'_>, Small, false);
+impl_memory_mapper_for!(RecursivePageTable<'_>, Medium, true);
+impl_memory_mapper_for!(RecursivePageTable<'_>, Large, true);
