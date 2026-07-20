@@ -58,6 +58,8 @@ pub(crate) use arch_impl::canonicalize_virt;
 
 pub(crate) use arch_impl::PTE_FREE_BIT0;
 
+pub(crate) use arch_impl::pml4_phys;
+
 /// Validates that the given physical address is valid for the current architecture.
 pub const fn is_valid_phys(addr: u64) -> bool {
     canonicalize_phys(addr) == addr

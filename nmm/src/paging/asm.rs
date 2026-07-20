@@ -40,8 +40,13 @@ impl AddressSpace {
         }
     }
 
-    pub(crate) fn mapper(&self) -> MutexGuard<'_, arch::Mapper> {
-        self.mapper.lock()
+    pub(crate) fn mapper(&self) -> Option<MutexGuard<'_, arch::Mapper>> {
+        // TODO: Change return to Option<MutexGuard> and comparing the pml4 register to self.l4_table to determine if the mapper is valid for the current address space.
+        if self.l4_table == arch::pml4_phys() {
+            Some(self.mapper.lock())
+        } else {
+            None
+        }
     }
 
     pub(crate) fn l4_table(&self) -> &Frame<Small> {

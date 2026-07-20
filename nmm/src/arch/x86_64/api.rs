@@ -86,7 +86,8 @@ pub(crate) unsafe fn init_unchecked(
     asm::set_physical_memory_manager(pmm);
 
     info!("Memory manager initialized successfully");
-    Err(MemError::Uninit("todo"))
+    //Err(MemError::Uninit("todo"))
+    Ok(())
 }
 
 pub(crate) unsafe fn init_load_recursive(

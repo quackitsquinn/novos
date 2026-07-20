@@ -6,6 +6,7 @@ mod mapper;
 mod offset;
 mod recursive;
 
+use cfg_if::cfg_if;
 pub use mapper::Mapper;
 
 use bitflags::bitflags;
@@ -122,6 +123,17 @@ pub(crate) const fn canonicalize_virt(addr: u64) -> u64 {
     // By doing the right shift as a signed operation (on a i64), it will
     // sign extend the value, repeating the leftmost bit.
     ((addr << 16) as i64 >> 16) as u64
+}
+
+pub(crate) fn pml4_phys() -> Frame<Small> {
+    cfg_if! {
+        if #[cfg(target_arch = "x86_64")] {
+            let cr3: Frame<Small> = x86_64::registers::control::Cr3::read().0.into();
+            cr3
+        } else {
+            unreachable!()
+        }
+    }
 }
 
 pub const PTE_FREE_BIT0: u64 = 1 << 9;

@@ -95,7 +95,7 @@ where
     );
 
     let active_as = asm::active();
-    let mut mapper = active_as.mapper();
+    let mut mapper = active_as.mapper().unwrap();
 
     mapper.map(dst, src, flags, mapping_flags, frame_allocator)
 }
@@ -115,7 +115,7 @@ where
     trace!("Unmapping page {:?}", dst);
 
     let active_as = asm::active();
-    let mut mapper = active_as.mapper();
+    let mut mapper = active_as.mapper().unwrap();
 
     unsafe { mapper.unmap(dst) }
 }

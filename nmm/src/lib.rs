@@ -77,9 +77,14 @@ pub unsafe fn load_recursive(
     unsafe { arch::init_load_recursive(root, index, phys_addr) }
 }
 
+/// A source of physical memory for mapping virtual addresses.
+/// This enum defines the various ways in which physical memory can be allocated or copied when creating a new mapping in the virtual address space.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(C)]
 pub enum MapSource {
+    /// Maps the given physical address directly to the virtual address.
     Direct(PhysAddr),
+    /// Allocate physical memory for the mapping.
     Anon,
 }
 
