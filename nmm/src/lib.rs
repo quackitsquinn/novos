@@ -9,7 +9,7 @@
 #![feature(const_cmp)]
 #![feature(derive_const)]
 
-use core::{alloc::Layout, mem::Alignment};
+use core::{alloc::Layout, fmt::Display, mem::Alignment};
 
 use bitflags::bitflags;
 use cake::limine::memory_map;
@@ -47,12 +47,11 @@ pub mod paging;
 ///   This range is used for virtual address allocation (e.g., for `alloc_virtspace`) and physical memory mapping (e.g., for `alloc_paged`),
 ///   as well as internal memory management state.
 pub unsafe fn init(
-    root: &'static mut PageTable,
     offset: VirtAddr,
     ranges: &'static [&'static memory_map::Entry],
     managed_range: MemoryRange<VirtAddr>,
 ) -> Result<(), MemError> {
-    unsafe { arch::init_unchecked(root, offset, EntryWalker::new(ranges)?, managed_range) }
+    unsafe { arch::init_unchecked(offset, EntryWalker::new(ranges)?, managed_range) }
 }
 
 /// Enables recursive paging at the specified page table index, loading the given physical address into the architecture-specific register for the page table base address.
@@ -120,14 +119,6 @@ pub fn map(
 pub unsafe fn unmap(virt_base: VirtAddr, byte_size: usize) -> Result<(), MemError> {
     check_range_virt(virt_base, byte_size)?;
     unsafe { paging::unmap_unchecked(virt_base, byte_size) }
-}
-
-/// Maps `byte_size` bytes of memory, returning the base virtual address of the mapped region. The physical memory for this mapping is allocated by the memory manager, and the mapping is created with the specified flags.
-///
-/// `byte_size` will always be rounded up to the nearest page size, so the actual mapped size may be larger than the requested size.
-#[must_use = "The returned virtual address must be freed with `unmap` when it is no longer needed to avoid memory leaks and ensure proper resource management."]
-pub fn alloc_anon(byte_size: usize, flags: MapFlags) -> Result<VirtAddr, MemError> {
-    todo!()
 }
 
 /// Allocates a virtual address range of the specified size without mapping it to any physical memory.
@@ -383,6 +374,35 @@ bitflags! {
     }
 }
 
+impl Display for MapFlags {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        if self.contains(MapFlags::WRITABLE) {
+            write!(f, "W")?;
+        } else {
+            write!(f, "R")?;
+        };
+
+        if self.contains(MapFlags::USER_ACCESSIBLE) {
+            write!(f, " US")?;
+        } else {
+            write!(f, " KS")?;
+        };
+
+        if self.contains(MapFlags::EXECUTABLE) {
+            write!(f, " X")?;
+        } else {
+            write!(f, " NX")?;
+        };
+
+        if self.contains(MapFlags::CACHE_DISABLE) {
+            write!(f, " NC")?;
+        } else {
+            write!(f, " C")?;
+        };
+
+        Ok(())
+    }
+}
 /// Aligns the given value up or down to the nearest multiple of the specified alignment. The alignment must be a power of two.
 ///
 /// # Usage

@@ -1,6 +1,6 @@
 use core::fmt::Debug;
 
-use x86_64::structures::paging::{Mapper as _, Translate as _, mapper::PageTableFrameMapping};
+use x86_64::structures::paging::{Mapper as _, Translate as _};
 
 use crate::{
     MapFlags, MemError,

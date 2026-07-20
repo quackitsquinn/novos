@@ -3,7 +3,7 @@
 //! This module acts mostly as a hack to get proper rust-analyzer support for x86_64::RecursivePageTable, plus as a way to somewhat normalize what the cross platform
 //! Mapping system will look like. Again, deeply cursed but there IS a not completely cursed reason for it.use std::marker;
 
-use core::fmt::Debug;
+use core::{fmt::Debug, mem::transmute};
 
 use x86_64::structures::paging::mapper::{Mapper as _, Translate as _};
 
@@ -154,15 +154,15 @@ impl<'a> RecursivePageTable<'a> {
     }
 
     /// Returns a reference to the level 4 page table.
-    pub fn p4(&self) -> &arch_lib::PageTable {
+    pub fn p4(&self) -> &PageTable {
         let p4 = self.inner.level_4_table();
-        p4
+        PageTable::from_arch_ref(p4)
     }
 
     /// Returns a mutable reference to the level 4 page table.
-    pub fn p4_mut(&mut self) -> &mut arch_lib::PageTable {
+    pub fn p4_mut(&mut self) -> &mut PageTable {
         let p4 = self.inner.level_4_table_mut();
-        p4
+        PageTable::from_arch_mut(p4)
     }
 }
 

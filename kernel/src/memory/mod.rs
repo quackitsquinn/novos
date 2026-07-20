@@ -31,19 +31,15 @@ fn init() -> Result<(), Infallible> {
     let hhdm_offset = *PHYSICAL_MEMORY_OFFSET
         .get()
         .expect("Physical memory offset not provided by bootloader");
-    let cr3 = Cr3::read();
-    let pml4_vaddr = (hhdm_offset + cr3.0.start_address().as_u64()) as *mut ();
     let memory_map = MEMORY_MAP.lock_limine();
     let memory_map = memory_map.entries();
     info!(
-        "Initializing nmm [hhdm_mapping: {:x}, pml4: {}, managed_range: {:?}]",
+        "Initializing nmm [hhdm_mapping: {:x}, managed_range: {:?}]",
         hhdm_offset,
-        pml4_vaddr as u64,
         map::nmm_managed_range::RANGE
     );
     unsafe {
         nmm::init(
-            &mut *(pml4_vaddr as *mut PageTable),
             VirtAddr::new_truncate(hhdm_offset),
             mem::transmute(memory_map),
             map::nmm_managed_range::RANGE,

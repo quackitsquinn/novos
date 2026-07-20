@@ -5,7 +5,7 @@ use core::{any::type_name, fmt::Debug, mem::transmute};
 use crate::{
     NmmSealed, align,
     paging::{
-        Address, FragmentSize, Large, Medium, MemoryFragment, PhysAddr, Small,
+        Address, FragmentSize, Large, Medium, MemoryFragment, PhysAddr, Small, VirtAddr,
         primitives::{AnyFragment, FrameClass, Primitive},
     },
 };
@@ -54,6 +54,15 @@ impl<S: FragmentSize> Frame<S> {
     /// Returns the starting physical address of the frame.
     pub const fn start_address(&self) -> PhysAddr {
         self.start_address
+    }
+
+    /// Applies the given HHDM offset to the frame's starting address, returning the resulting virtual address.
+    pub const fn translate_offset(&self, offset: VirtAddr) -> Option<VirtAddr> {
+        let addr = match self.start_address.as_u64().checked_add(offset.as_u64()) {
+            Some(addr) => addr,
+            None => return None,
+        };
+        Some(VirtAddr::new(addr))
     }
 }
 

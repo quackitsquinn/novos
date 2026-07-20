@@ -60,6 +60,11 @@ pub(crate) use arch_impl::PTE_FREE_BIT0;
 
 pub(crate) use arch_impl::pml4_phys;
 
+pub(crate) use arch_impl::RecursivePageTable;
+
+pub(crate) use arch_impl::RECURSIVE_SLOT0;
+pub(crate) use arch_impl::RECURSIVE_SLOT1;
+
 /// Validates that the given physical address is valid for the current architecture.
 pub const fn is_valid_phys(addr: u64) -> bool {
     canonicalize_phys(addr) == addr

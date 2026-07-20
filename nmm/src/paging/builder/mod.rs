@@ -4,6 +4,8 @@ use crate::{
     paging::{PhysAddr, VirtAddr},
 };
 
+mod recursive;
+
 /// The `AddressSpaceBuilder` trait defines the interface for building a new address space, such as when creating a new page table hierarchy for a process.
 ///  It provides a method to map virtual addresses to physical memory, with various options for how the mapping should be performed (e.g., identity mapping, copying from the current address space, allocating new memory, etc.).
 /// This trait can be implemented by both the physical and virtual memory managers to manage their respective address spaces.

@@ -7,7 +7,7 @@ use cake::{
 use crate::{
     arch,
     bitmap::{PhysicalMemoryManager, VirtualMemoryManager},
-    paging::{Frame, PhysAddr, Small},
+    paging::{Frame, Page, PhysAddr, Small},
 };
 
 static ADDRESS_SPACE: OnceRwLock<AddressSpace> = OnceRwLock::new();
@@ -15,42 +15,50 @@ static PHYSICAL_MEMORY_MANAGER: OnceMutex<PhysicalMemoryManager> = OnceMutex::un
 
 pub(crate) struct AddressSpace {
     mapper: Mutex<arch::Mapper>,
-    l4_table: Frame<Small>,
+    l4_table_frame: Frame<Small>,
+    l4_table: Page<Small>,
     vmm: Mutex<Option<VirtualMemoryManager<'static>>>,
 }
 
 impl AddressSpace {
     pub(crate) fn new(
         mapper: arch::Mapper,
-        l4_table: Frame<Small>,
+        l4_table_frame: Frame<Small>,
+        l4_table: Page<Small>,
         vmm: Option<VirtualMemoryManager<'static>>,
     ) -> Self {
         Self {
             mapper: Mutex::new(mapper),
+            l4_table_frame,
             l4_table,
             vmm: Mutex::new(vmm),
         }
     }
 
-    pub(crate) fn without_vmm(mapper: arch::Mapper, l4_table: Frame<Small>) -> Self {
+    pub(crate) fn without_vmm(mapper: arch::Mapper, l4_table_frame: Frame<Small>) -> Self {
+        let l4_table = mapper.root_table().as_page();
         Self {
             mapper: Mutex::new(mapper),
+            l4_table_frame,
             l4_table,
             vmm: Mutex::new(None),
         }
     }
 
     pub(crate) fn mapper(&self) -> Option<MutexGuard<'_, arch::Mapper>> {
-        // TODO: Change return to Option<MutexGuard> and comparing the pml4 register to self.l4_table to determine if the mapper is valid for the current address space.
-        if self.l4_table == arch::pml4_phys() {
+        if self.l4_table_frame == arch::pml4_phys() {
             Some(self.mapper.lock())
         } else {
             None
         }
     }
 
-    pub(crate) fn l4_table(&self) -> &Frame<Small> {
-        &self.l4_table
+    pub(crate) fn l4_frame(&self) -> Frame<Small> {
+        self.l4_table_frame
+    }
+
+    pub(crate) fn l4_table(&self) -> Page<Small> {
+        self.l4_table
     }
 
     pub(crate) fn vmm(&self) -> Option<MappedMutexGuard<'_, VirtualMemoryManager<'static>>> {

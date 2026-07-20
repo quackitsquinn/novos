@@ -1,6 +1,8 @@
+use core::fmt::{Debug, Display};
+
 use crate::{
     MapFlags, arch,
-    paging::{Address, FragmentSize, Frame, PhysAddr},
+    paging::{Address, AddressExt, FragmentSize, Frame, Page, PhysAddr, Small, VirtAddr},
 };
 
 /// A page table, accurate to the current architecture.
@@ -38,10 +40,15 @@ impl PageTable {
     pub unsafe fn entries_mut(&mut self) -> &mut [PageTableEntry; arch::ENTRY_COUNT] {
         &mut self.entries
     }
+
+    /// Returns the page that contains this page table.
+    pub fn as_page(&self) -> Page<Small> {
+        Page::from_start_address(VirtAddr::from_ptr(self).unwrap()).unwrap()
+    }
 }
 
 /// A page table entry, representing a single entry in a page table.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 #[repr(C)]
 pub struct PageTableEntry {
     value: u64,
@@ -75,5 +82,25 @@ impl PageTableEntry {
     /// Returns the physical address contained in this page table entry, if it is present and valid.
     pub fn addr(&self) -> PhysAddr {
         PhysAddr::new(self.value & arch::PHYSICAL_ADDRESS_MAX)
+    }
+}
+
+impl Debug for PageTableEntry {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("PageTableEntry")
+            .field("addr", &format_args!("{:?}", self.addr()))
+            .field("flags", &self.flags())
+            .finish()
+    }
+}
+
+impl Display for PageTableEntry {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(
+            f,
+            "pte(addr: {:#x}, flags: {})",
+            self.addr().as_u64(),
+            self.flags()
+        )
     }
 }

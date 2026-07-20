@@ -40,6 +40,13 @@ impl Mapper {
         // TODO: Maybe make sure the recursive index is actually recursive?
         Self::Recursive(unsafe { RecursivePageTable::new(root, recursive_index) })
     }
+
+    pub fn root_table(&self) -> &PageTable {
+        match self {
+            Mapper::Offset(mapper) => mapper.p4(),
+            Mapper::Recursive(mapper) => mapper.p4(),
+        }
+    }
 }
 
 impl<S> MemoryMapper<S> for Mapper

@@ -3,7 +3,7 @@ use x86_64::registers::control::Cr3;
 
 use crate::{
     MapFlags, MemError, align,
-    arch::{self, L1_PAGE_SIZE, x86_64::mapper::Mapper},
+    arch::{self, L1_PAGE_SIZE, pml4_phys, x86_64::mapper::Mapper},
     bitmap::{BitPtr, Bitmap, PhysicalMemoryManager, VirtualMemoryManager},
     entry_walker::EntryWalker,
     paging::{
@@ -16,7 +16,6 @@ use crate::{
 };
 
 pub(crate) unsafe fn init_unchecked(
-    root: &'static mut PageTable,
     offset: VirtAddr,
     mut walker: EntryWalker<'static>,
     scratch_range: MemoryRange<VirtAddr>,
@@ -28,10 +27,25 @@ pub(crate) unsafe fn init_unchecked(
         });
     }
 
-    #[cfg(target_arch = "x86_64")]
-    let cr3: Frame<Small> = Cr3::read().0.into();
-    #[cfg(not(target_arch = "x86_64"))]
-    let cr3: Frame<Small> = todo!("Unsupported architecture for init_unchecked");
+    let cr3: Frame<Small> = pml4_phys();
+    let root: &'static mut PageTable = unsafe {
+        &mut *(cr3
+            .translate_offset(offset)
+            .unwrap()
+            .as_mut_ptr::<PageTable>())
+    };
+
+    for (i, entry) in root.entries().chunks_exact(4).enumerate() {
+        debug!(
+            "pml4[{}..{}]: {} {} {} {}",
+            i * 4,
+            (i * 4) + 4,
+            entry[0],
+            entry[1],
+            entry[2],
+            entry[3]
+        );
+    }
 
     // Initialize the mapper and set it as the active mapper for the system.
     // This is necessary to perform any virtual memory operations, including mapping the scratch space.

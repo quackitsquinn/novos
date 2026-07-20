@@ -17,10 +17,12 @@ use crate::{
     MapFlags, MemError,
     arch::x86_64::conv::XFrameAllocator,
     paging::{
-        Address, FragmentManager, FragmentSize, Frame, Page, Small, VirtAddr,
+        Address, FragmentManager, FragmentSize, Frame, Page, PageTableIndex, Small, VirtAddr,
         map::{Flush, MemoryMapper},
     },
 };
+
+pub(crate) use recursive::RecursivePageTable;
 
 /// The width of virtual addresses in bits for x86_64 architecture.
 pub const VIRTUAL_ADDRESS_WIDTH: u8 = 48;
@@ -136,7 +138,13 @@ pub(crate) fn pml4_phys() -> Frame<Small> {
     }
 }
 
+/// The first free available-to-software bit in a page table entry.
 pub const PTE_FREE_BIT0: u64 = 1 << 9;
+
+/// The first slot in the pml4 table that is reserved for recursive mapping, specifically reserved for mapping of the current address space.
+pub const RECURSIVE_SLOT0: PageTableIndex = PageTableIndex::new(510);
+/// The second slot in the pml4 table that is reserved for recursive mapping, specifically reserved for building new address spaces.
+pub const RECURSIVE_SLOT1: PageTableIndex = PageTableIndex::new(511);
 
 cake::encapsulate_macro!(
     impl_memory_mapper_for,
