@@ -28,10 +28,10 @@ mod arch_lib {
     mod recursive_spoof {
         use x86_64::structures::paging::{
             FrameAllocator, Mapper, Page, PageSize, PageTable, PageTableFlags, PageTableIndex,
-            PhysFrame, Size4KiB,
+            PhysFrame, Size4KiB, Translate,
             mapper::{
                 FlagUpdateError, MapToError, MapperFlush, MapperFlushAll, TranslateError,
-                UnmapError,
+                TranslateResult, UnmapError,
             },
         };
 
@@ -115,6 +115,12 @@ mod arch_lib {
             }
 
             fn translate_page(&self, _page: Page<S>) -> Result<PhysFrame<S>, TranslateError> {
+                unimplemented!()
+            }
+        }
+
+        impl Translate for RecursivePageTable<'_> {
+            fn translate(&self, _addr: x86_64::VirtAddr) -> TranslateResult {
                 unimplemented!()
             }
         }

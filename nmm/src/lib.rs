@@ -20,7 +20,7 @@ pub use pastey as _pastey;
 use crate::{
     entry_walker::EntryWalker,
     paging::{
-        Address, PageTable, PhysAddr, VirtAddr, asm,
+        Address, AddressExt, PageTable, PhysAddr, VirtAddr, asm,
         primitives::{AnyFragment, MemoryRange, PageClass},
     },
 };
@@ -194,6 +194,16 @@ impl MemoryMapping {
     pub fn byte_size(&self) -> usize {
         self.byte_size
     }
+
+    /// Returns an immutable pointer to the start of the mapped virtual address range, allowing for direct access to the mapped memory.
+    pub fn as_ptr<T>(&self) -> *const T {
+        self.virt_base.as_ptr()
+    }
+
+    /// Returns a mutable pointer to the start of the mapped virtual address range, allowing for direct access to the mapped memory.
+    pub fn as_mut_ptr<T>(&self) -> *mut T {
+        self.virt_base.as_mut_ptr()
+    }
 }
 
 fn make_layout_for_mapping(phys_base: PhysAddr, byte_size: usize) -> Layout {
@@ -216,7 +226,7 @@ pub fn create_phys_mapping(
 }
 
 /// Frees a physical memory mapping that was previously created with `create_phys_mapping`, unmapping the virtual address range and freeing the allocated virtual address space.
-pub fn free_phys_mapping(mapping: MemoryMapping) -> Result<(), MemError> {
+pub unsafe fn free_phys_mapping(mapping: MemoryMapping) -> Result<(), MemError> {
     unsafe {
         unmap(mapping.virt_base(), mapping.byte_size())?;
         free_virtual(

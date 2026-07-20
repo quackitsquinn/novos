@@ -48,7 +48,7 @@ impl IoApic {
         let base = *self.base.get().expect("No IOAPIC found in MADT");
         info!("IO APIC base address: {:#x}", base);
         let phys_addr = x86_64::PhysAddr::new(base);
-        let map = nmm::map_phys(
+        let map = nmm::create_phys_mapping(
             phys_addr.into(),
             1024,
             MapFlags::CACHE_DISABLE | MapFlags::WRITABLE,

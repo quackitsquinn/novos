@@ -33,7 +33,7 @@ fn init() -> Result<(), AcpiError> {
         .as_ref()
         .ok_or(AcpiError::NoValidRsdp)?;
 
-    let rsdp_table = nmm::map_phys(
+    let rsdp_table = nmm::create_phys_mapping(
         PhysAddr::new(rsdp_addr as u64).into(),
         size_of::<Rsdp>(),
         MapFlags::empty(),
