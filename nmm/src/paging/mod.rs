@@ -249,10 +249,47 @@ pub(crate) unsafe fn map_unchecked(
     byte_size: usize,
     flags: MapFlags,
 ) -> Result<(), MemError> {
-    let mut pmm = asm::physical_memory_manager();
+    let mut pmm_guard = asm::physical_memory_manager();
+    let pmm = &mut *pmm_guard;
 
-    //unsafe { map_raw(dest, src, byte_size, flags, todo!(), &mut *pmm) }
-    todo!()
+    match src {
+        MapSource::Direct(phys_base) => {
+            trace!(
+                "Mapping physical memory at address {:#x} to virtual address {:#x} with size {} bytes and flags {:?}",
+                phys_base.as_u64(),
+                dest.as_u64(),
+                byte_size,
+                flags
+            );
+            unsafe {
+                map_raw(
+                    dest,
+                    phys_base,
+                    byte_size,
+                    flags,
+                    EntryMappingFlags::empty(),
+                    pmm,
+                )?
+            };
+        }
+        MapSource::Anon => unsafe {
+            trace!(
+                "Mapping anonymous memory at virtual address {:#x} with size {} bytes and flags {:?}",
+                dest.as_u64(),
+                byte_size,
+                flags
+            );
+            map_from(
+                dest,
+                byte_size as u64,
+                flags,
+                EntryMappingFlags::MAP_ANON,
+                pmm,
+            )?;
+        },
+    }
+
+    Ok(())
 }
 
 pub(crate) unsafe fn unmap_unchecked(
@@ -266,20 +303,26 @@ pub(crate) unsafe fn unmap_unchecked(
             AnyFragment::Small(page_prim) => {
                 let mut ent = unsafe { unmap_primitive(page_prim)? };
                 ent.flush();
-                let mut pmm = asm::physical_memory_manager();
-                pmm.deallocate_fragment(ent.frame);
+                if ent.mapping_flags.contains(EntryMappingFlags::MAP_ANON) {
+                    let mut pmm = asm::physical_memory_manager();
+                    pmm.deallocate_fragment(ent.frame);
+                }
             }
             AnyFragment::Medium(page_prim) => {
                 let mut ent = unsafe { unmap_primitive(page_prim)? };
                 ent.flush();
-                let mut pmm = asm::physical_memory_manager();
-                pmm.deallocate_fragment(ent.frame);
+                if ent.mapping_flags.contains(EntryMappingFlags::MAP_ANON) {
+                    let mut pmm = asm::physical_memory_manager();
+                    pmm.deallocate_fragment(ent.frame);
+                }
             }
             AnyFragment::Large(page_prim) => {
                 let mut ent = unsafe { unmap_primitive(page_prim)? };
                 ent.flush();
-                let mut pmm = asm::physical_memory_manager();
-                pmm.deallocate_fragment(ent.frame);
+                if ent.mapping_flags.contains(EntryMappingFlags::MAP_ANON) {
+                    let mut pmm = asm::physical_memory_manager();
+                    pmm.deallocate_fragment(ent.frame);
+                }
             }
         }
     }
