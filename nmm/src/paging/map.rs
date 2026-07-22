@@ -4,23 +4,30 @@
 
 use core::fmt;
 
+use cake::log::trace;
+
 use crate::{
     MapFlags, MemError,
-    paging::{EntryMappingFlags, FragmentManager, FragmentSize, Frame, Page, Small, VirtAddr},
+    paging::{
+        Address, EntryMappingFlags, FragmentManager, FragmentSize, Frame, FullManager, Large,
+        Medium, Page, PhysAddr, Small, VirtAddr,
+        fragment::{GreedyFragmentMapper, JointFragmentMapper},
+        primitives::{AnyFragment, FrameClass, PageClass},
+    },
 };
 
 /// A trait for types that can map and unmap pages of a specific size. This is the main interface for mapping
 /// and unmapping pages in the memory manager, and it abstracts over the architecture-specific details of how
 /// page tables are manipulated to create mappings.
-pub trait MemoryMapper<S: FragmentSize> {
+pub trait SizedMemoryMapper<S: FragmentSize> {
     /// Maps the given page to the given frame with the specified flags, using the provided frame allocator
     /// for any necessary allocations of page tables.
     ///
     /// Returns an error if the mapping operation fails for any reason.
-    fn map<A>(
+    fn map_primitive<A>(
         &mut self,
-        page: Page<S>,
-        frame: Frame<S>,
+        dst: Page<S>,
+        src: Frame<S>,
         flags: MapFlags,
         mapping_flags: EntryMappingFlags,
         allocator: &mut A,
@@ -29,7 +36,96 @@ pub trait MemoryMapper<S: FragmentSize> {
         A: FragmentManager<Frame<Small>, Small>;
 
     /// Unmaps the given page, returning the frame that was mapped to it before, or an error if the page was not mapped.
-    unsafe fn unmap(&mut self, page: Page<S>) -> Result<Unmapped<S>, MemError>;
+    unsafe fn unmap_primitive(&mut self, page: Page<S>) -> Result<Unmapped<S>, MemError>;
+}
+
+/// A memory mapper that can map and unmap pages of any size.
+pub trait MemoryMapper:
+    SizedMemoryMapper<Small> + SizedMemoryMapper<Medium> + SizedMemoryMapper<Large>
+{
+    /// Maps a range of virtual addresses to physical frames, using the provided frame allocator for any necessary allocations of page tables.
+    unsafe fn map_from<D>(
+        &mut self,
+        base: VirtAddr,
+        len: u64,
+        flags: MapFlags,
+        mapping_flags: EntryMappingFlags,
+        data_allocator: &mut D,
+    ) -> Result<(), MemError>
+    where
+        D: FullManager<FrameClass>,
+    {
+        trace!(
+            "Mapping from base address {:x?} with length {:?} and flags {:?}",
+            base.as_u64(),
+            len,
+            flags
+        );
+
+        let mapper = GreedyFragmentMapper::<PageClass>::new(base, len);
+        for frag in mapper {
+            match frag {
+                AnyFragment::Small(prim) => {
+                    let frame = data_allocator.allocate_small()?;
+                    self.map_primitive(prim, frame, flags, mapping_flags, data_allocator)?
+                        .flush();
+                }
+                AnyFragment::Medium(prim) => {
+                    let frame = data_allocator.allocate_medium()?;
+                    self.map_primitive(prim, frame, flags, mapping_flags, data_allocator)?
+                        .flush();
+                }
+                AnyFragment::Large(prim) => {
+                    let frame = data_allocator.allocate_large()?;
+                    self.map_primitive(prim, frame, flags, mapping_flags, data_allocator)?
+                        .flush();
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Maps a range of virtual addresses to physical frames, using the provided frame allocator for any necessary allocations of page tables.
+    unsafe fn map<F>(
+        &mut self,
+        virt_base: VirtAddr,
+        phys_base: PhysAddr,
+        byte_size: usize,
+        flags: MapFlags,
+        mapping_flags: EntryMappingFlags,
+        frame_alloc: &mut F,
+    ) -> Result<(), MemError>
+    where
+        F: FragmentManager<Frame<Small>, Small>,
+    {
+        let mapper = JointFragmentMapper::new(virt_base, phys_base, byte_size as u64);
+
+        for pair in mapper {
+            match pair {
+                (AnyFragment::Small(page_prim), AnyFragment::Small(phys_prim)) => {
+                    self.map_primitive(page_prim, phys_prim, flags, mapping_flags, frame_alloc)?
+                        .flush();
+                }
+                (AnyFragment::Medium(page_prim), AnyFragment::Medium(phys_prim)) => {
+                    self.map_primitive(page_prim, phys_prim, flags, mapping_flags, frame_alloc)?
+                        .flush();
+                }
+                (AnyFragment::Large(page_prim), AnyFragment::Large(phys_prim)) => {
+                    self.map_primitive(page_prim, phys_prim, flags, mapping_flags, frame_alloc)?
+                        .flush();
+                }
+                _ => unreachable!("non-matched fragments produced by mapper"),
+            }
+        }
+
+        Ok(())
+    }
+}
+
+impl<T> MemoryMapper for T where
+    T: SizedMemoryMapper<Small> + SizedMemoryMapper<Medium> + SizedMemoryMapper<Large>
+{
 }
 
 pub struct Unmapped<S: FragmentSize> {

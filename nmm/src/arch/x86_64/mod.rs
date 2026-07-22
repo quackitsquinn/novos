@@ -18,7 +18,7 @@ use crate::{
     arch::x86_64::conv::XFrameAllocator,
     paging::{
         Address, FragmentManager, FragmentSize, Frame, Page, PageTableIndex, Small, VirtAddr,
-        map::{Flush, MemoryMapper},
+        map::{Flush, SizedMemoryMapper},
     },
 };
 
@@ -152,8 +152,8 @@ cake::encapsulate_macro!(
     /// Implements the `MemoryMapper` trait for a given type and fragment size.
     macro_rules! impl_memory_mapper_for {
         ($ty: ty, $size:ident, $is_huge:literal) => {
-            impl MemoryMapper<$size> for $ty {
-                fn map<A>(
+            impl SizedMemoryMapper<$size> for $ty {
+                fn map_primitive<A>(
                     &mut self,
                     page: Page<$size>,
                     frame: Frame<$size>,
@@ -186,7 +186,7 @@ cake::encapsulate_macro!(
                     Ok(unsafe { Flush::flush_page(page) })
                 }
 
-                unsafe fn unmap(
+                unsafe fn unmap_primitive(
                     &mut self,
                     page: crate::paging::Page<$size>,
                 ) -> Result<Unmapped<$size>, MemError> {

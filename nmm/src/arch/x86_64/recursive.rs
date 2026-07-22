@@ -13,7 +13,7 @@ use crate::{
     paging::{
         EntryMappingFlags, FragmentManager, Frame, Large, Medium, Page, PageTable, PageTableIndex,
         Small,
-        map::{Flush, MemoryMapper, Unmapped},
+        map::{Flush, SizedMemoryMapper, Unmapped},
     },
 };
 

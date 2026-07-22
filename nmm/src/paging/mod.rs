@@ -19,7 +19,7 @@ use crate::{
     arch::{self, Mapper, PageEntryType},
     paging::{
         fragment::{GreedyFragmentMapper, JointFragmentMapper},
-        map::{Flush, MemoryMapper, Unmapped},
+        map::{Flush, MemoryMapper, SizedMemoryMapper, Unmapped},
         primitives::{AnyFragment, FrameClass, PageClass, PrimitiveClass},
     },
 };
@@ -87,7 +87,7 @@ pub(crate) fn map_primitive<S, A>(
 where
     S: FragmentSize,
     A: FragmentManager<Frame<Small>, Small>,
-    Mapper: MemoryMapper<S>,
+    Mapper: SizedMemoryMapper<S>,
 {
     trace!(
         "Mapping frame {:?} to page {:?} with flags {:?}",
@@ -97,7 +97,7 @@ where
     let active_as = asm::active();
     let mut mapper = active_as.mapper().unwrap();
 
-    mapper.map(dst, src, flags, mapping_flags, frame_allocator)
+    mapper.map_primitive(dst, src, flags, mapping_flags, frame_allocator)
 }
 
 /// Unmaps a page, returning the frame that was mapped to it before, or an error if the page was not mapped.
@@ -110,14 +110,14 @@ where
 pub(crate) unsafe fn unmap_primitive<S>(dst: Page<S>) -> Result<Unmapped<S>, MemError>
 where
     S: FragmentSize,
-    Mapper: MemoryMapper<S>,
+    Mapper: SizedMemoryMapper<S>,
 {
     trace!("Unmapping page {:?}", dst);
 
     let active_as = asm::active();
     let mut mapper = active_as.mapper().unwrap();
 
-    unsafe { mapper.unmap(dst) }
+    unsafe { mapper.unmap_primitive(dst) }
 }
 
 pub(crate) unsafe fn map_from<D>(
@@ -137,63 +137,10 @@ where
         flags
     );
 
-    let mapper = GreedyFragmentMapper::<PageClass>::new(base, len);
-    for frag in mapper {
-        match frag {
-            AnyFragment::Small(prim) => {
-                let frame = data_allocator.allocate_small()?;
-                map_primitive(frame, prim, flags, mapping_flags, data_allocator)?.flush();
-            }
-            AnyFragment::Medium(prim) => {
-                let frame = data_allocator.allocate_medium()?;
-                map_primitive(frame, prim, flags, mapping_flags, data_allocator)?.flush();
-            }
-            AnyFragment::Large(prim) => {
-                let frame = data_allocator.allocate_large()?;
-                map_primitive(frame, prim, flags, mapping_flags, data_allocator)?.flush();
-            }
-        }
-    }
+    let active_as = asm::active();
+    let mut mapper = active_as.mapper().unwrap();
 
-    Ok(())
-}
-
-pub(crate) unsafe fn map_from_with_allocator<D, F>(
-    base: VirtAddr,
-    len: u64,
-    flags: MapFlags,
-    mapping_flags: EntryMappingFlags,
-    data_allocator: &mut D,
-    frame_allocator: &mut F,
-) -> Result<(), MemError>
-where
-    D: FullManager<FrameClass>,
-    F: FragmentManager<Frame<Small>, Small>,
-{
-    trace!(
-        "Mapping from base address {:?} with length {:?} and flags {:?}",
-        base, len, flags
-    );
-
-    let mapper = GreedyFragmentMapper::<PageClass>::new(base, len);
-    for frag in mapper {
-        match frag {
-            AnyFragment::Small(prim) => {
-                let frame = data_allocator.allocate_small()?;
-                map_primitive(frame, prim, flags, mapping_flags, frame_allocator)?.flush();
-            }
-            AnyFragment::Medium(prim) => {
-                let frame = data_allocator.allocate_medium()?;
-                map_primitive(frame, prim, flags, mapping_flags, frame_allocator)?.flush();
-            }
-            AnyFragment::Large(prim) => {
-                let frame = data_allocator.allocate_large()?;
-                map_primitive(frame, prim, flags, mapping_flags, frame_allocator)?.flush();
-            }
-        }
-    }
-
-    Ok(())
+    unsafe { mapper.map_from(base, len, flags, mapping_flags, data_allocator) }
 }
 
 bitflags! {
@@ -202,6 +149,7 @@ bitflags! {
     /// This may need to be refactored if we need more than a few flags (i believe the lower limit accounting for x86_64, aarch64, and riscv is 3 bits but it may be more idk)
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct EntryMappingFlags: u64 {
+        /// A flag indicating that the mapping is anonymous, meaning that the underlying frame of memory should be deallocated when the mapping is removed.
         const MAP_ANON = arch::PTE_FREE_BIT0;
     }
 }
@@ -223,24 +171,19 @@ pub(crate) unsafe fn map_raw<F>(
 where
     F: FragmentManager<Frame<Small>, Small>,
 {
-    let mapper = JointFragmentMapper::new(virt_base, phys_base, byte_size as u64);
+    let active_as = asm::active();
+    let mut mapper = active_as.mapper().unwrap();
 
-    for pair in mapper {
-        match pair {
-            (AnyFragment::Small(page_prim), AnyFragment::Small(phys_prim)) => {
-                map_primitive(phys_prim, page_prim, flags, mapping_flags, frame_alloc)?.flush();
-            }
-            (AnyFragment::Medium(page_prim), AnyFragment::Medium(phys_prim)) => {
-                map_primitive(phys_prim, page_prim, flags, mapping_flags, frame_alloc)?.flush();
-            }
-            (AnyFragment::Large(page_prim), AnyFragment::Large(phys_prim)) => {
-                map_primitive(phys_prim, page_prim, flags, mapping_flags, frame_alloc)?.flush();
-            }
-            _ => unreachable!("non-matched fragments produced by mapper"),
-        }
+    unsafe {
+        mapper.map(
+            virt_base,
+            phys_base,
+            byte_size,
+            flags,
+            mapping_flags,
+            frame_alloc,
+        )
     }
-
-    Ok(())
 }
 
 pub(crate) unsafe fn map_unchecked(

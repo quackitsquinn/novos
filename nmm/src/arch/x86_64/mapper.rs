@@ -7,7 +7,7 @@ use crate::{
     paging::{
         EntryMappingFlags, FragmentManager, FragmentSize, Frame, Page, PageTable, PageTableIndex,
         Small,
-        map::{Flush, MemoryMapper, Unmapped},
+        map::{Flush, SizedMemoryMapper, Unmapped},
     },
 };
 
@@ -49,13 +49,13 @@ impl Mapper {
     }
 }
 
-impl<S> MemoryMapper<S> for Mapper
+impl<S> SizedMemoryMapper<S> for Mapper
 where
     S: FragmentSize,
-    RecursivePageTable<'static>: MemoryMapper<S>,
-    OffsetPageTable<'static>: MemoryMapper<S>,
+    RecursivePageTable<'static>: SizedMemoryMapper<S>,
+    OffsetPageTable<'static>: SizedMemoryMapper<S>,
 {
-    fn map<A>(
+    fn map_primitive<A>(
         &mut self,
         page: Page<S>,
         frame: Frame<S>,
@@ -67,15 +67,22 @@ where
         A: FragmentManager<Frame<Small>, Small>,
     {
         match self {
-            Mapper::Offset(mapper) => mapper.map(page, frame, flags, mapping_flags, allocator),
-            Mapper::Recursive(mapper) => mapper.map(page, frame, flags, mapping_flags, allocator),
+            Mapper::Offset(mapper) => {
+                mapper.map_primitive(page, frame, flags, mapping_flags, allocator)
+            }
+            Mapper::Recursive(mapper) => {
+                mapper.map_primitive(page, frame, flags, mapping_flags, allocator)
+            }
         }
     }
 
-    unsafe fn unmap(&mut self, page: crate::paging::Page<S>) -> Result<Unmapped<S>, MemError> {
+    unsafe fn unmap_primitive(
+        &mut self,
+        page: crate::paging::Page<S>,
+    ) -> Result<Unmapped<S>, MemError> {
         match self {
-            Mapper::Offset(mapper) => unsafe { mapper.unmap(page) },
-            Mapper::Recursive(mapper) => unsafe { mapper.unmap(page) },
+            Mapper::Offset(mapper) => unsafe { mapper.unmap_primitive(page) },
+            Mapper::Recursive(mapper) => unsafe { mapper.unmap_primitive(page) },
         }
     }
 }
