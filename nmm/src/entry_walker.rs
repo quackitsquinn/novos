@@ -7,7 +7,10 @@ use cake::limine::memory_map::{Entry, EntryType};
 use cake::log::error;
 
 use crate::paging::limine::LimineEntry;
-use crate::paging::{Address, FragmentManager, FragmentSize, Frame, MemoryRange, PhysAddr};
+use crate::paging::primitives::FrameClass;
+use crate::paging::{
+    Address, FragmentManager, FragmentSize, Frame, FullManager, MemoryRange, PhysAddr,
+};
 use crate::{MemError, align};
 
 const MAX_FRAGMENTS: usize = 0x40;
@@ -271,6 +274,8 @@ where
         error!("EntryWalker<{}>::deallocate_range called", S::NAME);
     }
 }
+
+impl FullManager<FrameClass> for EntryWalker<'_> {}
 
 #[cfg(test)]
 mod tests {

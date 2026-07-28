@@ -17,8 +17,9 @@ use crate::{
     },
     entry_walker::EntryWalker,
     paging::{
-        Address, AddressExt, FragmentManager, FragmentSize, Frame, PhysAddr, Small, VirtAddr,
-        map_from, primitives::MemoryRange,
+        Address, AddressExt, FragmentManager, FragmentSize, Frame, FullManager, PhysAddr, Small,
+        VirtAddr, map_from,
+        primitives::{FrameClass, MemoryRange},
     },
 };
 
@@ -225,6 +226,8 @@ where
         }
     }
 }
+
+impl FullManager<FrameClass> for PhysicalMemoryManager {}
 
 struct BitmapEntry {
     // the bitmap that tracks the allocation of frames in this range

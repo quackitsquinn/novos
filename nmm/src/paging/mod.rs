@@ -66,15 +66,6 @@ pub trait FullManager<C: PrimitiveClass>:
     }
 }
 
-impl<C, T> FullManager<C> for T
-where
-    C: PrimitiveClass,
-    T: FragmentManager<C::Fragment<Small>, Small>
-        + FragmentManager<C::Fragment<Medium>, Medium>
-        + FragmentManager<C::Fragment<Large>, Large>,
-{
-}
-
 /// Maps a memory primitive (such as a frame) to a page with the specified flags, using the provided frame allocator to allocate any necessary intermediate page tables.
 //#[must_use = "The returned `Flush` should be flushed after the mapping operation to ensure that there are no stale mappings."]
 pub(crate) fn map_primitive<S, A>(
