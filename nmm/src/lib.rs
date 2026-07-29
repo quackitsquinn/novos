@@ -34,6 +34,20 @@ pub mod entry_walker;
 pub mod kernel_map;
 pub mod paging;
 
+#[derive(Clone, Copy)]
+pub struct InitConfig {
+    // The virtual address offset where the physical memory is mapped in the virtual address space.
+    pub offset: VirtAddr,
+    /// A range of virtual memory that the memory manager will manage. This is used for virtual address allocation.
+    /// This range is used for virtual address allocation (e.g., for `alloc_virtspace`) and physical memory mapping (e.g., for `alloc_paged`),
+    /// as well as internal memory management state.
+    pub managed_range: MemoryRange<VirtAddr>,
+    /// The physical memory map of the system, typically provided by the bootloader.
+    ///
+    // TODO: It seems reasonable to just make this a ArrayVec or something, since this is *super* clunky if you aren't using limine.
+    pub memory_map: &'static [&'static memory_map::Entry],
+}
+
 /// Initializes the memory manager.
 ///
 /// - `root` is a pointer to the root page table structure, which will be used as the base for all page table operations. The specific type and
@@ -46,12 +60,8 @@ pub mod paging;
 /// - `managed_range` is a tuple containing the starting virtual address and size of a range of virtual memory manager will manage.
 ///   This range is used for virtual address allocation (e.g., for `alloc_virtspace`) and physical memory mapping (e.g., for `alloc_paged`),
 ///   as well as internal memory management state.
-pub unsafe fn init(
-    offset: VirtAddr,
-    ranges: &'static [&'static memory_map::Entry],
-    managed_range: MemoryRange<VirtAddr>,
-) -> Result<(), MemError> {
-    unsafe { arch::init_unchecked(offset, EntryWalker::new(ranges)?, managed_range) }
+pub unsafe fn init(init_config: InitConfig) -> Result<(), MemError> {
+    unsafe { arch::init_unchecked(EntryWalker::new(init_config.memory_map)?, init_config) }
 }
 
 /// Enables recursive paging at the specified page table index, loading the given physical address into the architecture-specific register for the page table base address.

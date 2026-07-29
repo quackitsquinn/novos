@@ -1,7 +1,8 @@
 use core::{convert::Infallible, mem};
 
-use cake::log::info;
+use cake::{ResourceGuard, log::info};
 use nmm::{
+    InitConfig,
     arch::HIGHER_HALF_START,
     paging::{Address, PageTable, VirtAddr},
 };
@@ -38,14 +39,12 @@ fn init() -> Result<(), Infallible> {
         hhdm_offset,
         map::nmm_managed_range::RANGE
     );
-    unsafe {
-        nmm::init(
-            VirtAddr::new_truncate(hhdm_offset),
-            mem::transmute(memory_map),
-            map::nmm_managed_range::RANGE,
-        )
-    }
-    .expect("Failed to initialize memory manager");
+    let init = InitConfig {
+        offset: VirtAddr::new_truncate(hhdm_offset),
+        managed_range: map::nmm_managed_range::RANGE,
+        memory_map: unsafe { mem::transmute(memory_map) },
+    };
+    unsafe { nmm::init(init) }.expect("Failed to initialize memory manager");
     info!("Memory manager initialized");
     init_heap();
     Ok(())
