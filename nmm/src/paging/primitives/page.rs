@@ -1,7 +1,7 @@
 //! This module defines the `Page` struct, which represents a virtual memory page of a specific size (small, medium, or large) on the current architecture.
 //! It also defines the `UnsizedPage` enum, which can represent a page of any size.
 use crate::paging::primitives::{AnyFragment, PageClass, Primitive};
-use crate::paging::{Address, Large, Medium, Small, VirtAddr};
+use crate::paging::{Address, AddressExt, Large, Medium, Small, VirtAddr};
 use crate::{align, paging::FragmentSize};
 use core::any::type_name;
 use core::fmt::Debug;
@@ -67,6 +67,15 @@ impl<S: FragmentSize> Page<S> {
     /// Returns the starting virtual address of the page.
     pub const fn start_address(&self) -> VirtAddr {
         self.start_address
+    }
+
+    /// Zeros the memory of the page.
+    ///
+    /// # Safety
+    /// The page must be mapped to physical memory and must be writable.
+    pub unsafe fn zero(&self) {
+        let ptr = self.start_address.as_mut_ptr::<u8>();
+        unsafe { core::ptr::write_bytes(ptr, 0, S::SIZE as usize) };
     }
 }
 

@@ -1,13 +1,18 @@
 //! Address Space Management (ASM) module for nmm.
 
+use core::mem::transmute;
+
 use cake::{
-    MappedMutexGuard, Mutex, MutexGuard, OnceMutex, OnceMutexGuard, OnceRwLock, OnceRwReadGuard,
+    MappedMutexGuard, Mutex, MutexGuard, Once, OnceMutex, OnceMutexGuard, OnceRwLock,
+    OnceRwReadGuard,
 };
 
 use crate::{
-    arch,
+    arch::{self, Mapper},
     bitmap::{PhysicalMemoryManager, VirtualMemoryManager},
-    paging::{Frame, Page, PhysAddr, Small},
+    paging::{
+        FragmentSize, Frame, Large, MemoryFragment, Page, PhysAddr, Small, map::SizedMemoryMapper,
+    },
 };
 
 static ADDRESS_SPACE: OnceRwLock<AddressSpace> = OnceRwLock::new();
@@ -98,4 +103,36 @@ pub(crate) fn active() -> OnceRwReadGuard<'static, AddressSpace> {
 
 pub(crate) fn physical_memory_manager() -> OnceMutexGuard<'static, PhysicalMemoryManager> {
     PHYSICAL_MEMORY_MANAGER.get()
+}
+
+// A page that is used to zero out frames when they are allocated and zeroing is requested.
+// This page is mapped to a known virtual address and is used to write zeros to the frame before it is returned to the caller.
+static ZERO_PAGE: Once<Page<Large>> = Once::new();
+
+pub(crate) fn zero_frame<S>(frame: Frame<S>)
+where
+    S: FragmentSize,
+    arch::Mapper: SizedMemoryMapper<S>,
+{
+    let active_as = active();
+    let page = *ZERO_PAGE.get().unwrap();
+    let lower_page: Page<S> = unsafe { transmute(page) };
+    let mut mapper = active_as.mapper().unwrap();
+    unsafe {
+        mapper
+            .map_primitive(
+                lower_page,
+                frame,
+                crate::paging::MapFlags::WRITABLE,
+                Default::default(),
+                &mut *physical_memory_manager(),
+            )
+            .expect("Failed to map zero page to frame")
+            .flush();
+        lower_page.zero();
+        mapper
+            .unmap_primitive(lower_page)
+            .expect("Failed to unmap zero page from frame")
+            .flush();
+    }
 }
