@@ -24,7 +24,8 @@ pub use pastey as _pastey;
 use crate::{
     entry_walker::EntryWalker,
     paging::{
-        Address, AddressExt, Large, Page, PageTable, PhysAddr, VirtAddr, asm,
+        Address, AddressExt, FragmentManager, FragmentSize, Frame, Large, Page, PageTable,
+        PhysAddr, VirtAddr, asm,
         primitives::{AnyFragment, MemoryRange, PageClass},
     },
 };
@@ -166,7 +167,7 @@ pub unsafe fn unmap(virt_base: VirtAddr, byte_size: usize) -> Result<(), MemErro
 
 /// Allocates a virtual address range of the specified size without mapping it to any physical memory.
 #[must_use = "The returned virtual address must be freed with `free_virtspace` when it is no longer needed to avoid memory leaks and ensure proper resource management."]
-pub(crate) fn reserve_virtual(layout: Layout) -> Result<VirtAddr, MemError> {
+pub fn reserve_virtual(layout: Layout) -> Result<VirtAddr, MemError> {
     if layout.size() > arch::VIRTUAL_ADDRESS_MAX as usize {
         return Err(MemError::OutOfMemory);
     }
@@ -186,7 +187,7 @@ pub(crate) fn reserve_virtual(layout: Layout) -> Result<VirtAddr, MemError> {
 /// # Safety
 /// The caller must ensure that the provided virtual address range is not currently mapped to any physical memory and is not in use before freeing it,
 /// as freeing a virtual address range that is still in use can lead to undefined behavior such as use-after-free or memory corruption.
-pub(crate) unsafe fn free_virtual(virt_base: VirtAddr, layout: Layout) -> Result<(), MemError> {
+pub unsafe fn free_virtual(virt_base: VirtAddr, layout: Layout) -> Result<(), MemError> {
     check_range_virt(virt_base, layout.size())?;
 
     let c_as = asm::active();
@@ -199,6 +200,20 @@ pub(crate) unsafe fn free_virtual(virt_base: VirtAddr, layout: Layout) -> Result
     unsafe { vmm.deallocate(virt_base, layout) };
 
     Ok(())
+}
+
+/// Reserves a physical frame of the specified size and returns it to the caller.
+pub fn reserve_frame<S: FragmentSize>() -> Result<Frame<S>, MemError> {
+    let mut pmm = asm::physical_memory_manager();
+
+    pmm.allocate_fragment()
+}
+
+/// Frees a physical frame that was previously reserved with `reserve_frame`.
+pub fn free_frame<S: FragmentSize>(frame: Frame<S>) {
+    let mut pmm = asm::physical_memory_manager();
+
+    pmm.deallocate_fragment(frame);
 }
 
 /// A structure representing a mapping between a virtual address range and a physical address range, along with the size of the mapping in bytes.
@@ -252,7 +267,6 @@ fn make_layout_for_mapping(phys_base: PhysAddr, byte_size: usize) -> Layout {
 
 /// Maps a physical address range to a virtual address range of the specified size with the given flags, where the virtual address is allocated by the memory manager. This is a convenience function that combines `alloc_paged` and `map` into a single operation for ease of use.
 #[must_use = "The returned virtual address must be freed with `unmap` when it is no longer needed to avoid memory leaks and ensure proper resource management."]
-// TODO: how to handle freeing the virtspace allocated by this function?
 pub fn create_phys_mapping(
     phys_base: PhysAddr,
     byte_size: usize,

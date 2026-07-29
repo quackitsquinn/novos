@@ -47,7 +47,6 @@ pub const L3_PAGE_SIZE: u64 = arch_impl::L3_PAGE_SIZE;
 
 // TODO: maybe support x86 in the future? would be cool to watch this run on a xp or 98 era machine
 
-pub(crate) use arch_impl::api::init_load_recursive;
 pub(crate) use arch_impl::api::init_unchecked;
 
 pub(crate) use arch_impl::do_flush;

@@ -102,11 +102,3 @@ pub(crate) unsafe fn init_unchecked(
     //Err(MemError::Uninit("todo"))
     Ok(())
 }
-
-pub(crate) unsafe fn init_load_recursive(
-    _root: &'static mut PageTable,
-    _index: PageTableIndex,
-    _phys_addr: PhysAddr,
-) -> Result<(), MemError> {
-    todo!("todo")
-}
