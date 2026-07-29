@@ -128,13 +128,18 @@ impl<T> MemoryMapper for T where
 {
 }
 
+/// A structure representing an unmapped page.
+#[derive(Debug)]
 pub struct Unmapped<S: FragmentSize> {
+    /// The physical frame that was previously mapped to the page.
     pub frame: Frame<S>,
     flush: Option<Flush>,
+    /// The mapping flags that were used for the mapping before it was unmapped.
     pub mapping_flags: EntryMappingFlags,
 }
 
 impl<S: FragmentSize> Unmapped<S> {
+    /// Creates a new `Unmapped` structure with the given frame, flush operation, and mapping flags.
     pub fn new(frame: Frame<S>, flush: Option<Flush>, mapping_flags: EntryMappingFlags) -> Self {
         Self {
             frame,
@@ -143,6 +148,7 @@ impl<S: FragmentSize> Unmapped<S> {
         }
     }
 
+    /// Flushes the TLB entry for the unmapped page, if it has not already been flushed.
     pub fn flush(&mut self) {
         self.flush.take().map(|f| f.flush());
     }
