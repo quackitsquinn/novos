@@ -34,16 +34,13 @@ fn init() -> Result<(), Infallible> {
         .expect("Physical memory offset not provided by bootloader");
     let memory_map = MEMORY_MAP.lock_limine();
     let memory_map = memory_map.entries();
-    info!(
-        "Initializing nmm [hhdm_mapping: {:x}, managed_range: {:?}]",
-        hhdm_offset,
-        map::nmm_managed_range::RANGE
-    );
-    let init = InitConfig {
-        offset: VirtAddr::new_truncate(hhdm_offset),
-        managed_range: map::nmm_managed_range::RANGE,
-        memory_map: unsafe { mem::transmute(memory_map) },
-    };
+    let init = InitConfig::find_zero_page(
+        VirtAddr::new_truncate(hhdm_offset),
+        map::nmm_managed_range::RANGE,
+        unsafe { mem::transmute(memory_map) },
+    )
+    .unwrap();
+    info!("Initializing nmm {:?}", init);
     unsafe { nmm::init(init) }.expect("Failed to initialize memory manager");
     info!("Memory manager initialized");
     init_heap();

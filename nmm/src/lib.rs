@@ -9,7 +9,11 @@
 #![feature(const_cmp)]
 #![feature(derive_const)]
 
-use core::{alloc::Layout, fmt::Display, mem::Alignment};
+use core::{
+    alloc::Layout,
+    fmt::{Debug, Display},
+    mem::Alignment,
+};
 
 use bitflags::bitflags;
 use cake::limine::memory_map;
@@ -20,7 +24,7 @@ pub use pastey as _pastey;
 use crate::{
     entry_walker::EntryWalker,
     paging::{
-        Address, AddressExt, PageTable, PhysAddr, VirtAddr, asm,
+        Address, AddressExt, Large, Page, PageTable, PhysAddr, VirtAddr, asm,
         primitives::{AnyFragment, MemoryRange, PageClass},
     },
 };
@@ -34,18 +38,68 @@ pub mod entry_walker;
 pub mod kernel_map;
 pub mod paging;
 
+/// The minimum size of the managed range required for the memory manager to function correctly.
+pub const MIN_MANAGED_RANGE_SIZE: u64 = arch::L3_PAGE_SIZE + arch::L2_PAGE_SIZE;
+
+/// The configuration for initializing the memory manager.
 #[derive(Clone, Copy)]
 pub struct InitConfig {
-    // The virtual address offset where the physical memory is mapped in the virtual address space.
+    /// The virtual address offset where the physical memory is mapped in the virtual address space.
     pub offset: VirtAddr,
     /// A range of virtual memory that the memory manager will manage. This is used for virtual address allocation.
     /// This range is used for virtual address allocation (e.g., for `alloc_virtspace`) and physical memory mapping (e.g., for `alloc_paged`),
     /// as well as internal memory management state.
     pub managed_range: MemoryRange<VirtAddr>,
+    /// A page that is reserved for zeroing out frames before they are returned to the caller (if requested).
+    pub zero_page: Page<Large>,
     /// The physical memory map of the system, typically provided by the bootloader.
     ///
     // TODO: It seems reasonable to just make this a ArrayVec or something, since this is *super* clunky if you aren't using limine.
     pub memory_map: &'static [&'static memory_map::Entry],
+}
+
+impl Debug for InitConfig {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("InitConfig")
+            .field("offset", &self.offset)
+            .field("managed_range", &self.managed_range)
+            .field("zero_page", &self.zero_page)
+            .finish()
+    }
+}
+
+impl InitConfig {
+    /// Creates a new `InitConfig`, taking space out of the managed range for the zero page.
+    pub fn find_zero_page(
+        offset: VirtAddr,
+        managed_range: MemoryRange<VirtAddr>,
+        memory_map: &'static [&'static memory_map::Entry],
+    ) -> Result<Self, MemError> {
+        if managed_range.size() < arch::L3_PAGE_SIZE {
+            return Err(MemError::scratch_space_too_small(managed_range.size()));
+        }
+
+        let managed_aligned = managed_range
+            .align_up_to::<Large>()
+            .ok_or_else(|| MemError::scratch_space_too_small(managed_range.size()))?;
+
+        if managed_aligned.start() + arch::L3_PAGE_SIZE > managed_range.end() {
+            return Err(MemError::scratch_space_too_small(managed_range.size()));
+        }
+
+        let zero_page = Page::<Large>::from_start_address(managed_aligned.start()).unwrap();
+        let managed_range = MemoryRange::new(
+            managed_aligned.start() + arch::L3_PAGE_SIZE,
+            managed_aligned.end(),
+        );
+
+        Ok(Self {
+            offset,
+            managed_range,
+            zero_page,
+            memory_map,
+        })
+    }
 }
 
 /// Initializes the memory manager.
@@ -61,29 +115,8 @@ pub struct InitConfig {
 ///   This range is used for virtual address allocation (e.g., for `alloc_virtspace`) and physical memory mapping (e.g., for `alloc_paged`),
 ///   as well as internal memory management state.
 pub unsafe fn init(init_config: InitConfig) -> Result<(), MemError> {
+    asm::init_zero_page(init_config.zero_page);
     unsafe { arch::init_unchecked(EntryWalker::new(init_config.memory_map)?, init_config) }
-}
-
-/// Enables recursive paging at the specified page table index, loading the given physical address into the architecture-specific register for the page table base address.
-/// This allows the entire page table hierarchy to be accessed through a single virtual address, simplifying memory management and page table manipulation.
-///
-/// # Safety
-/// The caller must ensure that the recursive mapping is a. present and b. pointing towards `phys_addr` before enabling it,
-/// as enabling a recursive mapping that is not properly set up can lead to undefined behavior when accessing the page tables through the recursive mapping.
-pub unsafe fn load_recursive(
-    root: &'static mut PageTable,
-    index: paging::PageTableIndex,
-    phys_addr: PhysAddr,
-) -> Result<(), MemError> {
-    if (phys_addr.as_u64() & arch::L1_PAGE_SIZE as u64 - 1) != 0 {
-        return Err(MemError::InvalidVirtRange {
-            reason: InvalidRangeReason::Unaligned,
-            begin: VirtAddr::new(phys_addr.as_u64()),
-            size: arch::L1_PAGE_SIZE as u64,
-        });
-    }
-
-    unsafe { arch::init_load_recursive(root, index, phys_addr) }
 }
 
 /// A source of physical memory for mapping virtual addresses.
@@ -330,6 +363,15 @@ pub enum MemError {
     /// An error that originated from the underlying memory mapping implementation, such as page table manipulation or low-level memory operations.
     #[error("An error occurred during memory management operations: {0}")]
     Other(&'static str),
+}
+
+impl MemError {
+    pub(crate) fn scratch_space_too_small(provided: u64) -> Self {
+        Self::ScratchSpaceTooSmall {
+            provided,
+            required: MIN_MANAGED_RANGE_SIZE,
+        }
+    }
 }
 
 const fn check_range_virt(virt_base: VirtAddr, byte_size: usize) -> Result<(), MemError> {

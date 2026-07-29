@@ -15,7 +15,7 @@ pub use paddr::PhysAddr;
 pub use page::Page;
 pub use vaddr::VirtAddr;
 
-use crate::{NmmSealed, arch::L1_PAGE_SIZE, seal};
+use crate::{NmmSealed, align, arch::L1_PAGE_SIZE, seal};
 
 encapsulate_macro!(
     impl_ops,
@@ -294,6 +294,24 @@ where
     /// Returns the starting address of this memory range.
     pub const fn size(&self) -> u64 {
         self.end.as_u64() - self.start.as_u64()
+    }
+
+    /// Returns a new MemoryRange that is aligned up to the next multiple of the given fragment size.
+    /// Returns `None` if the aligned start address is greater than or equal to the end address.
+    pub const fn align_up_to<S: FragmentSize>(&self) -> Option<MemoryRange<A>> {
+        let aligned_start = match A::try_new(align!(up, self.start.as_u64(), S::SIZE)) {
+            Some(addr) => addr,
+            None => return None,
+        };
+
+        if aligned_start >= self.end {
+            return None;
+        }
+
+        Some(MemoryRange {
+            start: aligned_start,
+            end: self.end,
+        })
     }
 }
 

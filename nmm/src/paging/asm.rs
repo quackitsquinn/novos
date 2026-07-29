@@ -109,6 +109,10 @@ pub(crate) fn physical_memory_manager() -> OnceMutexGuard<'static, PhysicalMemor
 // This page is mapped to a known virtual address and is used to write zeros to the frame before it is returned to the caller.
 static ZERO_PAGE: Once<Page<Large>> = Once::new();
 
+pub(crate) fn init_zero_page(zero_page: Page<Large>) {
+    ZERO_PAGE.call_once(|| zero_page);
+}
+
 pub(crate) fn zero_frame<S>(frame: Frame<S>)
 where
     S: FragmentSize,
