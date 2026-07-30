@@ -17,8 +17,8 @@ use crate::{
     },
     entry_walker::EntryWalker,
     paging::{
-        Address, AddressExt, FragmentManager, FragmentSize, Frame, FullManager, PhysAddr, Small,
-        VirtAddr, map_from,
+        Address, AddressExt, FragmentManager, FragmentSize, Frame, FullManager, MemoryFragment,
+        PhysAddr, Small, VirtAddr, map_from,
         primitives::{FrameClass, MemoryRange},
     },
 };
@@ -208,7 +208,7 @@ where
             if let Some(bitptr) = bitmap.bitmap.allocate(S::BITS, bitmap.bit_alignment) {
                 bitmap.free -= S::BITS;
                 let addr = bit_index_as_address(bitptr.bit_index(), bitmap.start);
-                return Ok(Frame::new(addr));
+                return Ok(Frame::from_start_address(addr).unwrap());
             }
         }
         Err(MemError::OutOfMemory)

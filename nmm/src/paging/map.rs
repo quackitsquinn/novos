@@ -10,7 +10,7 @@ use crate::{
     MapFlags, MemError,
     paging::{
         Address, EntryMappingFlags, FragmentManager, FragmentSize, Frame, FullManager, Large,
-        Medium, Page, PhysAddr, Small, VirtAddr,
+        Medium, MemoryFragment, Page, PhysAddr, Small, VirtAddr,
         fragment::{GreedyFragmentMapper, JointFragmentMapper},
         primitives::{AnyFragment, FrameClass, PageClass},
     },

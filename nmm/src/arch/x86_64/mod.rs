@@ -190,6 +190,7 @@ cake::encapsulate_macro!(
                     &mut self,
                     page: crate::paging::Page<$size>,
                 ) -> Result<Unmapped<$size>, MemError> {
+                    use $crate::paging::primitives::MemoryFragment;
                     let flags = match self.inner.translate(page.start_address().into()) {
                         arch_lib::TranslateResult::Mapped { flags, .. } => flags,
                         arch_lib::TranslateResult::NotMapped => {

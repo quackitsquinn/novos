@@ -9,7 +9,8 @@ use cake::log::error;
 use crate::paging::limine::LimineEntry;
 use crate::paging::primitives::FrameClass;
 use crate::paging::{
-    Address, FragmentManager, FragmentSize, Frame, FullManager, MemoryRange, PhysAddr,
+    Address, FragmentManager, FragmentSize, Frame, FullManager, MemoryFragment, MemoryRange,
+    PhysAddr,
 };
 use crate::{MemError, align};
 
@@ -168,7 +169,7 @@ impl<'a> EntryWalker<'a> {
                     length: new_length,
                 };
             }
-            return Some(Frame::new(aligned_base));
+            return Some(Frame::from_start_address(aligned_base).unwrap());
         }
         None
     }
@@ -266,7 +267,7 @@ where
             };
         }
 
-        Ok(Frame::new(aligned))
+        Ok(Frame::from_start_address(aligned).unwrap())
     }
 
     fn deallocate_fragment(&mut self, _primitive: Frame<S>) {

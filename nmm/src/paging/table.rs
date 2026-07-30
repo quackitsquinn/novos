@@ -2,7 +2,9 @@ use core::fmt::{Debug, Display};
 
 use crate::{
     MapFlags, arch,
-    paging::{Address, AddressExt, FragmentSize, Frame, Page, PhysAddr, Small, VirtAddr},
+    paging::{
+        Address, AddressExt, FragmentSize, Frame, MemoryFragment, Page, PhysAddr, Small, VirtAddr,
+    },
 };
 
 /// A page table, accurate to the current architecture.

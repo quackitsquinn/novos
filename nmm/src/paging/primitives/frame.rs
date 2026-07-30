@@ -19,43 +19,6 @@ pub struct Frame<S: FragmentSize> {
 }
 
 impl<S: FragmentSize> Frame<S> {
-    /// Creates a new `Frame` from the given starting physical address. The address must be aligned to the size of the frame, otherwise this function will panic.
-    pub const fn new(start_address: PhysAddr) -> Self {
-        Self::try_new(start_address)
-            .expect("Frame::new: start_address is not aligned to frame size")
-    }
-
-    /// Tries to create a new `Frame` from the given starting physical address. Returns `None` if the address is not aligned to the size of the frame.
-    pub const fn try_new(start_address: PhysAddr) -> Option<Self> {
-        if align!(down, start_address.as_u64(), S::SIZE) == start_address.as_u64() {
-            Some(unsafe { Self::new_unchecked(start_address) })
-        } else {
-            None
-        }
-    }
-
-    /// Creates a new `Frame` from the given starting physical address without checking for alignment.
-    ///
-    /// # Safety
-    ///
-    /// The caller must ensure that the `start_address` is aligned to the size of the frame.
-    pub const unsafe fn new_unchecked(start_address: PhysAddr) -> Self {
-        Self {
-            start_address,
-            _size_marker: core::marker::PhantomData,
-        }
-    }
-
-    /// Creates a new `Frame` from the given starting physical address.
-    pub const fn from_start_address(start_address: PhysAddr) -> Option<Self> {
-        Self::try_new(start_address)
-    }
-
-    /// Returns the starting physical address of the frame.
-    pub const fn start_address(&self) -> PhysAddr {
-        self.start_address
-    }
-
     /// Applies the given HHDM offset to the frame's starting address, returning the resulting virtual address.
     pub const fn translate_offset(&self, offset: VirtAddr) -> Option<VirtAddr> {
         let addr = match self.start_address.as_u64().checked_add(offset.as_u64()) {

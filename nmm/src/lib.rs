@@ -24,8 +24,8 @@ pub use pastey as _pastey;
 use crate::{
     entry_walker::EntryWalker,
     paging::{
-        Address, AddressExt, FragmentManager, FragmentSize, Frame, Large, Page, PageTable,
-        PhysAddr, VirtAddr, asm,
+        Address, AddressExt, FragmentManager, FragmentSize, Frame, Large, MemoryFragment, Page,
+        PageTable, PhysAddr, VirtAddr, asm,
         primitives::{AnyFragment, MemoryRange, PageClass},
     },
 };

@@ -2,7 +2,7 @@ use core::sync::atomic::AtomicBool;
 
 use crate::{
     arch::RecursivePageTable,
-    paging::{AddressExt, PageTable, asm},
+    paging::{AddressExt, MemoryFragment, PageTable, asm},
 };
 
 pub struct RecursiveAddressSpaceBuilder<'a> {

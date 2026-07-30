@@ -3,7 +3,6 @@
 use crate::paging::primitives::{AnyFragment, PageClass, Primitive};
 use crate::paging::{Address, AddressExt, Large, Medium, Small, VirtAddr};
 use crate::{align, paging::FragmentSize};
-use core::any::type_name;
 use core::fmt::Debug;
 use core::mem::transmute;
 
@@ -25,7 +24,13 @@ const impl<S: FragmentSize> crate::paging::MemoryFragment<S> for Page<S> {
     }
 
     fn containing_address(addr: Self::AddressType) -> Self {
-        unsafe { Self::new_unchecked(VirtAddr::new_truncate(align!(down, addr.as_u64(), S::SIZE))) }
+        unsafe {
+            Self::from_start_address_unchecked(VirtAddr::new_truncate(align!(
+                down,
+                addr.as_u64(),
+                S::SIZE
+            )))
+        }
     }
 
     unsafe fn from_start_address_unchecked(start_address: Self::AddressType) -> Self {
@@ -37,41 +42,6 @@ const impl<S: FragmentSize> crate::paging::MemoryFragment<S> for Page<S> {
 }
 
 impl<S: FragmentSize> Page<S> {
-    /// Attempts to create a new `Page` from the given starting virtual address. The address must be aligned to the size of the page, otherwise this function will return `None`.
-    pub const fn try_new_u64(start_address: u64) -> Option<Self> {
-        Self::try_new(VirtAddr::new(start_address))
-    }
-
-    /// Creates a new `Page` from the given starting virtual address. The address must be aligned to the size of the page, otherwise this function will panic.
-    pub const fn try_new(start_address: VirtAddr) -> Option<Self> {
-        if align!(down, start_address.as_u64(), S::SIZE) == start_address.as_u64() {
-            Some(unsafe { Self::new_unchecked(start_address) })
-        } else {
-            None
-        }
-    }
-
-    /// Creates a new `Page` from the given starting virtual address without checking for alignment.
-    ///
-    /// # Safety
-    /// The caller must ensure that the `start_address` is aligned to the size of the page.
-    pub const unsafe fn new_unchecked(start_address: VirtAddr) -> Self {
-        Self {
-            start_address,
-            _size_marker: core::marker::PhantomData,
-        }
-    }
-
-    /// Creates a new `Page` from the given starting virtual address.
-    pub const fn from_start_address(start_address: VirtAddr) -> Option<Self> {
-        Self::try_new(start_address)
-    }
-
-    /// Returns the starting virtual address of the page.
-    pub const fn start_address(&self) -> VirtAddr {
-        self.start_address
-    }
-
     /// Zeros the memory of the page.
     ///
     /// # Safety

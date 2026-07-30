@@ -111,6 +111,7 @@ macro_rules! into_arch_page {
     ($x86_64_size: path, $size: path) => {
         impl Into<arch_lib::Page<$x86_64_size>> for Page<$size> {
             fn into(self) -> arch_lib::Page<$x86_64_size> {
+                use $crate::paging::primitives::MemoryFragment;
                 arch_lib::Page::from_start_address(self.start_address().into()).unwrap()
             }
         }
@@ -136,12 +137,14 @@ macro_rules! into_arch_frame {
     ($x86_64_size: path, $size: path) => {
         impl Into<arch_lib::PhysFrame<$x86_64_size>> for Frame<$size> {
             fn into(self) -> arch_lib::PhysFrame<$x86_64_size> {
+                use $crate::paging::primitives::MemoryFragment;
                 arch_lib::PhysFrame::from_start_address(self.start_address().into()).unwrap()
             }
         }
 
         impl From<arch_lib::PhysFrame<$x86_64_size>> for Frame<$size> {
             fn from(value: arch_lib::PhysFrame<$x86_64_size>) -> Self {
+                use $crate::paging::primitives::MemoryFragment;
                 Frame::from_start_address(PhysAddr::new(value.start_address().as_u64())).unwrap()
             }
         }
