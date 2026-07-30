@@ -28,8 +28,11 @@ const impl<S: FragmentSize> crate::paging::MemoryFragment<S> for Page<S> {
         unsafe { Self::new_unchecked(VirtAddr::new_truncate(align!(down, addr.as_u64(), S::SIZE))) }
     }
 
-    fn from_start_address(start_address: Self::AddressType) -> Option<Self> {
-        Self::try_new(start_address)
+    unsafe fn from_start_address_unchecked(start_address: Self::AddressType) -> Self {
+        Self {
+            start_address,
+            _size_marker: core::marker::PhantomData,
+        }
     }
 }
 

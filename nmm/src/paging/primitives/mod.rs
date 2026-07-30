@@ -101,13 +101,21 @@ seal!(Small, Medium, Large);
 
 /// A trait that represents both Page and Frame types, allowing for generic functions that can work with either type of memory primitive.
 #[allow(private_bounds)] // intentionally seal this
-pub const trait MemoryFragment<Ps: FragmentSize>: Primitive {
+pub const trait MemoryFragment<Size: FragmentSize>: Primitive {
     /// The address space type associated with this memory primitive (e.g., `VirtAddr` for pages, `PhysAddr` for frames).
-    type AddressType: Address;
+    type AddressType: [const] Address;
 
     /// Tries to create a new memory primitive from the given starting address.
     /// The address must be aligned to the size of the primitive, otherwise this function will return `None`.
-    fn from_start_address(start_address: Self::AddressType) -> Option<Self>;
+    unsafe fn from_start_address_unchecked(start_address: Self::AddressType) -> Self;
+
+    fn from_start_address(start_address: Self::AddressType) -> Option<Self> {
+        if start_address.as_u64() % Size::SIZE == 0 {
+            Some(unsafe { Self::from_start_address_unchecked(start_address) })
+        } else {
+            None
+        }
+    }
 
     /// Creates a new memory primitive containing the given address.
     /// The starting address of the primitive will be the largest aligned address less than or equal to the given address.

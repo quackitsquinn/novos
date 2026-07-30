@@ -72,12 +72,17 @@ impl<S: FragmentSize> Primitive for Frame<S> {}
 const impl<S: FragmentSize> MemoryFragment<S> for Frame<S> {
     type AddressType = PhysAddr;
 
-    fn from_start_address(start_address: Self::AddressType) -> Option<Self> {
-        Self::try_new(start_address)
+    unsafe fn from_start_address_unchecked(start_address: Self::AddressType) -> Self {
+        Self {
+            start_address,
+            _size_marker: core::marker::PhantomData,
+        }
     }
 
     fn containing_address(addr: Self::AddressType) -> Self {
-        unsafe { Self::new_unchecked(PhysAddr::new(align!(down, addr.as_u64(), S::SIZE))) }
+        unsafe {
+            Self::from_start_address_unchecked(PhysAddr::new(align!(down, addr.as_u64(), S::SIZE)))
+        }
     }
 
     /// Returns the starting physical address of the frame.
