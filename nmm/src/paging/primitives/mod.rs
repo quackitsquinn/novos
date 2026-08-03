@@ -6,7 +6,7 @@ pub mod paddr;
 pub mod page;
 pub mod vaddr;
 
-use core::mem::transmute_copy;
+use core::{alloc::Layout, mem::transmute_copy};
 
 pub use address::{Address, AddressExt};
 use cake::encapsulate_macro;
@@ -69,6 +69,11 @@ pub trait FragmentSize: NmmSealed + Sized + Copy + core::fmt::Debug + Eq + Parti
     const BITS: u64 = Self::SIZE / L1_PAGE_SIZE;
     /// The name of this page size type, as a string.
     const NAME: &'static str;
+    /// The layout of a page for this page size type, used for allocation and deallocation.
+    const LAYOUT: Layout = match Layout::from_size_align(Self::SIZE as usize, Self::SIZE as usize) {
+        Ok(layout) => layout,
+        Err(_) => panic!("Invalid layout"),
+    };
 }
 
 /// Marker type for small pages, typically 4KB in size for x86_64 architecture.

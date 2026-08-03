@@ -47,8 +47,16 @@ impl<S: FragmentSize> Page<S> {
     /// # Safety
     /// The page must be mapped to physical memory and must be writable.
     pub unsafe fn zero(&self) {
+        unsafe { self.fill(0x00) };
+    }
+
+    /// Fills the memory of the page with the given value.
+    ///
+    /// # Safety
+    /// The page must be mapped to physical memory and must be writable.
+    pub unsafe fn fill(&self, value: u8) {
         let ptr = self.start_address.as_mut_ptr::<u8>();
-        unsafe { core::ptr::write_bytes(ptr, 0, S::SIZE as usize) };
+        unsafe { core::ptr::write_bytes(ptr, value, S::SIZE as usize) };
     }
 }
 

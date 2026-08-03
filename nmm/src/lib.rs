@@ -16,7 +16,7 @@ use core::{
 };
 
 use bitflags::bitflags;
-use cake::limine::memory_map;
+use cake::{limine::memory_map, log::warn};
 
 #[doc(hidden)]
 pub use pastey as _pastey;
@@ -128,7 +128,11 @@ pub enum MapSource {
     /// Maps the given physical address directly to the virtual address.
     Direct(PhysAddr),
     /// Allocate physical memory for the mapping.
-    Anon,
+    Anon {
+        /// If true, the allocated physical memory will be zeroed before being mapped to the virtual address.
+        /// If this is not set, it is undefined behavior to read from the mapped virtual address before writing to it.
+        zero: bool,
+    },
 }
 
 /// Maps a virtual address range to a physical address range with the specified size
@@ -148,6 +152,12 @@ pub fn map(
     check_range_virt(dest, byte_size)?;
     if let MapSource::Direct(phys_base) = src {
         check_range_phys(phys_base, byte_size)?;
+    }
+
+    if matches!(src, MapSource::Anon { zero: false }) && !flags.contains(MapFlags::WRITABLE) {
+        warn!(
+            "nmm::map: Mapping anonymous memory without zeroing and without the writable flag makes the mapping useless without undefined behavior."
+        )
     }
     unsafe { paging::map_unchecked(dest, src, byte_size, flags) }
 }

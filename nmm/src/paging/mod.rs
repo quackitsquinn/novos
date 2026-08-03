@@ -134,6 +134,31 @@ where
     unsafe { mapper.map_from(base, len, flags, mapping_flags, data_allocator) }
 }
 
+pub(crate) unsafe fn map_from_zeroed<D>(
+    base: VirtAddr,
+    len: u64,
+    flags: MapFlags,
+    mapping_flags: EntryMappingFlags,
+    data_allocator: &mut D,
+) -> Result<(), MemError>
+where
+    D: FullManager<FrameClass>,
+{
+    trace!(
+        "Mapping from base address {:x?} with length {:?} and flags {:?}",
+        base.as_u64(),
+        len,
+        flags
+    );
+
+    let active_as = asm::active();
+    let mut mapper = active_as.mapper().unwrap();
+
+    unsafe { mapper.map_from_zeroed(base, len, flags, mapping_flags, data_allocator) }?;
+
+    Ok(())
+}
+
 bitflags! {
     /// The flags used for handling special cases in page table entries, such as anonymous mappings.
     /// This is a bitflag where the positions of the bits are not formally defined, and above a couple entries even guaranteed to exist.
@@ -206,20 +231,30 @@ pub(crate) unsafe fn map_unchecked(
                 )?
             };
         }
-        MapSource::Anon => unsafe {
+        MapSource::Anon { zero } => unsafe {
             trace!(
                 "Mapping anonymous memory at virtual address {:#x} with size {} bytes and flags {:?}",
                 dest.as_u64(),
                 byte_size,
                 flags
             );
-            map_from(
-                dest,
-                byte_size as u64,
-                flags,
-                EntryMappingFlags::MAP_ANON,
-                pmm,
-            )?;
+            if !zero {
+                return map_from(
+                    dest,
+                    byte_size as u64,
+                    flags,
+                    EntryMappingFlags::MAP_ANON,
+                    pmm,
+                );
+            } else {
+                return map_from_zeroed(
+                    dest,
+                    byte_size as u64,
+                    flags,
+                    EntryMappingFlags::MAP_ANON,
+                    pmm,
+                );
+            }
         },
     }
 

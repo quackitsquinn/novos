@@ -10,7 +10,7 @@ use crate::{
     MapFlags, MemError,
     paging::{
         Address, EntryMappingFlags, FragmentManager, FragmentSize, Frame, FullManager, Large,
-        Medium, MemoryFragment, Page, PhysAddr, Small, VirtAddr,
+        Medium, MemoryFragment, Page, PhysAddr, Small, VirtAddr, asm,
         fragment::{GreedyFragmentMapper, JointFragmentMapper},
         primitives::{AnyFragment, FrameClass, PageClass},
     },
@@ -79,6 +79,51 @@ pub trait MemoryMapper:
                     let frame = data_allocator.allocate_large()?;
                     self.map_primitive(prim, frame, flags, mapping_flags, data_allocator)?
                         .flush();
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    unsafe fn map_from_zeroed<D>(
+        &mut self,
+        base: VirtAddr,
+        len: u64,
+        flags: MapFlags,
+        mapping_flags: EntryMappingFlags,
+        data_allocator: &mut D,
+    ) -> Result<(), MemError>
+    where
+        D: FullManager<FrameClass>,
+    {
+        trace!(
+            "Mapping from base address {:x?} with length {:?} and flags {:?}",
+            base.as_u64(),
+            len,
+            flags
+        );
+
+        let mapper = GreedyFragmentMapper::<PageClass>::new(base, len);
+        for frag in mapper {
+            match frag {
+                AnyFragment::Small(prim) => {
+                    let frame = data_allocator.allocate_small()?;
+                    self.map_primitive(prim, frame, flags, mapping_flags, data_allocator)?
+                        .flush();
+                    asm::zero_frame(frame);
+                }
+                AnyFragment::Medium(prim) => {
+                    let frame = data_allocator.allocate_medium()?;
+                    self.map_primitive(prim, frame, flags, mapping_flags, data_allocator)?
+                        .flush();
+                    asm::zero_frame(frame);
+                }
+                AnyFragment::Large(prim) => {
+                    let frame = data_allocator.allocate_large()?;
+                    self.map_primitive(prim, frame, flags, mapping_flags, data_allocator)?
+                        .flush();
+                    asm::zero_frame(frame);
                 }
             }
         }
