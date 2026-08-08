@@ -7,7 +7,7 @@ use core::{
 use log::{error, trace};
 use spin::{Mutex, MutexGuard, Once};
 
-use crate::{get_caller_rip_1_up, resolve_symbol};
+use crate::trace::{read_caller_frame, sym::resolve_sym};
 
 /// A mutex that can be initialized once.
 ///
@@ -46,9 +46,9 @@ impl<'a, T> OnceMutex<T> {
     #[track_caller]
     pub fn try_get(&self) -> Option<OnceMutexGuard<'_, T>> {
         let cid = crate::core_id() as i64;
-        let caller = get_caller_rip_1_up();
+        let caller = read_caller_frame(1);
 
-        self.acquire(cid as u64, caller)?;
+        self.acquire(cid as u64, caller.map(|c| c.instruction_pointer))?;
 
         unsafe {
             Some(OnceMutexGuard::from_raw_parts(
@@ -109,7 +109,7 @@ impl<'a, T> OnceMutex<T> {
             return None;
         }
 
-        if let Some(s) = resolve_symbol(locker_caller) {
+        if let Some(s) = resolve_sym(locker_caller) {
             trace!(
                 "Deadlock detected: Attempted to re-lock OnceMutex on core {}: Locked by {}.",
                 cid, s,
@@ -128,7 +128,7 @@ impl<'a, T> OnceMutex<T> {
     /// Gets a lock guard to the inner data.
     #[track_caller]
     pub fn get(&self) -> OnceMutexGuard<'_, T> {
-        let caller = get_caller_rip_1_up();
+        let caller = read_caller_frame(1).map(|c| c.instruction_pointer);
         let cid = crate::core_id() as i64;
 
         self.acquire(cid as u64, caller)

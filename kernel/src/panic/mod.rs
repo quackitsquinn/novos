@@ -2,7 +2,7 @@
 
 use core::{convert::Infallible, fmt::Write, panic::PanicInfo};
 
-use cake::Fuse;
+use cake::{Fuse, trace};
 
 use crate::{
     declare_module, hlt_loop,
@@ -13,8 +13,6 @@ use crate::{
     serial::{self, interface::SERIAL_PORT_NUM, raw::SerialPort},
     testing,
 };
-
-pub mod stacktrace;
 
 /// A basic panic handler that just prints the panic message to the serial port.
 pub fn panic_basic(pi: &PanicInfo) {
@@ -39,7 +37,11 @@ pub fn panic_basic(pi: &PanicInfo) {
 pub fn panic_extended_info(pi: &PanicInfo) {
     println!("=== KERNEL PANIC ===");
     print!("Panic at ");
-    write_location(pi);
+    if let Some(location) = pi.location() {
+        println!("{}:{}", location.file(), location.line());
+    } else {
+        println!("Unknown location");
+    }
     println!();
     println!("{}", pi.message());
     if memory::allocator::ALLOCATOR.is_initialized() {
@@ -53,16 +55,13 @@ pub fn panic_extended_info(pi: &PanicInfo) {
     }
 
     println!("=== STACK TRACE ===");
-    stacktrace::print_trace();
-    println!("=== END OF PANIC ===");
+    panic_stacktrace();
+    println!("=== END STACK TRACE ===");
 }
 
-fn write_location(pi: &PanicInfo) {
-    if let Some(location) = pi.location() {
-        print!("{}:{}", location.file(), location.line())
-    } else {
-        print!("Unknown location")
-    }
+pub(crate) fn panic_stacktrace() {
+    let stacktrace = trace::collect_stacktrace::<32>();
+    stacktrace.print(6, kserial::client::writer());
 }
 
 static PANICKED: Fuse = Fuse::new();

@@ -1,4 +1,3 @@
-
 use cake::log::info;
 use x86_64::registers::control::Cr2;
 
@@ -6,7 +5,7 @@ use crate::{
     context::{InterruptCodeContext, InterruptContext, PageFaultInterruptContext},
     interrupt_wrapper, interrupts,
     mp::{self, LAPIC},
-    panic::stacktrace::{self, StackFrame},
+    panic::panic_stacktrace,
     println,
 };
 
@@ -20,7 +19,7 @@ pub fn general_handler(ctx: InterruptContext, _: u8, name: &'static str) {
     println!("== CPU STATE ==");
     println!("{}", ctx.context);
     println!("== STACK TRACE ==");
-    unsafe { stacktrace::print_trace_raw(ctx.context.rbp as *const StackFrame) };
+    panic_stacktrace();
     exception_brk();
     loop {}
 }
@@ -31,7 +30,7 @@ pub fn general_code_handler(ctx: InterruptCodeContext, _: u8, name: &'static str
     println!("== CPU STATE ==");
     println!("{}", ctx.context);
     println!("== STACK TRACE ==");
-    unsafe { stacktrace::print_trace_raw(ctx.context.rbp as *const StackFrame) };
+    panic_stacktrace();
     exception_brk();
     loop {}
 }
@@ -42,7 +41,7 @@ pub fn page_fault_handler(ctx: PageFaultInterruptContext) {
     println!("== CPU STATE ==");
     println!("{}", ctx.context);
     println!("== STACK TRACE ==");
-    unsafe { stacktrace::print_trace_raw(ctx.context.rbp as *const StackFrame) };
+    panic_stacktrace();
     exception_brk();
     loop {}
 }

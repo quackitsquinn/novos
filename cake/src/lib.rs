@@ -10,12 +10,14 @@ mod oncemut;
 mod oncerw;
 mod owned;
 mod resource;
+pub mod trace;
 
 /* Crate Exports */
 pub use self::limine_request::{
     LimineData, LimineRequest, RawLimineRequest, requests_terminated, terminate_requests,
 };
 pub use fuse::Fuse;
+use kelp::Elf;
 pub use module::KernelModule;
 pub use oncemut::{OnceMutex, OnceMutexGuard};
 pub use oncerw::{OnceRwLock, OnceRwReadGuard, OnceRwWriteGuard};
@@ -40,26 +42,16 @@ static CALLER_INSTRUCTION_POINTER_NAME_RESOLVER: Once<fn(usize) -> Option<&'stat
     Once::new();
 static MULTITHREADED: Once<bool> = Once::new();
 
-/// Sets the function that will be used to get the instruction pointer of the caller.
-/// This function should return the caller 2 levels up the stack.
-///
-/// Any inaccuracies will not cause U.B. because this is treated as a heuristic.
-///
-/// The stack will look like this:
-/// - caller
-/// - wrapper function
-/// - instruction pointer function (`f`)
-pub fn set_caller_instruction_pointer_fn(f: fn() -> usize) {
-    CALLER_INSTRUCTION_POINTER_FN.call_once(|| f);
-}
+pub(crate) static KERNEL_ELF: Once<Elf<'static>> = Once::new();
 
-/// Sets the function that will be used to resolve the instruction pointer to a symbol name.
-/// This function should return the name of the symbol at the given instruction pointer.
-/// If the symbol cannot be found, it should return `None`.
-///
-/// Similar to the above, this is treated as a heuristic and inaccuracies will not cause U.B.
-pub fn set_caller_instruction_pointer_name_resolver(f: fn(usize) -> Option<&'static str>) {
-    CALLER_INSTRUCTION_POINTER_NAME_RESOLVER.call_once(|| f);
+pub fn set_kernel_elf(kernel_elf: &'static [u8]) -> Result<Option<()>, kelp::ElfError> {
+    let elf = Elf::new(kernel_elf)?;
+    let mut set = false;
+    KERNEL_ELF.call_once(|| {
+        set = true;
+        elf
+    });
+    if set { Ok(Some(())) } else { Ok(None) }
 }
 
 /// Returns true if the kernel is running in a multithreaded environment (i.e., with multiple cores).
@@ -72,30 +64,6 @@ pub fn set_multithreaded(multithreaded: bool) {
 pub(crate) fn is_multithreaded() -> bool {
     *MULTITHREADED.get().unwrap_or(&false)
 }
-
-#[inline(never)]
-fn get_caller_rip_1_up() -> Option<*const ()> {
-    let func = CALLER_INSTRUCTION_POINTER_FN.get()?;
-    Some(func() as *const ())
-}
-
-fn resolve_symbol(addr: *const ()) -> Option<&'static str> {
-    let resolver = CALLER_INSTRUCTION_POINTER_NAME_RESOLVER.get()?;
-    resolver(addr as usize)
-}
-
-mod _macro {
-    macro_rules! get_caller_rip_2_up {
-        () => {
-            $crate::CALLER_INSTRUCTION_POINTER_FN
-                .get()
-                .map(|f| f() as *const ())
-        };
-    }
-    pub(crate) use get_caller_rip_2_up;
-}
-
-pub(crate) use _macro::get_caller_rip_2_up;
 
 /// Encapsulates a macro definition within a private module to prevent it from being used outside of the intended scope.
 ///

@@ -76,6 +76,14 @@ fn init() -> Result<(), Infallible> {
     EXECUTABLE_ADDRESS.call_once(|| exec_addr);
 
     RSDP_ADDRESS.call_once(|| RSDP_ADDRESS_REQUEST.get_response().map(|r| r.address()));
+
+    let lock = KERNEL_ELF.lock_limine();
+    let file = lock.file();
+    cake::set_kernel_elf(unsafe {
+        core::slice::from_raw_parts(file.addr() as *const u8, file.size() as usize)
+    })
+    .unwrap()
+    .unwrap();
     Ok(())
 }
 
