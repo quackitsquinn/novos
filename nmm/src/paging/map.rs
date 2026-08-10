@@ -111,19 +111,19 @@ pub trait MemoryMapper:
                     let frame = data_allocator.allocate_small()?;
                     self.map_primitive(prim, frame, flags, mapping_flags, data_allocator)?
                         .flush();
-                    asm::zero_frame(frame);
+                    unsafe { asm::zero_frame(frame) };
                 }
                 AnyFragment::Medium(prim) => {
                     let frame = data_allocator.allocate_medium()?;
                     self.map_primitive(prim, frame, flags, mapping_flags, data_allocator)?
                         .flush();
-                    asm::zero_frame(frame);
+                    unsafe { asm::zero_frame(frame) };
                 }
                 AnyFragment::Large(prim) => {
                     let frame = data_allocator.allocate_large()?;
                     self.map_primitive(prim, frame, flags, mapping_flags, data_allocator)?
                         .flush();
-                    asm::zero_frame(frame);
+                    unsafe { asm::zero_frame(frame) };
                 }
             }
         }

@@ -13,7 +13,7 @@ pub trait AddressSpaceBuilder {
     /// Maps `size` bytes of memory starting at the virtual address `virt` to physical memory according to the specified `source`. The mapping should be page-aligned and can have various options for how the physical memory is allocated or copied.
     fn map(
         &mut self,
-        virt: VirtAddr,
+        base: VirtAddr,
         source: Source,
         size: u64,
         map_flags: MapFlags,
@@ -33,20 +33,10 @@ pub(crate) trait RemapInto {
 pub enum Source {
     /// Maps the virtual address to the same physical address (identity mapping).
     Identity,
-    /// Maps the virtual address to the same physical address as the current address space, effectively copying the mapping from the current address space to the new one. This is useful for mapping ELF sections that are already mapped in the current address space.
-    CopyFromCurrent(VirtAddr),
     /// Maps a new range of memory, without copying any data from the source address.
     Allocate {
         /// Should the memory be zeroed?
         should_zero: bool,
-    },
-    /// Like `CopyFromCurrent`, but with an additional `size` parameter that limits the number of bytes copied from the source address. T
-    /// Bytes beyond the specified size will not be copied, and will be mapped to zeroed pages. This is useful for mapping ELF sections.
-    CopyFromCurrentLimited {
-        /// The source address to copy from in the current address space.
-        source: VirtAddr,
-        /// The number of bytes to copy from the source address. The remaining bytes in the mapped range will be zeroed.
-        size: u64,
     },
     /// Maps the virtual address to a specific physical address.
     ///

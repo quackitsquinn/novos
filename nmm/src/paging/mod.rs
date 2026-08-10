@@ -81,7 +81,7 @@ where
     Mapper: SizedMemoryMapper<S>,
 {
     trace!(
-        "Mapping frame {:?} to page {:?} with flags {:?}",
+        "Mapping frame {:?} to page {:?} with flags {}",
         src, dst, flags
     );
 

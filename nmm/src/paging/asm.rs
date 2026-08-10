@@ -113,7 +113,7 @@ pub(crate) fn init_zero_page(zero_page: Page<Large>) {
     ZERO_PAGE.call_once(|| zero_page);
 }
 
-pub(crate) fn zero_frame<S>(frame: Frame<S>)
+pub(crate) unsafe fn zero_frame<S>(frame: Frame<S>)
 where
     S: FragmentSize,
     arch::Mapper: SizedMemoryMapper<S>,
