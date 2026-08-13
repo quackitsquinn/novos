@@ -5,7 +5,6 @@ use crate::{
         Address,
         primitives::{Primitive, impl_ops},
     },
-    seal,
 };
 
 use core::ops;
@@ -14,8 +13,6 @@ use core::ops;
 #[derive(Clone, Copy, Hash, Debug)]
 #[derive_const(PartialEq, Eq, PartialOrd, Ord)]
 pub struct VirtAddr(u64);
-
-seal!(VirtAddr);
 
 impl_ops!(blanket VirtAddr);
 

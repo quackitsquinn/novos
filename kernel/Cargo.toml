@@ -13,17 +13,17 @@ bitflags = "2.5.0"
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 pic8259 = "0.11.0"
 uart_16550 = "0.4.0"
-x86_64 = "0.15.2"
+x86_64 = "0.15.5"
 kproc = { path = "../kproc" }
 kserial = { path = "../kserial", default-features = false }
-kalloc ={ path = "../kalloc" }
+kalloc = { path = "../kalloc" }
 thiserror = { version = "2.0.3", default-features = false }
 rustc-demangle = { version = "0.1.24", default-features = false }
 # TODO: Find an alternative to this, because it's now deprecated
 paste = "1.0.15"
 arrayvec = { version = "0.7.6", default-features = false }
 acpi = "6.0.1"
-cake = {path = "../cake"}
+cake = { path = "../cake" }
 raw-cpuid = "11.6.0"
 modular-bitfield = "0.12.0"
 kelp = { path = "../kelp" }

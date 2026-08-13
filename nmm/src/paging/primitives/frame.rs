@@ -3,7 +3,7 @@
 use core::{any::type_name, fmt::Debug, mem::transmute};
 
 use crate::{
-    NmmSealed, align,
+    align,
     paging::{
         Address, FragmentSize, Large, Medium, MemoryFragment, PhysAddr, Small, VirtAddr,
         primitives::{AnyFragment, FrameClass, Primitive},
@@ -29,7 +29,6 @@ impl<S: FragmentSize> Frame<S> {
     }
 }
 
-impl<S: FragmentSize> NmmSealed for Frame<S> {}
 impl<S: FragmentSize> Primitive for Frame<S> {}
 
 const impl<S: FragmentSize> MemoryFragment<S> for Frame<S> {

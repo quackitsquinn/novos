@@ -8,6 +8,8 @@
 #![feature(const_destruct)]
 #![feature(const_cmp)]
 #![feature(derive_const)]
+#![feature(impl_restriction)]
+#![feature(mut_restriction)]
 
 use core::{
     alloc::Layout,
@@ -229,9 +231,12 @@ pub fn free_frame<S: FragmentSize>(frame: Frame<S>) {
 /// A structure representing a mapping between a virtual address range and a physical address range, along with the size of the mapping in bytes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MemoryMapping {
-    virt_base: VirtAddr,
-    phys_base: PhysAddr,
-    byte_size: usize,
+    /// The starting virtual address of the mapped range.
+    pub mut(crate) virt_base: VirtAddr,
+    /// The starting physical address of the mapped range.
+    pub mut(crate) phys_base: PhysAddr,
+    /// The size of the mapped range in bytes.
+    pub mut(crate) byte_size: usize,
 }
 
 impl MemoryMapping {
@@ -242,21 +247,6 @@ impl MemoryMapping {
             phys_base,
             byte_size,
         }
-    }
-
-    /// Returns the starting virtual address of the memory mapping.
-    pub fn virt_base(&self) -> VirtAddr {
-        self.virt_base
-    }
-
-    /// Returns the starting physical address of the memory mapping.
-    pub fn phys_base(&self) -> PhysAddr {
-        self.phys_base
-    }
-
-    /// Returns the size of the memory mapping in bytes.
-    pub fn byte_size(&self) -> usize {
-        self.byte_size
     }
 
     /// Returns an immutable pointer to the start of the mapped virtual address range, allowing for direct access to the mapped memory.
@@ -291,10 +281,10 @@ pub fn create_phys_mapping(
 /// Frees a physical memory mapping that was previously created with `create_phys_mapping`, unmapping the virtual address range and freeing the allocated virtual address space.
 pub unsafe fn free_phys_mapping(mapping: MemoryMapping) -> Result<(), MemError> {
     unsafe {
-        unmap(mapping.virt_base(), mapping.byte_size())?;
+        unmap(mapping.virt_base, mapping.byte_size)?;
         free_virtual(
             mapping.virt_base,
-            make_layout_for_mapping(mapping.phys_base(), mapping.byte_size()),
+            make_layout_for_mapping(mapping.phys_base, mapping.byte_size),
         )
     }
 }
@@ -511,21 +501,6 @@ macro_rules! align {
         $value & !($alignment - 1)
     }};
 }
-
-pub(crate) trait NmmSealed {}
-
-cake::encapsulate_macro!(
-    pub(crate) seal,
-    _seal_mod,
-    /// Implements the `NmmSealed` trait for the specified types.
-    macro_rules! seal {
-        ($($ty: ty),*) => {
-            $(
-                impl $crate::NmmSealed for $ty {}
-            )*
-        };
-    }
-);
 
 cake::encapsulate_macro!(
     pub(crate) test_print,

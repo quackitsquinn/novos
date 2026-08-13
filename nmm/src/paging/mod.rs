@@ -36,7 +36,6 @@ pub type Table = [PageEntryType; crate::arch::ENTRY_COUNT];
 
 /// A trait for managing ranges of memory primitives, such as pages. T
 // I wish we didn't also have to specify the address space here..
-#[allow(private_bounds)] // intentionally seal this
 pub unsafe trait FragmentManager<T: MemoryFragment<S>, S: FragmentSize> {
     /// Allocates a range of memory of the specified size and alignment, returning the starting address of the allocated range.
     fn allocate_fragment(&mut self) -> Result<T, MemError>;

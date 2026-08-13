@@ -13,7 +13,6 @@ pub struct Page<S: FragmentSize> {
     _size_marker: core::marker::PhantomData<S>,
 }
 
-impl<S: FragmentSize> crate::NmmSealed for Page<S> {}
 impl<S: FragmentSize> Primitive for Page<S> {}
 
 const impl<S: FragmentSize> crate::paging::MemoryFragment<S> for Page<S> {

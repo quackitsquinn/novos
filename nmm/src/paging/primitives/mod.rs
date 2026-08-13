@@ -15,7 +15,7 @@ pub use paddr::PhysAddr;
 pub use page::Page;
 pub use vaddr::VirtAddr;
 
-use crate::{NmmSealed, align, arch::L1_PAGE_SIZE, seal};
+use crate::{align, arch::L1_PAGE_SIZE};
 
 encapsulate_macro!(
     impl_ops,
@@ -61,8 +61,9 @@ encapsulate_macro!(
 );
 
 /// A trait representing a page size for the current architecture.
-#[allow(private_bounds)]
-pub trait FragmentSize: NmmSealed + Sized + Copy + core::fmt::Debug + Eq + PartialEq {
+pub impl(crate) trait FragmentSize:
+    Sized + Copy + core::fmt::Debug + Eq + PartialEq
+{
     /// The size of a page for this page size type, in bytes.
     const SIZE: u64;
     /// The number of bits in a page for this page size type.
@@ -99,13 +100,12 @@ impl FragmentSize for Large {
 }
 
 /// A memory primitive.
-#[allow(private_bounds)] // intentionally seal this
-pub trait Primitive: NmmSealed + Sized + Copy + core::fmt::Debug + Eq + PartialEq {}
-
-seal!(Small, Medium, Large);
+pub impl(crate) trait Primitive:
+    Sized + Copy + core::fmt::Debug + Eq + PartialEq
+{
+}
 
 /// A trait that represents both Page and Frame types, allowing for generic functions that can work with either type of memory primitive.
-#[allow(private_bounds)] // intentionally seal this
 pub const trait MemoryFragment<Size: FragmentSize>: Primitive {
     /// The address space type associated with this memory primitive (e.g., `VirtAddr` for pages, `PhysAddr` for frames).
     type AddressType: [const] Address;
@@ -131,9 +131,8 @@ pub const trait MemoryFragment<Size: FragmentSize>: Primitive {
 }
 
 /// A trait representing a family of memory primitives (e.g., pages, frames, and virt/phys addresses) that can be used in paging,
-#[allow(private_bounds)] // intentionally seal this
-pub const trait PrimitiveClass:
-    NmmSealed + Sized + Copy + core::fmt::Debug + Eq + PartialEq
+pub impl(crate) const trait PrimitiveClass:
+    Sized + Copy + core::fmt::Debug + Eq + PartialEq
 {
     /// The address space type associated with this family of memory fragments (e.g., `VirtAddr` for pages, `PhysAddr` for frames).
     type Addr: Address;
@@ -157,8 +156,6 @@ impl PrimitiveClass for FrameClass {
     type Addr = PhysAddr;
     type Fragment<S: FragmentSize> = Frame<S>;
 }
-
-seal!(PageClass, FrameClass);
 
 /// A memory primitive of unknown size.
 /// This is used for functions that need to work with memory primitives of any size, but don't need to know the specific size of the primitive.
