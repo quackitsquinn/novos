@@ -184,7 +184,8 @@ impl Iterator for JointFragmentMapper {
 #[cfg(test)]
 mod test {
     use crate::paging::{
-        Address, FragmentSize, Frame, Large, Medium, Page, PhysAddr, Small, VirtAddr,
+        Address, FragmentSize, Frame, Large, Medium, MemoryFragment, Page, PhysAddr, Small,
+        VirtAddr,
         fragment::{GreedyFragmentMapper, JointFragmentMapper},
         primitives::{AnyFragment, AnyPage, FrameClass, PageClass},
     };
@@ -303,13 +304,14 @@ mod test {
 
         let mut mapper = new(0, Medium::SIZE);
 
-        let page = AnyFragment::Small(Page::<Small>::try_new_u64(0).unwrap());
+        let page = AnyFragment::Small(Page::<Small>::from_start_address(VirtAddr::new(0)).unwrap());
         assert_eq!(mapper.try_take_same(page), Some(page));
         for i in 0..(Medium::SIZE / Small::SIZE) - 1 {
             assert_eq!(
                 mapper.next(),
                 Some(AnyFragment::Small(
-                    Page::<Small>::try_new_u64((i + 1) * Small::SIZE).unwrap()
+                    Page::<Small>::from_start_address(VirtAddr::new((i + 1) * Small::SIZE))
+                        .unwrap()
                 ))
             );
         }

@@ -66,7 +66,7 @@ macro_rules! kernel_map {
     (gen_modules @munch $start:expr,) => {};
 
     (gen_modules @munch $start:expr, $name:ident = $size:tt $($size_unit: ident)?, $($rest:tt)*) => {
-        $crate::kernel_map!(gen_module $name, $start, $size);
+        $crate::kernel_map!(gen_module $name, $start, $size $($size_unit)?);
         $crate::kernel_map!(gen_modules @munch ($start.checked_add($crate::kernel_map!(size $size $($size_unit)?)).expect("overflow")), $($rest)*);
     };
 

@@ -288,8 +288,8 @@ mod tests {
         arch::{L1_PAGE_SIZE, L2_PAGE_SIZE, L3_PAGE_SIZE},
         entry_walker::{EntryWalker, MemoryRegion},
         paging::{
-            Address, FragmentManager, Frame, FullManager, Large, Medium, PhysAddr, Small,
-            limine::LimineEntry,
+            Address, FragmentManager, Frame, FullManager, Large, Medium, MemoryFragment, PhysAddr,
+            Small, limine::LimineEntry,
         },
     };
 
@@ -421,11 +421,11 @@ mod tests {
         let mut walker = unsafe { EntryWalker::from_limine_entries(&refs).unwrap() };
         assert_eq!(
             walker.allocate_for::<Small>(),
-            Ok(Frame::new(PhysAddr::new(0x1000)))
+            Ok(Frame::from_start_address(PhysAddr::new(0x1000)).unwrap())
         );
         assert_eq!(
             walker.allocate_for::<Small>(),
-            Ok(Frame::new(PhysAddr::new(0x3000)))
+            Ok(Frame::from_start_address(PhysAddr::new(0x3000)).unwrap())
         );
 
         let used_regions: Vec<MemoryRegion> = walker.used_regions().collect();
