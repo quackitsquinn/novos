@@ -5,6 +5,7 @@ mod fragment;
 pub mod index;
 pub(crate) mod limine;
 pub mod map;
+pub mod operation;
 pub mod primitives;
 mod table;
 

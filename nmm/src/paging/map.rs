@@ -12,6 +12,7 @@ use crate::{
         Address, EntryMappingFlags, FragmentManager, FragmentSize, Frame, FullManager, Large,
         Medium, MemoryFragment, Page, PhysAddr, Small, VirtAddr, asm,
         fragment::{GreedyFragmentMapper, JointFragmentMapper},
+        operation::{Operation, OperationAllSizes},
         primitives::{AnyFragment, FrameClass, PageClass},
     },
 };
@@ -79,6 +80,53 @@ pub trait MemoryMapper:
                     let frame = data_allocator.allocate_large()?;
                     self.map_primitive(prim, frame, flags, mapping_flags, data_allocator)?
                         .flush();
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Maps a range of virtual addresses to physical frames, using the provided frame allocator for any necessary allocations of page tables, and executes the given memory mapping operations for each mapping.
+    unsafe fn map_from_with_operation<D>(
+        &mut self,
+        base: VirtAddr,
+        len: u64,
+        flags: MapFlags,
+        mapping_flags: EntryMappingFlags,
+        data_allocator: &mut D,
+        op: &mut impl OperationAllSizes,
+    ) -> Result<(), MemError>
+    where
+        D: FullManager<FrameClass>,
+    {
+        trace!(
+            "Mapping from base address {:x?} with length {:?} and flags {:?}",
+            base.as_u64(),
+            len,
+            flags
+        );
+
+        let mapper = GreedyFragmentMapper::<PageClass>::new(base, len);
+        for frag in mapper {
+            match frag {
+                AnyFragment::Small(prim) => {
+                    let frame = data_allocator.allocate_small()?;
+                    self.map_primitive(prim, frame, flags, mapping_flags, data_allocator)?
+                        .flush();
+                    unsafe { op.execute(prim, frame)? };
+                }
+                AnyFragment::Medium(prim) => {
+                    let frame = data_allocator.allocate_medium()?;
+                    self.map_primitive(prim, frame, flags, mapping_flags, data_allocator)?
+                        .flush();
+                    unsafe { op.execute(prim, frame)? };
+                }
+                AnyFragment::Large(prim) => {
+                    let frame = data_allocator.allocate_large()?;
+                    self.map_primitive(prim, frame, flags, mapping_flags, data_allocator)?
+                        .flush();
+                    unsafe { op.execute(prim, frame)? };
                 }
             }
         }

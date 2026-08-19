@@ -39,7 +39,7 @@ impl<const LIMIT: usize> StackTrace<LIMIT> {
 
             match symbol {
                 Some(sym) => {
-                    writeln!(writer, "{} {:p}: {}", i - skip_levels, addr, sym).unwrap();
+                    writeln!(writer, "{} {:p}: {:#}", i - skip_levels, addr, sym).unwrap();
                 }
                 None => {
                     writeln!(writer, "{} {:p}: <unknown>", i - skip_levels, addr).unwrap();

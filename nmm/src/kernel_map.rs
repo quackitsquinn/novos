@@ -21,6 +21,7 @@ macro_rules! kernel_map {
         pub mod map {
             use $crate::paging::Address;
 
+            // First, read where the mapped space starts, and then generate the modules for each section of the kernel map.
             $crate::kernel_map!(gen_modules @munch $crate::kernel_map!(read_start $start), $($rest)*);
         }
     };
@@ -43,13 +44,13 @@ macro_rules! kernel_map {
     };
 
 
-    (gen_module $name:ident, $base: expr, $size: expr) => {
+    (gen_module $name:ident, $base: expr, $size:tt $($size_unit: ident)?) => {
         $crate::_pastey::paste!{ pub mod [<$name:lower>] { // TODO: figure out how to allow for documenting these modules
             use $crate::paging::Address;
             /// The start address of the section.
             pub const START: $crate::paging::VirtAddr = $base;
             /// The size of the section.
-            pub const SIZE: u64 = $size;
+            pub const SIZE: u64 = $crate::kernel_map!(size $size $($size_unit)?);
             /// The start address of the section as a raw u64.
             pub const START_RAW: u64 = START.as_u64();
             /// The end address of the section.
@@ -73,13 +74,13 @@ macro_rules! kernel_map {
         $crate::kernel_map!(gen_module $name,
             $crate::paging::VirtAddr::new_truncate(
                 $crate::align!(up, $start.as_u64(), $crate::kernel_map!(size $alignment $($align_unit)?))),
-                $crate::kernel_map!(size $size $($size_unit)?)
+                $size $($size_unit)?
 
         );
         $crate::kernel_map!(gen_modules @munch
             $crate::paging::VirtAddr::new_truncate(
                 $crate::align!(up, $start.as_u64(), $crate::kernel_map!(size $alignment $($align_unit)?)) + $crate::kernel_map!(size $size $($size_unit)?) )
-                .checked_add($size).expect("overflow"),
+                .checked_add($crate::kernel_map!(size $size $($size_unit)?)).expect("overflow"),
                 $($rest)*
             );
     };
@@ -110,6 +111,18 @@ macro_rules! kernel_map {
 
     (size $size:literal GiB) =>{
         $size * 1024 * 1024 * 1024
+    };
+
+    (size Small) => {
+        <$crate::paging::primitives::Small as $crate::paging::primitives::FragmentSize>::SIZE
+    };
+
+    (size Medium) => {
+        <$crate::paging::primitives::Medium as $crate::paging::primitives::FragmentSize>::SIZE
+    };
+
+    (size Large) => {
+        <$crate::paging::primitives::Large as $crate::paging::primitives::FragmentSize>::SIZE
     };
 
     (size $expr:expr) => {
