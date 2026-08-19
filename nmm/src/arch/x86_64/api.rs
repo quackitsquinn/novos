@@ -50,7 +50,7 @@ pub(crate) unsafe fn init_unchecked(
     // This is necessary to perform any virtual memory operations, including mapping the scratch space.
     let mapper = unsafe { Mapper::new_offset(root, config.offset) };
     unsafe {
-        asm::set_active(AddressSpace::without_vmm(mapper, cr3));
+        asm::set_active(AddressSpace::without_vmm(mapper, cr3, config.zero_page));
     };
 
     info!("Found {} bytes of usable memory", walker.usable_memory());

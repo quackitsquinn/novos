@@ -72,8 +72,10 @@ impl Debug for InitConfig {
 }
 
 impl InitConfig {
-    /// Creates a new `InitConfig`, taking space out of the managed range for the zero page.
-    pub fn find_zero_page(
+    /// Creates a new `InitConfig`, taking space out of the managed range for the scratch page.
+    ///
+    /// This means the managed range must be at least `arch::L3_PAGE_SIZE` bytes in size, and the scratch page will be the first page in the managed range.
+    pub fn find_scratch_page(
         offset: VirtAddr,
         managed_range: MemoryRange<VirtAddr>,
         memory_map: &'static [&'static memory_map::Entry],
@@ -118,7 +120,6 @@ impl InitConfig {
 ///   This range is used for virtual address allocation (e.g., for `alloc_virtspace`) and physical memory mapping (e.g., for `alloc_paged`),
 ///   as well as internal memory management state.
 pub unsafe fn init(init_config: InitConfig) -> Result<(), MemError> {
-    asm::init_zero_page(init_config.zero_page);
     unsafe { arch::init_unchecked(EntryWalker::new(init_config.memory_map)?, init_config) }
 }
 

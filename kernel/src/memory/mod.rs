@@ -34,7 +34,7 @@ fn init() -> Result<(), Infallible> {
         .expect("Physical memory offset not provided by bootloader");
     let memory_map = MEMORY_MAP.lock_limine();
     let memory_map = memory_map.entries();
-    let init = InitConfig::find_zero_page(
+    let init = InitConfig::find_scratch_page(
         VirtAddr::new_truncate(hhdm_offset),
         map::nmm_managed_range::RANGE,
         unsafe { mem::transmute(memory_map) },

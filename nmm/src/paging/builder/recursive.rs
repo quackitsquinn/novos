@@ -27,10 +27,7 @@ impl<'a> RecursiveAddressSpaceBuilder<'a> {
         Ok(Self {
             table: unsafe {
                 RecursivePageTable::new(
-                    &mut *active_as
-                        .l4_table()
-                        .start_address()
-                        .as_mut_ptr::<PageTable>(),
+                    &mut *active_as.l4_table.start_address().as_mut_ptr::<PageTable>(),
                     crate::arch::RECURSIVE_SLOT1,
                 )
             },
