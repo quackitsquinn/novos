@@ -85,6 +85,7 @@ pub fn read_caller_frame(level: usize) -> Option<StackFrame> {
 }
 
 #[inline(never)]
+#[cfg(target_arch = "x86_64")]
 fn root_frame() -> *const () {
     let mut rbp: *const ();
     unsafe {
@@ -94,6 +95,17 @@ fn root_frame() -> *const () {
     }
 }
 
+#[cfg(target_arch = "aarch64")]
+fn root_frame() -> *const () {
+    let mut fp: *const ();
+    unsafe {
+        asm!("mov {}, x29", out(reg) fp);
+        // We want the caller's frame, not ours. Traverse a frame up.
+        read_frame(fp).map_or(core::ptr::null(), |frame| frame.last_frame)
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
 unsafe fn read_frame(frame: *const ()) -> Option<StackFrame> {
     #[derive(Clone, Copy)]
     #[repr(C)]
@@ -111,5 +123,25 @@ unsafe fn read_frame(frame: *const ()) -> Option<StackFrame> {
     Some(StackFrame {
         instruction_pointer: frame.rip,
         last_frame: frame.rbp as *mut (),
+    })
+}
+
+#[cfg(target_arch = "aarch64")]
+unsafe fn read_frame(frame: *const ()) -> Option<StackFrame> {
+    #[derive(Clone, Copy)]
+    #[repr(C)]
+    struct AArch64StackFrame {
+        fp: *const AArch64StackFrame,
+        lr: *const (),
+    }
+    if frame.is_null() {
+        return None;
+    }
+
+    let frame = &unsafe { *(frame as *const AArch64StackFrame) };
+
+    Some(StackFrame {
+        instruction_pointer: frame.lr,
+        last_frame: frame.fp as *mut (),
     })
 }
