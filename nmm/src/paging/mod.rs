@@ -12,15 +12,17 @@ mod table;
 use bitflags::bitflags;
 pub use table::{PageTable, PageTableEntry};
 
-use cake::log::trace;
+use cake::log::{trace, warn};
 pub use index::PageTableIndex;
 
 use crate::{
     MapFlags, MapSource, MemError,
     arch::{self, Mapper, PageEntryType},
+    map_with_operation,
     paging::{
         fragment::GreedyFragmentMapper,
         map::{Flush, MemoryMapper, SizedMemoryMapper, Unmapped},
+        operation::{Chain, OperationAllSizes, ZeroMemory},
         primitives::{AnyFragment, FrameClass, PageClass, PrimitiveClass},
     },
 };
@@ -111,7 +113,7 @@ where
     unsafe { mapper.unmap_primitive(dst) }
 }
 
-pub(crate) unsafe fn map_from<D>(
+pub(crate) unsafe fn map_from_with_allocator<D>(
     base: VirtAddr,
     len: u64,
     flags: MapFlags,
@@ -131,32 +133,7 @@ where
     let active_as = asm::active();
     let mut mapper = active_as.mapper().unwrap();
 
-    unsafe { mapper.map_from(base, len, flags, mapping_flags, data_allocator) }
-}
-
-pub(crate) unsafe fn map_from_zeroed<D>(
-    base: VirtAddr,
-    len: u64,
-    flags: MapFlags,
-    mapping_flags: EntryMappingFlags,
-    data_allocator: &mut D,
-) -> Result<(), MemError>
-where
-    D: FullManager<FrameClass>,
-{
-    trace!(
-        "Mapping from base address {:x?} with length {:?} and flags {:?}",
-        base.as_u64(),
-        len,
-        flags
-    );
-
-    let active_as = asm::active();
-    let mut mapper = active_as.mapper().unwrap();
-
-    unsafe { mapper.map_from_zeroed(base, len, flags, mapping_flags, data_allocator) }?;
-
-    Ok(())
+    unsafe { mapper.map_from_with_allocator(base, len, flags, mapping_flags, data_allocator) }
 }
 
 bitflags! {
@@ -191,7 +168,7 @@ where
     let mut mapper = active_as.mapper().unwrap();
 
     unsafe {
-        mapper.map(
+        mapper.map_linear(
             virt_base,
             phys_base,
             byte_size,
@@ -239,7 +216,7 @@ pub(crate) unsafe fn map_unchecked(
                 flags
             );
             if !zero {
-                return map_from(
+                return map_from_with_allocator(
                     dest,
                     byte_size as u64,
                     flags,
@@ -247,13 +224,7 @@ pub(crate) unsafe fn map_unchecked(
                     pmm,
                 );
             } else {
-                return map_from_zeroed(
-                    dest,
-                    byte_size as u64,
-                    flags,
-                    EntryMappingFlags::MAP_ANON,
-                    pmm,
-                );
+                return map_with_operation(dest, src, byte_size, flags, ZeroMemory);
             }
         },
     }
@@ -297,4 +268,69 @@ pub(crate) unsafe fn unmap_unchecked(
     }
 
     Ok(())
+}
+
+pub unsafe fn map_with_operation_unchecked(
+    dest: VirtAddr,
+    src: MapSource,
+    byte_size: usize,
+    flags: MapFlags,
+    mapping_flags: EntryMappingFlags,
+    operation: impl OperationAllSizes,
+) -> Result<(), MemError> {
+    if matches!(src, MapSource::Anon { zero: false }) && !flags.contains(MapFlags::WRITABLE) {
+        warn!(
+            "nmm::map_with_operation: Mapping anonymous memory without zeroing and without the writable flag makes the mapping useless without undefined behavior."
+        )
+    }
+
+    match src {
+        MapSource::Direct(phys_base) => {
+            trace!(
+                "Mapping physical memory at address {:#x} to virtual address {:#x} with size {} bytes and flags {:?}",
+                phys_base.as_u64(),
+                dest.as_u64(),
+                byte_size,
+                flags
+            );
+            unsafe {
+                map_raw(
+                    dest,
+                    phys_base,
+                    byte_size,
+                    flags,
+                    mapping_flags,
+                    &mut *asm::physical_memory_manager(),
+                )
+            }
+        }
+        MapSource::Anon { zero } => unsafe {
+            trace!(
+                "Mapping anonymous memory at virtual address {:#x} with size {} bytes and flags {:?}",
+                dest.as_u64(),
+                byte_size,
+                flags
+            );
+
+            if !zero {
+                return map_from_with_allocator(
+                    dest,
+                    byte_size as u64,
+                    flags,
+                    mapping_flags,
+                    &mut *asm::physical_memory_manager(),
+                );
+            } else {
+                let mut mapper: Mapper = todo!();
+                return mapper.map_from_with_operation(
+                    dest,
+                    byte_size as u64,
+                    flags,
+                    mapping_flags,
+                    &mut *asm::physical_memory_manager(),
+                    Chain(ZeroMemory, operation),
+                );
+            }
+        },
+    }
 }

@@ -28,6 +28,7 @@ use crate::{
     paging::{
         Address, AddressExt, FragmentManager, FragmentSize, Frame, Large, MemoryFragment, Page,
         PageTable, PhysAddr, VirtAddr, asm,
+        operation::OperationAllSizes,
         primitives::{AnyFragment, MemoryRange, PageClass},
     },
 };
@@ -163,6 +164,36 @@ pub fn map(
         )
     }
     unsafe { paging::map_unchecked(dest, src, byte_size, flags) }
+}
+
+pub fn map_with_operation(
+    dest: VirtAddr,
+    src: MapSource,
+    byte_size: usize,
+    flags: MapFlags,
+    operation: impl OperationAllSizes,
+) -> Result<(), MemError> {
+    check_range_virt(dest, byte_size)?;
+    if let MapSource::Direct(phys_base) = src {
+        check_range_phys(phys_base, byte_size)?;
+    }
+
+    if matches!(src, MapSource::Anon { zero: false }) && !flags.contains(MapFlags::WRITABLE) {
+        warn!(
+            "nmm::map: Mapping anonymous memory without zeroing and without the writable flag makes the mapping useless without undefined behavior."
+        )
+    }
+    unsafe {
+        paging::map_with_operation_unchecked(
+            dest,
+            src,
+            byte_size,
+            flags,
+            Default::default(),
+            operation,
+        )?;
+        Ok(())
+    }
 }
 
 /// Unmaps a virtual address range of the specified size starting from the given virtual base address
@@ -372,6 +403,13 @@ pub enum MemError {
         /// The physical address that is not managed by the memory manager.
         PhysAddr,
     ),
+    #[error(
+        "The provided virtual address is mapped to a higher-level page table entry, preventing the requested operation from completing: {0:?}"
+    )]
+    MappedToHigherLevel(
+        /// The virtual address that is mapped to a higher-level page table entry, preventing the requested operation from completing.
+        VirtAddr,
+    ),
     /// An error that originated from architecture-specific operations in the memory manager.
     #[error("An architecture-specific error occurred during memory management operations: {0}")]
     ArchError(#[from] arch::ArchError),
@@ -438,6 +476,8 @@ bitflags! {
         const EXECUTABLE = 1 << 3;
         /// Disable caching for this page
         const CACHE_DISABLE = 1 << 4;
+        /// Deallocate the physical memory backing this mapping when unmapping it
+        const DEALLOCATE = 1 << 5;
     }
 }
 

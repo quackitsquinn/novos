@@ -45,7 +45,7 @@ pub trait MemoryMapper:
     SizedMemoryMapper<Small> + SizedMemoryMapper<Medium> + SizedMemoryMapper<Large>
 {
     /// Maps a range of virtual addresses to physical frames, using the provided frame allocator for any necessary allocations of page tables.
-    unsafe fn map_from<D>(
+    unsafe fn map_from_with_allocator<D>(
         &mut self,
         base: VirtAddr,
         len: u64,
@@ -95,7 +95,7 @@ pub trait MemoryMapper:
         flags: MapFlags,
         mapping_flags: EntryMappingFlags,
         data_allocator: &mut D,
-        op: &mut impl OperationAllSizes,
+        mut op: impl OperationAllSizes,
     ) -> Result<(), MemError>
     where
         D: FullManager<FrameClass>,
@@ -134,53 +134,8 @@ pub trait MemoryMapper:
         Ok(())
     }
 
-    unsafe fn map_from_zeroed<D>(
-        &mut self,
-        base: VirtAddr,
-        len: u64,
-        flags: MapFlags,
-        mapping_flags: EntryMappingFlags,
-        data_allocator: &mut D,
-    ) -> Result<(), MemError>
-    where
-        D: FullManager<FrameClass>,
-    {
-        trace!(
-            "Mapping from base address {:x?} with length {:?} and flags {:?}",
-            base.as_u64(),
-            len,
-            flags
-        );
-
-        let mapper = GreedyFragmentMapper::<PageClass>::new(base, len);
-        for frag in mapper {
-            match frag {
-                AnyFragment::Small(prim) => {
-                    let frame = data_allocator.allocate_small()?;
-                    self.map_primitive(prim, frame, flags, mapping_flags, data_allocator)?
-                        .flush();
-                    unsafe { asm::zero_frame(frame) };
-                }
-                AnyFragment::Medium(prim) => {
-                    let frame = data_allocator.allocate_medium()?;
-                    self.map_primitive(prim, frame, flags, mapping_flags, data_allocator)?
-                        .flush();
-                    unsafe { asm::zero_frame(frame) };
-                }
-                AnyFragment::Large(prim) => {
-                    let frame = data_allocator.allocate_large()?;
-                    self.map_primitive(prim, frame, flags, mapping_flags, data_allocator)?
-                        .flush();
-                    unsafe { asm::zero_frame(frame) };
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Maps a range of virtual addresses to physical frames, using the provided frame allocator for any necessary allocations of page tables.
-    unsafe fn map<F>(
+    /// Maps a linear range of virtual addresses to physical addresses, using the provided frame allocator for any necessary allocations of page tables.
+    unsafe fn map_linear<F>(
         &mut self,
         virt_base: VirtAddr,
         phys_base: PhysAddr,
@@ -297,3 +252,5 @@ impl fmt::Debug for Flush {
         }
     }
 }
+
+pub trait MemoryMapLock {}

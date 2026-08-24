@@ -10,7 +10,7 @@ use crate::{
         Address, AddressExt, EntryMappingFlags, FragmentSize, Frame, Medium, MemoryFragment, Page,
         PageTable, PageTableIndex, PhysAddr, Small, VirtAddr,
         asm::{self, AddressSpace},
-        map_from, map_primitive,
+        map_from_with_allocator, map_primitive,
         primitives::MemoryRange,
     },
 };
@@ -68,7 +68,7 @@ pub(crate) unsafe fn init_unchecked(
         n_entries
     );
     unsafe {
-        map_from(
+        map_from_with_allocator(
             config.managed_range.start(),
             n_bytes,
             MapFlags::WRITABLE,

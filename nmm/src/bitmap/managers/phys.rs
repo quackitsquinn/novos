@@ -18,7 +18,7 @@ use crate::{
     entry_walker::EntryWalker,
     paging::{
         Address, AddressExt, FragmentManager, FragmentSize, Frame, FullManager, MemoryFragment,
-        PhysAddr, Small, VirtAddr, map_from,
+        PhysAddr, Small, VirtAddr, map_from_with_allocator,
         primitives::{FrameClass, MemoryRange},
     },
 };
@@ -45,7 +45,7 @@ impl PhysicalMemoryManager {
             .expect("Failed to allocate memory for bitmap entries");
 
         unsafe {
-            map_from(
+            map_from_with_allocator(
                 vmem,
                 slice_layout.size() as u64,
                 MapFlags::WRITABLE,
@@ -110,7 +110,7 @@ impl PhysicalMemoryManager {
             .allocate(Layout::from_size_align(needed_bytes as usize, 8).unwrap())
             .ok_or(MemError::OutOfMemory)?;
         unsafe {
-            map_from(
+            map_from_with_allocator(
                 virtual_start,
                 needed_bytes,
                 MapFlags::WRITABLE,

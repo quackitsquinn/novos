@@ -6,6 +6,7 @@ use crate::{
     paging::{
         Address, AddressExt, EntryMappingFlags, FragmentSize, FullManager, Medium, MemoryFragment,
         Page, PageTable, PhysAddr, asm, builder::AddressSpaceBuilder, map::MemoryMapper,
+        operation::ZeroMemory,
     },
     reserve_virtual,
 };
@@ -48,15 +49,16 @@ impl<'a> AddressSpaceBuilder for RecursiveAddressSpaceBuilder<'a> {
         match source {
             S::Allocate { should_zero } => unsafe {
                 if should_zero {
-                    self.table.map_from_zeroed(
+                    self.table.map_from_with_operation(
                         base,
                         size,
                         map_flags,
                         EntryMappingFlags::MAP_ANON,
                         &mut *pmm,
+                        ZeroMemory,
                     )
                 } else {
-                    self.table.map_from(
+                    self.table.map_from_with_allocator(
                         base,
                         size,
                         map_flags,
@@ -70,7 +72,7 @@ impl<'a> AddressSpaceBuilder for RecursiveAddressSpaceBuilder<'a> {
                     "failed to convert virt to phys for identity mapping",
                 ))?;
                 unsafe {
-                    self.table.map(
+                    self.table.map_linear(
                         base,
                         phys_base,
                         size as usize,
@@ -81,7 +83,7 @@ impl<'a> AddressSpaceBuilder for RecursiveAddressSpaceBuilder<'a> {
                 }
             }
             S::PhysAddr(phys_addr) => unsafe {
-                self.table.map(
+                self.table.map_linear(
                     base,
                     phys_addr,
                     size as usize,
