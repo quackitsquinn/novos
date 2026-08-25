@@ -184,14 +184,7 @@ pub fn map_with_operation(
         )
     }
     unsafe {
-        paging::map_with_operation_unchecked(
-            dest,
-            src,
-            byte_size,
-            flags,
-            Default::default(),
-            operation,
-        )?;
+        paging::map_with_operation_unchecked(dest, src, byte_size, flags, operation)?;
         Ok(())
     }
 }

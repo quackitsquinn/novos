@@ -1,12 +1,11 @@
 use core::{alloc::Layout, sync::atomic::AtomicBool};
 
 use crate::{
-    MemError,
+    MapFlags, MemError,
     arch::RecursivePageTable,
     paging::{
-        Address, AddressExt, EntryMappingFlags, FragmentSize, FullManager, Medium, MemoryFragment,
-        Page, PageTable, PhysAddr, asm, builder::AddressSpaceBuilder, map::MemoryMapper,
-        operation::ZeroMemory,
+        Address, AddressExt, FragmentSize, FullManager, Medium, MemoryFragment, Page, PageTable,
+        PhysAddr, asm, builder::AddressSpaceBuilder, map::MemoryMapper, operation::ZeroMemory,
     },
     reserve_virtual,
 };
@@ -52,8 +51,7 @@ impl<'a> AddressSpaceBuilder for RecursiveAddressSpaceBuilder<'a> {
                     self.table.map_from_with_operation(
                         base,
                         size,
-                        map_flags,
-                        EntryMappingFlags::MAP_ANON,
+                        map_flags | MapFlags::DEALLOCATE,
                         &mut *pmm,
                         ZeroMemory,
                     )
@@ -61,8 +59,7 @@ impl<'a> AddressSpaceBuilder for RecursiveAddressSpaceBuilder<'a> {
                     self.table.map_from_with_allocator(
                         base,
                         size,
-                        map_flags,
-                        EntryMappingFlags::MAP_ANON,
+                        map_flags | MapFlags::DEALLOCATE,
                         &mut *pmm,
                     )
                 }
@@ -72,25 +69,13 @@ impl<'a> AddressSpaceBuilder for RecursiveAddressSpaceBuilder<'a> {
                     "failed to convert virt to phys for identity mapping",
                 ))?;
                 unsafe {
-                    self.table.map_linear(
-                        base,
-                        phys_base,
-                        size as usize,
-                        map_flags,
-                        Default::default(),
-                        &mut *pmm,
-                    )
+                    self.table
+                        .map_linear(base, phys_base, size as usize, map_flags, &mut *pmm)
                 }
             }
             S::PhysAddr(phys_addr) => unsafe {
-                self.table.map_linear(
-                    base,
-                    phys_addr,
-                    size as usize,
-                    map_flags,
-                    Default::default(),
-                    &mut *pmm,
-                )
+                self.table
+                    .map_linear(base, phys_addr, size as usize, map_flags, &mut *pmm)
             },
         }
     }

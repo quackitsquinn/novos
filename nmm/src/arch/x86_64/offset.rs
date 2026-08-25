@@ -6,7 +6,7 @@ use crate::{
     MapFlags, MemError,
     arch::x86_64::{PageTableFlags, XFrameAllocator, impl_memory_mapper_for},
     paging::{
-        EntryMappingFlags, FragmentManager, Frame, Large, Medium, Page, PageTable, Small, VirtAddr,
+        FragmentManager, Frame, Large, Medium, Page, PageTable, Small, VirtAddr,
         map::{Flush, SizedMemoryMapper, Unmapped},
     },
 };

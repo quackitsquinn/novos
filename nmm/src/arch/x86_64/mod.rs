@@ -158,17 +158,13 @@ cake::encapsulate_macro!(
                     page: Page<$size>,
                     frame: Frame<$size>,
                     flags: MapFlags,
-                    mapping_flags: EntryMappingFlags,
                     allocator: &mut A,
                 ) -> Result<Flush, MemError>
                 where
                     A: FragmentManager<Frame<Small>, Small>,
                 {
                     let mut x_fa = XFrameAllocator::new(allocator);
-                    let flags: PageTableFlags = flags.into();
-                    let flag_bits = flags.bits();
-                    let mapping_bits = mapping_flags.bits();
-                    let mut flags = PageTableFlags::from_bits_retain(flag_bits | mapping_bits);
+                    let mut flags: PageTableFlags = flags.into();
 
                     if $is_huge {
                         flags.insert(PageTableFlags::HUGE_PAGE)
@@ -205,7 +201,7 @@ cake::encapsulate_macro!(
                         Ok((frame, _)) => Ok(Unmapped::new(
                             frame.into(),
                             Some(unsafe { Flush::flush_page(page) }),
-                            EntryMappingFlags::from_bits_truncate(flags.bits()),
+                            flags.into(),
                         )),
                         Err(e) => Err(MemError::from_unmap_error(e, page)),
                     }

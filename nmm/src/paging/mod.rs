@@ -74,7 +74,6 @@ pub fn map_primitive<S, A>(
     src: Frame<S>,
     dst: Page<S>,
     flags: MapFlags,
-    mapping_flags: EntryMappingFlags,
     frame_allocator: &mut A,
 ) -> Result<Flush, MemError>
 where
@@ -90,7 +89,7 @@ where
     let active_as = asm::active();
     let mut mapper = active_as.mapper().unwrap();
 
-    mapper.map_primitive(dst, src, flags, mapping_flags, frame_allocator)
+    mapper.map_primitive(dst, src, flags, frame_allocator)
 }
 
 /// Unmaps a page, returning the frame that was mapped to it before, or an error if the page was not mapped.
@@ -117,7 +116,6 @@ pub(crate) unsafe fn map_from_with_allocator<D>(
     base: VirtAddr,
     len: u64,
     flags: MapFlags,
-    mapping_flags: EntryMappingFlags,
     data_allocator: &mut D,
 ) -> Result<(), MemError>
 where
@@ -133,24 +131,7 @@ where
     let active_as = asm::active();
     let mut mapper = active_as.mapper().unwrap();
 
-    unsafe { mapper.map_from_with_allocator(base, len, flags, mapping_flags, data_allocator) }
-}
-
-bitflags! {
-    /// The flags used for handling special cases in page table entries, such as anonymous mappings.
-    /// This is a bitflag where the positions of the bits are not formally defined, and above a couple entries even guaranteed to exist.
-    /// This may need to be refactored if we need more than a few flags (i believe the lower limit accounting for x86_64, aarch64, and riscv is 3 bits but it may be more idk)
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    pub struct EntryMappingFlags: u64 {
-        /// A flag indicating that the mapping is anonymous, meaning that the underlying frame of memory should be deallocated when the mapping is removed.
-        const MAP_ANON = arch::PTE_FREE_BIT0;
-    }
-}
-
-impl Default for EntryMappingFlags {
-    fn default() -> Self {
-        Self::empty()
-    }
+    unsafe { mapper.map_from_with_allocator(base, len, flags, data_allocator) }
 }
 
 pub(crate) unsafe fn map_raw<F>(
@@ -158,7 +139,6 @@ pub(crate) unsafe fn map_raw<F>(
     phys_base: PhysAddr,
     byte_size: usize,
     flags: MapFlags,
-    mapping_flags: EntryMappingFlags,
     frame_alloc: &mut F,
 ) -> Result<(), MemError>
 where
@@ -167,16 +147,7 @@ where
     let active_as = asm::active();
     let mut mapper = active_as.mapper().unwrap();
 
-    unsafe {
-        mapper.map_linear(
-            virt_base,
-            phys_base,
-            byte_size,
-            flags,
-            mapping_flags,
-            frame_alloc,
-        )
-    }
+    unsafe { mapper.map_linear(virt_base, phys_base, byte_size, flags, frame_alloc) }
 }
 
 pub(crate) unsafe fn map_unchecked(
@@ -197,16 +168,7 @@ pub(crate) unsafe fn map_unchecked(
                 byte_size,
                 flags
             );
-            unsafe {
-                map_raw(
-                    dest,
-                    phys_base,
-                    byte_size,
-                    flags,
-                    EntryMappingFlags::empty(),
-                    pmm,
-                )?
-            };
+            unsafe { map_raw(dest, phys_base, byte_size, flags, pmm)? };
         }
         MapSource::Anon { zero } => unsafe {
             trace!(
@@ -219,8 +181,7 @@ pub(crate) unsafe fn map_unchecked(
                 return map_from_with_allocator(
                     dest,
                     byte_size as u64,
-                    flags,
-                    EntryMappingFlags::MAP_ANON,
+                    flags | MapFlags::DEALLOCATE,
                     pmm,
                 );
             } else {
@@ -243,7 +204,7 @@ pub(crate) unsafe fn unmap_unchecked(
             AnyFragment::Small(page_prim) => {
                 let mut ent = unsafe { unmap_primitive(page_prim)? };
                 ent.flush();
-                if ent.mapping_flags.contains(EntryMappingFlags::MAP_ANON) {
+                if ent.flags.contains(MapFlags::DEALLOCATE) {
                     let mut pmm = asm::physical_memory_manager();
                     pmm.deallocate_fragment(ent.frame);
                 }
@@ -251,7 +212,7 @@ pub(crate) unsafe fn unmap_unchecked(
             AnyFragment::Medium(page_prim) => {
                 let mut ent = unsafe { unmap_primitive(page_prim)? };
                 ent.flush();
-                if ent.mapping_flags.contains(EntryMappingFlags::MAP_ANON) {
+                if ent.flags.contains(MapFlags::DEALLOCATE) {
                     let mut pmm = asm::physical_memory_manager();
                     pmm.deallocate_fragment(ent.frame);
                 }
@@ -259,7 +220,7 @@ pub(crate) unsafe fn unmap_unchecked(
             AnyFragment::Large(page_prim) => {
                 let mut ent = unsafe { unmap_primitive(page_prim)? };
                 ent.flush();
-                if ent.mapping_flags.contains(EntryMappingFlags::MAP_ANON) {
+                if ent.flags.contains(MapFlags::DEALLOCATE) {
                     let mut pmm = asm::physical_memory_manager();
                     pmm.deallocate_fragment(ent.frame);
                 }
@@ -275,7 +236,6 @@ pub unsafe fn map_with_operation_unchecked(
     src: MapSource,
     byte_size: usize,
     flags: MapFlags,
-    mapping_flags: EntryMappingFlags,
     operation: impl OperationAllSizes,
 ) -> Result<(), MemError> {
     if matches!(src, MapSource::Anon { zero: false }) && !flags.contains(MapFlags::WRITABLE) {
@@ -299,7 +259,6 @@ pub unsafe fn map_with_operation_unchecked(
                     phys_base,
                     byte_size,
                     flags,
-                    mapping_flags,
                     &mut *asm::physical_memory_manager(),
                 )
             }
@@ -317,7 +276,6 @@ pub unsafe fn map_with_operation_unchecked(
                     dest,
                     byte_size as u64,
                     flags,
-                    mapping_flags,
                     &mut *asm::physical_memory_manager(),
                 );
             } else {
@@ -326,7 +284,6 @@ pub unsafe fn map_with_operation_unchecked(
                     dest,
                     byte_size as u64,
                     flags,
-                    mapping_flags,
                     &mut *asm::physical_memory_manager(),
                     Chain(ZeroMemory, operation),
                 );

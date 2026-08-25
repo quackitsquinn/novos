@@ -149,9 +149,7 @@ where
         let mut mapper = active_as.mapper().ok_or(MemError::Uninit("mapper"))?;
         let mut pmm = physical_memory_manager();
 
-        mapper
-            .map_primitive(dst, src, flags, Default::default(), &mut *pmm)?
-            .flush();
+        mapper.map_primitive(dst, src, flags, &mut *pmm)?.flush();
         dst
     };
 

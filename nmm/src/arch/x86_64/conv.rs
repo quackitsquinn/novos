@@ -4,7 +4,10 @@ use cake::log::error;
 
 use crate::{
     MapFlags, MemError,
-    arch::x86_64::{ArchError, PageTableFlags},
+    arch::{
+        PTE_FREE_BIT0,
+        x86_64::{ArchError, PageTableFlags},
+    },
     paging::{
         Address, FragmentManager, FragmentSize, Frame, Large, Medium, Page, PageTable,
         PageTableIndex, PhysAddr, Small, VirtAddr,
@@ -181,7 +184,16 @@ impl From<MapFlags> for PageTableFlags {
         if value.contains(MapFlags::CACHE_DISABLE) {
             flags |= Self::NO_CACHE;
         }
+        if value.contains(MapFlags::DEALLOCATE) {
+            flags = flags | Self::from_bits_retain(PTE_FREE_BIT0);
+        }
         flags
+    }
+}
+
+impl From<x86_64::structures::paging::PageTableFlags> for MapFlags {
+    fn from(value: x86_64::structures::paging::PageTableFlags) -> Self {
+        PageTableFlags::from_bits_retain(value.bits()).into()
     }
 }
 
@@ -205,6 +217,10 @@ impl From<PageTableFlags> for MapFlags {
         }
         if value.contains(PageTableFlags::NO_CACHE) {
             flags |= MapFlags::CACHE_DISABLE;
+        }
+
+        if value.bits() & PTE_FREE_BIT0 != 0 {
+            flags |= MapFlags::DEALLOCATE;
         }
         flags
     }

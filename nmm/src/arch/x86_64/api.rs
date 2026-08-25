@@ -7,8 +7,8 @@ use crate::{
     bitmap::{BitPtr, Bitmap, PhysicalMemoryManager, VirtualMemoryManager},
     entry_walker::EntryWalker,
     paging::{
-        Address, AddressExt, EntryMappingFlags, FragmentSize, Frame, Medium, MemoryFragment, Page,
-        PageTable, PageTableIndex, PhysAddr, Small, VirtAddr,
+        Address, AddressExt, FragmentSize, Frame, Medium, MemoryFragment, Page, PageTable,
+        PageTableIndex, PhysAddr, Small, VirtAddr,
         asm::{self, AddressSpace},
         map_from_with_allocator, map_primitive,
         primitives::MemoryRange,
@@ -72,7 +72,6 @@ pub(crate) unsafe fn init_unchecked(
             config.managed_range.start(),
             n_bytes,
             MapFlags::WRITABLE,
-            EntryMappingFlags::empty(),
             &mut walker,
         )?;
     }

@@ -9,8 +9,8 @@ use cake::log::trace;
 use crate::{
     MapFlags, MemError,
     paging::{
-        Address, EntryMappingFlags, FragmentManager, FragmentSize, Frame, FullManager, Large,
-        Medium, MemoryFragment, Page, PhysAddr, Small, VirtAddr, asm,
+        Address, FragmentManager, FragmentSize, Frame, FullManager, Large, Medium, MemoryFragment,
+        Page, PhysAddr, Small, VirtAddr, asm,
         fragment::{GreedyFragmentMapper, JointFragmentMapper},
         operation::{Operation, OperationAllSizes},
         primitives::{AnyFragment, FrameClass, PageClass},
@@ -30,7 +30,6 @@ pub trait SizedMemoryMapper<S: FragmentSize> {
         dst: Page<S>,
         src: Frame<S>,
         flags: MapFlags,
-        mapping_flags: EntryMappingFlags,
         allocator: &mut A,
     ) -> Result<Flush, MemError>
     where
@@ -50,7 +49,6 @@ pub trait MemoryMapper:
         base: VirtAddr,
         len: u64,
         flags: MapFlags,
-        mapping_flags: EntryMappingFlags,
         data_allocator: &mut D,
     ) -> Result<(), MemError>
     where
@@ -68,17 +66,17 @@ pub trait MemoryMapper:
             match frag {
                 AnyFragment::Small(prim) => {
                     let frame = data_allocator.allocate_small()?;
-                    self.map_primitive(prim, frame, flags, mapping_flags, data_allocator)?
+                    self.map_primitive(prim, frame, flags, data_allocator)?
                         .flush();
                 }
                 AnyFragment::Medium(prim) => {
                     let frame = data_allocator.allocate_medium()?;
-                    self.map_primitive(prim, frame, flags, mapping_flags, data_allocator)?
+                    self.map_primitive(prim, frame, flags, data_allocator)?
                         .flush();
                 }
                 AnyFragment::Large(prim) => {
                     let frame = data_allocator.allocate_large()?;
-                    self.map_primitive(prim, frame, flags, mapping_flags, data_allocator)?
+                    self.map_primitive(prim, frame, flags, data_allocator)?
                         .flush();
                 }
             }
@@ -93,7 +91,6 @@ pub trait MemoryMapper:
         base: VirtAddr,
         len: u64,
         flags: MapFlags,
-        mapping_flags: EntryMappingFlags,
         data_allocator: &mut D,
         mut op: impl OperationAllSizes,
     ) -> Result<(), MemError>
@@ -112,19 +109,19 @@ pub trait MemoryMapper:
             match frag {
                 AnyFragment::Small(prim) => {
                     let frame = data_allocator.allocate_small()?;
-                    self.map_primitive(prim, frame, flags, mapping_flags, data_allocator)?
+                    self.map_primitive(prim, frame, flags, data_allocator)?
                         .flush();
                     unsafe { op.execute(prim, frame)? };
                 }
                 AnyFragment::Medium(prim) => {
                     let frame = data_allocator.allocate_medium()?;
-                    self.map_primitive(prim, frame, flags, mapping_flags, data_allocator)?
+                    self.map_primitive(prim, frame, flags, data_allocator)?
                         .flush();
                     unsafe { op.execute(prim, frame)? };
                 }
                 AnyFragment::Large(prim) => {
                     let frame = data_allocator.allocate_large()?;
-                    self.map_primitive(prim, frame, flags, mapping_flags, data_allocator)?
+                    self.map_primitive(prim, frame, flags, data_allocator)?
                         .flush();
                     unsafe { op.execute(prim, frame)? };
                 }
@@ -141,7 +138,6 @@ pub trait MemoryMapper:
         phys_base: PhysAddr,
         byte_size: usize,
         flags: MapFlags,
-        mapping_flags: EntryMappingFlags,
         frame_alloc: &mut F,
     ) -> Result<(), MemError>
     where
@@ -152,15 +148,15 @@ pub trait MemoryMapper:
         for pair in mapper {
             match pair {
                 (AnyFragment::Small(page_prim), AnyFragment::Small(phys_prim)) => {
-                    self.map_primitive(page_prim, phys_prim, flags, mapping_flags, frame_alloc)?
+                    self.map_primitive(page_prim, phys_prim, flags, frame_alloc)?
                         .flush();
                 }
                 (AnyFragment::Medium(page_prim), AnyFragment::Medium(phys_prim)) => {
-                    self.map_primitive(page_prim, phys_prim, flags, mapping_flags, frame_alloc)?
+                    self.map_primitive(page_prim, phys_prim, flags, frame_alloc)?
                         .flush();
                 }
                 (AnyFragment::Large(page_prim), AnyFragment::Large(phys_prim)) => {
-                    self.map_primitive(page_prim, phys_prim, flags, mapping_flags, frame_alloc)?
+                    self.map_primitive(page_prim, phys_prim, flags, frame_alloc)?
                         .flush();
                 }
                 _ => unreachable!("non-matched fragments produced by mapper"),
@@ -180,19 +176,19 @@ impl<T> MemoryMapper for T where
 #[derive(Debug)]
 pub struct Unmapped<S: FragmentSize> {
     /// The physical frame that was previously mapped to the page.
-    pub frame: Frame<S>,
+    pub mut(crate) frame: Frame<S>,
     flush: Option<Flush>,
     /// The mapping flags that were used for the mapping before it was unmapped.
-    pub mapping_flags: EntryMappingFlags,
+    pub mut(crate) flags: MapFlags,
 }
 
 impl<S: FragmentSize> Unmapped<S> {
     /// Creates a new `Unmapped` structure with the given frame, flush operation, and mapping flags.
-    pub fn new(frame: Frame<S>, flush: Option<Flush>, mapping_flags: EntryMappingFlags) -> Self {
+    pub fn new(frame: Frame<S>, flush: Option<Flush>, flags: MapFlags) -> Self {
         Self {
             frame,
             flush,
-            mapping_flags,
+            flags,
         }
     }
 

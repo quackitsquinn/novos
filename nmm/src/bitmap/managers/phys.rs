@@ -49,7 +49,6 @@ impl PhysicalMemoryManager {
                 vmem,
                 slice_layout.size() as u64,
                 MapFlags::WRITABLE,
-                Default::default(),
                 &mut entry_walker,
             )?
         };
@@ -110,13 +109,7 @@ impl PhysicalMemoryManager {
             .allocate(Layout::from_size_align(needed_bytes as usize, 8).unwrap())
             .ok_or(MemError::OutOfMemory)?;
         unsafe {
-            map_from_with_allocator(
-                virtual_start,
-                needed_bytes,
-                MapFlags::WRITABLE,
-                Default::default(),
-                walker,
-            )?
+            map_from_with_allocator(virtual_start, needed_bytes, MapFlags::WRITABLE, walker)?
         };
 
         let bitmap_slice = unsafe {
