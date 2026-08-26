@@ -21,7 +21,10 @@ use crate::{
     map_with_operation,
     paging::{
         fragment::GreedyFragmentMapper,
-        map::{Flush, MemoryMapper, SizedMemoryMapper, Unmapped},
+        map::{
+            DataAllocator, Flush, FullProvider, MemoryMapper, PhysLinear, SizedMemoryMapper,
+            Unmapped,
+        },
         operation::{Chain, OperationAllSizes, ZeroMemory},
         primitives::{AnyFragment, FrameClass, PageClass, PrimitiveClass},
     },
@@ -112,14 +115,14 @@ where
     unsafe { mapper.unmap_primitive(dst) }
 }
 
-pub(crate) unsafe fn map_from_with_allocator<D>(
+pub(crate) unsafe fn map_from<P>(
     base: VirtAddr,
     len: u64,
     flags: MapFlags,
-    data_allocator: &mut D,
+    provider: &mut P,
 ) -> Result<(), MemError>
 where
-    D: FullManager<FrameClass>,
+    P: FullProvider,
 {
     trace!(
         "Mapping from base address {:x?} with length {:?} and flags {:?}",
@@ -131,23 +134,7 @@ where
     let active_as = asm::active();
     let mut mapper = active_as.mapper().unwrap();
 
-    unsafe { mapper.map_from_with_allocator(base, len, flags, data_allocator) }
-}
-
-pub(crate) unsafe fn map_raw<F>(
-    virt_base: VirtAddr,
-    phys_base: PhysAddr,
-    byte_size: usize,
-    flags: MapFlags,
-    frame_alloc: &mut F,
-) -> Result<(), MemError>
-where
-    F: FragmentManager<Frame<Small>, Small>,
-{
-    let active_as = asm::active();
-    let mut mapper = active_as.mapper().unwrap();
-
-    unsafe { mapper.map_linear(virt_base, phys_base, byte_size, flags, frame_alloc) }
+    unsafe { mapper.map_from(base, len, flags, provider) }
 }
 
 pub(crate) unsafe fn map_unchecked(
@@ -168,7 +155,14 @@ pub(crate) unsafe fn map_unchecked(
                 byte_size,
                 flags
             );
-            unsafe { map_raw(dest, phys_base, byte_size, flags, pmm)? };
+            unsafe {
+                map_from(
+                    dest,
+                    byte_size as u64,
+                    flags,
+                    &mut PhysLinear(phys_base, &mut *pmm),
+                )
+            };
         }
         MapSource::Anon { zero } => unsafe {
             trace!(
@@ -178,11 +172,11 @@ pub(crate) unsafe fn map_unchecked(
                 flags
             );
             if !zero {
-                return map_from_with_allocator(
+                return map_from(
                     dest,
                     byte_size as u64,
                     flags | MapFlags::DEALLOCATE,
-                    pmm,
+                    &mut DataAllocator(pmm),
                 );
             } else {
                 return map_with_operation(dest, src, byte_size, flags, ZeroMemory);
@@ -254,12 +248,11 @@ pub unsafe fn map_with_operation_unchecked(
                 flags
             );
             unsafe {
-                map_raw(
+                map_from(
                     dest,
-                    phys_base,
-                    byte_size,
+                    byte_size as u64,
                     flags,
-                    &mut *asm::physical_memory_manager(),
+                    &mut PhysLinear(phys_base, &mut *asm::physical_memory_manager()),
                 )
             }
         }
@@ -272,11 +265,11 @@ pub unsafe fn map_with_operation_unchecked(
             );
 
             if !zero {
-                return map_from_with_allocator(
+                return map_from(
                     dest,
                     byte_size as u64,
-                    flags,
-                    &mut *asm::physical_memory_manager(),
+                    flags | MapFlags::DEALLOCATE,
+                    &mut DataAllocator(&mut *asm::physical_memory_manager()),
                 );
             } else {
                 let mut mapper: Mapper = todo!();

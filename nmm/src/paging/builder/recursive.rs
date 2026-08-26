@@ -5,7 +5,10 @@ use crate::{
     arch::RecursivePageTable,
     paging::{
         Address, AddressExt, FragmentSize, FullManager, Medium, MemoryFragment, Page, PageTable,
-        PhysAddr, asm, builder::AddressSpaceBuilder, map::MemoryMapper, operation::ZeroMemory,
+        PhysAddr, asm,
+        builder::AddressSpaceBuilder,
+        map::{DataAllocator, MemoryMapper, PhysLinear},
+        operation::ZeroMemory,
     },
     reserve_virtual,
 };
@@ -56,11 +59,11 @@ impl<'a> AddressSpaceBuilder for RecursiveAddressSpaceBuilder<'a> {
                         ZeroMemory,
                     )
                 } else {
-                    self.table.map_from_with_allocator(
+                    self.table.map_from(
                         base,
                         size,
                         map_flags | MapFlags::DEALLOCATE,
-                        &mut *pmm,
+                        &mut DataAllocator(&mut *pmm),
                     )
                 }
             },
@@ -69,13 +72,17 @@ impl<'a> AddressSpaceBuilder for RecursiveAddressSpaceBuilder<'a> {
                     "failed to convert virt to phys for identity mapping",
                 ))?;
                 unsafe {
-                    self.table
-                        .map_linear(base, phys_base, size as usize, map_flags, &mut *pmm)
+                    self.table.map_from(
+                        base,
+                        size,
+                        map_flags,
+                        &mut PhysLinear(phys_base, &mut *pmm),
+                    )
                 }
             }
             S::PhysAddr(phys_addr) => unsafe {
                 self.table
-                    .map_linear(base, phys_addr, size as usize, map_flags, &mut *pmm)
+                    .map_from(base, size, map_flags, &mut PhysLinear(phys_addr, &mut *pmm))
             },
         }
     }

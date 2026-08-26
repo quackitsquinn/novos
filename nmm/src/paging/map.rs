@@ -8,6 +8,7 @@ use cake::log::trace;
 
 use crate::{
     MapFlags, MemError,
+    arch::Mapper,
     paging::{
         Address, FragmentManager, FragmentSize, Frame, FullManager, Large, Medium, MemoryFragment,
         Page, PhysAddr, Small, VirtAddr, asm,
@@ -39,21 +40,140 @@ pub trait SizedMemoryMapper<S: FragmentSize> {
     unsafe fn unmap_primitive(&mut self, page: Page<S>) -> Result<Unmapped<S>, MemError>;
 }
 
+/// A provider for memory for a mapping operation.
+pub trait MemoryProvider<S: FragmentSize> {
+    /// Allocates a frame of the specified size for use as data in a mapping operation.
+    fn allocate_data(&mut self) -> Result<Frame<S>, MemError>
+    where
+        Mapper: SizedMemoryMapper<S>;
+    /// Allocates a frame of the specified size for use as a page table in a mapping operation.
+    fn allocate_table(&mut self) -> Result<Frame<Small>, MemError>;
+}
+
+/// Memory provider to map a linear range of physical addresses to a linear range of virtual addresses.
+#[derive(Debug)]
+pub struct PhysLinear<'a, Ta: FragmentManager<Frame<Small>, Small>>(pub PhysAddr, pub &'a mut Ta);
+
+impl<'a, Ta: FragmentManager<Frame<Small>, Small>> PhysLinear<'a, Ta> {
+    /// Creates a new `Linear` memory provider with the given base physical address.
+    pub fn new(base: PhysAddr, table_allocator: &'a mut Ta) -> Self {
+        Self(base, table_allocator)
+    }
+}
+
+impl<'a, Ta: FragmentManager<Frame<Small>, Small>, S: FragmentSize> MemoryProvider<S>
+    for PhysLinear<'a, Ta>
+{
+    fn allocate_data(&mut self) -> Result<Frame<S>, MemError> {
+        let frame =
+            Frame::from_start_address(self.0).ok_or(MemError::InvalidFrameAddress(self.0))?;
+        self.0 += S::SIZE;
+        Ok(frame)
+    }
+
+    fn allocate_table(&mut self) -> Result<Frame<Small>, MemError> {
+        self.1.allocate_fragment()
+    }
+}
+
+/// A memory provider that uses a single allocator for both data and page tables.
+#[derive(Debug)]
+pub struct DataAllocator<'a, Ta>(pub &'a mut Ta)
+where
+    Ta: FullManager<FrameClass>;
+
+impl<'a, Ta: FullManager<FrameClass>, S: FragmentSize> MemoryProvider<S> for DataAllocator<'a, Ta>
+where
+    Ta: FragmentManager<Frame<S>, S>,
+{
+    fn allocate_data(&mut self) -> Result<Frame<S>, MemError> {
+        self.0.allocate_fragment()
+    }
+
+    fn allocate_table(&mut self) -> Result<Frame<Small>, MemError> {
+        self.0.allocate_fragment()
+    }
+}
+
+struct TableAllocator<'a, T: MemoryProvider<Small>>(&'a mut T);
+
+impl<'a, T> TableAllocator<'a, T>
+where
+    T: MemoryProvider<Small>,
+{
+    fn new(provider: &'a mut T) -> Self {
+        Self(provider)
+    }
+}
+
+unsafe impl<'a, T> FragmentManager<Frame<Small>, Small> for TableAllocator<'a, T>
+where
+    T: MemoryProvider<Small>,
+{
+    fn allocate_fragment(&mut self) -> Result<Frame<Small>, MemError> {
+        self.0.allocate_table()
+    }
+
+    fn deallocate_fragment(&mut self, primitive: Frame<Small>) {
+        // Deallocation is not supported in this implementation.
+        // In a real implementation, you would want to add support for deallocation.
+        unimplemented!("Deallocation is not supported in this implementation.");
+    }
+}
+
+/// A memory provider that uses separate allocators for data and page tables.
+#[derive(Debug, Clone, Copy)]
+pub struct DataWithTableAllocator<D, T>(pub D, pub T)
+where
+    D: FullManager<FrameClass>,
+    T: FragmentManager<Frame<Small>, Small>;
+
+impl<D: FullManager<FrameClass>, S: FragmentSize, T> MemoryProvider<S>
+    for DataWithTableAllocator<D, T>
+where
+    D: FragmentManager<Frame<S>, S>,
+    T: FragmentManager<Frame<Small>, Small>,
+{
+    fn allocate_data(&mut self) -> Result<Frame<S>, MemError>
+    where
+        Mapper: SizedMemoryMapper<S>,
+    {
+        self.0.allocate_fragment()
+    }
+
+    fn allocate_table(&mut self) -> Result<Frame<Small>, MemError> {
+        self.1.allocate_fragment()
+    }
+}
+
+pub(crate) trait FullProvider:
+    MemoryProvider<Small> + MemoryProvider<Medium> + MemoryProvider<Large>
+{
+    fn table_allocator(&mut self) -> TableAllocator<'_, Self>
+    where
+        Self: Sized,
+    {
+        TableAllocator::new(self)
+    }
+}
+
+impl<T> FullProvider for T where
+    T: MemoryProvider<Small> + MemoryProvider<Medium> + MemoryProvider<Large>
+{
+}
+
 /// A memory mapper that can map and unmap pages of any size.
 pub trait MemoryMapper:
     SizedMemoryMapper<Small> + SizedMemoryMapper<Medium> + SizedMemoryMapper<Large>
 {
     /// Maps a range of virtual addresses to physical frames, using the provided frame allocator for any necessary allocations of page tables.
-    unsafe fn map_from_with_allocator<D>(
+    unsafe fn map_from<P: FullProvider>(
         &mut self,
         base: VirtAddr,
         len: u64,
         flags: MapFlags,
-        data_allocator: &mut D,
-    ) -> Result<(), MemError>
-    where
-        D: FullManager<FrameClass>,
-    {
+        provider: &mut P,
+    ) -> Result<(), MemError> {
         trace!(
             "Mapping from base address {:x?} with length {:?} and flags {:?}",
             base.as_u64(),
@@ -65,18 +185,18 @@ pub trait MemoryMapper:
         for frag in mapper {
             match frag {
                 AnyFragment::Small(prim) => {
-                    let frame = data_allocator.allocate_small()?;
-                    self.map_primitive(prim, frame, flags, data_allocator)?
+                    let frame = provider.allocate_data()?;
+                    self.map_primitive(prim, frame, flags, &mut provider.table_allocator())?
                         .flush();
                 }
                 AnyFragment::Medium(prim) => {
-                    let frame = data_allocator.allocate_medium()?;
-                    self.map_primitive(prim, frame, flags, data_allocator)?
+                    let frame = provider.allocate_data()?;
+                    self.map_primitive(prim, frame, flags, &mut provider.table_allocator())?
                         .flush();
                 }
                 AnyFragment::Large(prim) => {
-                    let frame = data_allocator.allocate_large()?;
-                    self.map_primitive(prim, frame, flags, data_allocator)?
+                    let frame = provider.allocate_data()?;
+                    self.map_primitive(prim, frame, flags, &mut provider.table_allocator())?
                         .flush();
                 }
             }
@@ -125,41 +245,6 @@ pub trait MemoryMapper:
                         .flush();
                     unsafe { op.execute(prim, frame)? };
                 }
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Maps a linear range of virtual addresses to physical addresses, using the provided frame allocator for any necessary allocations of page tables.
-    unsafe fn map_linear<F>(
-        &mut self,
-        virt_base: VirtAddr,
-        phys_base: PhysAddr,
-        byte_size: usize,
-        flags: MapFlags,
-        frame_alloc: &mut F,
-    ) -> Result<(), MemError>
-    where
-        F: FragmentManager<Frame<Small>, Small>,
-    {
-        let mapper = JointFragmentMapper::new(virt_base, phys_base, byte_size as u64);
-
-        for pair in mapper {
-            match pair {
-                (AnyFragment::Small(page_prim), AnyFragment::Small(phys_prim)) => {
-                    self.map_primitive(page_prim, phys_prim, flags, frame_alloc)?
-                        .flush();
-                }
-                (AnyFragment::Medium(page_prim), AnyFragment::Medium(phys_prim)) => {
-                    self.map_primitive(page_prim, phys_prim, flags, frame_alloc)?
-                        .flush();
-                }
-                (AnyFragment::Large(page_prim), AnyFragment::Large(phys_prim)) => {
-                    self.map_primitive(page_prim, phys_prim, flags, frame_alloc)?
-                        .flush();
-                }
-                _ => unreachable!("non-matched fragments produced by mapper"),
             }
         }
 
@@ -248,5 +333,3 @@ impl fmt::Debug for Flush {
         }
     }
 }
-
-pub trait MemoryMapLock {}
