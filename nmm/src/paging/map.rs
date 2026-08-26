@@ -206,16 +206,16 @@ pub trait MemoryMapper:
     }
 
     /// Maps a range of virtual addresses to physical frames, using the provided frame allocator for any necessary allocations of page tables, and executes the given memory mapping operations for each mapping.
-    unsafe fn map_from_with_operation<D>(
+    unsafe fn map_from_with_operation<P>(
         &mut self,
         base: VirtAddr,
         len: u64,
         flags: MapFlags,
-        data_allocator: &mut D,
+        provider: &mut P,
         mut op: impl OperationAllSizes,
     ) -> Result<(), MemError>
     where
-        D: FullManager<FrameClass>,
+        P: FullProvider,
     {
         trace!(
             "Mapping from base address {:x?} with length {:?} and flags {:?}",
@@ -228,20 +228,20 @@ pub trait MemoryMapper:
         for frag in mapper {
             match frag {
                 AnyFragment::Small(prim) => {
-                    let frame = data_allocator.allocate_small()?;
-                    self.map_primitive(prim, frame, flags, data_allocator)?
+                    let frame = provider.allocate_data()?;
+                    self.map_primitive(prim, frame, flags, &mut provider.table_allocator())?
                         .flush();
                     unsafe { op.execute(prim, frame)? };
                 }
                 AnyFragment::Medium(prim) => {
-                    let frame = data_allocator.allocate_medium()?;
-                    self.map_primitive(prim, frame, flags, data_allocator)?
+                    let frame = provider.allocate_data()?;
+                    self.map_primitive(prim, frame, flags, &mut provider.table_allocator())?
                         .flush();
                     unsafe { op.execute(prim, frame)? };
                 }
                 AnyFragment::Large(prim) => {
-                    let frame = data_allocator.allocate_large()?;
-                    self.map_primitive(prim, frame, flags, data_allocator)?
+                    let frame = provider.allocate_data()?;
+                    self.map_primitive(prim, frame, flags, &mut provider.table_allocator())?
                         .flush();
                     unsafe { op.execute(prim, frame)? };
                 }

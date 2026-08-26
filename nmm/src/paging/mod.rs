@@ -277,7 +277,7 @@ pub unsafe fn map_with_operation_unchecked(
                     dest,
                     byte_size as u64,
                     flags,
-                    &mut *asm::physical_memory_manager(),
+                    &mut DataAllocator(&mut *asm::physical_memory_manager()),
                     Chain(ZeroMemory, operation),
                 );
             }

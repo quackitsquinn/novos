@@ -10,7 +10,8 @@ use crate::{
         Address, AddressExt, FragmentSize, Frame, Medium, MemoryFragment, Page, PageTable,
         PageTableIndex, PhysAddr, Small, VirtAddr,
         asm::{self, AddressSpace},
-        map_from_with_allocator, map_primitive,
+        map::DataAllocator,
+        map_from, map_primitive,
         primitives::MemoryRange,
     },
 };
@@ -68,11 +69,11 @@ pub(crate) unsafe fn init_unchecked(
         n_entries
     );
     unsafe {
-        map_from_with_allocator(
+        map_from(
             config.managed_range.start(),
             n_bytes,
             MapFlags::WRITABLE,
-            &mut walker,
+            &mut DataAllocator(&mut *asm::physical_memory_manager()),
         )?;
     }
 

@@ -55,7 +55,7 @@ impl<'a> AddressSpaceBuilder for RecursiveAddressSpaceBuilder<'a> {
                         base,
                         size,
                         map_flags | MapFlags::DEALLOCATE,
-                        &mut *pmm,
+                        &mut DataAllocator(&mut *pmm),
                         ZeroMemory,
                     )
                 } else {

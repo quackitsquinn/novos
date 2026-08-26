@@ -18,7 +18,9 @@ use crate::{
     entry_walker::EntryWalker,
     paging::{
         Address, AddressExt, FragmentManager, FragmentSize, Frame, FullManager, MemoryFragment,
-        PhysAddr, Small, VirtAddr, map_from_with_allocator,
+        PhysAddr, Small, VirtAddr,
+        map::DataAllocator,
+        map_from,
         primitives::{FrameClass, MemoryRange},
     },
 };
@@ -45,11 +47,11 @@ impl PhysicalMemoryManager {
             .expect("Failed to allocate memory for bitmap entries");
 
         unsafe {
-            map_from_with_allocator(
+            map_from(
                 vmem,
                 slice_layout.size() as u64,
                 MapFlags::WRITABLE,
-                &mut entry_walker,
+                &mut DataAllocator(&mut entry_walker),
             )?
         };
 
@@ -109,7 +111,12 @@ impl PhysicalMemoryManager {
             .allocate(Layout::from_size_align(needed_bytes as usize, 8).unwrap())
             .ok_or(MemError::OutOfMemory)?;
         unsafe {
-            map_from_with_allocator(virtual_start, needed_bytes, MapFlags::WRITABLE, walker)?
+            map_from(
+                virtual_start,
+                needed_bytes,
+                MapFlags::WRITABLE,
+                &mut DataAllocator(walker),
+            )?
         };
 
         let bitmap_slice = unsafe {
