@@ -9,7 +9,6 @@ pub mod operation;
 pub mod primitives;
 mod table;
 
-use bitflags::bitflags;
 pub use table::{PageTable, PageTableEntry};
 
 use cake::log::{trace, warn};
@@ -17,7 +16,7 @@ pub use index::PageTableIndex;
 
 use crate::{
     MapFlags, MapSource, MemError,
-    arch::{self, Mapper, PageEntryType},
+    arch::{Mapper, PageEntryType},
     map_with_operation,
     paging::{
         fragment::GreedyFragmentMapper,
@@ -26,7 +25,7 @@ use crate::{
             Unmapped,
         },
         operation::{Chain, OperationAllSizes, ZeroMemory},
-        primitives::{AnyFragment, FrameClass, PageClass, PrimitiveClass},
+        primitives::{AnyFragment, PageClass, PrimitiveClass},
     },
 };
 
@@ -272,7 +271,8 @@ pub unsafe fn map_with_operation_unchecked(
                     &mut DataAllocator(&mut *asm::physical_memory_manager()),
                 );
             } else {
-                let mut mapper: Mapper = todo!();
+                let as_guard = asm::active();
+                let mut mapper = as_guard.mapper().unwrap();
                 return mapper.map_from_with_operation(
                     dest,
                     byte_size as u64,

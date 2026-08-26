@@ -3,16 +3,16 @@
 use core::mem::transmute;
 
 use cake::{
-    MappedMutexGuard, Mutex, MutexGuard, Once, OnceMutex, OnceMutexGuard, OnceRwLock,
+    MappedMutexGuard, Mutex, MutexGuard, OnceMutex, OnceMutexGuard, OnceRwLock,
     OnceRwReadGuard,
 };
 
 use crate::{
     MapFlags, MemError,
-    arch::{self, Mapper},
+    arch::{self},
     bitmap::{PhysicalMemoryManager, VirtualMemoryManager},
     paging::{
-        AddressExt, FragmentManager, FragmentSize, Frame, Large, MemoryFragment, Page, PhysAddr,
+        AddressExt, FragmentSize, Frame, Large, MemoryFragment, Page,
         Small, map::SizedMemoryMapper,
     },
 };

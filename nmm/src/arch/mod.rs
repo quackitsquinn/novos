@@ -4,11 +4,7 @@ pub mod x86_64;
 #[cfg(feature = "x86_64")]
 use x86_64 as arch_impl;
 
-use crate::{
-    MapFlags, MemError,
-    entry_walker::EntryWalker,
-    paging::{self, PageTable, PhysAddr, VirtAddr},
-};
+use crate::paging::VirtAddr;
 
 /// Page table entry type for the current architecture.
 /// Currently, this is an alias for `arch::PageEntryType`.
@@ -61,7 +57,6 @@ pub(crate) use arch_impl::pml4_phys;
 
 pub(crate) use arch_impl::RecursivePageTable;
 
-pub(crate) use arch_impl::RECURSIVE_SLOT0;
 pub(crate) use arch_impl::RECURSIVE_SLOT1;
 
 /// Validates that the given physical address is valid for the current architecture.

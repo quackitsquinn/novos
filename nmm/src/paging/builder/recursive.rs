@@ -1,16 +1,15 @@
-use core::{alloc::Layout, sync::atomic::AtomicBool};
+use core::sync::atomic::AtomicBool;
 
 use crate::{
     MapFlags, MemError,
     arch::RecursivePageTable,
     paging::{
-        Address, AddressExt, FragmentSize, FullManager, Medium, MemoryFragment, Page, PageTable,
+        Address, AddressExt, MemoryFragment, PageTable,
         PhysAddr, asm,
         builder::AddressSpaceBuilder,
         map::{DataAllocator, MemoryMapper, PhysLinear},
         operation::ZeroMemory,
     },
-    reserve_virtual,
 };
 
 pub struct RecursiveAddressSpaceBuilder<'a> {

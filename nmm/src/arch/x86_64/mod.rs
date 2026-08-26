@@ -11,14 +11,11 @@ pub use mapper::Mapper;
 
 use bitflags::bitflags;
 
-use cake::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use crate::{
-    MapFlags, MemError,
     arch::x86_64::conv::XFrameAllocator,
     paging::{
-        Address, FragmentManager, FragmentSize, Frame, Page, PageTableIndex, Small, VirtAddr,
-        map::{Flush, SizedMemoryMapper},
+        Address, Frame, PageTableIndex, Small, VirtAddr,
     },
 };
 

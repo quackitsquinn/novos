@@ -83,7 +83,7 @@ where
         self.0.allocate_table()
     }
 
-    fn deallocate_fragment(&mut self, primitive: Frame<Small>) {
+    fn deallocate_fragment(&mut self, _primitive: Frame<Small>) {
         // Deallocation is not supported in this implementation.
         // In a real implementation, you would want to add support for deallocation.
         unimplemented!("Deallocation is not supported in this implementation.");

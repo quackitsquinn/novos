@@ -13,7 +13,7 @@ use crate::{
 
 mod arch_lib {
     pub use x86_64::structures::paging::{
-        OffsetPageTable, PageTableFlags, mapper::TranslateResult,
+        OffsetPageTable, mapper::TranslateResult,
     };
 }
 

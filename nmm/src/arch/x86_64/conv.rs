@@ -1,4 +1,4 @@
-use core::{error, mem};
+use core::mem;
 
 use cake::log::error;
 

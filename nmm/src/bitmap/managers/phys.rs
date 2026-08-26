@@ -7,7 +7,7 @@ use core::{
 use cake::{limine::memory_map::EntryType, log::info};
 
 use crate::{
-    MapFlags, MemError, align,
+    MapFlags, MemError,
     bitmap::{
         Bitmap, VirtualMemoryManager,
         managers::{
@@ -18,7 +18,7 @@ use crate::{
     entry_walker::EntryWalker,
     paging::{
         Address, AddressExt, FragmentManager, FragmentSize, Frame, FullManager, MemoryFragment,
-        PhysAddr, Small, VirtAddr,
+        PhysAddr, Small,
         map::DataAllocator,
         map_from,
         primitives::{FrameClass, MemoryRange},

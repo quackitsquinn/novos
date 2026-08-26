@@ -1,12 +1,12 @@
-use core::{alloc::Layout, mem::Alignment};
+use core::alloc::Layout;
 
 use crate::{
     MemError, arch,
     bitmap::{
-        BitPtr, Bitmap,
+        Bitmap,
         managers::{address_as_bit_index, align_in_bits, bit_index_as_address, n_pages_for_bytes},
     },
-    paging::{Address, AddressExt, VirtAddr, primitives::MemoryRange},
+    paging::{Address, VirtAddr, primitives::MemoryRange},
     test_println,
 };
 

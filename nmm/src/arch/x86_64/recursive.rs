@@ -3,7 +3,7 @@
 //! This module acts mostly as a hack to get proper rust-analyzer support for x86_64::RecursivePageTable, plus as a way to somewhat normalize what the cross platform
 //! Mapping system will look like. Again, deeply cursed but there IS a not completely cursed reason for it.use std::marker;
 
-use core::{fmt::Debug, mem::transmute};
+use core::fmt::Debug;
 
 use x86_64::structures::paging::mapper::{Mapper as _, Translate as _};
 

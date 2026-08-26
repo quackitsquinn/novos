@@ -67,7 +67,7 @@ pub struct CopyMemory<'a> {
 }
 
 impl CopyMemory<'_> {
-    pub fn new(buf: &[u8]) -> CopyMemory {
+    pub fn new(buf: &[u8]) -> CopyMemory<'_> {
         CopyMemory { buf }
     }
 }

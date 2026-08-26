@@ -1,23 +1,20 @@
 use cake::log::{debug, info};
-use x86_64::registers::control::Cr3;
 
 use crate::{
     InitConfig, MapFlags, MemError, align,
     arch::{self, L1_PAGE_SIZE, pml4_phys, x86_64::mapper::Mapper},
-    bitmap::{BitPtr, Bitmap, PhysicalMemoryManager, VirtualMemoryManager},
+    bitmap::{PhysicalMemoryManager, VirtualMemoryManager},
     entry_walker::EntryWalker,
     paging::{
-        Address, AddressExt, FragmentSize, Frame, Medium, MemoryFragment, Page, PageTable,
-        PageTableIndex, PhysAddr, Small, VirtAddr,
+        Address, AddressExt, Frame, PageTable, Small,
         asm::{self, AddressSpace},
         map::DataAllocator,
-        map_from, map_primitive,
-        primitives::MemoryRange,
+        map_from,
     },
 };
 
 pub(crate) unsafe fn init_unchecked(
-    mut walker: EntryWalker<'static>,
+    walker: EntryWalker<'static>,
     config: InitConfig,
 ) -> Result<(), MemError> {
     if config.managed_range.size() < arch::L1_PAGE_SIZE * 16 {

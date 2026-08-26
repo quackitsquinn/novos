@@ -8,19 +8,17 @@ use cake::log::trace;
 
 use crate::{
     MapFlags, MemError,
-    arch::Mapper,
     paging::{
-        Address, FragmentManager, FragmentSize, Frame, FullManager, Large, Medium, MemoryFragment,
-        Page, PhysAddr, Small, VirtAddr, asm,
-        fragment::{GreedyFragmentMapper, JointFragmentMapper},
+        Address, FragmentManager, FragmentSize, Frame, Large, Medium, MemoryFragment,
+        Page, Small, VirtAddr,
+        fragment::GreedyFragmentMapper,
         operation::{Operation, OperationAllSizes},
-        primitives::{AnyFragment, FrameClass, PageClass},
+        primitives::{AnyFragment, PageClass},
     },
 };
 
 mod provider;
 
-pub(crate) use provider::TableAllocator;
 pub use provider::{DataAllocator, FullProvider, MemoryProvider, PhysLinear};
 
 /// A trait for types that can map and unmap pages of a specific size. This is the main interface for mapping
