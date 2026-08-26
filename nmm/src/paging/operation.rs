@@ -1,3 +1,5 @@
+//! This module defines the `Operation` trait and its implementations for various memory mapping operations,
+//! such as zeroing memory and copying memory. It also provides a way to chain multiple operations together.
 use crate::{
     MemError, arch,
     paging::{
@@ -61,12 +63,15 @@ where
         }
     }
 }
-
+/// Copy the contents of the provided buffer into the mapped memory.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct CopyMemory<'a> {
+    /// The buffer to copy into the mapped memory.
     pub buf: &'a [u8],
 }
 
 impl CopyMemory<'_> {
+    /// Creates a new `CopyMemory` operation with the provided buffer.
     pub fn new(buf: &[u8]) -> CopyMemory<'_> {
         CopyMemory { buf }
     }

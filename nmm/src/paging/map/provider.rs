@@ -115,9 +115,11 @@ where
     }
 }
 
+/// A trait that combines the `MemoryProvider` trait for all supported fragment sizes.
 pub trait FullProvider:
     MemoryProvider<Small> + MemoryProvider<Medium> + MemoryProvider<Large>
 {
+    /// Returns a `TableAllocator` that uses this provider for allocating page tables.
     fn table_allocator(&mut self) -> TableAllocator<'_, Self>
     where
         Self: Sized,

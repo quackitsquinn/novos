@@ -160,7 +160,7 @@ pub(crate) unsafe fn map_unchecked(
                     byte_size as u64,
                     flags,
                     &mut PhysLinear(phys_base, &mut *pmm),
-                )
+                )?
             };
         }
         MapSource::Anon { zero } => unsafe {
@@ -224,6 +224,8 @@ pub(crate) unsafe fn unmap_unchecked(
     Ok(())
 }
 
+/// Maps a range of virtual addresses to physical frames, using the provided frame allocator for any necessary allocations of page tables,
+/// and executes the given memory mapping operations for each mapping.
 pub unsafe fn map_with_operation_unchecked(
     dest: VirtAddr,
     src: MapSource,

@@ -25,7 +25,8 @@ pub use pastey as _pastey;
 use crate::{
     entry_walker::EntryWalker,
     paging::{
-        Address, AddressExt, FragmentManager, FragmentSize, Frame, Large, MemoryFragment, Page, PhysAddr, VirtAddr, asm,
+        Address, AddressExt, FragmentManager, FragmentSize, Frame, Large, MemoryFragment, Page,
+        PhysAddr, VirtAddr, asm,
         operation::OperationAllSizes,
         primitives::{AnyFragment, MemoryRange, PageClass},
     },
@@ -164,6 +165,8 @@ pub fn map(
     unsafe { paging::map_unchecked(dest, src, byte_size, flags) }
 }
 
+/// Maps a given MapSource to a virtual address range of the specified size with the given flags,
+///  using the provided operation to perform any necessary memory operations (e.g., zeroing or copying memory) during the mapping process.
 pub fn map_with_operation(
     dest: VirtAddr,
     src: MapSource,
@@ -394,6 +397,8 @@ pub enum MemError {
         /// The physical address that is not managed by the memory manager.
         PhysAddr,
     ),
+    /// The requested operation failed because the provided virtual address is mapped to a higher-level page table entry,
+    /// preventing the requested operation from completing.
     #[error(
         "The provided virtual address is mapped to a higher-level page table entry, preventing the requested operation from completing: {0:?}"
     )]
@@ -533,18 +538,6 @@ macro_rules! align {
         $value & !($alignment - 1)
     }};
 }
-
-cake::encapsulate_macro!(
-    pub(crate) test_print,
-    _test_print_mod,
-    /// Expands to a print statement that is only included in test builds, allowing for debug printing in tests without affecting release builds.
-    macro_rules! test_print {
-        ($($arg:tt)*) => {
-            #[cfg(test)]
-            print!($($arg)*);
-        };
-    }
-);
 
 cake::encapsulate_macro!(
     pub(crate) test_println,
