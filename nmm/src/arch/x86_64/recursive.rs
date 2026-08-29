@@ -12,7 +12,7 @@ use crate::{
     arch::x86_64::{PageTableFlags, XFrameAllocator, impl_memory_mapper_for},
     paging::{
         FragmentManager, Frame, Large, Medium, Page, PageTable, PageTableIndex, Small,
-        map::{Flush, SizedMemoryMapper, Unmapped},
+        map::{Flush, MemoryMapper, SizedMemoryMapper, Unmapped},
     },
 };
 
@@ -172,6 +172,8 @@ impl Debug for RecursivePageTable<'_> {
             .finish()
     }
 }
+
+impl MemoryMapper for RecursivePageTable<'_> {}
 
 impl_memory_mapper_for!(RecursivePageTable<'_>, Small, false);
 impl_memory_mapper_for!(RecursivePageTable<'_>, Medium, true);

@@ -3,7 +3,7 @@ use crate::{
     arch::Mapper,
     paging::{
         FragmentManager, FragmentSize, Frame, FullManager, Large, Medium, MemoryFragment, PhysAddr,
-        Small, map::SizedMemoryMapper, primitives::FrameClass,
+        Small, asm, map::SizedMemoryMapper, primitives::FrameClass,
     },
 };
 
@@ -112,6 +112,22 @@ where
 
     fn allocate_table(&mut self) -> Result<Frame<Small>, MemError> {
         self.1.allocate_fragment()
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct GlobalMemoryProvider;
+
+impl<S: FragmentSize> MemoryProvider<S> for GlobalMemoryProvider {
+    fn allocate_data(&mut self) -> Result<Frame<S>, MemError>
+    where
+        Mapper: SizedMemoryMapper<S>,
+    {
+        asm::physical_memory_manager().allocate_fragment()
+    }
+
+    fn allocate_table(&mut self) -> Result<Frame<Small>, MemError> {
+        asm::physical_memory_manager().allocate_fragment()
     }
 }
 

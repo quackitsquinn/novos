@@ -6,7 +6,7 @@ use crate::{
     },
     paging::{
         FragmentManager, FragmentSize, Frame, Page, PageTable, PageTableIndex, Small,
-        map::{Flush, SizedMemoryMapper, Unmapped},
+        map::{Flush, MemoryMapper, SizedMemoryMapper, Unmapped},
     },
 };
 
@@ -80,3 +80,5 @@ where
         }
     }
 }
+
+impl MemoryMapper for Mapper {}

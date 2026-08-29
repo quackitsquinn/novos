@@ -89,6 +89,7 @@ macro_rules! encapsulate_macro {
 }
 
 /// Gets the current core ID.
+// TODO: Don't use the initial local APIC ID because it may be reconfigured.. I don't know if CpuId can do tht
 #[allow(unreachable_code)]
 pub fn core_id() -> u64 {
     #[cfg(all(target_arch = "x86_64", not(test)))]

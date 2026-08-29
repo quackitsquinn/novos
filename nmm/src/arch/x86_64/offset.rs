@@ -7,14 +7,12 @@ use crate::{
     arch::x86_64::{PageTableFlags, XFrameAllocator, impl_memory_mapper_for},
     paging::{
         FragmentManager, Frame, Large, Medium, Page, PageTable, Small, VirtAddr,
-        map::{Flush, SizedMemoryMapper, Unmapped},
+        map::{Flush, MemoryMapper, SizedMemoryMapper, Unmapped},
     },
 };
 
 mod arch_lib {
-    pub use x86_64::structures::paging::{
-        OffsetPageTable, mapper::TranslateResult,
-    };
+    pub use x86_64::structures::paging::{OffsetPageTable, mapper::TranslateResult};
 }
 
 /// An offset page table mapper for x86_64. This mapper uses a fixed offset to access the page tables, and is the most basic type of mapper.
@@ -55,6 +53,8 @@ impl Debug for OffsetPageTable<'_> {
         f.debug_struct("OffsetPageTable").finish()
     }
 }
+
+impl MemoryMapper for OffsetPageTable<'_> {}
 
 impl_memory_mapper_for!(OffsetPageTable<'_>, Medium, true);
 impl_memory_mapper_for!(OffsetPageTable<'_>, Large, true);

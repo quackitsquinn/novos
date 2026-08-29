@@ -11,12 +11,9 @@ pub use mapper::Mapper;
 
 use bitflags::bitflags;
 
-
 use crate::{
     arch::x86_64::conv::XFrameAllocator,
-    paging::{
-        Address, Frame, PageTableIndex, Small, VirtAddr,
-    },
+    paging::{Address, Frame, PageTableIndex, Small, VirtAddr},
 };
 
 pub(crate) use recursive::RecursivePageTable;

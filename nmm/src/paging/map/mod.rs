@@ -23,6 +23,8 @@ pub use provider::{
     DataAllocator, DataWithTableAllocator, FullProvider, MemoryProvider, PhysLinear,
 };
 
+mod local;
+
 /// A trait for types that can map and unmap pages of a specific size. This is the main interface for mapping
 /// and unmapping pages in the memory manager, and it abstracts over the architecture-specific details of how
 /// page tables are manipulated to create mappings.
@@ -133,11 +135,6 @@ pub trait MemoryMapper:
 
         Ok(())
     }
-}
-
-impl<T> MemoryMapper for T where
-    T: SizedMemoryMapper<Small> + SizedMemoryMapper<Medium> + SizedMemoryMapper<Large>
-{
 }
 
 /// A structure representing an unmapped page.

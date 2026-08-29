@@ -238,6 +238,20 @@ where
             }
         }
     }
+
+    /// Dissects the AnyFragment into its specific size variant and calls the appropriate closure with the contained fragment and additional parameters.
+    pub fn dissect_with<Lf, Mf, Sf, P, R>(self, lf: Lf, mf: Mf, sf: Sf, params: P) -> R
+    where
+        Sf: FnOnce(C::Fragment<Small>, P) -> R,
+        Mf: FnOnce(C::Fragment<Medium>, P) -> R,
+        Lf: FnOnce(C::Fragment<Large>, P) -> R,
+    {
+        match self {
+            AnyFragment::Small(page) => sf(page, params),
+            AnyFragment::Medium(page) => mf(page, params),
+            AnyFragment::Large(page) => lf(page, params),
+        }
+    }
 }
 
 /// Type alias for a memory primitive of unknown size that is specifically a page.
