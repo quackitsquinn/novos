@@ -40,10 +40,19 @@ impl Mapper {
         Self::Recursive(unsafe { RecursivePageTable::new(root, recursive_index) })
     }
 
+    /// Returns a reference to the root page table of the mapper.
     pub fn root_table(&self) -> &PageTable {
         match self {
             Mapper::Offset(mapper) => mapper.p4(),
             Mapper::Recursive(mapper) => mapper.p4(),
+        }
+    }
+
+    /// Returns a mutable reference to the root page table of the mapper.
+    pub fn root_table_mut(&mut self) -> &mut PageTable {
+        match self {
+            Mapper::Offset(mapper) => mapper.p4_mut(),
+            Mapper::Recursive(mapper) => mapper.p4_mut(),
         }
     }
 }

@@ -3,7 +3,8 @@ use core::fmt::{Debug, Display};
 use crate::{
     MapFlags, arch,
     paging::{
-        Address, AddressExt, FragmentSize, Frame, MemoryFragment, Page, PhysAddr, Small, VirtAddr,
+        Address, AddressExt, FragmentSize, Frame, MemoryFragment, Page, PageTableIndex, PhysAddr,
+        Small, VirtAddr,
     },
 };
 
@@ -47,6 +48,21 @@ impl PageTable {
     pub fn as_page(&self) -> Page<Small> {
         Page::from_start_address(VirtAddr::from_ptr(self).unwrap()).unwrap()
     }
+
+    /// Updates the given entry in the page table with the provided `PageTableEntry`.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the index is valid and that the entry being set does not
+    /// violate memory safety, e.g., by creating invalid mappings or overwriting critical entries.
+    pub unsafe fn set_entry(&mut self, index: PageTableIndex, entry: PageTableEntry) {
+        self.entries[index.value() as usize] = entry;
+    }
+
+    /// Reads the entry at the given index in the page table.
+    pub fn read_entry(&self, index: PageTableIndex) -> PageTableEntry {
+        self.entries[index.value() as usize]
+    }
 }
 
 /// A page table entry, representing a single entry in a page table.
@@ -58,11 +74,16 @@ pub struct PageTableEntry {
 
 impl PageTableEntry {
     /// Creates a new page table entry with the given physical frame and flags.
-    pub fn new<S: FragmentSize>(phys: Frame<S>, flags: arch::ArchEntryFlags) -> Self {
+    pub fn new<S: FragmentSize>(phys: Frame<S>, flags: MapFlags) -> Self {
         let addr = phys.start_address().as_u64();
         Self {
-            value: addr | flags.bits(),
+            value: addr | arch::ArchEntryFlags::from(flags).bits(),
         }
+    }
+
+    /// Creates an empty page table entry with all bits set to zero.
+    pub fn empty() -> Self {
+        Self { value: 0 }
     }
 
     /// The arch specific flags of this page table entry, as a `arch::ArchEntryFlags` bitflags struct.
@@ -84,6 +105,11 @@ impl PageTableEntry {
     /// Returns the physical address contained in this page table entry, if it is present and valid.
     pub fn addr(&self) -> PhysAddr {
         PhysAddr::new(self.value & arch::PHYSICAL_ADDRESS_MAX)
+    }
+
+    /// Returns whether this page table entry is present (i.e., valid and mapped).
+    pub fn is_present(&self) -> bool {
+        self.arch_flags().contains(arch::ArchEntryFlags::PRESENT)
     }
 }
 

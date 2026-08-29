@@ -406,6 +406,9 @@ pub enum MemError {
         /// The virtual address that is mapped to a higher-level page table entry, preventing the requested operation from completing.
         VirtAddr,
     ),
+    /// The requested operation failed because the required resources are unavailable, such as a missing page table or a second address space builder on the same address space.
+    #[error("The requested operation failed because the required resources are unavailable: {0}")]
+    ResourceUnavailable(&'static str),
     /// An error that originated from architecture-specific operations in the memory manager.
     #[error("An architecture-specific error occurred during memory management operations: {0}")]
     ArchError(#[from] arch::ArchError),

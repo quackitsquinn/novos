@@ -2,12 +2,12 @@ use core::sync::atomic::AtomicBool;
 
 use crate::{
     MapFlags, MemError,
-    arch::RecursivePageTable,
+    arch::{self, Mapper, RecursivePageTable},
+    map_with_operation,
     paging::{
-        Address, AddressExt, MemoryFragment, PageTable,
-        PhysAddr, asm,
-        builder::AddressSpaceBuilder,
-        map::{DataAllocator, MemoryMapper, PhysLinear},
+        Address, AddressExt, FragmentManager, FragmentSize, Frame, MemoryFragment, Page, PageTable,
+        PageTableEntry, PhysAddr, Small, asm,
+        map::{DataAllocator, Flush, MemoryMapper, PhysLinear, SizedMemoryMapper, Unmapped},
         operation::ZeroMemory,
     },
 };
@@ -22,10 +22,28 @@ static RECURSIVE_LOCKED: AtomicBool = AtomicBool::new(false);
 impl<'a> RecursiveAddressSpaceBuilder<'a> {
     pub fn acquire_instance() -> Result<Self, MemError> {
         if RECURSIVE_LOCKED.swap(true, core::sync::atomic::Ordering::Acquire) {
-            panic!("RecursiveAddressSpaceBuilder instance already acquired");
+            return Err(MemError::ResourceUnavailable(
+                "RecursiveAddressSpaceBuilder",
+            ));
         }
 
+        let builder_pml4: Frame<Small> = crate::reserve_frame()?;
+        unsafe { asm::zero_frame(builder_pml4)? };
         let active_as = asm::active();
+        let mut mapper = active_as.mapper.lock_inner_mapper();
+        let current_pml4 = mapper.root_table_mut();
+        if current_pml4.read_entry(arch::RECURSIVE_SLOT1).is_present() {
+            return Err(MemError::ResourceUnavailable(
+                "RecursiveAddressSpaceBuilder: RECURSIVE_SLOT1 is already in use",
+            ));
+        }
+        unsafe {
+            current_pml4.set_entry(
+                arch::RECURSIVE_SLOT1,
+                PageTableEntry::new(builder_pml4, MapFlags::WRITABLE),
+            )
+        };
+
         Ok(Self {
             table: unsafe {
                 RecursivePageTable::new(
@@ -37,58 +55,33 @@ impl<'a> RecursiveAddressSpaceBuilder<'a> {
     }
 }
 
-impl<'a> AddressSpaceBuilder for RecursiveAddressSpaceBuilder<'a> {
-    fn map(
+impl<'a, S: FragmentSize> SizedMemoryMapper<S> for RecursiveAddressSpaceBuilder<'a>
+where
+    RecursivePageTable<'a>: SizedMemoryMapper<S>,
+{
+    fn map_primitive<A>(
         &mut self,
-        base: crate::paging::VirtAddr,
-        source: super::Source,
-        size: u64,
-        map_flags: crate::MapFlags,
-    ) -> Result<(), crate::MemError> {
-        use super::Source as S;
-        let mut pmm = asm::physical_memory_manager();
-        match source {
-            S::Allocate { should_zero } => unsafe {
-                if should_zero {
-                    self.table.map_from_with_operation(
-                        base,
-                        size,
-                        map_flags | MapFlags::DEALLOCATE,
-                        &mut DataAllocator(&mut *pmm),
-                        ZeroMemory,
-                    )
-                } else {
-                    self.table.map_from(
-                        base,
-                        size,
-                        map_flags | MapFlags::DEALLOCATE,
-                        &mut DataAllocator(&mut *pmm),
-                    )
-                }
-            },
-            S::Identity => {
-                let phys_base = PhysAddr::try_new(base.as_u64()).ok_or(MemError::Other(
-                    "failed to convert virt to phys for identity mapping",
-                ))?;
-                unsafe {
-                    self.table.map_from(
-                        base,
-                        size,
-                        map_flags,
-                        &mut PhysLinear(phys_base, &mut *pmm),
-                    )
-                }
-            }
-            S::PhysAddr(phys_addr) => unsafe {
-                self.table
-                    .map_from(base, size, map_flags, &mut PhysLinear(phys_addr, &mut *pmm))
-            },
-        }
+        dst: Page<S>,
+        src: Frame<S>,
+        flags: MapFlags,
+        allocator: &mut A,
+    ) -> Result<Flush, MemError>
+    where
+        A: FragmentManager<Frame<Small>, Small>,
+    {
+        self.table.map_primitive(dst, src, flags, allocator)
+    }
+
+    unsafe fn unmap_primitive(&mut self, page: Page<S>) -> Result<Unmapped<S>, MemError> {
+        unsafe { self.table.unmap_primitive(page) }
     }
 }
 
 impl<'a> Drop for RecursiveAddressSpaceBuilder<'a> {
     fn drop(&mut self) {
-        RECURSIVE_LOCKED.store(false, core::sync::atomic::Ordering::Release);
+        let active_as = asm::active();
+        let mut mapper = active_as.mapper.lock_inner_mapper();
+        let current_pml4 = mapper.root_table_mut();
+        unsafe { current_pml4.set_entry(arch::RECURSIVE_SLOT1, PageTableEntry::empty()) };
     }
 }

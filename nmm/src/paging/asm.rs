@@ -20,7 +20,7 @@ static ADDRESS_SPACE: OnceRwLock<AddressSpace> = OnceRwLock::new();
 static PHYSICAL_MEMORY_MANAGER: OnceMutex<PhysicalMemoryManager> = OnceMutex::uninitialized();
 
 pub(crate) struct AddressSpace {
-    mapper: LocalMemoryMapper<arch::Mapper>,
+    pub(crate) mapper: LocalMemoryMapper<arch::Mapper>,
     pub mut(crate) l4_table_frame: Frame<Small>,
     pub mut(crate) l4_table: Page<Small>,
     pub mut(crate) scratch_page: Page<Large>,

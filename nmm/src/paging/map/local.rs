@@ -37,8 +37,8 @@ impl<M: MemoryMapper> LocalMemoryMapper<M> {
         }
     }
 
-    /// Returns a mutable reference to the actual mapper object.
-    fn mapper(&self) -> RefMut<'_, M> {
+    /// Returns a lock to the inner mapper. This function is not lock/borrowless, and should be used with care.
+    pub(crate) fn lock_inner_mapper(&self) -> RefMut<'_, M> {
         self.check_core();
         self.inner.borrow_mut()
     }
@@ -75,12 +75,12 @@ where
         A: FragmentManager<Frame<Small>, Small>,
     {
         self.inner
-            .mapper()
+            .lock_inner_mapper()
             .map_primitive(dst, src, flags, allocator)
     }
 
     unsafe fn unmap_primitive(&mut self, page: Page<S>) -> Result<Unmapped<S>, MemError> {
-        unsafe { self.inner.mapper().unmap_primitive(page) }
+        unsafe { self.inner.lock_inner_mapper().unmap_primitive(page) }
     }
 }
 

@@ -25,7 +25,7 @@ fn main() {
     println!("Running tests");
 
     let mut cfg = QemuConfig::default();
-    cfg.iso = "boot_images/kernel_tests.iso".to_string();
+    cfg.iso = "boot_images/kernel_tests.iso".to_string().into();
     cfg.dev_exit = true;
     cfg.display = false;
     cfg.serial.clear();
