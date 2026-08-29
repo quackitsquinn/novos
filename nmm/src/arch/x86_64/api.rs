@@ -14,7 +14,7 @@ use crate::{
 };
 
 pub(crate) unsafe fn init_unchecked(
-    walker: EntryWalker<'static>,
+    mut walker: EntryWalker<'static>,
     config: InitConfig,
 ) -> Result<(), MemError> {
     if config.managed_range.size() < arch::L1_PAGE_SIZE * 16 {
@@ -70,7 +70,7 @@ pub(crate) unsafe fn init_unchecked(
             config.managed_range.start(),
             n_bytes,
             MapFlags::WRITABLE,
-            &mut DataAllocator(&mut *asm::physical_memory_manager()),
+            &mut DataAllocator(&mut walker),
         )?;
     }
 

@@ -115,6 +115,9 @@ where
     }
 }
 
+/// A provider that defers to the system physical memory manager for all allocations.
+///
+/// This also implements `FullManager<FrameClass>`, allowing for better composability: `PhysLinear(addr, &mut GlobalMemoryProvider)`
 #[derive(Debug, Clone, Copy)]
 pub struct GlobalMemoryProvider;
 
@@ -130,6 +133,18 @@ impl<S: FragmentSize> MemoryProvider<S> for GlobalMemoryProvider {
         asm::physical_memory_manager().allocate_fragment()
     }
 }
+
+unsafe impl<S: FragmentSize> FragmentManager<Frame<S>, S> for GlobalMemoryProvider {
+    fn allocate_fragment(&mut self) -> Result<Frame<S>, MemError> {
+        asm::physical_memory_manager().allocate_fragment()
+    }
+
+    fn deallocate_fragment(&mut self, primitive: Frame<S>) {
+        asm::physical_memory_manager().deallocate_fragment(primitive)
+    }
+}
+
+impl FullManager<FrameClass> for GlobalMemoryProvider {}
 
 /// A trait that combines the `MemoryProvider` trait for all supported fragment sizes.
 pub trait FullProvider:

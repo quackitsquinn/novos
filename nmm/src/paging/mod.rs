@@ -21,8 +21,8 @@ use crate::{
     paging::{
         fragment::GreedyFragmentMapper,
         map::{
-            DataAllocator, Flush, FullProvider, MemoryMapper, PhysLinear, SizedMemoryMapper,
-            Unmapped,
+            DataAllocator, Flush, FullProvider, GlobalMemoryProvider, MemoryMapper, PhysLinear,
+            SizedMemoryMapper, Unmapped,
         },
         operation::{Chain, OperationAllSizes, ZeroMemory},
         primitives::{AnyFragment, PageClass, PrimitiveClass},
@@ -142,9 +142,6 @@ pub(crate) unsafe fn map_unchecked(
     byte_size: usize,
     flags: MapFlags,
 ) -> Result<(), MemError> {
-    let mut pmm_guard = asm::physical_memory_manager();
-    let pmm = &mut *pmm_guard;
-
     match src {
         MapSource::Direct(phys_base) => {
             trace!(
@@ -159,7 +156,7 @@ pub(crate) unsafe fn map_unchecked(
                     dest,
                     byte_size as u64,
                     flags,
-                    &mut PhysLinear(phys_base, &mut *pmm),
+                    &mut PhysLinear(phys_base, &mut GlobalMemoryProvider),
                 )?
             };
         }
@@ -175,7 +172,7 @@ pub(crate) unsafe fn map_unchecked(
                     dest,
                     byte_size as u64,
                     flags | MapFlags::DEALLOCATE,
-                    &mut DataAllocator(pmm),
+                    &mut DataAllocator(&mut GlobalMemoryProvider),
                 );
             } else {
                 return map_with_operation(dest, src, byte_size, flags, ZeroMemory);

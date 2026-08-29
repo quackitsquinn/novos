@@ -20,10 +20,13 @@ use crate::{
 mod provider;
 
 pub use provider::{
-    DataAllocator, DataWithTableAllocator, FullProvider, MemoryProvider, PhysLinear,
+    DataAllocator, DataWithTableAllocator, FullProvider, GlobalMemoryProvider, MemoryProvider,
+    PhysLinear,
 };
 
 mod local;
+
+pub(crate) use local::{LocalMemoryMapper, MapperMut};
 
 /// A trait for types that can map and unmap pages of a specific size. This is the main interface for mapping
 /// and unmapping pages in the memory manager, and it abstracts over the architecture-specific details of how

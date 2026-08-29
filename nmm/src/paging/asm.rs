@@ -3,8 +3,7 @@
 use core::mem::transmute;
 
 use cake::{
-    MappedMutexGuard, Mutex, MutexGuard, OnceMutex, OnceMutexGuard, OnceRwLock,
-    OnceRwReadGuard,
+    MappedMutexGuard, Mutex, MutexGuard, OnceMutex, OnceMutexGuard, OnceRwLock, OnceRwReadGuard,
 };
 
 use crate::{
@@ -12,8 +11,8 @@ use crate::{
     arch::{self},
     bitmap::{PhysicalMemoryManager, VirtualMemoryManager},
     paging::{
-        AddressExt, FragmentSize, Frame, Large, MemoryFragment, Page,
-        Small, map::SizedMemoryMapper,
+        AddressExt, FragmentSize, Frame, Large, MemoryFragment, Page, Small,
+        map::{LocalMemoryMapper, MapperMut, MemoryMapper, SizedMemoryMapper},
     },
 };
 
@@ -21,7 +20,7 @@ static ADDRESS_SPACE: OnceRwLock<AddressSpace> = OnceRwLock::new();
 static PHYSICAL_MEMORY_MANAGER: OnceMutex<PhysicalMemoryManager> = OnceMutex::uninitialized();
 
 pub(crate) struct AddressSpace {
-    mapper: Mutex<arch::Mapper>,
+    mapper: LocalMemoryMapper<arch::Mapper>,
     pub mut(crate) l4_table_frame: Frame<Small>,
     pub mut(crate) l4_table: Page<Small>,
     pub mut(crate) scratch_page: Page<Large>,
@@ -37,7 +36,7 @@ impl AddressSpace {
         vmm: Option<VirtualMemoryManager<'static>>,
     ) -> Self {
         Self {
-            mapper: Mutex::new(mapper),
+            mapper: LocalMemoryMapper::new(mapper),
             l4_table_frame,
             scratch_page,
             l4_table,
@@ -52,7 +51,7 @@ impl AddressSpace {
     ) -> Self {
         let l4_table = mapper.root_table().as_page();
         Self {
-            mapper: Mutex::new(mapper),
+            mapper: LocalMemoryMapper::new(mapper),
             l4_table_frame,
             l4_table,
             scratch_page,
@@ -60,9 +59,9 @@ impl AddressSpace {
         }
     }
 
-    pub(crate) fn mapper(&self) -> Option<MutexGuard<'_, arch::Mapper>> {
+    pub(crate) fn mapper(&self) -> Option<MapperMut<'_, arch::Mapper>> {
         if self.l4_table_frame == arch::pml4_phys() {
-            Some(self.mapper.lock())
+            Some(self.mapper.get_mapper())
         } else {
             None
         }
