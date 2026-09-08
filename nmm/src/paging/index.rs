@@ -26,7 +26,13 @@ impl PageTableIndex {
     }
 
     /// Returns the raw index value.
+    #[inline(always)]
     pub const fn value(self) -> u16 {
         self.0
+    }
+
+    /// Returns the raw index value as a `u64`.
+    pub const fn as_u64(self) -> u64 {
+        self.0 as u64
     }
 }

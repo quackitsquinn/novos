@@ -6,7 +6,9 @@ use crate::{
     MapFlags, MemError,
     arch::x86_64::{PageTableFlags, XFrameAllocator, impl_memory_mapper_for},
     paging::{
-        FragmentManager, Frame, Large, Medium, Page, PageTable, Small, VirtAddr,
+        Address, FragmentManager, Frame, Large, Medium, Page, PageTable, PageTableIndex, Small,
+        VirtAddr,
+        accessor::{self, PagetableAccessor},
         map::{Flush, MemoryMapper, SizedMemoryMapper, Unmapped},
     },
 };
@@ -59,3 +61,63 @@ impl MemoryMapper for OffsetPageTable<'_> {}
 impl_memory_mapper_for!(OffsetPageTable<'_>, Medium, true);
 impl_memory_mapper_for!(OffsetPageTable<'_>, Large, true);
 impl_memory_mapper_for!(OffsetPageTable<'_>, Small, false);
+
+impl PagetableAccessor for OffsetPageTable<'_> {
+    fn read_l4_table(&self) -> Result<VirtAddr, MemError> {
+        Ok(self.p4().as_virt())
+    }
+
+    fn read_l3_table(&self, l4_index: crate::paging::PageTableIndex) -> Result<VirtAddr, MemError> {
+        let l4 = self.p4();
+        let entry = l4.read_entry(l4_index);
+        if entry.is_present() {
+            Ok(self.phys_offset() + entry.addr().as_u64())
+        } else {
+            Err(MemError::PagetableNotPresent)
+        }
+    }
+
+    fn read_l2_table(
+        &self,
+        l4_index: crate::paging::PageTableIndex,
+        l3_index: crate::paging::PageTableIndex,
+    ) -> Result<VirtAddr, MemError> {
+        let l3_table = self.l3_table(l4_index)?;
+        let entry = l3_table.read_entry(l3_index);
+        if entry.is_huge() {
+            return Err(MemError::MappedToHigherLevel(
+                self.phys_offset()
+                    + accessor::build_address(
+                        l4_index,
+                        l3_index,
+                        PageTableIndex::new(0),
+                        PageTableIndex::new(0),
+                    ),
+            ));
+        }
+        if entry.is_present() {
+            return Ok(self.phys_offset() + entry.addr().as_u64());
+        }
+        Err(MemError::PagetableNotPresent)
+    }
+
+    fn read_l1_table(
+        &self,
+        l4_index: crate::paging::PageTableIndex,
+        l3_index: crate::paging::PageTableIndex,
+        l2_index: crate::paging::PageTableIndex,
+    ) -> Result<VirtAddr, MemError> {
+        let l2_table = self.l2_table(l4_index, l3_index)?;
+        let entry = l2_table.read_entry(l2_index);
+        if entry.is_huge() {
+            return Err(MemError::MappedToHigherLevel(
+                self.phys_offset()
+                    + accessor::build_address(l4_index, l3_index, l2_index, PageTableIndex::new(0)),
+            ));
+        }
+        if entry.is_present() {
+            return Ok(self.phys_offset() + entry.addr().as_u64());
+        }
+        Err(MemError::PagetableNotPresent)
+    }
+}

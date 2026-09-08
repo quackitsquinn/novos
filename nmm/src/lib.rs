@@ -10,6 +10,7 @@
 #![feature(derive_const)]
 #![feature(impl_restriction)]
 #![feature(mut_restriction)]
+#![feature(min_adt_const_params)]
 
 use core::{
     alloc::Layout,
@@ -409,6 +410,11 @@ pub enum MemError {
     /// The requested operation failed because the required resources are unavailable, such as a missing page table or a second address space builder on the same address space.
     #[error("The requested operation failed because the required resources are unavailable: {0}")]
     ResourceUnavailable(&'static str),
+    /// The requested operation failed because the required page table is not present in memory.
+    #[error(
+        "The requested operation failed because the required page table is not present in memory."
+    )]
+    PagetableNotPresent,
     /// An error that originated from architecture-specific operations in the memory manager.
     #[error("An architecture-specific error occurred during memory management operations: {0}")]
     ArchError(#[from] arch::ArchError),

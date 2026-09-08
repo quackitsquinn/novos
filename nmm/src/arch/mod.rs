@@ -32,6 +32,8 @@ pub const PHYSICAL_ADDRESS_WIDTH: u8 = arch_impl::PHYSICAL_ADDRESS_WIDTH;
 pub const PHYSICAL_ADDRESS_MAX: u64 = arch_impl::PHYSICAL_ADDRESS_MAX;
 /// The number of bits used for indexing into page tables at each level.
 pub const TABLE_INDEX_BITS: usize = arch_impl::TABLE_INDEX_BITS;
+/// The number of bits used for the offset within a page.
+pub const ENTRY_OFFSET_BITS: usize = L1_PAGE_SIZE.trailing_zeros() as usize;
 /// The number of entries in a page table for the current architecture.
 pub const ENTRY_COUNT: usize = arch_impl::ENTRY_COUNT;
 /// The size of a level 1 page (4KB) for the current architecture.

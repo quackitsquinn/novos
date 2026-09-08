@@ -6,6 +6,7 @@ use crate::{
     },
     paging::{
         FragmentManager, FragmentSize, Frame, Page, PageTable, PageTableIndex, Small,
+        accessor::PagetableAccessor,
         map::{Flush, MemoryMapper, SizedMemoryMapper, Unmapped},
     },
 };
@@ -91,3 +92,42 @@ where
 }
 
 impl MemoryMapper for Mapper {}
+
+impl PagetableAccessor for Mapper {
+    fn read_l4_table(&self) -> Result<VirtAddr, MemError> {
+        match self {
+            Mapper::Offset(mapper) => Ok(mapper.p4().as_virt()),
+            Mapper::Recursive(mapper) => Ok(mapper.p4().as_virt()),
+        }
+    }
+
+    fn read_l3_table(&self, l4_index: PageTableIndex) -> Result<VirtAddr, MemError> {
+        match self {
+            Mapper::Offset(mapper) => mapper.read_l3_table(l4_index),
+            Mapper::Recursive(mapper) => mapper.read_l3_table(l4_index),
+        }
+    }
+
+    fn read_l2_table(
+        &self,
+        l4_index: PageTableIndex,
+        l3_index: PageTableIndex,
+    ) -> Result<VirtAddr, MemError> {
+        match self {
+            Mapper::Offset(mapper) => mapper.read_l2_table(l4_index, l3_index),
+            Mapper::Recursive(mapper) => mapper.read_l2_table(l4_index, l3_index),
+        }
+    }
+
+    fn read_l1_table(
+        &self,
+        l4_index: PageTableIndex,
+        l3_index: PageTableIndex,
+        l2_index: PageTableIndex,
+    ) -> Result<VirtAddr, MemError> {
+        match self {
+            Mapper::Offset(mapper) => mapper.read_l1_table(l4_index, l3_index, l2_index),
+            Mapper::Recursive(mapper) => mapper.read_l1_table(l4_index, l3_index, l2_index),
+        }
+    }
+}

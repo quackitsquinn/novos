@@ -11,8 +11,10 @@ use crate::{
     MapFlags, MemError,
     arch::x86_64::{PageTableFlags, XFrameAllocator, impl_memory_mapper_for},
     paging::{
-        FragmentManager, Frame, Large, Medium, Page, PageTable, PageTableIndex, Small,
+        Address, FragmentManager, Frame, Large, Medium, Page, PageTable, PageTableIndex, Small,
+        accessor::{self, PagetableAccessor},
         map::{Flush, MemoryMapper, SizedMemoryMapper, Unmapped},
+        primitives::{PhysAddr, VirtAddr},
     },
 };
 
@@ -178,3 +180,78 @@ impl MemoryMapper for RecursivePageTable<'_> {}
 impl_memory_mapper_for!(RecursivePageTable<'_>, Small, false);
 impl_memory_mapper_for!(RecursivePageTable<'_>, Medium, true);
 impl_memory_mapper_for!(RecursivePageTable<'_>, Large, true);
+
+impl PagetableAccessor for RecursivePageTable<'_> {
+    fn read_l4_table(&self) -> Result<crate::paging::VirtAddr, MemError> {
+        Ok(self.p4().as_virt())
+    }
+
+    fn read_l3_table(&self, l4_index: PageTableIndex) -> Result<crate::paging::VirtAddr, MemError> {
+        let addr_raw = accessor::build_address(
+            self.recursive_index,
+            self.recursive_index,
+            l4_index,
+            PageTableIndex::new(0),
+        );
+
+        if !self.p4().read_entry(l4_index).is_present() {
+            return Err(MemError::PagetableNotPresent);
+        }
+
+        Ok(VirtAddr::new(addr_raw))
+    }
+
+    fn read_l2_table(
+        &self,
+        l4_index: PageTableIndex,
+        l3_index: PageTableIndex,
+    ) -> Result<crate::paging::VirtAddr, MemError> {
+        let addr_raw = accessor::build_address(
+            self.recursive_index,
+            l4_index,
+            l3_index,
+            PageTableIndex::new(0),
+        );
+
+        let entry = self.l3_table(l4_index)?.read_entry(l3_index);
+
+        if !entry.is_present() {
+            return Err(MemError::PagetableNotPresent);
+        }
+
+        if entry.is_huge() {
+            return Err(MemError::MappedToHigherLevel(VirtAddr::new(
+                accessor::build_address(
+                    l4_index,
+                    l3_index,
+                    PageTableIndex::new(0),
+                    PageTableIndex::new(0),
+                ),
+            )));
+        }
+
+        Ok(VirtAddr::new(addr_raw))
+    }
+
+    fn read_l1_table(
+        &self,
+        l4_index: PageTableIndex,
+        l3_index: PageTableIndex,
+        l2_index: PageTableIndex,
+    ) -> Result<crate::paging::VirtAddr, MemError> {
+        let addr_raw = accessor::build_address(self.recursive_index, l4_index, l3_index, l2_index);
+
+        let entry = self.l2_table(l4_index, l3_index)?.read_entry(l2_index);
+        if !entry.is_present() {
+            return Err(MemError::PagetableNotPresent);
+        }
+
+        if entry.is_huge() {
+            return Err(MemError::MappedToHigherLevel(VirtAddr::new(
+                accessor::build_address(l4_index, l3_index, l2_index, PageTableIndex::new(0)),
+            )));
+        }
+
+        Ok(VirtAddr::new(addr_raw))
+    }
+}

@@ -63,6 +63,11 @@ impl PageTable {
     pub fn read_entry(&self, index: PageTableIndex) -> PageTableEntry {
         self.entries[index.value() as usize]
     }
+
+    /// Returns the virtual address of this page table.
+    pub fn as_virt(&self) -> VirtAddr {
+        VirtAddr::from_ptr(self).unwrap()
+    }
 }
 
 /// A page table entry, representing a single entry in a page table.
@@ -110,6 +115,11 @@ impl PageTableEntry {
     /// Returns whether this page table entry is present (i.e., valid and mapped).
     pub fn is_present(&self) -> bool {
         self.arch_flags().contains(arch::ArchEntryFlags::PRESENT)
+    }
+
+    /// Returns whether this page table entry is marked as huge (i.e., representing a large page).
+    pub fn is_huge(&self) -> bool {
+        self.arch_flags().contains(arch::ArchEntryFlags::HUGE_PAGE)
     }
 }
 
