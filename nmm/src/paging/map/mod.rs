@@ -4,6 +4,7 @@
 
 use core::fmt;
 
+use arrayvec::ArrayVec;
 use cake::log::trace;
 
 use crate::{
@@ -145,6 +146,10 @@ pub trait MemoryMapper:
 pub struct Unmapped<S: FragmentSize> {
     /// The physical frame that was previously mapped to the page.
     pub mut(crate) frame: Frame<S>,
+    /// Free parent page tables that were used to map the page, if any.
+    ///
+    /// Entries are only present when the table is empty, and the capacity is 4 for future 5 level paging support.
+    pub mut(crate) parent_tables: ArrayVec<Frame<Small>, 4>,
     flush: Option<Flush>,
     /// The mapping flags that were used for the mapping before it was unmapped.
     pub mut(crate) flags: MapFlags,
@@ -152,9 +157,15 @@ pub struct Unmapped<S: FragmentSize> {
 
 impl<S: FragmentSize> Unmapped<S> {
     /// Creates a new `Unmapped` structure with the given frame, flush operation, and mapping flags.
-    pub fn new(frame: Frame<S>, flush: Option<Flush>, flags: MapFlags) -> Self {
+    pub fn new(
+        frame: Frame<S>,
+        parent_tables: ArrayVec<Frame<Small>, 4>,
+        flush: Option<Flush>,
+        flags: MapFlags,
+    ) -> Self {
         Self {
             frame,
+            parent_tables,
             flush,
             flags,
         }

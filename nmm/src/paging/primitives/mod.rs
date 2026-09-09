@@ -75,6 +75,12 @@ pub impl(crate) trait FragmentSize:
         Ok(layout) => layout,
         Err(_) => panic!("Invalid layout"),
     };
+
+    /// The level of the page table that this page size type corresponds to.
+    const LEVEL: u8;
+
+    /// Is this page size type considered a huge page for the current architecture?
+    const IS_HUGE: bool = Self::SIZE > L1_PAGE_SIZE;
 }
 
 /// Marker type for small pages, typically 4KB in size for x86_64 architecture.
@@ -83,6 +89,7 @@ pub struct Small;
 impl FragmentSize for Small {
     const SIZE: u64 = crate::arch::L1_PAGE_SIZE;
     const NAME: &'static str = "Small";
+    const LEVEL: u8 = 1;
 }
 /// Marker type for medium pages, typically 2MB in size for x86_64 architecture.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -90,6 +97,7 @@ pub struct Medium;
 impl FragmentSize for Medium {
     const SIZE: u64 = crate::arch::L2_PAGE_SIZE;
     const NAME: &'static str = "Medium";
+    const LEVEL: u8 = 2;
 }
 /// Marker type for large pages, typically 1GB in size for x86_64 architecture.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -97,6 +105,7 @@ pub struct Large;
 impl FragmentSize for Large {
     const SIZE: u64 = crate::arch::L3_PAGE_SIZE;
     const NAME: &'static str = "Large";
+    const LEVEL: u8 = 3;
 }
 
 /// A memory primitive.

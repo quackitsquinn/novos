@@ -68,6 +68,11 @@ impl PageTable {
     pub fn as_virt(&self) -> VirtAddr {
         VirtAddr::from_ptr(self).unwrap()
     }
+
+    /// Returns whether any entry in this page table is present (i.e., valid and mapped).
+    pub fn any_present(&self) -> bool {
+        self.entries.iter().any(|entry| entry.is_present())
+    }
 }
 
 /// A page table entry, representing a single entry in a page table.

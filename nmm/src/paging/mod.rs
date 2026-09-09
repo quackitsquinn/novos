@@ -190,31 +190,34 @@ pub(crate) unsafe fn unmap_unchecked(
 ) -> Result<(), MemError> {
     let mapper = GreedyFragmentMapper::<PageClass>::new(virt_base, byte_size as u64);
 
+    fn unmap<S: FragmentSize>(page: Page<S>) -> Result<(), MemError>
+    where
+        Mapper: SizedMemoryMapper<S>,
+    {
+        let mut ent = unsafe { unmap_primitive(page)? };
+        ent.flush();
+        let mut pmm = asm::physical_memory_manager();
+        if ent.flags.contains(MapFlags::DEALLOCATE) {
+            pmm.deallocate_fragment(ent.frame);
+        }
+
+        for parent in ent.parent_tables.iter() {
+            pmm.deallocate_fragment(*parent);
+        }
+
+        Ok(())
+    }
+
     for frag in mapper {
         match frag {
             AnyFragment::Small(page_prim) => {
-                let mut ent = unsafe { unmap_primitive(page_prim)? };
-                ent.flush();
-                if ent.flags.contains(MapFlags::DEALLOCATE) {
-                    let mut pmm = asm::physical_memory_manager();
-                    pmm.deallocate_fragment(ent.frame);
-                }
+                unmap(page_prim)?;
             }
             AnyFragment::Medium(page_prim) => {
-                let mut ent = unsafe { unmap_primitive(page_prim)? };
-                ent.flush();
-                if ent.flags.contains(MapFlags::DEALLOCATE) {
-                    let mut pmm = asm::physical_memory_manager();
-                    pmm.deallocate_fragment(ent.frame);
-                }
+                unmap(page_prim)?;
             }
             AnyFragment::Large(page_prim) => {
-                let mut ent = unsafe { unmap_primitive(page_prim)? };
-                ent.flush();
-                if ent.flags.contains(MapFlags::DEALLOCATE) {
-                    let mut pmm = asm::physical_memory_manager();
-                    pmm.deallocate_fragment(ent.frame);
-                }
+                unmap(page_prim)?;
             }
         }
     }

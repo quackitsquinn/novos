@@ -1,8 +1,13 @@
 //! A trait for accessing page tables at different levels in the page table hierarchy.
 
+use arrayvec::ArrayVec;
+
 use crate::{
     MemError, arch,
-    paging::{Address, AddressExt, PageTable, PageTableIndex, VirtAddr},
+    paging::{
+        Address, AddressExt, FragmentSize, Frame, MemoryFragment, Page, PageTable, PageTableEntry,
+        PageTableIndex, Small, VirtAddr, map::Flush,
+    },
 };
 
 /// A trait for accessing page tables at different levels in the page table hierarchy.
@@ -75,6 +80,43 @@ pub trait PagetableAccessor {
     ) -> Result<&PageTable, MemError> {
         let addr = self.read_l1_table(l4_index, l3_index, l2_index)?;
         let table: &PageTable = unsafe { &*(addr.as_ptr()) };
+        Ok(table)
+    }
+
+    /// Returns a mutable reference to the level 4 page table.
+    fn l4_table_mut(&mut self) -> Result<&mut PageTable, MemError> {
+        let addr = self.read_l4_table()?;
+        let table: &mut PageTable = unsafe { &mut *(addr.as_mut_ptr()) };
+        Ok(table)
+    }
+
+    /// Returns a mutable reference to the level 3 page table for the given index of the higher-level page table.
+    fn l3_table_mut(&mut self, l4_index: PageTableIndex) -> Result<&mut PageTable, MemError> {
+        let addr = self.read_l3_table(l4_index)?;
+        let table: &mut PageTable = unsafe { &mut *(addr.as_mut_ptr()) };
+        Ok(table)
+    }
+
+    /// Returns a mutable reference to the level 2 page table for the given indices of the higher-level page tables.
+    fn l2_table_mut(
+        &mut self,
+        l4_index: PageTableIndex,
+        l3_index: PageTableIndex,
+    ) -> Result<&mut PageTable, MemError> {
+        let addr = self.read_l2_table(l4_index, l3_index)?;
+        let table: &mut PageTable = unsafe { &mut *(addr.as_mut_ptr()) };
+        Ok(table)
+    }
+
+    /// Returns a mutable reference to the level 1 page table for the given indices of the higher-level page tables.
+    fn l1_table_mut(
+        &mut self,
+        l4_index: PageTableIndex,
+        l3_index: PageTableIndex,
+        l2_index: PageTableIndex,
+    ) -> Result<&mut PageTable, MemError> {
+        let addr = self.read_l1_table(l4_index, l3_index, l2_index)?;
+        let table: &mut PageTable = unsafe { &mut *(addr.as_mut_ptr()) };
         Ok(table)
     }
 }
@@ -173,4 +215,69 @@ pub fn dissolve_address(
         ((addr_val >> arch::ENTRY_OFFSET_BITS) & ((1 << arch::TABLE_INDEX_BITS) - 1)) as u16,
     );
     (l4_idx, l3_idx, l2_idx, l1_idx)
+}
+
+/// A helper function that finds the parent page tables of a given page and unmaps them if they are empty.
+///  This is used to free up memory when unmapping pages, ensuring that any empty parent page tables are also unmapped and their TLB entries are flushed.
+pub fn find_free_parents_for<S: FragmentSize>(
+    mut page: Page<S>,
+    accessor: &mut impl PagetableAccessor,
+) -> Result<ArrayVec<Frame<Small>, 4>, MemError> {
+    let mut parents: ArrayVec<Frame<Small>, 4> = ArrayVec::new();
+
+    let (l4_index, l3_index, l2_index, _) = dissolve_address(page.start_address());
+
+    match S::LEVEL {
+        1 => {
+            // The actual page should already be unmapped, so we don't need to remove it ourselves.
+            let l1_table = accessor.l1_table(l4_index, l3_index, l2_index)?;
+            if l1_table.any_present() {
+                return Ok(parents);
+            }
+
+            let l1_virt = l1_table.as_page();
+            drop(l1_table);
+
+            let l2_table = accessor.l2_table_mut(l4_index, l3_index)?;
+            let l2_page = l2_table.as_page();
+            let l1_entry = l2_table.read_entry(l2_index);
+            parents.push(Frame::from_start_address(l1_entry.addr()).unwrap());
+            unsafe { l2_table.set_entry(l2_index, PageTableEntry::empty()) };
+            unsafe { Flush::flush_page(l1_virt) }.flush();
+
+            if l2_table.any_present() {
+                return Ok(parents);
+            }
+
+            drop(l2_table);
+
+            let l3 = accessor.l3_table_mut(l4_index)?;
+            let l2_entry = l3.read_entry(l3_index);
+            parents.push(Frame::from_start_address(l2_entry.addr()).unwrap());
+            unsafe { l3.set_entry(l3_index, PageTableEntry::empty()) };
+            unsafe { Flush::flush_page(l2_page) }.flush();
+
+            // PML4 entries are what control various access flags for the entire address space, so we don't want to remove them.
+            return Ok(parents);
+        }
+        2 => {
+            let l2_table = accessor.l2_table(l4_index, l3_index)?;
+            if l2_table.any_present() {
+                return Ok(parents);
+            }
+
+            let l2_virt = l2_table.as_page();
+            drop(l2_table);
+
+            let l3_table = accessor.l3_table_mut(l4_index)?;
+            let l2_entry = l3_table.read_entry(l3_index);
+            parents.push(Frame::from_start_address(l2_entry.addr()).unwrap());
+            unsafe { l3_table.set_entry(l3_index, PageTableEntry::empty()) };
+            unsafe { Flush::flush_page(l2_virt) }.flush();
+
+            // PML4 entries are what control various access flags for the entire address space, so we don't want to remove them.
+            return Ok(parents);
+        }
+        _ => return Ok(parents), // For level 3 pages, we don't have any parent tables to free. This function can also not be called for levels higher than 3.
+    }
 }

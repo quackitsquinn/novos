@@ -6,14 +6,22 @@ mod mapper;
 mod offset;
 mod recursive;
 
+use arrayvec::ArrayVec;
 use cfg_if::cfg_if;
 pub use mapper::Mapper;
 
 use bitflags::bitflags;
+use x86_64::PhysAddr;
 
 use crate::{
+    MemError,
     arch::x86_64::conv::XFrameAllocator,
-    paging::{Address, Frame, PageTableIndex, Small, VirtAddr},
+    paging::{
+        Address, FragmentSize, Frame, MemoryFragment, Page, PageTableEntry, PageTableIndex, Small,
+        VirtAddr,
+        accessor::{self, PagetableAccessor},
+        map::Flush,
+    },
 };
 
 pub(crate) use recursive::RecursivePageTable;
@@ -194,6 +202,7 @@ cake::encapsulate_macro!(
                     match result {
                         Ok((frame, _)) => Ok(Unmapped::new(
                             frame.into(),
+                            $crate::paging::accessor::find_free_parents_for(page, self)?,
                             Some(unsafe { Flush::flush_page(page) }),
                             flags.into(),
                         )),
