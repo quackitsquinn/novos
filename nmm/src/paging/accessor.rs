@@ -3,10 +3,11 @@
 use arrayvec::ArrayVec;
 
 use crate::{
-    MemError, arch,
+    MapFlags, MemError, arch,
     paging::{
-        Address, AddressExt, FragmentSize, Frame, MemoryFragment, Page, PageTable, PageTableEntry,
-        PageTableIndex, Small, VirtAddr, map::Flush,
+        Address, AddressExt, FragmentManager, FragmentSize, Frame, FullManager, Large, Medium,
+        MemoryFragment, Page, PageTable, PageTableEntry, PageTableIndex, Small, VirtAddr,
+        map::Flush, primitives::FrameClass,
     },
 };
 
@@ -220,7 +221,7 @@ pub fn dissolve_address(
 /// A helper function that finds the parent page tables of a given page and unmaps them if they are empty.
 ///  This is used to free up memory when unmapping pages, ensuring that any empty parent page tables are also unmapped and their TLB entries are flushed.
 pub fn find_free_parents_for<S: FragmentSize>(
-    mut page: Page<S>,
+    page: Page<S>,
     accessor: &mut impl PagetableAccessor,
 ) -> Result<ArrayVec<Frame<Small>, 4>, MemError> {
     let mut parents: ArrayVec<Frame<Small>, 4> = ArrayVec::new();
@@ -230,26 +231,27 @@ pub fn find_free_parents_for<S: FragmentSize>(
     match S::LEVEL {
         1 => {
             // The actual page should already be unmapped, so we don't need to remove it ourselves.
-            let l1_table = accessor.l1_table(l4_index, l3_index, l2_index)?;
-            if l1_table.any_present() {
-                return Ok(parents);
-            }
+            let l1_page = {
+                let l1_table = accessor.l1_table(l4_index, l3_index, l2_index)?;
+                if l1_table.any_present() {
+                    return Ok(parents);
+                }
 
-            let l1_virt = l1_table.as_page();
-            drop(l1_table);
+                l1_table.as_page()
+            };
 
-            let l2_table = accessor.l2_table_mut(l4_index, l3_index)?;
-            let l2_page = l2_table.as_page();
-            let l1_entry = l2_table.read_entry(l2_index);
-            parents.push(Frame::from_start_address(l1_entry.addr()).unwrap());
-            unsafe { l2_table.set_entry(l2_index, PageTableEntry::empty()) };
-            unsafe { Flush::flush_page(l1_virt) }.flush();
+            let l2_page = {
+                let l2_table = accessor.l2_table_mut(l4_index, l3_index)?;
+                let l1_entry = l2_table.read_entry(l2_index);
+                parents.push(Frame::from_start_address(l1_entry.addr()).unwrap());
+                unsafe { l2_table.set_entry(l2_index, PageTableEntry::empty()) };
+                unsafe { Flush::flush_page(l1_page) }.flush();
 
-            if l2_table.any_present() {
-                return Ok(parents);
-            }
-
-            drop(l2_table);
+                if l2_table.any_present() {
+                    return Ok(parents);
+                }
+                l2_table.as_page()
+            };
 
             let l3 = accessor.l3_table_mut(l4_index)?;
             let l2_entry = l3.read_entry(l3_index);
@@ -261,13 +263,14 @@ pub fn find_free_parents_for<S: FragmentSize>(
             return Ok(parents);
         }
         2 => {
-            let l2_table = accessor.l2_table(l4_index, l3_index)?;
-            if l2_table.any_present() {
-                return Ok(parents);
-            }
+            let l2_virt = {
+                let l2_table = accessor.l2_table(l4_index, l3_index)?;
+                if l2_table.any_present() {
+                    return Ok(parents);
+                }
 
-            let l2_virt = l2_table.as_page();
-            drop(l2_table);
+                l2_table.as_page()
+            };
 
             let l3_table = accessor.l3_table_mut(l4_index)?;
             let l2_entry = l3_table.read_entry(l3_index);
@@ -280,4 +283,123 @@ pub fn find_free_parents_for<S: FragmentSize>(
         }
         _ => return Ok(parents), // For level 3 pages, we don't have any parent tables to free. This function can also not be called for levels higher than 3.
     }
+}
+
+/// Cleans up the given range of level 4 page table entries, unmapping all memory and freeing it if appropriate.
+pub unsafe fn cleanup_l4_range(
+    l4_range: core::ops::Range<PageTableIndex>,
+    accessor: &mut impl PagetableAccessor,
+    dealloc: &mut impl FullManager<FrameClass>,
+) -> Result<(), MemError> {
+    let iter_range = PageTableIndex::iter_range(l4_range);
+    for p4_idx in iter_range {
+        let l4_table = accessor.l4_table_mut()?;
+        let entry = l4_table.read_entry(p4_idx);
+        if !entry.is_present() {
+            continue;
+        }
+
+        unsafe { cleanup_l3(p4_idx, accessor, dealloc)? };
+
+        let l4_table = accessor.l4_table_mut()?;
+        unsafe { l4_table.set_entry(p4_idx, PageTableEntry::empty()) };
+    }
+
+    Ok(())
+}
+
+/// Cleans up the given level 3 page table, unmapping all memory and freeing it if appropriate.
+pub unsafe fn cleanup_l3(
+    l4_idx: PageTableIndex,
+    accessor: &mut impl PagetableAccessor,
+    dealloc: &mut impl FullManager<FrameClass>,
+) -> Result<(), MemError> {
+    for idx in PageTableIndex::iter_all() {
+        let l3_table = accessor.l3_table_mut(l4_idx)?;
+        let entry = l3_table.read_entry(idx);
+        if !entry.is_present() {
+            continue;
+        }
+
+        if entry.is_huge() && entry.flags().contains(MapFlags::DEALLOCATE) {
+            let frame = Frame::<Large>::from_start_address(entry.addr()).unwrap();
+            dealloc.deallocate_fragment(frame);
+            continue;
+        }
+
+        unsafe { cleanup_l2(l4_idx, idx, accessor, dealloc)? };
+    }
+
+    let l4_table = accessor.l4_table_mut()?;
+    let l3_entry = l4_table.read_entry(l4_idx);
+    if l3_entry.flags().contains(MapFlags::DEALLOCATE) {
+        let frame = Frame::<Small>::from_start_address(l3_entry.addr()).unwrap();
+        dealloc.deallocate_fragment(frame);
+    }
+
+    Ok(())
+}
+
+/// Cleans up the given level 2 page table, unmapping all memory and freeing it if appropriate.
+pub unsafe fn cleanup_l2(
+    l4_idx: PageTableIndex,
+    l3_idx: PageTableIndex,
+    accessor: &mut impl PagetableAccessor,
+    dealloc: &mut impl FullManager<FrameClass>,
+) -> Result<(), MemError> {
+    for idx in PageTableIndex::iter_all() {
+        let l2_table = accessor.l2_table_mut(l4_idx, l3_idx)?;
+        let entry = l2_table.read_entry(idx);
+        if !entry.is_present() {
+            continue;
+        }
+
+        if entry.is_huge() && entry.flags().contains(MapFlags::DEALLOCATE) {
+            let frame = Frame::<Medium>::from_start_address(entry.addr()).unwrap();
+            dealloc.deallocate_fragment(frame);
+            continue;
+        }
+
+        unsafe { cleanup_l1(l4_idx, l3_idx, idx, accessor, dealloc)? };
+    }
+
+    let l3_table = accessor.l3_table_mut(l4_idx)?;
+    let l2_entry = l3_table.read_entry(l3_idx);
+    if l2_entry.flags().contains(MapFlags::DEALLOCATE) {
+        let frame = Frame::<Small>::from_start_address(l2_entry.addr()).unwrap();
+        dealloc.deallocate_fragment(frame);
+    }
+
+    Ok(())
+}
+
+/// Cleans up the given level 1 page table, unmapping all memory and freeing it if appropriate.
+pub unsafe fn cleanup_l1(
+    l4_idx: PageTableIndex,
+    l3_idx: PageTableIndex,
+    l2_idx: PageTableIndex,
+    accessor: &mut impl PagetableAccessor,
+    dealloc: &mut impl FullManager<FrameClass>,
+) -> Result<(), MemError> {
+    for idx in PageTableIndex::iter_all() {
+        let l1_table = accessor.l1_table_mut(l4_idx, l3_idx, l2_idx)?;
+        let entry = l1_table.read_entry(idx);
+        if !entry.is_present() {
+            continue;
+        }
+
+        if entry.flags().contains(MapFlags::DEALLOCATE) {
+            let frame = Frame::<Small>::from_start_address(entry.addr()).unwrap();
+            dealloc.deallocate_fragment(frame);
+        }
+    }
+
+    let l4_table = accessor.l2_table_mut(l4_idx, l3_idx)?;
+    let l3_entry = l4_table.read_entry(l2_idx);
+    if l3_entry.flags().contains(MapFlags::DEALLOCATE) {
+        let frame = Frame::<Small>::from_start_address(l3_entry.addr()).unwrap();
+        dealloc.deallocate_fragment(frame);
+    }
+
+    Ok(())
 }

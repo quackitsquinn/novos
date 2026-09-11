@@ -1,7 +1,7 @@
 //! Page index type.
 
 /// A index into a page table. This value will always be less than the current platform's page table entry count (512 for x86_64).
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub struct PageTableIndex(u16);
 
@@ -34,5 +34,37 @@ impl PageTableIndex {
     /// Returns the raw index value as a `u64`.
     pub const fn as_u64(self) -> u64 {
         self.0 as u64
+    }
+
+    /// Returns an iterator over the range of `PageTableIndex` values from `start` to `end`.
+    pub const fn iter_range(range: core::ops::Range<PageTableIndex>) -> PageIndexIter {
+        PageIndexIter {
+            current: range.start,
+            end: range.end,
+        }
+    }
+
+    /// Returns an iterator over all possible `PageTableIndex` values for the current architecture.
+    pub const fn iter_all() -> PageIndexIter {
+        Self::iter_range(PageTableIndex(0)..PageTableIndex(crate::arch::ENTRY_COUNT as u16))
+    }
+}
+
+pub struct PageIndexIter {
+    current: PageTableIndex,
+    end: PageTableIndex,
+}
+
+impl Iterator for PageIndexIter {
+    type Item = PageTableIndex;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.current < self.end {
+            let idx = self.current;
+            self.current = PageTableIndex(self.current.value() + 1);
+            Some(idx)
+        } else {
+            None
+        }
     }
 }
