@@ -86,6 +86,8 @@ pub(crate) unsafe fn init_kernel_services() {
     output::MODULE.init();
     requests::MODULE.init();
     panic::MODULE.init();
+    cake::init_rng();
+    memory::MODULE.init();
     gdt::MODULE.init();
     interrupts::MODULE.init();
     hardware::MODULE.init();
@@ -99,7 +101,6 @@ pub(crate) unsafe fn init_kernel_services() {
     // }
 
     // test_two_way_serial();
-    memory::MODULE.init();
     mp::PREINIT_MODULE.init();
     #[cfg(not(test))] // Tests don't have a display
     display::MODULE.init();
@@ -108,6 +109,10 @@ pub(crate) unsafe fn init_kernel_services() {
     pci::MODULE.init();
     //proc::MODULE.init();
     info!("Kernel services initialized");
+}
+
+fn init_cake() {
+    // cake::set_kernel_elf(requests::KERNEL_ELF.)
 }
 
 #[macro_export]

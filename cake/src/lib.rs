@@ -10,6 +10,7 @@ mod oncemut;
 mod oncerw;
 mod owned;
 mod resource;
+pub mod securand;
 pub mod trace;
 
 /* Crate Exports */
@@ -18,15 +19,15 @@ pub use self::limine_request::{
 };
 pub use fuse::Fuse;
 use kelp::Elf;
+pub use limine;
+pub use lock_api;
+pub use log;
 pub use module::KernelModule;
 pub use oncemut::{OnceMutex, OnceMutexGuard};
 pub use oncerw::{OnceRwLock, OnceRwReadGuard, OnceRwWriteGuard};
 pub use owned::Owned;
 pub use resource::{ResourceGuard, ResourceMutex};
-
-pub use limine;
-pub use lock_api;
-pub use log;
+pub use securand::{add_entropy_source, init_rng, rng, rng32, rng64};
 pub use spin::lock_api::*;
 pub use spin::{Barrier, Lazy, Once};
 /// A type alias for a mapped mutex guard.

@@ -24,6 +24,9 @@ static PAGING_MODE_REQUEST: PagingModeRequest =
 static EXECUTABLE_ADDRESS_REQUEST: ExecutableAddressRequest = ExecutableAddressRequest::new();
 #[used]
 static BASE_REVISION: BaseRevision = BaseRevision::with_revision(3);
+#[used]
+static DATE_AT_BOOT: DateAtBootRequest = DateAtBootRequest::new();
+static BOOT_TIMESTAMP: Once<u64> = Once::new();
 
 /// Physical memory offset provided by the bootloader
 pub static PHYSICAL_MEMORY_OFFSET: Once<u64> = Once::new();
@@ -84,6 +87,9 @@ fn init() -> Result<(), Infallible> {
     })
     .unwrap()
     .unwrap();
+
+    BOOT_TIMESTAMP.call_once(|| DATE_AT_BOOT.get_response().unwrap().timestamp().as_secs());
+    cake::add_entropy_source(|| Some(BOOT_TIMESTAMP.get().unwrap().clone()));
     Ok(())
 }
 
