@@ -295,7 +295,7 @@ pub unsafe fn cleanup_l4_range(
     for p4_idx in iter_range {
         let l4_table = accessor.l4_table_mut()?;
         let entry = l4_table.read_entry(p4_idx);
-        if !entry.is_present() {
+        if !entry.is_present() || entry.flags().contains(MapFlags::GLOBAL) {
             continue;
         }
 

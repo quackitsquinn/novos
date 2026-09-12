@@ -187,6 +187,9 @@ impl From<MapFlags> for PageTableFlags {
         if value.contains(MapFlags::DEALLOCATE) {
             flags = flags | Self::from_bits_retain(PTE_FREE_BIT0);
         }
+        if value.contains(MapFlags::GLOBAL) {
+            flags |= Self::GLOBAL;
+        }
         flags
     }
 }
@@ -221,6 +224,10 @@ impl From<PageTableFlags> for MapFlags {
 
         if value.bits() & PTE_FREE_BIT0 != 0 {
             flags |= MapFlags::DEALLOCATE;
+        }
+
+        if value.contains(PageTableFlags::GLOBAL) {
+            flags |= MapFlags::GLOBAL;
         }
         flags
     }

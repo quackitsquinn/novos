@@ -483,6 +483,8 @@ bitflags! {
         const CACHE_DISABLE = 1 << 4;
         /// Deallocate the physical memory backing this mapping when unmapping it
         const DEALLOCATE = 1 << 5;
+        /// Marks the page as global, meaning it is not flushed from the TLB on a context switch
+        const GLOBAL = 1 << 6;
     }
 }
 
