@@ -1,4 +1,4 @@
-#!/usr/bin/env python3.13
+#!/usr/bin/env python3
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
@@ -14,6 +14,7 @@ def update_nightly() -> Date:
     subprocess.check_call(["rustup", "update", "nightly"])
     output = subprocess.check_output(["rustc", "+nightly", "--version"]).decode("utf-8").strip()
     date = output.replace(")", "").split(" ")[3]
+    subprocess.check_call(["rustup", "target", "add", "x86_64-unknown-none"])
     print(f"Updating nightly version to {date}")
     return Date.fromisoformat(date)
 

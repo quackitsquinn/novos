@@ -3,7 +3,7 @@
     "rust-analyzer.check.allTargets": false,
     "rust-analyzer.cargo.targetDir": true,
     "rust-analyzer.check.overrideCommand": [
-        "python3.12",
+        "python3",
         "./tools/smart_check.py"
     ],
     "rust-analyzer.imports.preferNoStd": true
