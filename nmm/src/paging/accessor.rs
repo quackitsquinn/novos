@@ -6,7 +6,7 @@ use crate::{
     MapFlags, MemError, arch,
     paging::{
         Address, AddressExt, FragmentManager, FragmentSize, Frame, FullManager, Large, Medium,
-        MemoryFragment, Page, PageTable, PageTableEntry, PageTableIndex, Small, VirtAddr,
+        MemoryFragment, Page, PageTable, PageTableEntry, PageTableIndex, PhysAddr, Small, VirtAddr,
         map::Flush, primitives::FrameClass,
     },
 };
@@ -188,6 +188,16 @@ pub fn build_address(
     addr
 }
 
+/// Builds a virtual address from the given page table indices for each level of the page table hierarchy.
+pub fn build_vaddress(
+    l4_idx: PageTableIndex,
+    l3_idx: PageTableIndex,
+    l2_idx: PageTableIndex,
+    l1_idx: PageTableIndex,
+) -> VirtAddr {
+    VirtAddr::new(build_address(l4_idx, l3_idx, l2_idx, l1_idx))
+}
+
 /// Dissolves a virtual address into its constituent page table indices for each level of the page table hierarchy.
 ///
 /// This does not account for larger sized pages.
@@ -290,6 +300,7 @@ pub unsafe fn cleanup_l4_range(
     l4_range: core::ops::Range<PageTableIndex>,
     accessor: &mut impl PagetableAccessor,
     dealloc: &mut impl FullManager<FrameClass>,
+    should_traverse_globals: bool,
 ) -> Result<(), MemError> {
     let iter_range = PageTableIndex::iter_range(l4_range);
     for p4_idx in iter_range {
@@ -299,7 +310,7 @@ pub unsafe fn cleanup_l4_range(
             continue;
         }
 
-        unsafe { cleanup_l3(p4_idx, accessor, dealloc)? };
+        unsafe { cleanup_l3(p4_idx, accessor, dealloc, should_traverse_globals)? };
 
         let l4_table = accessor.l4_table_mut()?;
         unsafe { l4_table.set_entry(p4_idx, PageTableEntry::empty()) };
@@ -313,22 +324,21 @@ pub unsafe fn cleanup_l3(
     l4_idx: PageTableIndex,
     accessor: &mut impl PagetableAccessor,
     dealloc: &mut impl FullManager<FrameClass>,
+    should_traverse_globals: bool,
 ) -> Result<(), MemError> {
-    for idx in PageTableIndex::iter_all() {
-        let l3_table = accessor.l3_table_mut(l4_idx)?;
-        let entry = l3_table.read_entry(idx);
-        if !entry.is_present() {
-            continue;
-        }
-
-        if entry.is_huge() && entry.flags().contains(MapFlags::DEALLOCATE) {
-            let frame = Frame::<Large>::from_start_address(entry.addr()).unwrap();
-            dealloc.deallocate_fragment(frame);
-            continue;
-        }
-
-        unsafe { cleanup_l2(l4_idx, idx, accessor, dealloc)? };
-    }
+    let ctx = create_ctx(accessor, dealloc);
+    access_and_clear_table(
+        ctx,
+        |c| c.accessor.l3_table_mut(l4_idx).unwrap(),
+        |c, paddr| {
+            let frame = Frame::<Large>::from_start_address(paddr).unwrap();
+            c.dealloc.deallocate_fragment(frame);
+            Ok(())
+        },
+        |c, idx| unsafe { cleanup_l2(l4_idx, idx, c.accessor, c.dealloc, should_traverse_globals) },
+        should_traverse_globals,
+        true,
+    )?;
 
     let l4_table = accessor.l4_table_mut()?;
     let l3_entry = l4_table.read_entry(l4_idx);
@@ -346,22 +356,30 @@ pub unsafe fn cleanup_l2(
     l3_idx: PageTableIndex,
     accessor: &mut impl PagetableAccessor,
     dealloc: &mut impl FullManager<FrameClass>,
+    should_traverse_globals: bool,
 ) -> Result<(), MemError> {
-    for idx in PageTableIndex::iter_all() {
-        let l2_table = accessor.l2_table_mut(l4_idx, l3_idx)?;
-        let entry = l2_table.read_entry(idx);
-        if !entry.is_present() {
-            continue;
-        }
-
-        if entry.is_huge() && entry.flags().contains(MapFlags::DEALLOCATE) {
-            let frame = Frame::<Medium>::from_start_address(entry.addr()).unwrap();
-            dealloc.deallocate_fragment(frame);
-            continue;
-        }
-
-        unsafe { cleanup_l1(l4_idx, l3_idx, idx, accessor, dealloc)? };
-    }
+    let ctx = create_ctx(accessor, dealloc);
+    access_and_clear_table(
+        ctx,
+        |c| c.accessor.l2_table_mut(l4_idx, l3_idx).unwrap(),
+        |c, paddr| {
+            let frame = Frame::<Medium>::from_start_address(paddr).unwrap();
+            c.dealloc.deallocate_fragment(frame);
+            Ok(())
+        },
+        |c, idx| unsafe {
+            cleanup_l1(
+                l4_idx,
+                l3_idx,
+                idx,
+                c.accessor,
+                c.dealloc,
+                should_traverse_globals,
+            )
+        },
+        should_traverse_globals,
+        true,
+    )?;
 
     let l3_table = accessor.l3_table_mut(l4_idx)?;
     let l2_entry = l3_table.read_entry(l3_idx);
@@ -380,26 +398,87 @@ pub unsafe fn cleanup_l1(
     l2_idx: PageTableIndex,
     accessor: &mut impl PagetableAccessor,
     dealloc: &mut impl FullManager<FrameClass>,
+    should_traverse_globals: bool,
 ) -> Result<(), MemError> {
-    for idx in PageTableIndex::iter_all() {
-        let l1_table = accessor.l1_table_mut(l4_idx, l3_idx, l2_idx)?;
-        let entry = l1_table.read_entry(idx);
-        if !entry.is_present() {
-            continue;
-        }
+    let ctx = create_ctx(accessor, dealloc);
+    // TODO: This approach makes it so that `c`'s type is.. `&mut &mut &mut impl PTA`..
+    // I don't know if this will have any pref issues so benchmark in the future.
+    access_and_clear_table(
+        ctx,
+        |c| c.accessor.l1_table_mut(l4_idx, l3_idx, l2_idx).unwrap(),
+        |ctx, paddr| {
+            let frame = Frame::<Small>::from_start_address(paddr).unwrap();
+            ctx.dealloc.deallocate_fragment(frame);
+            Ok(())
+        },
+        |_, _| Ok(()),
+        false,
+        should_traverse_globals,
+    )?;
 
-        if entry.flags().contains(MapFlags::DEALLOCATE) {
-            let frame = Frame::<Small>::from_start_address(entry.addr()).unwrap();
-            dealloc.deallocate_fragment(frame);
-        }
-    }
-
-    let l4_table = accessor.l2_table_mut(l4_idx, l3_idx)?;
-    let l3_entry = l4_table.read_entry(l2_idx);
+    let l3_table = accessor.l3_table_mut(l4_idx)?;
+    let l3_entry = l3_table.read_entry(l3_idx);
     if l3_entry.flags().contains(MapFlags::DEALLOCATE) {
         let frame = Frame::<Small>::from_start_address(l3_entry.addr()).unwrap();
         dealloc.deallocate_fragment(frame);
     }
 
     Ok(())
+}
+
+fn access_and_clear_table<C>(
+    mut ctx: C,
+    mut read_table: impl FnMut(&mut C) -> &mut PageTable,
+    mut free: impl FnMut(&mut C, PhysAddr) -> Result<(), MemError>,
+    mut traverse: impl FnMut(&mut C, PageTableIndex) -> Result<(), MemError>,
+    should_traverse_globals: bool,
+    free_needs_huge: bool,
+) -> Result<(), MemError> {
+    let mut err = Ok(());
+    for idx in PageTableIndex::iter_all() {
+        let table = read_table(&mut ctx);
+        let entry = table.read_entry(idx);
+        if !entry.is_present() {
+            continue;
+        }
+
+        if entry.flags().contains(MapFlags::GLOBAL) && !should_traverse_globals {
+            err = Err(MemError::GlobalPageEncountered);
+            continue;
+        }
+
+        match traverse(&mut ctx, idx) {
+            Ok(_) => {}
+            Err(MemError::GlobalPageEncountered) => {
+                err = Err(MemError::GlobalPageEncountered);
+            }
+            Err(e) => {
+                return Err(e);
+            }
+        }
+
+        if !entry.flags().contains(MapFlags::DEALLOCATE) {
+            continue;
+        }
+
+        if free_needs_huge && !entry.is_huge() {
+            continue;
+        }
+
+        free(&mut ctx, entry.addr())?;
+    }
+
+    err
+}
+
+struct CleanupCtx<'a, T: PagetableAccessor, M: FullManager<FrameClass>> {
+    accessor: &'a mut T,
+    dealloc: &'a mut M,
+}
+
+fn create_ctx<'a, T: PagetableAccessor, M: FullManager<FrameClass>>(
+    accessor: &'a mut T,
+    dealloc: &'a mut M,
+) -> CleanupCtx<'a, T, M> {
+    CleanupCtx { accessor, dealloc }
 }

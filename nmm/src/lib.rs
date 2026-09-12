@@ -415,6 +415,11 @@ pub enum MemError {
         "The requested operation failed because the required page table is not present in memory."
     )]
     PagetableNotPresent,
+    /// The requested operation failed because a global page was encountered, which is not supported or disabled.
+    #[error(
+        "The requested operation failed because a global page was encountered, which is not supported or disabled."
+    )]
+    GlobalPageEncountered,
     /// An error that originated from architecture-specific operations in the memory manager.
     #[error("An architecture-specific error occurred during memory management operations: {0}")]
     ArchError(#[from] arch::ArchError),
