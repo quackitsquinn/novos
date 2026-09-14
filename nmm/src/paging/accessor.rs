@@ -7,7 +7,7 @@ use crate::{
     paging::{
         Address, AddressExt, FragmentManager, FragmentSize, Frame, FullManager, Large, Medium,
         MemoryFragment, Page, PageTable, PageTableEntry, PageTableIndex, PhysAddr, Small, VirtAddr,
-        map::Flush, primitives::FrameClass,
+        index::PageIndexIter, map::Flush, primitives::FrameClass,
     },
 };
 
@@ -297,20 +297,27 @@ pub fn find_free_parents_for<S: FragmentSize>(
 
 /// Cleans up the given range of level 4 page table entries, unmapping all memory and freeing it if appropriate.
 pub unsafe fn cleanup_l4_range(
-    l4_range: core::ops::Range<PageTableIndex>,
+    l4_range: PageIndexIter,
     accessor: &mut impl PagetableAccessor,
     dealloc: &mut impl FullManager<FrameClass>,
     should_traverse_globals: bool,
 ) -> Result<(), MemError> {
-    let iter_range = PageTableIndex::iter_range(l4_range);
-    for p4_idx in iter_range {
+    for p4_idx in l4_range {
         let l4_table = accessor.l4_table_mut()?;
         let entry = l4_table.read_entry(p4_idx);
         if !entry.is_present() || entry.flags().contains(MapFlags::GLOBAL) {
             continue;
         }
 
-        unsafe { cleanup_l3(p4_idx, accessor, dealloc, should_traverse_globals)? };
+        match unsafe { cleanup_l3(p4_idx, accessor, dealloc, should_traverse_globals) } {
+            Ok(()) => {}
+            Err(MemError::GlobalPageEncountered) => {
+                if !should_traverse_globals {
+                    continue;
+                }
+            }
+            Err(e) => return Err(e),
+        }
 
         let l4_table = accessor.l4_table_mut()?;
         unsafe { l4_table.set_entry(p4_idx, PageTableEntry::empty()) };

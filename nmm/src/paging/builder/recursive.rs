@@ -6,7 +6,9 @@ use crate::{
     map_with_operation,
     paging::{
         Address, AddressExt, FragmentManager, FragmentSize, Frame, MemoryFragment, Page, PageTable,
-        PageTableEntry, PhysAddr, Small, asm,
+        PageTableEntry, PageTableIndex, PhysAddr, Small,
+        accessor::cleanup_l4_range,
+        asm::{self, AddressSpace},
         map::{DataAllocator, Flush, MemoryMapper, PhysLinear, SizedMemoryMapper, Unmapped},
         operation::ZeroMemory,
     },
@@ -80,7 +82,17 @@ where
 impl<'a> Drop for RecursiveAddressSpaceBuilder<'a> {
     fn drop(&mut self) {
         let active_as = asm::active();
+        let mut pmm = asm::physical_memory_manager();
         let mut mapper = active_as.mapper.lock_inner_mapper();
+        unsafe {
+            cleanup_l4_range(
+                PageTableIndex::iter_range(arch::RECURSIVE_SLOT1..arch::RECURSIVE_SLOT1),
+                &mut *mapper,
+                &mut *pmm,
+                false,
+            )
+            .expect("RecursiveAddressSpaceBuilder::drop failed!");
+        }
         let current_pml4 = mapper.root_table_mut();
         unsafe { current_pml4.set_entry(arch::RECURSIVE_SLOT1, PageTableEntry::empty()) };
     }

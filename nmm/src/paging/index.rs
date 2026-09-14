@@ -6,6 +6,11 @@
 pub struct PageTableIndex(u16);
 
 impl PageTableIndex {
+    /// The minimum valid page table index (0).
+    pub const MIN: PageTableIndex = PageTableIndex(0);
+    /// The maximum valid page table index (ENTRY_COUNT - 1).
+    pub const MAX: PageTableIndex = PageTableIndex(crate::arch::ENTRY_COUNT as u16 - 1);
+
     /// Creates a new `PageTableIndex` from a raw value. The caller must ensure that the value is valid (i.e., less than the entry count for the current architecture).
     pub const unsafe fn new_unchecked(value: u16) -> Self {
         Self(value)
