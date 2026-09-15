@@ -3,7 +3,7 @@ use cake::log::{debug, info};
 use crate::{
     InitConfig, MapFlags, MemError, align,
     arch::{self, L1_PAGE_SIZE, pml4_phys, x86_64::mapper::Mapper},
-    bitmap::{PhysicalMemoryManager, VirtualMemoryManager},
+    bitmap::{BitmapBacking, PhysicalMemoryManager, VirtualMemoryManager},
     entry_walker::EntryWalker,
     paging::{
         Address, AddressExt, Frame, PageTable, Small,
@@ -82,7 +82,12 @@ pub(crate) unsafe fn init_unchecked(
     };
 
     info!("Initializing virtual memory manager with scratch space");
-    let mut vmm = unsafe { VirtualMemoryManager::init(entries, config.managed_range) };
+    let mut vmm = unsafe {
+        VirtualMemoryManager::init(
+            BitmapBacking::ManuallyManaged(entries),
+            config.managed_range,
+        )
+    };
     unsafe { vmm.mark_allocated(config.managed_range.start(), n_bytes) }
 
     info!("Initializing physical memory manager with scratch space");

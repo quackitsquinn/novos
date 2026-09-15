@@ -9,7 +9,7 @@ use cake::{limine::memory_map::EntryType, log::info};
 use crate::{
     MapFlags, MemError,
     bitmap::{
-        Bitmap, VirtualMemoryManager,
+        Bitmap, BitmapBacking, VirtualMemoryManager,
         managers::{
             address_as_bit_index, align_in_bits, alignment_of, bit_index_as_address,
             entries_for_bytes, n_pages_for_bytes,
@@ -128,7 +128,10 @@ impl PhysicalMemoryManager {
 
         Ok(BitmapEntry {
             start: range.start(),
-            bitmap: Bitmap::init(bitmap_slice, (bits % 64) as u8),
+            bitmap: Bitmap::init(
+                BitmapBacking::ManuallyManaged(bitmap_slice),
+                (bits % 64) as u8,
+            ),
             bit_alignment: align_in_bits(alignment_of(range.start())),
             free: range.size() / Small::SIZE,
         })

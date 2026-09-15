@@ -1,8 +1,10 @@
 use core::mem::Alignment;
-use core::ops::BitOr;
+use core::ops::{BitOr, Deref, DerefMut};
 
 use core::ops::{Index, IndexMut};
 use core::simd::{num::SimdUint, u64x4};
+
+use alloc::vec::Vec;
 
 mod allocate;
 mod bitptr;
@@ -11,14 +13,47 @@ pub use bitptr::BitPtr;
 pub use managers::phys::PhysicalMemoryManager;
 pub use managers::virt::VirtualMemoryManager;
 
+use crate::paging::heapless::HeaplessAllocator;
 use crate::test_println;
+
+/// The backing storage for a bitmap, which can either be manually
+/// managed (a mutable slice of u64 values) or owned
+/// (a vector of u64 values with a custom allocator).
+#[derive(Debug)]
+pub enum BitmapBacking<'a> {
+    /// A manually managed bitmap, represented by a mutable slice of u64 values.
+    /// The caller is responsible for ensuring that the slice remains valid for the lifetime of the bitmap.
+    ManuallyManaged(&'a mut [u64]),
+    /// An owned bitmap, represented by a vector of u64 values with a custom allocator.
+    Owned(Vec<u64, HeaplessAllocator>),
+}
+
+impl Deref for BitmapBacking<'_> {
+    type Target = [u64];
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            BitmapBacking::ManuallyManaged(slice) => slice,
+            BitmapBacking::Owned(vec) => vec.as_slice(),
+        }
+    }
+}
+
+impl DerefMut for BitmapBacking<'_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        match self {
+            BitmapBacking::ManuallyManaged(slice) => slice,
+            BitmapBacking::Owned(vec) => vec.as_mut_slice(),
+        }
+    }
+}
 
 /// A bitmap primitive for tracking the allocation status of pages in the memory manager.
 pub struct Bitmap<'a> {
     /// The number of bits in the bitmap, which corresponds to the number of pages it can manage.
     n_bits: u64,
     /// A pointer to the bitmap data, which is a slice of u64 values where each bit represents the allocation status of a page.
-    data: &'a mut [u64],
+    backing: BitmapBacking<'a>,
 }
 
 impl<'a> core::fmt::Debug for Bitmap<'a> {
@@ -32,26 +67,26 @@ impl<'a> core::fmt::Debug for Bitmap<'a> {
 impl<'a> Bitmap<'a> {
     /// Initializes a new bitmap with the given data slice and the number of bits in the last entry to use.
     ///
-    pub fn init(data: &'a mut [u64], remainder: u8) -> Self {
+    pub fn init(backing: BitmapBacking<'a>, remainder: u8) -> Self {
         assert!(
             remainder <= 64,
             "Remainder must be less than or equal to 64"
         );
-        let n_bits = (data.len() as u64 - 1) * 64 + remainder as u64;
+        let n_bits = (backing.len() as u64 - 1) * 64 + remainder as u64;
 
         debug_assert!(
-            n_bits <= data.len() as u64 * 64,
+            n_bits <= backing.len() as u64 * 64,
             "Number of bits exceeds capacity of data slice ({} bits available, but {} bits requested)",
-            data.len() as u64 * 64,
+            backing.len() as u64 * 64,
             n_bits
         );
 
         debug_assert!(
-            data.len() as u64 * 64 >= n_bits,
+            backing.len() as u64 * 64 >= n_bits,
             "Data slice is too small to hold the specified number of bits"
         );
 
-        Bitmap { n_bits, data }
+        Bitmap { n_bits, backing }
     }
 
     /// Returns a u64x4 SIMD vector containing 4 consecutive entries from the bitmap data, starting at the specified entry index.
@@ -60,7 +95,7 @@ impl<'a> Bitmap<'a> {
     pub(crate) fn get_vec(&self, entry: usize) -> u64x4 {
         let start = entry;
         let end = start + 4;
-        let slice = &self.data[start..end];
+        let slice = &self.backing[start..end];
         u64x4::from_slice(slice)
     }
 
@@ -68,13 +103,13 @@ impl<'a> Bitmap<'a> {
     pub(crate) fn set_vec(&mut self, entry: usize, vec: u64x4) {
         let start = entry;
         let end = start + 4;
-        let slice = &mut self.data[start..end];
+        let slice = &mut self.backing[start..end];
         vec.copy_to_slice(slice);
     }
 
     /// Returns an iterator over the bitmap data in chunks of 4 entries, yielding each chunk as a u64x4 SIMD vector.
     pub(crate) fn vec_chunks(&self) -> impl Iterator<Item = u64x4> {
-        self.data
+        self.backing
             .chunks_exact(4)
             .map(|chunk| u64x4::from_slice(chunk))
     }
@@ -85,7 +120,7 @@ impl<'a> Bitmap<'a> {
     pub(crate) fn aligned_entries(&self, align: Alignment) -> impl Iterator<Item = (usize, u64)> {
         let align = align.as_usize();
         let ent_skip = (align / 64).max(1);
-        self.data
+        self.backing
             .chunks(ent_skip)
             .enumerate()
             .map(move |(i, chunk)| (i * ent_skip, chunk[0]))
@@ -130,7 +165,7 @@ impl<'a> Bitmap<'a> {
 
     /// Resets the entire bitmap, clearing all bits and marking all pages as free.
     pub fn reset(&mut self) {
-        self.data.fill(0);
+        self.backing.fill(0);
     }
 
     /// Returns the number of bits in the bitmap, which corresponds to the number of pages it can manage.
@@ -160,11 +195,11 @@ impl<'a> Bitmap<'a> {
 
         if count < 64 || (bit_offset == 0 && count == 64) || (bit_offset == 0 && count <= 128) {
             match entry_mask(bit_offset, count) {
-                Ok(mask) => self.data[entry_index] = mask_op(self.data[entry_index], mask),
+                Ok(mask) => self.backing[entry_index] = mask_op(self.backing[entry_index], mask),
                 Err((mask, remaining)) => {
-                    self.data[entry_index] = mask_op(self.data[entry_index], mask);
-                    self.data[entry_index + 1] =
-                        mask_op(self.data[entry_index + 1], bit_run_mask(remaining));
+                    self.backing[entry_index] = mask_op(self.backing[entry_index], mask);
+                    self.backing[entry_index + 1] =
+                        mask_op(self.backing[entry_index + 1], bit_run_mask(remaining));
                 }
             }
             return;
@@ -196,8 +231,8 @@ impl<'a> Bitmap<'a> {
         };
         let end_entry = start_entry + needed_entries as usize;
 
-        self.data[start_entry] = mask_op(self.data[start_entry], start_mask);
-        self.data[end_entry] = mask_op(self.data[end_entry], end_mask);
+        self.backing[start_entry] = mask_op(self.backing[start_entry], start_mask);
+        self.backing[end_entry] = mask_op(self.backing[end_entry], end_mask);
 
         let full_start = start_entry + 1;
         let full_end = end_entry - 1;
@@ -238,7 +273,7 @@ impl<'a> Bitmap<'a> {
 
         while i <= full_end {
             test_println!("Fallback at entry {}", i);
-            self.data[i] = mask_op(self.data[i], u64::MAX);
+            self.backing[i] = mask_op(self.backing[i], u64::MAX);
             i += 1;
         }
     }
@@ -248,13 +283,13 @@ impl<'a> Index<usize> for Bitmap<'a> {
     type Output = u64;
 
     fn index(&self, index: usize) -> &Self::Output {
-        &self.data[index]
+        &self.backing[index]
     }
 }
 
 impl<'a> IndexMut<usize> for Bitmap<'a> {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        &mut self.data[index]
+        &mut self.backing[index]
     }
 }
 
@@ -297,7 +332,7 @@ pub const fn entry_mask(bit_offset: u8, size: u64) -> Result<u64, (u64, u64)> {
 mod tests {
     use std::simd::u64x4;
 
-    use crate::bitmap::BitPtr;
+    use crate::bitmap::{BitPtr, BitmapBacking};
 
     /// assert_eq but it prints the binary representation
     // implementation is mostly a copy and paste of assert_eq!, sans the internal panic message formatting.
@@ -356,7 +391,7 @@ mod tests {
         let mut data = [0u64; 64];
         data.iter_mut().enumerate().for_each(|(i, x)| *x = i as u64);
 
-        let bitmap = unsafe { super::Bitmap::init(&mut data, 64) };
+        let bitmap = unsafe { super::Bitmap::init(BitmapBacking::ManuallyManaged(&mut data), 64) };
 
         let vec = bitmap.get_vec(0);
         assert_eq!(vec, u64x4::from_array([0, 1, 2, 3]));
@@ -368,7 +403,8 @@ mod tests {
     #[test]
     fn test_set_vec() {
         let mut data = [0u64; 64];
-        let mut bitmap = unsafe { super::Bitmap::init(&mut data, 64) };
+        let mut bitmap =
+            unsafe { super::Bitmap::init(BitmapBacking::ManuallyManaged(&mut data), 64) };
 
         let val = u64x4::splat(u64::MAX);
         bitmap.set_vec(0, val);
@@ -380,7 +416,7 @@ mod tests {
         let mut data = [0u64; 64];
         data.iter_mut().enumerate().for_each(|(i, x)| *x = i as u64);
 
-        let bitmap = unsafe { super::Bitmap::init(&mut data, 64) };
+        let bitmap = unsafe { super::Bitmap::init(BitmapBacking::ManuallyManaged(&mut data), 64) };
 
         let mut chunks = bitmap.vec_chunks();
 
@@ -396,14 +432,14 @@ mod tests {
     #[test]
     fn test_first_clear() {
         let mut data = [0u64; 64];
-        let bitmap = unsafe { super::Bitmap::init(&mut data, 64) };
+        let bitmap = unsafe { super::Bitmap::init(BitmapBacking::ManuallyManaged(&mut data), 64) };
 
         assert_eq!(bitmap.first_clear(), Some(BitPtr::new(0, 0)));
 
-        bitmap.data[0] = u64::MAX;
+        bitmap.backing[0] = u64::MAX;
         assert_eq!(bitmap.first_clear(), Some(BitPtr::new(1, 0)));
 
-        for entry in bitmap.data.iter_mut() {
+        for entry in bitmap.backing.iter_mut() {
             *entry = u64::MAX;
         }
         assert_eq!(bitmap.first_clear(), None);
@@ -412,7 +448,8 @@ mod tests {
     #[test]
     fn test_set() {
         let mut data = [0u64; 64];
-        let mut bitmap = unsafe { super::Bitmap::init(&mut data, 64) };
+        let mut bitmap =
+            unsafe { super::Bitmap::init(BitmapBacking::ManuallyManaged(&mut data), 64) };
 
         macro_rules! case {
             ($entry_index:expr, $bit_offset:expr,  $count:expr, $blk:block) => {
@@ -423,58 +460,69 @@ mod tests {
         }
 
         case!(0, 0, 1, {
-            bit_assert_eq!(bitmap.data[0], 1);
-            assert!(bitmap.data[1..].iter().all(|&x| x == 0));
+            bit_assert_eq!(bitmap.backing[0], 1);
+            assert!(bitmap.backing[1..].iter().all(|&x| x == 0));
         });
 
         case!(0, 0, 64, {
-            bit_assert_eq!(bitmap.data[0], u64::MAX);
-            assert!(bitmap.data[1..].iter().all(|&x| x == 0));
+            bit_assert_eq!(bitmap.backing[0], u64::MAX);
+            assert!(bitmap.backing[1..].iter().all(|&x| x == 0));
         });
 
         case!(0, 1, 3, {
-            bit_assert_eq!(bitmap.data[0], 0b1110);
-            assert!(bitmap.data[1..].iter().all(|&x| x == 0));
+            bit_assert_eq!(bitmap.backing[0], 0b1110);
+            assert!(bitmap.backing[1..].iter().all(|&x| x == 0));
         });
 
         case!(0, 60, 5, {
-            bit_assert_eq!(bitmap.data[0], 0b1111 << 60);
-            bit_assert_eq!(bitmap.data[1], 0b1);
-            assert!(bitmap.data[2..].iter().all(|&x| x == 0));
+            bit_assert_eq!(bitmap.backing[0], 0b1111 << 60);
+            bit_assert_eq!(bitmap.backing[1], 0b1);
+            assert!(bitmap.backing[2..].iter().all(|&x| x == 0));
         });
 
         case!(1, 0, 128, {
-            bit_assert_eq!(bitmap.data[1], u64::MAX);
-            bit_assert_eq!(bitmap.data[2], u64::MAX);
-            assert!(bitmap.data[3..].iter().all(|&x| x == 0));
+            bit_assert_eq!(bitmap.backing[1], u64::MAX);
+            bit_assert_eq!(bitmap.backing[2], u64::MAX);
+            assert!(bitmap.backing[3..].iter().all(|&x| x == 0));
         });
 
         case!(2, 32, 64, {
-            bit_assert_eq!(bitmap.data[2], 0xFFFF_FFFF_0000_0000);
-            bit_assert_eq!(bitmap.data[3], 0x0000_0000_FFFF_FFFF);
-            assert!(bitmap.data[4..].iter().all(|&x| x == 0));
+            bit_assert_eq!(bitmap.backing[2], 0xFFFF_FFFF_0000_0000);
+            bit_assert_eq!(bitmap.backing[3], 0x0000_0000_FFFF_FFFF);
+            assert!(bitmap.backing[4..].iter().all(|&x| x == 0));
         });
 
         case!(0, 0, 64 * 64, {
             for i in 0..64 {
-                bit_assert_eq!(bitmap.data[i], u64::MAX, "Entry {} should be fully set", i);
+                bit_assert_eq!(
+                    bitmap.backing[i],
+                    u64::MAX,
+                    "Entry {} should be fully set",
+                    i
+                );
             }
         });
 
         case!(0, 32, 64 * 32, {
-            bit_assert_eq!(bitmap.data[0], 0xFFFF_FFFF_0000_0000);
+            bit_assert_eq!(bitmap.backing[0], 0xFFFF_FFFF_0000_0000);
             for i in 1..31 {
-                bit_assert_eq!(bitmap.data[i], u64::MAX, "Entry {} should be fully set", i);
+                bit_assert_eq!(
+                    bitmap.backing[i],
+                    u64::MAX,
+                    "Entry {} should be fully set",
+                    i
+                );
             }
-            bit_assert_eq!(bitmap.data[32], 0x0000_0000_FFFF_FFFF);
-            assert!(bitmap.data[33..].iter().all(|&x| x == 0));
+            bit_assert_eq!(bitmap.backing[32], 0x0000_0000_FFFF_FFFF);
+            assert!(bitmap.backing[33..].iter().all(|&x| x == 0));
         });
     }
 
     #[test]
     fn test_clear() {
         let mut data = [u64::MAX; 64];
-        let mut bitmap = unsafe { super::Bitmap::init(&mut data, 64) };
+        let mut bitmap =
+            unsafe { super::Bitmap::init(BitmapBacking::ManuallyManaged(&mut data), 64) };
 
         // Since 99% of the functionality of clear is shared with set, we don't need to retest all the same cases.
         // We just want to make a few sanity checks to make sure the mask operation is correctly clearing bits instead of setting them.
@@ -487,26 +535,26 @@ mod tests {
         }
 
         case!(0, 1, 3, {
-            bit_assert_eq!(bitmap.data[0], !0b1110);
-            assert!(bitmap.data[1..].iter().all(|&x| x == u64::MAX));
+            bit_assert_eq!(bitmap.backing[0], !0b1110);
+            assert!(bitmap.backing[1..].iter().all(|&x| x == u64::MAX));
         });
 
         case!(0, 0, 64, {
-            bit_assert_eq!(bitmap.data[0], 0);
-            assert!(bitmap.data[1..].iter().all(|&x| x == u64::MAX));
+            bit_assert_eq!(bitmap.backing[0], 0);
+            assert!(bitmap.backing[1..].iter().all(|&x| x == u64::MAX));
         });
 
         case!(0, 60, 5, {
-            bit_assert_eq!(bitmap.data[0], !(0b1111 << 60));
-            bit_assert_eq!(bitmap.data[1], !0b1);
-            assert!(bitmap.data[2..].iter().all(|&x| x == u64::MAX));
+            bit_assert_eq!(bitmap.backing[0], !(0b1111 << 60));
+            bit_assert_eq!(bitmap.backing[1], !0b1);
+            assert!(bitmap.backing[2..].iter().all(|&x| x == u64::MAX));
         });
 
         case!(0, 0, 32 * 64, {
             for i in 0..32 {
-                bit_assert_eq!(bitmap.data[i], 0);
+                bit_assert_eq!(bitmap.backing[i], 0);
             }
-            assert!(bitmap.data[32..].iter().all(|&x| x == u64::MAX));
+            assert!(bitmap.backing[32..].iter().all(|&x| x == u64::MAX));
         });
     }
 }

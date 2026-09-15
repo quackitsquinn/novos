@@ -3,7 +3,7 @@ use core::alloc::Layout;
 use crate::{
     MemError, arch,
     bitmap::{
-        Bitmap,
+        Bitmap, BitmapBacking,
         managers::{address_as_bit_index, align_in_bits, bit_index_as_address, n_pages_for_bytes},
     },
     paging::{Address, VirtAddr, primitives::MemoryRange},
@@ -27,7 +27,7 @@ impl<'a> VirtualMemoryManager<'a> {
     /// The size of the bitmap in bits is determined by the `size` parameter, which specifies the total size of the virtual address space to manage in bytes.
     ///
     ///
-    pub unsafe fn init(bitmap_data: &'a mut [u64], range: MemoryRange<VirtAddr>) -> Self {
+    pub unsafe fn init(bitmap_data: BitmapBacking<'a>, range: MemoryRange<VirtAddr>) -> Self {
         Self {
             bitmap: Bitmap::init(bitmap_data, (n_pages_for_bytes(range.size()) % 64) as u8),
             base_addr: range.start(),
@@ -102,7 +102,7 @@ impl<'a> VirtualMemoryManager<'a> {
     #[cfg(test)]
     fn dump_entries(&self) {
         const CHUNK_SIZE: usize = 8;
-        for (i, entries) in self.bitmap.data.chunks(CHUNK_SIZE).enumerate() {
+        for (i, entries) in self.bitmap.backing.chunks(CHUNK_SIZE).enumerate() {
             print!(
                 "entry {:04x}/{:04x}: ",
                 i * CHUNK_SIZE,
@@ -116,7 +116,7 @@ impl<'a> VirtualMemoryManager<'a> {
     }
     #[cfg(test)]
     fn check_zero(&self) {
-        for (i, entry) in self.bitmap.data.iter().enumerate() {
+        for (i, entry) in self.bitmap.backing.iter().enumerate() {
             assert_eq!(
                 *entry, 0,
                 "bitmap entry {} should be zero, but is {:064b}",
@@ -145,7 +145,7 @@ mod tests {
         let base_u64 = base.as_u64();
         let mut manager = unsafe {
             VirtualMemoryManager::init(
-                &mut bitmap_data,
+                BitmapBacking::ManuallyManaged(&mut bitmap_data),
                 MemoryRange::new_len(base, 0x1000 * (64 * CAP)),
             )
         };
