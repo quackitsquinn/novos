@@ -83,6 +83,11 @@ pub const trait Address: Primitive + [const] AddressMath {
     fn alignment(&self) -> Alignment {
         Alignment::new(1 << self.as_u64().trailing_zeros() as usize).unwrap()
     }
+
+    /// Returns a null address (i.e., an address with a value of 0).
+    fn null() -> Self {
+        unsafe { Self::new_unchecked(0) }
+    }
 }
 
 /// Non-const additions to `Address` types.

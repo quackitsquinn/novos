@@ -3,6 +3,7 @@ pub mod accessor;
 pub(crate) mod asm;
 pub mod builder;
 mod fragment;
+pub mod heapless;
 pub mod index;
 pub(crate) mod limine;
 pub mod map;
