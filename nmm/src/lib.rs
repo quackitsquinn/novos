@@ -11,11 +11,14 @@
 #![feature(impl_restriction)]
 #![feature(mut_restriction)]
 #![feature(min_adt_const_params)]
+#![feature(allocator_api)]
 
 use core::{
     alloc::Layout,
     fmt::{Debug, Display},
 };
+
+extern crate alloc;
 
 use bitflags::bitflags;
 use cake::{limine::memory_map, log::warn};

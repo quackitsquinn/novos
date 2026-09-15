@@ -2,153 +2,132 @@
 //!
 //! Be warned: every allocation has a footprint of at least `crate::arch::L1_PAGE_SIZE` bytes.
 
-use core::{
-    alloc::Layout,
-    ops::{Deref, DerefMut, Index, IndexMut},
-    ptr::{self, NonNull},
-};
+use core::alloc::Layout;
 
-use crate::{
-    MapFlags, MapSource, MemError, align, map,
-    paging::{Address, AddressExt, Page, Small, VirtAddr, map::GlobalMemoryProvider, map_from},
-    reserve_virtual, unmap,
-};
+use alloc::alloc::Allocator;
+use cake::log::error;
 
-/// A Page-backed vector type.
-#[derive(Debug, PartialEq, Eq)]
-pub struct PageVec<T> {
-    base: NonNull<T>,
-    len: usize,
-    cap: usize,
-    flags: Option<MapFlags>,
-    _marker: core::marker::PhantomData<T>,
-}
+use crate::{MapFlags, MapSource, align, paging::AddressExt};
 
-impl<T> PageVec<T> {
-    /// Creates a new, empty `PageVec` with the specified capacity.
-    pub fn new(flags: Option<MapFlags>) -> Self {
-        Self {
-            base: NonNull::dangling(),
-            len: 0,
-            cap: 0,
-            flags,
-            _marker: core::marker::PhantomData,
-        }
+/// A page backed allocator that does not require a heap to be initialized.
+/// This is useful for early bootstrapping of the memory manager, where we need to allocate memory before the heap is available.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HeaplessAllocator(MapFlags);
+
+impl HeaplessAllocator {
+    /// Creates a new `HeaplessAllocator` with the given `MapFlags`.
+    pub const fn new(flags: MapFlags) -> Self {
+        Self(flags)
     }
 
-    fn reallocate(&mut self) -> Result<(), MemError> {
-        let (old_layout, _) = layout_for::<T>(self.cap);
-        let (layout, cap) = layout_for::<T>(self.cap + 1);
-        let range = reserve_virtual(layout)?;
-        let flags = self.flags.unwrap_or(MapFlags::empty()) | MapFlags::WRITABLE;
-        map(range, MapSource::Anon { zero: false }, layout.size(), flags)?;
-        // SAFETY: The range is valid for `layout.size()` bytes, which is enough to hold `cap` elements of type `T`.
-        unsafe { ptr::copy_nonoverlapping(self.as_ptr(), range.as_mut_ptr(), self.len) };
-        // SAFETY: We construct the layout the exact same way as we did for the allocation, so it is guaranteed to be the same.
+    fn reallocate_fallback(
+        &self,
+        ptr: core::ptr::NonNull<u8>,
+        old_layout: Layout,
+        new_layout: Layout,
+    ) -> Result<core::ptr::NonNull<[u8]>, alloc::alloc::AllocError> {
+        let new_ptr = self.allocate(new_layout)?;
         unsafe {
-            crate::unmap(
-                VirtAddr::from_mut_ptr(self.as_mut_ptr()).unwrap(),
+            core::ptr::copy_nonoverlapping(
+                ptr.as_ptr(),
+                new_ptr.cast::<u8>().as_ptr(),
                 old_layout.size(),
-            )?;
+            );
+            self.deallocate(ptr, old_layout);
         }
-
-        self.cap = cap;
-        self.base =
-            NonNull::new(range.as_mut_ptr()).expect("Failed to create NonNull pointer for PageVec");
-
-        Ok(())
-    }
-
-    fn as_slice(&self) -> &[T] {
-        // SAFETY: If `base` is dangling, then `len` is 0, and this will return an empty slice. Otherwise, `base` is valid for `len` elements.
-        unsafe { core::slice::from_raw_parts(self.base.as_ptr(), self.len) }
-    }
-
-    fn as_mut_slice(&mut self) -> &mut [T] {
-        // SAFETY: If `base` is dangling, then `len` is 0, and this will return an empty slice. Otherwise, `base` is valid for `len` elements.
-        unsafe { core::slice::from_raw_parts_mut(self.base.as_ptr(), self.len) }
-    }
-
-    /// Pushes a value onto the end of the `PageVec`, reallocating if necessary.
-    pub fn push(&mut self, value: T) -> Result<(), MemError> {
-        if self.len == self.cap {
-            self.reallocate()?;
-        }
-        // SAFETY: `self.len < self.cap`, so `self.base` is valid for `self.len + 1` elements.
-        unsafe { ptr::write(self.base.as_ptr().add(self.len), value) };
-        self.len += 1;
-        Ok(())
-    }
-
-    /// Pops a value off the end of the `PageVec`, returning `None` if the `PageVec` is empty.
-    pub fn pop(&mut self) -> Option<T> {
-        if self.len == 0 {
-            None
-        } else {
-            self.len -= 1;
-            // SAFETY: `self.len < self.cap`, so `self.base` is valid for `self.len + 1` elements.
-            Some(unsafe { ptr::read(self.base.as_ptr().add(self.len)) })
-        }
+        Ok(new_ptr)
     }
 }
 
-impl<T> Index<usize> for PageVec<T> {
-    type Output = T;
+unsafe impl Allocator for HeaplessAllocator {
+    fn allocate(
+        &self,
+        layout: core::alloc::Layout,
+    ) -> Result<core::ptr::NonNull<[u8]>, alloc::alloc::AllocError> {
+        let layout = create_page_layout(layout);
+        let vbase = crate::reserve_virtual(layout).map_err(|_| alloc::alloc::AllocError)?;
 
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.as_slice()[index]
-    }
-}
-
-impl<T> IndexMut<usize> for PageVec<T> {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        &mut self.as_mut_slice()[index]
-    }
-}
-
-impl<T> Deref for PageVec<T> {
-    type Target = [T];
-
-    fn deref(&self) -> &Self::Target {
-        self.as_slice()
-    }
-}
-
-impl<T> DerefMut for PageVec<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.as_mut_slice()
-    }
-}
-
-impl<T> Drop for PageVec<T> {
-    fn drop(&mut self) {
-        // SAFETY: `self.base` is valid for `self.len` elements.
-        unsafe { ptr::drop_in_place(self.as_mut_slice()) };
-        if self.cap > 0 {
-            let (layout, _) = layout_for::<T>(self.cap);
-            unsafe {
-                crate::unmap(
-                    VirtAddr::from_mut_ptr(self.as_mut_ptr()).unwrap(),
-                    layout.size(),
-                )
+        if let Err(e) = crate::map(
+            vbase,
+            MapSource::Anon { zero: false },
+            layout.size(),
+            self.0,
+        ) {
+            // SAFETY: We just reserved this virtual memory, so it is safe to free it.
+            error!(
+                "Failed to map virtual memory for heapless allocator: {:?}",
+                e
+            );
+            if let Err(e) = unsafe { crate::free_virtual(vbase, layout) } {
+                error!(
+                    "Failed to free virtual memory for heapless allocator: {:?}",
+                    e
+                );
             }
-            .expect("Failed to unmap PageVec memory");
+            return Err(alloc::alloc::AllocError);
         }
+
+        let ptr = vbase.as_mut_ptr::<u8>();
+        let slice = core::ptr::slice_from_raw_parts_mut(ptr, layout.size());
+        Ok(core::ptr::NonNull::new(slice).unwrap())
+    }
+
+    unsafe fn deallocate(&self, ptr: core::ptr::NonNull<u8>, layout: core::alloc::Layout) {
+        let layout = create_page_layout(layout);
+        let vbase = crate::VirtAddr::from_ptr(ptr.as_ptr()).unwrap();
+        // SAFETY: Upheld by the caller
+        if let Err(e) = unsafe { crate::unmap(vbase, layout.size()) } {
+            error!(
+                "Failed to unmap virtual memory for heapless allocator: {:?}",
+                e
+            );
+        }
+    }
+
+    unsafe fn grow(
+        &self,
+        ptr: core::ptr::NonNull<u8>,
+        old_layout: Layout,
+        new_layout: Layout,
+    ) -> Result<core::ptr::NonNull<[u8]>, alloc::alloc::AllocError> {
+        let old_pl = create_page_layout(old_layout);
+        let new_pl = create_page_layout(new_layout);
+
+        if new_pl.size() <= old_pl.size() {
+            return Ok(core::ptr::NonNull::new(core::ptr::slice_from_raw_parts_mut(
+                ptr.as_ptr(),
+                new_pl.size(),
+            ))
+            .unwrap());
+        }
+
+        self.reallocate_fallback(ptr, old_layout, new_layout)
+    }
+
+    unsafe fn shrink(
+        &self,
+        ptr: core::ptr::NonNull<u8>,
+        old_layout: Layout,
+        new_layout: Layout,
+    ) -> Result<core::ptr::NonNull<[u8]>, alloc::alloc::AllocError> {
+        let old_pl = create_page_layout(old_layout);
+        let new_pl = create_page_layout(new_layout);
+
+        if new_pl.size() >= old_pl.size() {
+            return Ok(core::ptr::NonNull::new(core::ptr::slice_from_raw_parts_mut(
+                ptr.as_ptr(),
+                new_pl.size(),
+            ))
+            .unwrap());
+        }
+
+        self.reallocate_fallback(ptr, old_layout, new_layout)
     }
 }
 
-fn layout_for<T>(len: usize) -> (Layout, usize) {
-    let layout = Layout::array::<T>(len).expect("Layout overflow");
-    let aligned_size = align!(up, layout.size(), crate::arch::L1_PAGE_SIZE as usize);
-    let aligned_align = align!(up, layout.align(), crate::arch::L1_PAGE_SIZE as usize);
-    let size = core::mem::size_of::<T>();
+fn create_page_layout(layout: Layout) -> Layout {
+    let size_pages = align!(up, layout.size(), crate::arch::L1_PAGE_SIZE as usize);
+    let align_pages = usize::max(layout.align(), crate::arch::L1_PAGE_SIZE as usize);
 
-    let aligned_layout =
-        Layout::from_size_align(aligned_size, aligned_align).expect("Aligned layout overflow");
-    let cap = if size != 0 {
-        aligned_size / size
-    } else {
-        usize::MAX
-    };
-    (aligned_layout, cap)
+    Layout::from_size_align(size_pages, align_pages).unwrap()
 }

@@ -177,7 +177,13 @@ pub(crate) unsafe fn map_unchecked(
                     &mut DataAllocator(&mut GlobalMemoryProvider),
                 );
             } else {
-                return map_with_operation(dest, src, byte_size, flags, ZeroMemory);
+                return map_with_operation(
+                    dest,
+                    src,
+                    byte_size,
+                    flags | MapFlags::DEALLOCATE,
+                    ZeroMemory,
+                );
             }
         },
     }
