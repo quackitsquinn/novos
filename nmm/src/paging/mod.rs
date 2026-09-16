@@ -203,7 +203,7 @@ pub(crate) unsafe fn unmap_unchecked(
     {
         let mut ent = unsafe { unmap_primitive(page)? };
         ent.flush();
-        let mut pmm = asm::physical_memory_manager();
+        let mut pmm = asm::pmm();
         if ent.flags.contains(MapFlags::DEALLOCATE) {
             pmm.deallocate_fragment(ent.frame);
         }
@@ -261,7 +261,7 @@ pub unsafe fn map_with_operation_unchecked(
                     dest,
                     byte_size as u64,
                     flags,
-                    &mut PhysLinear(phys_base, &mut *asm::physical_memory_manager()),
+                    &mut PhysLinear(phys_base, &mut *asm::pmm()),
                 )
             }
         }
@@ -278,7 +278,7 @@ pub unsafe fn map_with_operation_unchecked(
                     dest,
                     byte_size as u64,
                     flags | MapFlags::DEALLOCATE,
-                    &mut DataAllocator(&mut *asm::physical_memory_manager()),
+                    &mut DataAllocator(&mut *asm::pmm()),
                 );
             } else {
                 let as_guard = asm::active();
@@ -287,7 +287,7 @@ pub unsafe fn map_with_operation_unchecked(
                     dest,
                     byte_size as u64,
                     flags,
-                    &mut DataAllocator(&mut *asm::physical_memory_manager()),
+                    &mut DataAllocator(&mut *asm::pmm()),
                     Chain(ZeroMemory, operation),
                 );
             }

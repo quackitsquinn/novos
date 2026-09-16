@@ -126,21 +126,21 @@ impl<S: FragmentSize> MemoryProvider<S> for GlobalMemoryProvider {
     where
         Mapper: SizedMemoryMapper<S>,
     {
-        asm::physical_memory_manager().allocate_fragment()
+        asm::pmm().allocate_fragment()
     }
 
     fn allocate_table(&mut self) -> Result<Frame<Small>, MemError> {
-        asm::physical_memory_manager().allocate_fragment()
+        asm::pmm().allocate_fragment()
     }
 }
 
 unsafe impl<S: FragmentSize> FragmentManager<Frame<S>, S> for GlobalMemoryProvider {
     fn allocate_fragment(&mut self) -> Result<Frame<S>, MemError> {
-        asm::physical_memory_manager().allocate_fragment()
+        asm::pmm().allocate_fragment()
     }
 
     fn deallocate_fragment(&mut self, primitive: Frame<S>) {
-        asm::physical_memory_manager().deallocate_fragment(primitive)
+        asm::pmm().deallocate_fragment(primitive)
     }
 }
 

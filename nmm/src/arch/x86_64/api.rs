@@ -48,7 +48,7 @@ pub(crate) unsafe fn init_unchecked(
     // This is necessary to perform any virtual memory operations, including mapping the scratch space.
     let mapper = unsafe { Mapper::new_offset(root, config.offset) };
     unsafe {
-        asm::set_active(AddressSpace::without_vmm(mapper, cr3, config.zero_page));
+        asm::set_active(AddressSpace::new(mapper, cr3, config.zero_page));
     };
 
     info!("Found {} bytes of usable memory", walker.usable_memory());
@@ -94,11 +94,8 @@ pub(crate) unsafe fn init_unchecked(
     let pmm = unsafe { PhysicalMemoryManager::init(walker, &mut vmm)? };
     info!("Physical memory manager initialized successfully");
 
-    {
-        let ads = asm::active();
-        ads.set_vmm(vmm);
-    }
-    asm::set_physical_memory_manager(pmm);
+    asm::set_vmm(vmm);
+    asm::set_pmm(pmm);
 
     info!("Memory manager initialized successfully");
     //Err(MemError::Uninit("todo"))

@@ -17,6 +17,8 @@ use crate::{
 };
 
 static ADDRESS_SPACE: OnceRwLock<AddressSpace> = OnceRwLock::new();
+static VIRTUAL_MEMORY_MANAGER: OnceMutex<VirtualMemoryManager<'static>> =
+    OnceMutex::uninitialized();
 static PHYSICAL_MEMORY_MANAGER: OnceMutex<PhysicalMemoryManager> = OnceMutex::uninitialized();
 
 pub(crate) struct AddressSpace {
@@ -24,7 +26,6 @@ pub(crate) struct AddressSpace {
     pub mut(crate) l4_table_frame: Frame<Small>,
     pub mut(crate) l4_table: Page<Small>,
     pub mut(crate) scratch_page: Page<Large>,
-    vmm: Mutex<Option<VirtualMemoryManager<'static>>>,
 }
 
 impl AddressSpace {
@@ -32,15 +33,13 @@ impl AddressSpace {
         mapper: arch::Mapper,
         l4_table_frame: Frame<Small>,
         scratch_page: Page<Large>,
-        l4_table: Page<Small>,
-        vmm: Option<VirtualMemoryManager<'static>>,
     ) -> Self {
+        let l4_table = mapper.root_table().as_page();
         Self {
             mapper: LocalMemoryMapper::new(mapper),
             l4_table_frame,
             scratch_page,
             l4_table,
-            vmm: Mutex::new(vmm),
         }
     }
 
@@ -55,7 +54,6 @@ impl AddressSpace {
             l4_table_frame,
             l4_table,
             scratch_page,
-            vmm: Mutex::new(None),
         }
     }
 
@@ -65,16 +63,6 @@ impl AddressSpace {
         } else {
             None
         }
-    }
-
-    pub(crate) fn vmm(&self) -> Option<MappedMutexGuard<'_, VirtualMemoryManager<'static>>> {
-        MutexGuard::try_map(self.vmm.lock(), |vmm| vmm.as_mut()).ok()
-    }
-
-    /// Sets the virtual memory manager for this address space. This function should only be called once during system initialization.
-    pub(crate) fn set_vmm(&self, vmm: VirtualMemoryManager<'static>) {
-        let mut vmm_guard = self.vmm.lock();
-        *vmm_guard = Some(vmm);
     }
 }
 
@@ -92,7 +80,7 @@ pub(crate) unsafe fn set_active(new_space: AddressSpace) {
 
 /// Sets the global physical memory manager. This function should only be called once during system initialization.
 /// Returns true if the physical memory manager was successfully set, false if it was already set.
-pub(crate) fn set_physical_memory_manager(pmm: PhysicalMemoryManager) -> bool {
+pub(crate) fn set_pmm(pmm: PhysicalMemoryManager) -> bool {
     let mut pmm = Some(pmm);
     PHYSICAL_MEMORY_MANAGER.call_init(|| pmm.take().unwrap());
     pmm.is_none()
@@ -102,8 +90,20 @@ pub(crate) fn active() -> OnceRwReadGuard<'static, AddressSpace> {
     ADDRESS_SPACE.read()
 }
 
-pub(crate) fn physical_memory_manager() -> OnceMutexGuard<'static, PhysicalMemoryManager> {
+pub(crate) fn pmm() -> OnceMutexGuard<'static, PhysicalMemoryManager> {
     PHYSICAL_MEMORY_MANAGER.get()
+}
+
+pub(crate) fn set_vmm(vmm: VirtualMemoryManager<'static>) -> bool {
+    let mut vmm = Some(vmm);
+    VIRTUAL_MEMORY_MANAGER.call_init(|| vmm.take().unwrap());
+    vmm.is_none()
+}
+
+pub(crate) fn vmm() -> Result<OnceMutexGuard<'static, VirtualMemoryManager<'static>>, MemError> {
+    VIRTUAL_MEMORY_MANAGER
+        .try_get()
+        .ok_or(MemError::Uninit("virtual memory manager"))
 }
 
 /// Zeros out the given frame by mapping it to a known V.A. and writing zeros to it.
@@ -146,7 +146,7 @@ where
         let active_as = active();
         let dst = unsafe { transmute::<Page<Large>, Page<S>>(active_as.scratch_page) };
         let mut mapper = active_as.mapper().ok_or(MemError::Uninit("mapper"))?;
-        let mut pmm = physical_memory_manager();
+        let mut pmm = pmm();
 
         mapper.map_primitive(dst, src, flags, &mut *pmm)?.flush();
         dst

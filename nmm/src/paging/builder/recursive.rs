@@ -82,7 +82,7 @@ where
 impl<'a> Drop for RecursiveAddressSpaceBuilder<'a> {
     fn drop(&mut self) {
         let active_as = asm::active();
-        let mut pmm = asm::physical_memory_manager();
+        let mut pmm = asm::pmm();
         let mut mapper = active_as.mapper.lock_inner_mapper();
         unsafe {
             cleanup_l3(arch::RECURSIVE_SLOT1, &mut *mapper, &mut *pmm, false)

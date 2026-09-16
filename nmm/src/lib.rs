@@ -214,12 +214,7 @@ pub fn reserve_virtual(layout: Layout) -> Result<VirtAddr, MemError> {
         return Err(MemError::OutOfMemory);
     }
 
-    let c_as = asm::active();
-    let mut vmm_guard = c_as.vmm();
-    let vmm = vmm_guard
-        .as_mut()
-        .ok_or(MemError::Uninit("virtual memory manager"))?;
-
+    let mut vmm = asm::vmm()?;
     vmm.allocate(layout).ok_or(MemError::OutOfMemory)
 }
 
@@ -232,12 +227,7 @@ pub fn reserve_virtual(layout: Layout) -> Result<VirtAddr, MemError> {
 pub unsafe fn free_virtual(virt_base: VirtAddr, layout: Layout) -> Result<(), MemError> {
     check_range_virt(virt_base, layout.size())?;
 
-    let c_as = asm::active();
-    let mut vmm_guard = c_as.vmm();
-    let vmm = vmm_guard
-        .as_mut()
-        .ok_or(MemError::Uninit("virtual memory manager"))?;
-
+    let mut vmm = asm::vmm()?;
     // SAFETY: Guaranteed by caller.
     unsafe { vmm.deallocate(virt_base, layout) };
 
@@ -246,14 +236,14 @@ pub unsafe fn free_virtual(virt_base: VirtAddr, layout: Layout) -> Result<(), Me
 
 /// Reserves a physical frame of the specified size and returns it to the caller.
 pub fn reserve_frame<S: FragmentSize>() -> Result<Frame<S>, MemError> {
-    let mut pmm = asm::physical_memory_manager();
+    let mut pmm = asm::pmm();
 
     pmm.allocate_fragment()
 }
 
 /// Frees a physical frame that was previously reserved with `reserve_frame`.
 pub fn free_frame<S: FragmentSize>(frame: Frame<S>) {
-    let mut pmm = asm::physical_memory_manager();
+    let mut pmm = asm::pmm();
 
     pmm.deallocate_fragment(frame);
 }
