@@ -1,9 +1,12 @@
 //! Architecture-specific types and implementations for the memory manager.
 #[cfg(feature = "x86_64")]
 pub mod x86_64;
+use core::range::Range;
+
 #[cfg(feature = "x86_64")]
 use x86_64 as arch_impl;
 
+use crate::paging::PageTableIndex;
 use crate::paging::VirtAddr;
 
 /// Page table entry type for the current architecture.
@@ -59,8 +62,13 @@ pub(crate) use arch_impl::pml4_phys;
 
 pub(crate) use arch_impl::RecursivePageTable;
 
-pub use arch_impl::RECURSIVE_SLOT0;
-pub use arch_impl::RECURSIVE_SLOT1;
+pub use arch_impl::RECURSIVE_SLOTS;
+
+pub const RECURSIVE_SLOT0: PageTableIndex = arch_impl::RECURSIVE_SLOTS.start;
+pub const USEABLE_RECURSIVE_SLOTS: Range<PageTableIndex> = Range {
+    start: PageTableIndex::new(RECURSIVE_SLOT0.value() + 1),
+    end: RECURSIVE_SLOTS.end,
+};
 
 pub(crate) use arch_impl::set_root_table;
 

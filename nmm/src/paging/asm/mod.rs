@@ -9,11 +9,11 @@ use cake::{
 
 use crate::{
     MapFlags, MemError,
-    arch::{self, Mapper, x86_64::RECURSIVE_SLOT0},
+    arch::{self, Mapper, RECURSIVE_SLOT0},
     bitmap::{PhysicalMemoryManager, VirtualMemoryManager},
     paging::{
-        Address, AddressExt, FragmentSize, Frame, Large, MemoryFragment, Page, PageTable, Small,
-        accessor,
+        Address, AddressExt, FragmentSize, Frame, Large, MemoryFragment, Page, PageTable,
+        PageTableIndex, RecursiveEntryManager, Small, accessor,
         map::{LocalMemoryMapper, MapperMut, MemoryMapper, SizedMemoryMapper},
     },
 };
@@ -32,6 +32,7 @@ pub(crate) struct AddressSpace {
     pub mut(crate) l4_table_frame: Frame<Small>,
     pub mut(crate) l4_table: Page<Small>,
     pub mut(crate) scratch_page: Page<Large>,
+    rem: RecursiveEntryManager,
 }
 
 impl AddressSpace {
@@ -46,6 +47,7 @@ impl AddressSpace {
             l4_table_frame,
             scratch_page,
             l4_table,
+            rem: RecursiveEntryManager::default(),
         }
     }
 
@@ -60,6 +62,7 @@ impl AddressSpace {
             l4_table_frame,
             l4_table,
             scratch_page,
+            rem: RecursiveEntryManager::default(),
         }
     }
 
@@ -110,6 +113,20 @@ pub(crate) fn vmm() -> Result<OnceMutexGuard<'static, VirtualMemoryManager<'stat
     VIRTUAL_MEMORY_MANAGER
         .try_get()
         .ok_or(MemError::Uninit("virtual memory manager"))
+}
+
+pub(crate) fn reserve_recursive_slot() -> Result<PageTableIndex, MemError> {
+    let mut aspace = ADDRESS_SPACE.write();
+    aspace
+        .rem
+        .reserve()
+        .ok_or(MemError::Other("no recursive slots available"))
+}
+
+pub(crate) unsafe fn release_recursive_slot(idx: PageTableIndex) -> Result<(), MemError> {
+    let mut aspace = ADDRESS_SPACE.write();
+    unsafe { aspace.rem.release(idx) };
+    Ok(())
 }
 
 pub(crate) fn activate_inactive_space(

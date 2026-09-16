@@ -6,6 +6,8 @@ mod mapper;
 mod offset;
 mod recursive;
 
+use core::range::Range;
+
 use arrayvec::ArrayVec;
 use cfg_if::cfg_if;
 pub use mapper::Mapper;
@@ -161,9 +163,10 @@ pub(crate) unsafe fn set_root_table(frame: Frame<Small>) {
 pub const PTE_FREE_BIT0: u64 = 1 << 9;
 
 /// The first slot in the pml4 table that is reserved for recursive mapping, specifically reserved for mapping of the current address space.
-pub const RECURSIVE_SLOT0: PageTableIndex = PageTableIndex::new(510);
-/// The second slot in the pml4 table that is reserved for recursive mapping, specifically reserved for building new address spaces.
-pub const RECURSIVE_SLOT1: PageTableIndex = PageTableIndex::new(511);
+pub const RECURSIVE_SLOTS: Range<PageTableIndex> = Range {
+    start: PageTableIndex::new(507),
+    end: PageTableIndex::new(511),
+};
 
 cake::encapsulate_macro!(
     impl_memory_mapper_for,
