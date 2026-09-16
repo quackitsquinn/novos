@@ -174,7 +174,7 @@ impl TablePointer {
 }
 
 /// Builds a virtual address from the given page table indices for each level of the page table hierarchy.
-pub fn build_address(
+pub const fn build_address(
     l4_idx: PageTableIndex,
     l3_idx: PageTableIndex,
     l2_idx: PageTableIndex,
@@ -189,19 +189,19 @@ pub fn build_address(
 }
 
 /// Builds a virtual address from the given page table indices for each level of the page table hierarchy.
-pub fn build_vaddress(
+pub const fn build_vaddress(
     l4_idx: PageTableIndex,
     l3_idx: PageTableIndex,
     l2_idx: PageTableIndex,
     l1_idx: PageTableIndex,
 ) -> VirtAddr {
-    VirtAddr::new(build_address(l4_idx, l3_idx, l2_idx, l1_idx))
+    VirtAddr::new_truncate(build_address(l4_idx, l3_idx, l2_idx, l1_idx))
 }
 
 /// Dissolves a virtual address into its constituent page table indices for each level of the page table hierarchy.
 ///
 /// This does not account for larger sized pages.
-pub fn dissolve_address(
+pub const fn dissolve_address(
     addr: VirtAddr,
 ) -> (
     PageTableIndex,

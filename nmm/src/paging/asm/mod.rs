@@ -4,17 +4,23 @@ use core::mem::transmute;
 
 use cake::{
     MappedMutexGuard, Mutex, MutexGuard, OnceMutex, OnceMutexGuard, OnceRwLock, OnceRwReadGuard,
+    log::info,
 };
 
 use crate::{
     MapFlags, MemError,
-    arch::{self},
+    arch::{self, Mapper, x86_64::RECURSIVE_SLOT0},
     bitmap::{PhysicalMemoryManager, VirtualMemoryManager},
     paging::{
-        AddressExt, FragmentSize, Frame, Large, MemoryFragment, Page, Small,
+        Address, AddressExt, FragmentSize, Frame, Large, MemoryFragment, Page, PageTable, Small,
+        accessor,
         map::{LocalMemoryMapper, MapperMut, MemoryMapper, SizedMemoryMapper},
     },
 };
+
+mod inactive;
+
+pub use inactive::InactiveAddressSpace;
 
 static ADDRESS_SPACE: OnceRwLock<AddressSpace> = OnceRwLock::new();
 static VIRTUAL_MEMORY_MANAGER: OnceMutex<VirtualMemoryManager<'static>> =
@@ -104,6 +110,52 @@ pub(crate) fn vmm() -> Result<OnceMutexGuard<'static, VirtualMemoryManager<'stat
     VIRTUAL_MEMORY_MANAGER
         .try_get()
         .ok_or(MemError::Uninit("virtual memory manager"))
+}
+
+pub(crate) fn activate_inactive_space(
+    space: inactive::InactiveAddressSpace,
+) -> Result<(), MemError> {
+    let (mapper, needs_activate) = match space.bootstrap_hhdm_offset {
+        Some(hhdm_offset) => {
+            let pml4_page = space
+                .l4_table_frame
+                .translate_offset(hhdm_offset)
+                .ok_or(MemError::Other("translation out of range"))?;
+            let pml4 = unsafe { &mut *(pml4_page.as_mut_ptr::<PageTable>()) };
+            let mapper = unsafe { Mapper::new_offset(pml4, hhdm_offset) };
+            (mapper, false) // HHDM is only supported during bootstrap, where the kernel will switch to a recursive model as soon as possible. So this is already the active address space.
+        }
+        None => {
+            let pml4_page = const {
+                accessor::build_vaddress(
+                    RECURSIVE_SLOT0,
+                    RECURSIVE_SLOT0,
+                    RECURSIVE_SLOT0,
+                    RECURSIVE_SLOT0,
+                )
+            };
+            let pml4 = unsafe { &mut *(pml4_page.as_mut_ptr::<PageTable>()) };
+            let mapper = unsafe { Mapper::new_recursive(pml4, RECURSIVE_SLOT0) };
+            (mapper, true) // This is a normal inactive address space, so we need to activate it.
+        }
+    };
+
+    let new_space = AddressSpace::new(mapper, space.l4_table_frame, space.scratch_page);
+    unsafe { set_active(new_space) };
+
+    if !needs_activate {
+        return Ok(());
+    }
+
+    // Hold our breath..
+    info!(target: "nmm", "Activating new address space with L4 table frame: {:#x}", space.l4_table_frame.start_address().as_u64());
+    unsafe {
+        arch::set_root_table(space.l4_table_frame);
+    }
+    // Thank god it didn't explode. Now we can breathe again.
+    info!(target: "nmm", "New address space activated with L4 table frame: {:#x}", space.l4_table_frame.start_address().as_u64());
+
+    Ok(())
 }
 
 /// Zeros out the given frame by mapping it to a known V.A. and writing zeros to it.

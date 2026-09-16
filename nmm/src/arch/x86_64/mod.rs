@@ -11,7 +11,6 @@ use cfg_if::cfg_if;
 pub use mapper::Mapper;
 
 use bitflags::bitflags;
-use x86_64::PhysAddr;
 
 use crate::{
     MemError,
@@ -130,16 +129,34 @@ pub(crate) const fn canonicalize_virt(addr: u64) -> u64 {
 }
 
 pub(crate) fn pml4_phys() -> Frame<Small> {
-    cfg_if! {
-        if #[cfg(target_arch = "x86_64")] {
-            let cr3: Frame<Small> = x86_64::registers::control::Cr3::read().0.into();
-            cr3
-        } else {
-            unreachable!()
+    #[cfg(target_arch = "x86_64")]
+    {
+        use crate::paging::PhysAddr;
+
+        let cr3: u64;
+        unsafe {
+            core::arch::asm!("mov {}, cr3", out(reg) cr3, options(nostack, preserves_flags));
         }
+        Frame::from_start_address(PhysAddr::new(canonicalize_phys(cr3))).unwrap()
+    }
+    #[cfg(not(target_arch = "x86_64"))]
+    {
+        panic!("pml4_phys is only supported on x86_64 architecture");
     }
 }
 
+pub(crate) unsafe fn set_root_table(frame: Frame<Small>) {
+    #[cfg(target_arch = "x86_64")]
+    {
+        unsafe {
+            core::arch::asm! {
+                "mov cr3, {0}",
+                in(reg) frame.start_address().as_u64(),
+                options(nostack, preserves_flags)
+            }
+        };
+    }
+}
 /// The first free available-to-software bit in a page table entry.
 pub const PTE_FREE_BIT0: u64 = 1 << 9;
 

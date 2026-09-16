@@ -1,12 +1,16 @@
+use alloc::vec::Vec;
 use core::alloc::Layout;
 
 use crate::{
-    MemError, arch,
+    MapFlags, MemError, arch,
     bitmap::{
         Bitmap, BitmapBacking,
-        managers::{address_as_bit_index, align_in_bits, bit_index_as_address, n_pages_for_bytes},
+        managers::{
+            address_as_bit_index, align_in_bits, bit_index_as_address, entries_for_bytes,
+            n_pages_for_bytes,
+        },
     },
-    paging::{Address, VirtAddr, primitives::MemoryRange},
+    paging::{Address, VirtAddr, heapless::HeaplessAllocator, primitives::MemoryRange},
     test_println,
 };
 
@@ -14,7 +18,7 @@ use crate::{
 #[derive(Debug)]
 pub struct VirtualMemoryManager<'a> {
     bitmap: Bitmap<'a>,
-    base_addr: VirtAddr,
+    pub mut(super) range: MemoryRange<VirtAddr>,
 }
 
 impl<'a> VirtualMemoryManager<'a> {
@@ -30,8 +34,16 @@ impl<'a> VirtualMemoryManager<'a> {
     pub unsafe fn init(bitmap_data: BitmapBacking<'a>, range: MemoryRange<VirtAddr>) -> Self {
         Self {
             bitmap: Bitmap::init(bitmap_data, (n_pages_for_bytes(range.size()) % 64) as u8),
-            base_addr: range.start(),
+            range,
         }
+    }
+
+    pub unsafe fn owned(range: MemoryRange<VirtAddr>) -> Self {
+        let n_pages = n_pages_for_bytes(range.size());
+        let n_bytes = (n_pages / 8) as usize;
+        let mut bitmap_data = Vec::new_in(HeaplessAllocator::new(MapFlags::empty()));
+        bitmap_data.resize(entries_for_bytes(n_bytes as u64) as usize, 0);
+        unsafe { Self::init(BitmapBacking::Owned(bitmap_data), range) }
     }
 
     /// Allocates a range of virtual memory of the specified size and alignment, returning the starting virtual address of the allocated range.
@@ -45,7 +57,7 @@ impl<'a> VirtualMemoryManager<'a> {
         let bit_align = align_in_bits(layout.alignment());
 
         let bitptr = self.bitmap.allocate(n_bits, bit_align)?;
-        Some(bit_index_as_address(bitptr.bit_index(), self.base_addr))
+        Some(bit_index_as_address(bitptr.bit_index(), self.range.start()))
     }
 
     pub unsafe fn try_deallocate(
@@ -54,8 +66,8 @@ impl<'a> VirtualMemoryManager<'a> {
         layout: Layout,
     ) -> Result<(), MemError> {
         let n_bits = n_pages_for_bytes(layout.size() as u64);
-        let bitptr =
-            address_as_bit_index(addr, self.base_addr).ok_or(MemError::UnmanagedVirtual(addr))?;
+        let bitptr = address_as_bit_index(addr, self.range.start())
+            .ok_or(MemError::UnmanagedVirtual(addr))?;
 
         #[cfg(debug_assertions)]
         if !self.bitmap.all_are_set(bitptr, n_bits) {
@@ -72,7 +84,7 @@ impl<'a> VirtualMemoryManager<'a> {
     ///
     pub unsafe fn deallocate(&mut self, addr: VirtAddr, layout: Layout) {
         let n_bits = n_pages_for_bytes(layout.size() as u64);
-        let bitptr = address_as_bit_index(addr, self.base_addr)
+        let bitptr = address_as_bit_index(addr, self.range.start())
             .expect("deallocated address must be within the managed virtual address space and properly aligned");
         test_println!("deallocating addr {:?}, bitptr: {:?}", addr, bitptr);
         debug_assert!(self.bitmap.some_are_set(bitptr, n_bits));
@@ -82,7 +94,7 @@ impl<'a> VirtualMemoryManager<'a> {
     /// Marks a range of virtual memory as allocated in the bitmap, starting at the given virtual address and spanning the specified number of bytes.
     pub unsafe fn mark_allocated(&mut self, addr: VirtAddr, size_bytes: u64) {
         let n_bits = n_pages_for_bytes(size_bytes);
-        let bitptr = address_as_bit_index(addr, self.base_addr).expect(
+        let bitptr = address_as_bit_index(addr, self.range.start()).expect(
             "address must be within the managed virtual address space and properly aligned",
         );
 
@@ -92,7 +104,7 @@ impl<'a> VirtualMemoryManager<'a> {
     /// Marks a range of virtual memory as unallocated in the bitmap, starting at the given virtual address and spanning the specified number of bytes.
     pub unsafe fn mark_unallocated(&mut self, addr: VirtAddr, size_bytes: u64) {
         let n_bits = n_pages_for_bytes(size_bytes);
-        let bitptr = address_as_bit_index(addr, self.base_addr).expect(
+        let bitptr = address_as_bit_index(addr, self.range.start()).expect(
             "address must be within the managed virtual address space and properly aligned",
         );
 
@@ -163,7 +175,7 @@ mod tests {
                 "allocated address should be properly aligned"
             );
             let bits = n_pages_for_bytes(size_bytes);
-            let bitptr = address_as_bit_index(addr, manager.base_addr)
+            let bitptr = address_as_bit_index(addr, manager.range.start())
                 .expect("allocated address must be within the managed virtual address space and properly aligned");
             assert!(
                 manager.bitmap.all_are_set(bitptr, bits),
@@ -182,9 +194,10 @@ mod tests {
         let checked_dealloc =
             |manager: &mut VirtualMemoryManager, addr: VirtAddr, layout: Layout| {
                 assert!(
-                    manager
-                        .bitmap
-                        .all_are_set(address_as_bit_index(addr, manager.base_addr).unwrap(), 1),
+                    manager.bitmap.all_are_set(
+                        address_as_bit_index(addr, manager.range.start()).unwrap(),
+                        1
+                    ),
                     "attempted to deallocate an address that is not currently allocated"
                 );
                 unsafe { manager.deallocate(addr, layout) };

@@ -7,7 +7,7 @@ use crate::{
     entry_walker::EntryWalker,
     paging::{
         Address, AddressExt, Frame, PageTable, Small,
-        asm::{self, AddressSpace},
+        asm::{self, AddressSpace, InactiveAddressSpace},
         map::DataAllocator,
         map_from,
     },
@@ -46,10 +46,9 @@ pub(crate) unsafe fn init_unchecked(
 
     // Initialize the mapper and set it as the active mapper for the system.
     // This is necessary to perform any virtual memory operations, including mapping the scratch space.
-    let mapper = unsafe { Mapper::new_offset(root, config.offset) };
-    unsafe {
-        asm::set_active(AddressSpace::new(mapper, cr3, config.zero_page));
-    };
+    let bootstrap_table =
+        unsafe { InactiveAddressSpace::bootstrap(cr3, config.zero_page, config.offset) };
+    unsafe { bootstrap_table.activate()? };
 
     info!("Found {} bytes of usable memory", walker.usable_memory());
 
