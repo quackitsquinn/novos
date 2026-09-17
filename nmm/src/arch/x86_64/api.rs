@@ -66,8 +66,7 @@ pub(crate) unsafe fn init_unchecked(
     );
     unsafe {
         map_from(
-            config.managed_range.start(),
-            n_bytes,
+            config.managed_range.truncate(n_bytes),
             MapFlags::WRITABLE,
             &mut DataAllocator(&mut walker),
             &mut (),

@@ -32,7 +32,7 @@ use crate::{
         Address, AddressExt, FragmentManager, FragmentSize, Frame, Large, MemoryFragment, Page,
         PhysAddr, VirtAddr, asm,
         operation::OperationAllSizes,
-        primitives::{AnyFragment, MemoryRange, PageClass},
+        primitives::{AnyFragment, MemoryRange, PageClass, PhysRange, VirtRange},
     },
 };
 
@@ -147,18 +147,16 @@ pub enum MapSource {
 // I thought about making this unsafe since it can cause undefined behavior BUT
 // said undefined behavior requires dereferencing the mapped memory, so the safety is the caller's responsibility.
 pub fn map(
-    dest: VirtAddr,
+    dest: MemoryRange<VirtAddr>,
     src: MapSource,
-    byte_size: usize,
     flags: MapFlags,
     op: &mut impl OperationAllSizes,
 ) -> Result<(), MemError> {
-    check_range_virt(dest, byte_size)?;
     if let MapSource::Direct(phys_base) = src {
-        check_range_phys(phys_base, byte_size)?;
+        check_range_phys(phys_base, dest.size() as usize)?;
     }
 
-    unsafe { paging::map_unchecked(dest, src, byte_size, flags, op) }
+    unsafe { paging::map_unchecked(dest, src, flags, op) }
 }
 
 /// Unmaps a virtual address range of the specified size starting from the given virtual base address
@@ -169,14 +167,13 @@ pub fn map(
 /// # Safety
 /// This function is unsafe because unmapping memory that is still in use (e.g., memory that is currently mapped and being accessed) can lead to undefined behavior.
 /// The caller must ensure that unmapped memory is completely unused and will not be accessed after being unmapped to avoid issues such as use-after-free or memory corruption.
-pub unsafe fn unmap(virt_base: VirtAddr, byte_size: usize) -> Result<(), MemError> {
-    check_range_virt(virt_base, byte_size)?;
-    unsafe { paging::unmap_unchecked(virt_base, byte_size) }
+pub unsafe fn unmap(range: MemoryRange<VirtAddr>) -> Result<(), MemError> {
+    unsafe { paging::unmap_unchecked(range) }
 }
 
 /// Allocates a virtual address range of the specified size without mapping it to any physical memory.
 #[must_use = "The returned virtual address must be freed with `free_virtspace` when it is no longer needed to avoid memory leaks and ensure proper resource management."]
-pub fn reserve_virtual(layout: Layout) -> Result<VirtAddr, MemError> {
+pub fn reserve_virtual(layout: Layout) -> Result<MemoryRange<VirtAddr>, MemError> {
     if layout.size() > arch::VIRTUAL_ADDRESS_MAX as usize {
         return Err(MemError::OutOfMemory);
     }
@@ -191,12 +188,13 @@ pub fn reserve_virtual(layout: Layout) -> Result<VirtAddr, MemError> {
 /// # Safety
 /// The caller must ensure that the provided virtual address range is not currently mapped to any physical memory and is not in use before freeing it,
 /// as freeing a virtual address range that is still in use can lead to undefined behavior such as use-after-free or memory corruption.
-pub unsafe fn free_virtual(virt_base: VirtAddr, layout: Layout) -> Result<(), MemError> {
-    check_range_virt(virt_base, layout.size())?;
-
+pub unsafe fn free_virtual(
+    virt_range: MemoryRange<VirtAddr>,
+    layout: Layout,
+) -> Result<(), MemError> {
     let mut vmm = asm::vmm()?;
     // SAFETY: Guaranteed by caller.
-    unsafe { vmm.deallocate(virt_base, layout) };
+    unsafe { vmm.deallocate(virt_range, layout) };
 
     Ok(())
 }
@@ -219,67 +217,63 @@ pub fn free_frame<S: FragmentSize>(frame: Frame<S>) {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MemoryMapping {
     /// The starting virtual address of the mapped range.
-    pub mut(crate) virt_base: VirtAddr,
-    /// The starting physical address of the mapped range.
-    pub mut(crate) phys_base: PhysAddr,
-    /// The size of the mapped range in bytes.
-    pub mut(crate) byte_size: usize,
+    pub mut(crate) virt_range: VirtRange,
+    /// The range of physical memory that is mapped.
+    pub mut(crate) phys_range: PhysRange,
 }
 
 impl MemoryMapping {
     /// Creates a new `MemoryMapping` instance with the specified virtual base address, physical base address, and size in bytes.
-    pub fn new(virt_base: VirtAddr, phys_base: PhysAddr, byte_size: usize) -> Self {
+    pub fn new(virt_range: VirtRange, phys_range: MemoryRange<PhysAddr>) -> Self {
         Self {
-            virt_base,
-            phys_base,
-            byte_size,
+            virt_range,
+            phys_range,
         }
     }
 
     /// Returns an immutable pointer to the start of the mapped virtual address range, allowing for direct access to the mapped memory.
     pub fn as_ptr<T>(&self) -> *const T {
-        self.virt_base.as_ptr()
+        self.virt_range.start().as_ptr()
     }
 
     /// Returns a mutable pointer to the start of the mapped virtual address range, allowing for direct access to the mapped memory.
     pub fn as_mut_ptr<T>(&self) -> *mut T {
-        self.virt_base.as_mut_ptr()
+        self.virt_range.start().as_mut_ptr()
     }
 }
 
-fn make_layout_for_mapping(phys_base: PhysAddr, byte_size: usize) -> Layout {
+fn make_layout_for_mapping(phys_range: MemoryRange<PhysAddr>) -> Layout {
+    let phys_base = phys_range.start();
+    let size = phys_range.size() as usize;
     let alignment = phys_base.alignment();
-    Layout::from_size_align(byte_size, alignment.as_usize()).unwrap()
+    Layout::from_size_align(size, alignment.as_usize()).unwrap()
 }
 
 /// Maps a physical address range to a virtual address range of the specified size with the given flags, where the virtual address is allocated by the memory manager. This is a convenience function that combines `alloc_paged` and `map` into a single operation for ease of use.
 #[must_use = "The returned virtual address must be freed with `unmap` when it is no longer needed to avoid memory leaks and ensure proper resource management."]
 pub fn create_phys_mapping(
-    phys_base: PhysAddr,
-    byte_size: usize,
+    phys_range: MemoryRange<PhysAddr>,
     flags: MapFlags,
 ) -> Result<MemoryMapping, MemError> {
-    check_range_phys(phys_base, byte_size)?;
-    let virt_addr = reserve_virtual(make_layout_for_mapping(phys_base, byte_size))?;
+    let virt_range = reserve_virtual(make_layout_for_mapping(phys_range))?;
     unsafe {
         paging::map_unchecked(
-            virt_addr,
-            MapSource::Direct(phys_base),
-            byte_size,
+            virt_range,
+            MapSource::Direct(phys_range.start()),
             flags,
             &mut (),
         )
     }?;
-    Ok(MemoryMapping::new(virt_addr, phys_base, byte_size))
+    Ok(MemoryMapping::new(virt_range, phys_range))
 }
 
 /// Frees a physical memory mapping that was previously created with `create_phys_mapping`, unmapping the virtual address range and freeing the allocated virtual address space.
 pub unsafe fn free_phys_mapping(mapping: MemoryMapping) -> Result<(), MemError> {
     unsafe {
-        unmap(mapping.virt_base, mapping.byte_size)?;
+        unmap(mapping.virt_range)?;
         free_virtual(
-            mapping.virt_base,
-            make_layout_for_mapping(mapping.phys_base, mapping.byte_size),
+            mapping.virt_range,
+            make_layout_for_mapping(mapping.phys_range),
         )
     }
 }

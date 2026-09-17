@@ -29,7 +29,7 @@ use crate::{
             SizedMemoryMapper, Unmapped,
         },
         operation::{Chain, OperationAllSizes, ZeroMemory},
-        primitives::{AnyFragment, PageClass, PrimitiveClass},
+        primitives::{AnyFragment, PageClass, PrimitiveClass, VirtRange},
     },
 };
 
@@ -119,8 +119,7 @@ where
 }
 
 pub(crate) unsafe fn map_from<P>(
-    base: VirtAddr,
-    len: u64,
+    range: MemoryRange<VirtAddr>,
     flags: MapFlags,
     provider: &mut P,
     operation: &mut impl OperationAllSizes,
@@ -130,37 +129,34 @@ where
 {
     trace!(
         "Mapping from base address {:x?} with length {:?} and flags {:?}",
-        base.as_u64(),
-        len,
+        range.start().as_u64(),
+        range.size(),
         flags
     );
 
     let active_as = asm::active();
     let mut mapper = active_as.mapper().unwrap();
 
-    unsafe { mapper.map_from(base, len, flags, provider, operation) }
+    unsafe { mapper.map_from(range, flags, provider, operation) }
 }
 
 pub(crate) unsafe fn map_unchecked(
-    dest: VirtAddr,
+    dest: MemoryRange<VirtAddr>,
     src: MapSource,
-    byte_size: usize,
     flags: MapFlags,
     op: &mut impl OperationAllSizes,
 ) -> Result<(), MemError> {
     match src {
         MapSource::Direct(phys_base) => {
             trace!(
-                "Mapping physical memory at address {:#x} to virtual address {:#x} with size {} bytes and flags {:?}",
+                "Mapping physical memory at address {:#x} to virtual address {:?} and flags {:?}",
                 phys_base.as_u64(),
-                dest.as_u64(),
-                byte_size,
+                dest,
                 flags
             );
             unsafe {
                 map_from(
                     dest,
-                    byte_size as u64,
                     flags,
                     &mut PhysLinear(phys_base, &mut GlobalMemoryProvider),
                     op,
@@ -169,15 +165,12 @@ pub(crate) unsafe fn map_unchecked(
         }
         MapSource::Anon => unsafe {
             trace!(
-                "Mapping anonymous memory at virtual address {:#x} with size {} bytes and flags {:?}",
-                dest.as_u64(),
-                byte_size,
-                flags
+                "Allocating to virtual address {:?} and flags {:?}",
+                dest, flags
             );
 
             return map_from(
                 dest,
-                byte_size as u64,
                 flags | MapFlags::DEALLOCATE,
                 &mut DataAllocator(&mut GlobalMemoryProvider),
                 op,
@@ -188,11 +181,8 @@ pub(crate) unsafe fn map_unchecked(
     Ok(())
 }
 
-pub(crate) unsafe fn unmap_unchecked(
-    virt_base: VirtAddr,
-    byte_size: usize,
-) -> Result<(), MemError> {
-    let mapper = GreedyFragmentMapper::<PageClass>::new(virt_base, byte_size as u64);
+pub(crate) unsafe fn unmap_unchecked(virt_range: VirtRange) -> Result<(), MemError> {
+    let mapper = GreedyFragmentMapper::<PageClass>::new(virt_range.start(), virt_range.size());
 
     fn unmap<S: FragmentSize>(page: Page<S>) -> Result<(), MemError>
     where

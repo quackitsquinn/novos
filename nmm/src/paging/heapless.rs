@@ -7,7 +7,10 @@ use core::alloc::Layout;
 use alloc::alloc::Allocator;
 use cake::log::error;
 
-use crate::{MapFlags, MapSource, align, paging::AddressExt};
+use crate::{
+    MapFlags, MapSource, align,
+    paging::{AddressExt, primitives::VirtRange},
+};
 
 /// A page backed allocator that does not require a heap to be initialized.
 /// This is useful for early bootstrapping of the memory manager, where we need to allocate memory before the heap is available.
@@ -47,7 +50,7 @@ unsafe impl Allocator for HeaplessAllocator {
         let layout = create_page_layout(layout);
         let vbase = crate::reserve_virtual(layout).map_err(|_| alloc::alloc::AllocError)?;
 
-        if let Err(e) = crate::map(vbase, MapSource::Anon, layout.size(), self.0, &mut ()) {
+        if let Err(e) = crate::map(vbase, MapSource::Anon, self.0, &mut ()) {
             // SAFETY: We just reserved this virtual memory, so it is safe to free it.
             error!(
                 "Failed to map virtual memory for heapless allocator: {:?}",
@@ -62,7 +65,7 @@ unsafe impl Allocator for HeaplessAllocator {
             return Err(alloc::alloc::AllocError);
         }
 
-        let ptr = vbase.as_mut_ptr::<u8>();
+        let ptr = vbase.start().as_mut_ptr::<u8>();
         let slice = core::ptr::slice_from_raw_parts_mut(ptr, layout.size());
         Ok(core::ptr::NonNull::new(slice).unwrap())
     }
@@ -71,7 +74,7 @@ unsafe impl Allocator for HeaplessAllocator {
         let layout = create_page_layout(layout);
         let vbase = crate::VirtAddr::from_ptr(ptr.as_ptr()).unwrap();
         // SAFETY: Upheld by the caller
-        if let Err(e) = unsafe { crate::unmap(vbase, layout.size()) } {
+        if let Err(e) = unsafe { crate::unmap(VirtRange::new_len(vbase, layout.size() as u64)) } {
             error!(
                 "Failed to unmap virtual memory for heapless allocator: {:?}",
                 e

@@ -51,13 +51,16 @@ impl<'a> VirtualMemoryManager<'a> {
     /// Any allocation has a footprint of at least `crate::arch::L1_PAGE_SIZE` bytes, as the bitmap tracks virtual address space in units of pages.
     /// The `n_bytes` parameter specifies the total size of the virtual address range to allocate in bytes, and the `align` parameter specifies the required alignment of the starting virtual address.
     #[must_use = "the allocated virtual address must be used or deallocated to avoid memory leaks"]
-    pub fn allocate(&mut self, layout: Layout) -> Option<VirtAddr> {
+    pub fn allocate(&mut self, layout: Layout) -> Option<MemoryRange<VirtAddr>> {
         // TODO: Result<VirtAddr, MemError> instead of Option
         let n_bits = n_pages_for_bytes(layout.size() as u64);
+        let size = n_bits * Self::BIT_SIZE;
         let bit_align = align_in_bits(layout.alignment());
 
         let bitptr = self.bitmap.allocate(n_bits, bit_align)?;
-        Some(bit_index_as_address(bitptr.bit_index(), self.range.start()))
+        let start = bit_index_as_address(bitptr.bit_index(), self.range.start());
+
+        Some(MemoryRange::new_len(start, size))
     }
 
     pub unsafe fn try_deallocate(
@@ -82,11 +85,15 @@ impl<'a> VirtualMemoryManager<'a> {
 
     /// Deallocates a previously allocated range of virtual memory starting at the given virtual address and spanning the specified number of bytes.
     ///
-    pub unsafe fn deallocate(&mut self, addr: VirtAddr, layout: Layout) {
-        let n_bits = n_pages_for_bytes(layout.size() as u64);
-        let bitptr = address_as_bit_index(addr, self.range.start())
+    pub unsafe fn deallocate(&mut self, range: MemoryRange<VirtAddr>, _: Layout) {
+        let n_bits = n_pages_for_bytes(range.size() as u64);
+        let bitptr = address_as_bit_index(range.start(), self.range.start())
             .expect("deallocated address must be within the managed virtual address space and properly aligned");
-        test_println!("deallocating addr {:?}, bitptr: {:?}", addr, bitptr);
+        test_println!(
+            "deallocating addr {:?}, bitptr: {:?}",
+            range.start(),
+            bitptr
+        );
         debug_assert!(self.bitmap.some_are_set(bitptr, n_bits));
         self.bitmap.clear(bitptr, n_bits);
     }
@@ -166,36 +173,38 @@ mod tests {
                     size_bytes: u64,
                     align: u64,
                     deallocate: bool|
-         -> Option<(VirtAddr, Layout)> {
+         -> Option<(MemoryRange<VirtAddr>, Layout)> {
             let layout = Layout::from_size_align(size_bytes as usize, align as usize).unwrap();
-            let addr = manager.allocate(layout).expect("should allocate memory");
+            let range = manager.allocate(layout).expect("should allocate memory");
+            let size = range.size();
+            let start_address = range.start();
             assert_eq!(
-                addr.as_u64() % align,
+                start_address.as_u64() % align,
                 0,
                 "allocated address should be properly aligned"
             );
             let bits = n_pages_for_bytes(size_bytes);
-            let bitptr = address_as_bit_index(addr, manager.range.start())
+            let bitptr = address_as_bit_index(start_address, manager.range.start())
                 .expect("allocated address must be within the managed virtual address space and properly aligned");
             assert!(
                 manager.bitmap.all_are_set(bitptr, bits),
                 "allocated range should have its bits set in the bitmap"
             );
             if deallocate {
-                unsafe { manager.deallocate(addr, layout) };
+                unsafe { manager.deallocate(range, layout) };
                 manager.check_zero();
                 return None;
             }
 
-            Some((addr, layout))
+            Some((range, layout))
         };
 
         // This also covers a previous deallocation bug where a bit gets falsely cleared when deallocating another independent allocation.
         let checked_dealloc =
-            |manager: &mut VirtualMemoryManager, addr: VirtAddr, layout: Layout| {
+            |manager: &mut VirtualMemoryManager, addr: MemoryRange<VirtAddr>, layout: Layout| {
                 assert!(
                     manager.bitmap.all_are_set(
-                        address_as_bit_index(addr, manager.range.start()).unwrap(),
+                        address_as_bit_index(addr.start(), manager.range.start()).unwrap(),
                         1
                     ),
                     "attempted to deallocate an address that is not currently allocated"

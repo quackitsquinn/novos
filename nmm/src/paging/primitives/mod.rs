@@ -346,6 +346,22 @@ where
             end: self.end,
         })
     }
+
+    /// Truncates the memory range to the given new size, keeping the start address the same.
+    /// Panics if the new size is greater than the current size of the range.
+    pub fn truncate(mut self, new_size: u64) -> Self {
+        let new_end = self.start.as_u64() + new_size;
+        if new_end > self.end.as_u64() {
+            panic!(
+                "MemoryRange::truncate: `start + new_size` ({:#x}) is greater than `end` ({:#x})",
+                new_end,
+                self.end.as_u64()
+            );
+        }
+        self.end =
+            A::try_new(new_end).expect("MemoryRange::truncate: `start + new_size` overflowed");
+        self
+    }
 }
 
 /// A range of physical memory.

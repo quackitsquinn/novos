@@ -50,7 +50,6 @@ impl PhysicalMemoryManager {
         unsafe {
             map_from(
                 vmem,
-                slice_layout.size() as u64,
                 MapFlags::WRITABLE,
                 &mut DataAllocator(&mut entry_walker),
                 &mut (),
@@ -58,7 +57,10 @@ impl PhysicalMemoryManager {
         };
 
         let bitmaps = unsafe {
-            core::slice::from_raw_parts_mut(vmem.as_mut_ptr::<MaybeUninit<BitmapEntry>>(), n_avail)
+            core::slice::from_raw_parts_mut(
+                vmem.start().as_mut_ptr::<MaybeUninit<BitmapEntry>>(),
+                n_avail,
+            )
         };
 
         let mut bitmap_iter = entries.iter().filter(|e| e.entry_type == EntryType::USABLE);
@@ -109,13 +111,12 @@ impl PhysicalMemoryManager {
         let needed_entries = entries_for_bytes(range.size());
         let bits = n_pages_for_bytes(range.size());
         let needed_bytes = needed_entries * core::mem::size_of::<u64>() as u64;
-        let virtual_start = vmm
+        let allocated_range = vmm
             .allocate(Layout::from_size_align(needed_bytes as usize, 8).unwrap())
             .ok_or(MemError::OutOfMemory)?;
         unsafe {
             map_from(
-                virtual_start,
-                needed_bytes,
+                allocated_range,
                 MapFlags::WRITABLE,
                 &mut DataAllocator(walker),
                 &mut (),
@@ -124,7 +125,7 @@ impl PhysicalMemoryManager {
 
         let bitmap_slice = unsafe {
             core::slice::from_raw_parts_mut(
-                virtual_start.as_mut_ptr::<u64>(),
+                allocated_range.start().as_mut_ptr::<u64>(),
                 needed_entries as usize,
             )
         };

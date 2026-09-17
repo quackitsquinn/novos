@@ -10,8 +10,8 @@ use cake::log::trace;
 use crate::{
     MapFlags, MemError,
     paging::{
-        Address, FragmentManager, FragmentSize, Frame, Large, Medium, MemoryFragment, Page, Small,
-        VirtAddr,
+        Address, FragmentManager, FragmentSize, Frame, Large, Medium, MemoryFragment, MemoryRange,
+        Page, Small, VirtAddr,
         fragment::GreedyFragmentMapper,
         operation::{self, OperationAllSizes},
         primitives::{AnyFragment, PageClass},
@@ -58,20 +58,19 @@ pub trait MemoryMapper:
     /// Maps a range of virtual addresses to physical frames, using the provided frame allocator for any necessary allocations of page tables.
     unsafe fn map_from<P: FullProvider>(
         &mut self,
-        base: VirtAddr,
-        len: u64,
+        range: MemoryRange<VirtAddr>,
         flags: MapFlags,
         provider: &mut P,
         operation: &mut impl OperationAllSizes,
     ) -> Result<(), MemError> {
         trace!(
             "Mapping from base address {:x?} with length {:?} and flags {:?}",
-            base.as_u64(),
-            len,
+            range.start().as_u64(),
+            range.size(),
             flags
         );
 
-        let mapper = GreedyFragmentMapper::<PageClass>::new(base, len);
+        let mapper = GreedyFragmentMapper::<PageClass>::new(range.start(), range.size());
         for frag in mapper {
             match frag {
                 AnyFragment::Small(prim) => {
