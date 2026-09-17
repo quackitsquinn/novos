@@ -1,13 +1,18 @@
+use cake::log::error;
+
 use crate::{
     MemError,
-    bitmap::VirtualMemoryManager,
-    paging::{Frame, Large, Page, Small, VirtAddr, asm},
+    paging::{
+        Frame, Large, Page, Small, VirtAddr,
+        asm::{self, mounted},
+    },
 };
 
 pub struct InactiveAddressSpace {
     pub(crate) mut(super) l4_table_frame: Frame<Small>,
     pub(crate) mut(super) scratch_page: Page<Large>,
     pub(crate) mut(super) bootstrap_hhdm_offset: Option<VirtAddr>,
+    pub(crate) mut(super) rem: crate::paging::RecursiveEntryManager,
 }
 
 impl InactiveAddressSpace {
@@ -21,6 +26,7 @@ impl InactiveAddressSpace {
             l4_table_frame,
             scratch_page,
             bootstrap_hhdm_offset: Some(hhdm_offset),
+            rem: crate::paging::RecursiveEntryManager::default(),
         }
     }
 
@@ -33,6 +39,7 @@ impl InactiveAddressSpace {
             l4_table_frame,
             scratch_page,
             bootstrap_hhdm_offset: None,
+            rem: crate::paging::RecursiveEntryManager::default(),
         })
     }
 
@@ -41,13 +48,43 @@ impl InactiveAddressSpace {
     pub unsafe fn activate(self) -> Result<(), MemError> {
         asm::activate_inactive_space(self)
     }
+
+    /// Attempts to mount this inactive address space into the current active address space, allowing for direct access to its page tables.
+    /// This will consume this InactiveAddressSpace, and it will no longer be usable after this call (unless the mount operation fails).
+    pub fn try_mount(
+        self,
+    ) -> Result<crate::paging::asm::mounted::MountedAddressSpace, (crate::paging::MemError, Self)>
+    {
+        if self.bootstrap_hhdm_offset.is_some() {
+            error!(
+                "Attempted to mount InactiveAddressSpace during bootstrap phase. This is likely a bug, as the bootstrap address space should not be mounted."
+            );
+            return Err((crate::paging::MemError::InvalidOperation, self));
+        }
+        crate::paging::asm::mounted::MountedAddressSpace::try_mount_inactive(self)
+    }
 }
 
 impl Drop for InactiveAddressSpace {
     fn drop(&mut self) {
         if self.bootstrap_hhdm_offset.is_some() {
+            error!(
+                "Dropping InactiveAddressSpace during bootstrap phase. This is likely a bug, as the bootstrap address space should not be dropped."
+            );
             return;
         }
-        todo!()
+
+        if let Ok(mas) = unsafe { mounted::mount(self) } {
+            if let Err(e) = mas.free() {
+                error!(
+                    "Failed to free InactiveAddressSpace during drop: {:?}. This may indicate a memory leak.",
+                    e
+                );
+            }
+        } else {
+            error!(
+                "Failed to mount InactiveAddressSpace during drop. This may indicate a memory leak."
+            );
+        }
     }
 }

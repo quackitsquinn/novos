@@ -19,8 +19,10 @@ use crate::{
 };
 
 mod inactive;
+mod mounted;
 
 pub use inactive::InactiveAddressSpace;
+pub use mounted::MountedAddressSpace;
 
 static ADDRESS_SPACE: OnceRwLock<AddressSpace> = OnceRwLock::new();
 static VIRTUAL_MEMORY_MANAGER: OnceMutex<VirtualMemoryManager<'static>> =

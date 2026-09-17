@@ -416,6 +416,9 @@ pub enum MemError {
     /// An error that originated from architecture-specific operations in the memory manager.
     #[error("An architecture-specific error occurred during memory management operations: {0}")]
     ArchError(#[from] arch::ArchError),
+    /// The requested operation is invalid in the current context, such as attempting to perform an operation that is not allowed or supported.
+    #[error("The requested operation is invalid in the current context.")]
+    InvalidOperation,
     /// An error that originated from the underlying memory mapping implementation, such as page table manipulation or low-level memory operations.
     #[error("An error occurred during memory management operations: {0}")]
     Other(&'static str),

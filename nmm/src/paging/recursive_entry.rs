@@ -1,5 +1,6 @@
 use crate::paging::PageTableIndex;
 
+#[derive(Debug, Clone)]
 pub struct RecursiveEntryManager {
     base: PageTableIndex,
     indices: u16,
