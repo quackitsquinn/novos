@@ -135,11 +135,7 @@ pub enum MapSource {
     /// Maps the given physical address directly to the virtual address.
     Direct(PhysAddr),
     /// Allocate physical memory for the mapping.
-    Anon {
-        /// If true, the allocated physical memory will be zeroed before being mapped to the virtual address.
-        /// If this is not set, it is undefined behavior to read from the mapped virtual address before writing to it.
-        zero: bool,
-    },
+    Anon,
 }
 
 /// Maps a virtual address range to a physical address range with the specified size
@@ -155,43 +151,14 @@ pub fn map(
     src: MapSource,
     byte_size: usize,
     flags: MapFlags,
+    op: &mut impl OperationAllSizes,
 ) -> Result<(), MemError> {
     check_range_virt(dest, byte_size)?;
     if let MapSource::Direct(phys_base) = src {
         check_range_phys(phys_base, byte_size)?;
     }
 
-    if matches!(src, MapSource::Anon { zero: false }) && !flags.contains(MapFlags::WRITABLE) {
-        warn!(
-            "nmm::map: Mapping anonymous memory without zeroing and without the writable flag makes the mapping useless without undefined behavior."
-        )
-    }
-    unsafe { paging::map_unchecked(dest, src, byte_size, flags) }
-}
-
-/// Maps a given MapSource to a virtual address range of the specified size with the given flags,
-///  using the provided operation to perform any necessary memory operations (e.g., zeroing or copying memory) during the mapping process.
-pub fn map_with_operation(
-    dest: VirtAddr,
-    src: MapSource,
-    byte_size: usize,
-    flags: MapFlags,
-    operation: impl OperationAllSizes,
-) -> Result<(), MemError> {
-    check_range_virt(dest, byte_size)?;
-    if let MapSource::Direct(phys_base) = src {
-        check_range_phys(phys_base, byte_size)?;
-    }
-
-    if matches!(src, MapSource::Anon { zero: false }) && !flags.contains(MapFlags::WRITABLE) {
-        warn!(
-            "nmm::map: Mapping anonymous memory without zeroing and without the writable flag makes the mapping useless without undefined behavior."
-        )
-    }
-    unsafe {
-        paging::map_with_operation_unchecked(dest, src, byte_size, flags, operation)?;
-        Ok(())
-    }
+    unsafe { paging::map_unchecked(dest, src, byte_size, flags, op) }
 }
 
 /// Unmaps a virtual address range of the specified size starting from the given virtual base address
@@ -294,7 +261,15 @@ pub fn create_phys_mapping(
 ) -> Result<MemoryMapping, MemError> {
     check_range_phys(phys_base, byte_size)?;
     let virt_addr = reserve_virtual(make_layout_for_mapping(phys_base, byte_size))?;
-    unsafe { paging::map_unchecked(virt_addr, MapSource::Direct(phys_base), byte_size, flags) }?;
+    unsafe {
+        paging::map_unchecked(
+            virt_addr,
+            MapSource::Direct(phys_base),
+            byte_size,
+            flags,
+            &mut (),
+        )
+    }?;
     Ok(MemoryMapping::new(virt_addr, phys_base, byte_size))
 }
 

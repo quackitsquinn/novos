@@ -13,7 +13,7 @@ use crate::{
         Address, FragmentManager, FragmentSize, Frame, Large, Medium, MemoryFragment, Page, Small,
         VirtAddr,
         fragment::GreedyFragmentMapper,
-        operation::OperationAllSizes,
+        operation::{self, OperationAllSizes},
         primitives::{AnyFragment, PageClass},
     },
 };
@@ -62,6 +62,7 @@ pub trait MemoryMapper:
         len: u64,
         flags: MapFlags,
         provider: &mut P,
+        operation: &mut impl OperationAllSizes,
     ) -> Result<(), MemError> {
         trace!(
             "Mapping from base address {:x?} with length {:?} and flags {:?}",
@@ -75,16 +76,19 @@ pub trait MemoryMapper:
             match frag {
                 AnyFragment::Small(prim) => {
                     let frame = provider.allocate_data()?;
+                    unsafe { operation.execute(prim, frame)? };
                     self.map_primitive(prim, frame, flags, &mut provider.table_allocator())?
                         .flush();
                 }
                 AnyFragment::Medium(prim) => {
                     let frame = provider.allocate_data()?;
+                    unsafe { operation.execute(prim, frame)? };
                     self.map_primitive(prim, frame, flags, &mut provider.table_allocator())?
                         .flush();
                 }
                 AnyFragment::Large(prim) => {
                     let frame = provider.allocate_data()?;
+                    unsafe { operation.execute(prim, frame)? };
                     self.map_primitive(prim, frame, flags, &mut provider.table_allocator())?
                         .flush();
                 }

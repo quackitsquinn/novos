@@ -70,6 +70,7 @@ pub(crate) unsafe fn init_unchecked(
             n_bytes,
             MapFlags::WRITABLE,
             &mut DataAllocator(&mut walker),
+            &mut (),
         )?;
     }
 

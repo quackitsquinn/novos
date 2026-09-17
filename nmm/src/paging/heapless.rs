@@ -47,12 +47,7 @@ unsafe impl Allocator for HeaplessAllocator {
         let layout = create_page_layout(layout);
         let vbase = crate::reserve_virtual(layout).map_err(|_| alloc::alloc::AllocError)?;
 
-        if let Err(e) = crate::map(
-            vbase,
-            MapSource::Anon { zero: false },
-            layout.size(),
-            self.0,
-        ) {
+        if let Err(e) = crate::map(vbase, MapSource::Anon, layout.size(), self.0, &mut ()) {
             // SAFETY: We just reserved this virtual memory, so it is safe to free it.
             error!(
                 "Failed to map virtual memory for heapless allocator: {:?}",

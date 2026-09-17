@@ -22,7 +22,6 @@ pub use index::PageTableIndex;
 use crate::{
     MapFlags, MapSource, MemError,
     arch::{Mapper, PageEntryType},
-    map_with_operation,
     paging::{
         fragment::GreedyFragmentMapper,
         map::{
@@ -124,6 +123,7 @@ pub(crate) unsafe fn map_from<P>(
     len: u64,
     flags: MapFlags,
     provider: &mut P,
+    operation: &mut impl OperationAllSizes,
 ) -> Result<(), MemError>
 where
     P: FullProvider,
@@ -138,7 +138,7 @@ where
     let active_as = asm::active();
     let mut mapper = active_as.mapper().unwrap();
 
-    unsafe { mapper.map_from(base, len, flags, provider) }
+    unsafe { mapper.map_from(base, len, flags, provider, operation) }
 }
 
 pub(crate) unsafe fn map_unchecked(
@@ -146,6 +146,7 @@ pub(crate) unsafe fn map_unchecked(
     src: MapSource,
     byte_size: usize,
     flags: MapFlags,
+    op: &mut impl OperationAllSizes,
 ) -> Result<(), MemError> {
     match src {
         MapSource::Direct(phys_base) => {
@@ -162,32 +163,25 @@ pub(crate) unsafe fn map_unchecked(
                     byte_size as u64,
                     flags,
                     &mut PhysLinear(phys_base, &mut GlobalMemoryProvider),
+                    op,
                 )?
             };
         }
-        MapSource::Anon { zero } => unsafe {
+        MapSource::Anon => unsafe {
             trace!(
                 "Mapping anonymous memory at virtual address {:#x} with size {} bytes and flags {:?}",
                 dest.as_u64(),
                 byte_size,
                 flags
             );
-            if !zero {
-                return map_from(
-                    dest,
-                    byte_size as u64,
-                    flags | MapFlags::DEALLOCATE,
-                    &mut DataAllocator(&mut GlobalMemoryProvider),
-                );
-            } else {
-                return map_with_operation(
-                    dest,
-                    src,
-                    byte_size,
-                    flags | MapFlags::DEALLOCATE,
-                    ZeroMemory,
-                );
-            }
+
+            return map_from(
+                dest,
+                byte_size as u64,
+                flags | MapFlags::DEALLOCATE,
+                &mut DataAllocator(&mut GlobalMemoryProvider),
+                op,
+            );
         },
     }
 
@@ -233,67 +227,4 @@ pub(crate) unsafe fn unmap_unchecked(
     }
 
     Ok(())
-}
-
-/// Maps a range of virtual addresses to physical frames, using the provided frame allocator for any necessary allocations of page tables,
-/// and executes the given memory mapping operations for each mapping.
-pub unsafe fn map_with_operation_unchecked(
-    dest: VirtAddr,
-    src: MapSource,
-    byte_size: usize,
-    flags: MapFlags,
-    operation: impl OperationAllSizes,
-) -> Result<(), MemError> {
-    if matches!(src, MapSource::Anon { zero: false }) && !flags.contains(MapFlags::WRITABLE) {
-        warn!(
-            "nmm::map_with_operation: Mapping anonymous memory without zeroing and without the writable flag makes the mapping useless without undefined behavior."
-        )
-    }
-
-    match src {
-        MapSource::Direct(phys_base) => {
-            trace!(
-                "Mapping physical memory at address {:#x} to virtual address {:#x} with size {} bytes and flags {:?}",
-                phys_base.as_u64(),
-                dest.as_u64(),
-                byte_size,
-                flags
-            );
-            unsafe {
-                map_from(
-                    dest,
-                    byte_size as u64,
-                    flags,
-                    &mut PhysLinear(phys_base, &mut *asm::pmm()),
-                )
-            }
-        }
-        MapSource::Anon { zero } => unsafe {
-            trace!(
-                "Mapping anonymous memory at virtual address {:#x} with size {} bytes and flags {:?}",
-                dest.as_u64(),
-                byte_size,
-                flags
-            );
-
-            if !zero {
-                return map_from(
-                    dest,
-                    byte_size as u64,
-                    flags | MapFlags::DEALLOCATE,
-                    &mut DataAllocator(&mut *asm::pmm()),
-                );
-            } else {
-                let as_guard = asm::active();
-                let mut mapper = as_guard.mapper().unwrap();
-                return mapper.map_from_with_operation(
-                    dest,
-                    byte_size as u64,
-                    flags,
-                    &mut DataAllocator(&mut *asm::pmm()),
-                    Chain(ZeroMemory, operation),
-                );
-            }
-        },
-    }
 }

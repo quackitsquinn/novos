@@ -1,7 +1,7 @@
 use core::{
     alloc::Layout,
     fmt::Debug,
-    mem::{Alignment, MaybeUninit},
+    mem::{self, Alignment, MaybeUninit},
 };
 
 use cake::{limine::memory_map::EntryType, log::info};
@@ -21,6 +21,7 @@ use crate::{
         PhysAddr, Small,
         map::DataAllocator,
         map_from,
+        operation::ZeroMemory,
         primitives::{FrameClass, MemoryRange},
     },
 };
@@ -52,6 +53,7 @@ impl PhysicalMemoryManager {
                 slice_layout.size() as u64,
                 MapFlags::WRITABLE,
                 &mut DataAllocator(&mut entry_walker),
+                &mut (),
             )?
         };
 
@@ -116,6 +118,7 @@ impl PhysicalMemoryManager {
                 needed_bytes,
                 MapFlags::WRITABLE,
                 &mut DataAllocator(walker),
+                &mut (),
             )?
         };
 
@@ -125,6 +128,10 @@ impl PhysicalMemoryManager {
                 needed_entries as usize,
             )
         };
+
+        for entry in bitmap_slice.iter_mut() {
+            *entry = 0;
+        }
 
         Ok(BitmapEntry {
             start: range.start(),
