@@ -23,7 +23,6 @@ use cake::log::info;
 use interrupts::hardware;
 use kserial::client::get_serial_client;
 
-pub mod acpi;
 pub mod context;
 pub mod display;
 pub mod gdt;
@@ -104,7 +103,6 @@ pub(crate) unsafe fn init_kernel_services() {
     mp::PREINIT_MODULE.init();
     #[cfg(not(test))] // Tests don't have a display
     display::MODULE.init();
-    acpi::MODULE.init();
     mp::MODULE.init();
     pci::MODULE.init();
     //proc::MODULE.init();

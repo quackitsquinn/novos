@@ -5,7 +5,11 @@
 use cake::Once;
 use cake::log::info;
 use nmm::MapFlags;
+use nmm::arch::L1_PAGE_SIZE;
+use nmm::paging::Address;
 use nmm::paging::AddressExt;
+use nmm::paging::primitives::PhysAddr;
+use nmm::paging::primitives::PhysRange;
 use x86_64::registers::model_specific::Msr;
 
 use crate::mp::lapic::icr::InterruptCommandRegister;
@@ -58,10 +62,8 @@ impl Lapic {
         let base = unsafe { LAPIC_BASE_MSR.read() } & 0xFFFF_FFFF_FFFF_F000;
         self.base.call_once(|| base);
         info!("LAPIC base address: {:#x}", base);
-        let phys_addr = x86_64::PhysAddr::new(base);
         let map = nmm::create_phys_mapping(
-            phys_addr.into(),
-            1024,
+            PhysRange::new_len(PhysAddr::new(base), L1_PAGE_SIZE),
             MapFlags::CACHE_DISABLE | MapFlags::WRITABLE,
         )
         .expect("Failed to map LAPIC");

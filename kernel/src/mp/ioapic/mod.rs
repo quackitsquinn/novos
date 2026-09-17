@@ -6,12 +6,11 @@ use cake::log::info;
 use cake::{Once, OnceMutex};
 use modular_bitfield::prelude::*;
 use nmm::MapFlags;
-use nmm::paging::AddressExt;
+use nmm::arch::L1_PAGE_SIZE;
+use nmm::paging::primitives::{PhysRange, VirtRange};
+use nmm::paging::{Address, AddressExt, PhysAddr};
 
-use crate::{
-    acpi,
-    mp::{apic_page_flags, id},
-};
+use crate::mp::{apic_page_flags, id};
 
 mod redirection;
 mod version;
@@ -37,20 +36,18 @@ impl IoApic {
 
     /// Initializes the IOAPIC by reading the MADT and mapping the IOAPIC's physical address into the kernel's address space.
     pub fn init(&self) {
-        let madt = acpi::get_table::<Madt>().expect("Failed to get MADT");
-        for entry in madt.table_pin().entries() {
-            if let MadtEntry::IoApic(i) = entry {
-                self.base.call_once(|| i.io_apic_address as u64);
-                break;
-            }
-        }
+        let madt = todo!("Rewrite ACPI code");
+        // for entry in madt.table_pin().entries() {
+        //     if let MadtEntry::IoApic(i) = entry {
+        //         self.base.call_once(|| i.io_apic_address as u64);
+        //         break;
+        //     }
+        // }
 
         let base = *self.base.get().expect("No IOAPIC found in MADT");
         info!("IO APIC base address: {:#x}", base);
-        let phys_addr = x86_64::PhysAddr::new(base);
         let map = nmm::create_phys_mapping(
-            phys_addr.into(),
-            1024,
+            PhysRange::new_len(PhysAddr::new(base), L1_PAGE_SIZE),
             MapFlags::CACHE_DISABLE | MapFlags::WRITABLE,
         )
         .expect("Failed to map LAPIC");
