@@ -6,10 +6,10 @@ use crate::{
     MapFlags, MemError,
     arch::RecursivePageTable,
     paging::{
-        AddressExt, FragmentManager, FragmentSize, Frame, Large, Page, PageTable, PageTableEntry,
-        Small,
+        AddressExt, FragmentManager, FragmentSize, Frame, Large, MemoryRange, Page, PageTable,
+        PageTableEntry, Small, VirtAddr,
         accessor::{self, PagetableAccessor},
-        asm::{self, InactiveAddressSpace},
+        asm::{self, InactiveAddressSpace, MappingOwner},
         map::{Flush, MemoryMapper, SizedMemoryMapper},
         recursive_entry,
     },
@@ -42,6 +42,20 @@ impl MountedAddressSpace {
 
     pub fn free(mut self) -> Result<(), crate::paging::MemError> {
         unsafe { cleanup_mapped_address_space(&mut self) }
+    }
+
+    pub fn map_owned<M>(&mut self, owner: &mut M) -> Result<(), MemError>
+    where
+        M: MappingOwner,
+    {
+        owner.map_into(self)
+    }
+
+    pub fn copy_mappings_from_base(
+        &mut self,
+        range: MemoryRange<VirtAddr>,
+    ) -> Result<(), MemError> {
+        todo!()
     }
 }
 

@@ -177,6 +177,13 @@ pub(crate) fn activate_inactive_space(
     Ok(())
 }
 
+/// A trait for types that can own a mapping of memory into an address space.
+///
+/// This trait is used to allow types to map their internal state into an address space, such as the memory manager's internal data structures.
+pub trait MappingOwner {
+    fn map_into(&mut self, mapper: &mut MountedAddressSpace) -> Result<(), MemError>;
+}
+
 /// Zeros out the given frame by mapping it to a known V.A. and writing zeros to it.
 ///
 /// This requires access to the scratch page, so this cannot be called from within a [with_scratch_frame] call.
