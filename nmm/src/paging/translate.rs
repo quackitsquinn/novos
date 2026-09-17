@@ -1,0 +1,83 @@
+//! Address translation trait
+use crate::{
+    MemError,
+    arch::RecursivePageTable,
+    paging::{
+        Frame, Large, MemoryFragment, Page, PageTableIndex, VirtAddr,
+        accessor::{self, PagetableAccessor, build_vaddress},
+        primitives::{AnyFragment, FrameClass},
+    },
+};
+
+/// A trait for translating virtual addresses to physical addresses in a given address space.
+pub trait Translate {
+    /// Translates a virtual address to a physical address in the context of this address space.
+    /// Returns a `TranslateResult` indicating the outcome of the translation.
+    fn translate(&self, addr: VirtAddr) -> TranslateResult;
+}
+
+/// The result of a translation attempt, indicating whether the translation was successful, not mapped, or resulted in an error.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TranslateResult {
+    /// The translation was successful, and the resulting physical address is contained in the `AnyFragment<FrameClass>`.
+    Success(AnyFragment<FrameClass>),
+    /// The virtual address is not mapped in this address space.
+    NotMapped,
+    /// An error occurred during the translation process, such as an invalid address or a failure to access the page tables.
+    Error(MemError),
+}
+
+impl From<MemError> for TranslateResult {
+    fn from(err: MemError) -> Self {
+        TranslateResult::Error(err)
+    }
+}
+
+impl<T> Translate for T
+where
+    T: PagetableAccessor,
+{
+    fn translate(&self, addr: VirtAddr) -> TranslateResult {
+        let (l4, l3, l2, l1) = accessor::dissolve_address(addr);
+        let l3_table = match self.l3_table(l4) {
+            Ok(table) => table,
+            Err(e) => return TranslateResult::Error(e),
+        };
+
+        let l3_ent = l3_table.read_entry(l3);
+        if !l3_ent.is_present() {
+            return TranslateResult::NotMapped;
+        } else if l3_ent.is_huge() {
+            let frame = Frame::from_start_address(l3_ent.addr()).unwrap();
+            return TranslateResult::Success(AnyFragment::Large(frame));
+        }
+
+        let l2_table = match self.l2_table(l4, l3) {
+            Ok(table) => table,
+            Err(e) => return TranslateResult::Error(e),
+        };
+
+        let l2_ent = l2_table.read_entry(l2);
+        if !l2_ent.is_present() {
+            return TranslateResult::NotMapped;
+        } else if l2_ent.is_huge() {
+            let frame = Frame::from_start_address(l2_ent.addr()).unwrap();
+            return TranslateResult::Success(AnyFragment::Medium(frame));
+        }
+
+        let l1_table = match self.l1_table(l4, l3, l2) {
+            Ok(table) => table,
+            Err(e) => return TranslateResult::Error(e),
+        };
+
+        let l1_ent = l1_table.read_entry(l1);
+        if !l1_ent.is_present() {
+            return TranslateResult::NotMapped;
+        } else if l1_ent.is_huge() {
+            return TranslateResult::Error(MemError::InvalidOperation);
+        }
+
+        let frame = Frame::from_start_address(l1_ent.addr()).unwrap();
+        TranslateResult::Success(AnyFragment::Small(frame))
+    }
+}

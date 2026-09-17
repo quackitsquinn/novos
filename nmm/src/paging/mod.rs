@@ -10,6 +10,7 @@ pub mod operation;
 pub mod primitives;
 mod recursive_entry;
 mod table;
+pub mod translate;
 
 pub(crate) use recursive_entry::RecursiveEntryManager;
 
