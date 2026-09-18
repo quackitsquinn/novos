@@ -6,7 +6,7 @@ use crate::{
     paging::{
         Frame, Large, Medium, MemoryFragment, Page, PageTableIndex, Small, VirtAddr,
         accessor::{self, PagetableAccessor, build_vaddress},
-        primitives::{AnyFragment, FrameClass, PageClass},
+        primitives::{AnyFragment, DirectMapping, FrameClass, PageClass},
     },
 };
 
@@ -21,7 +21,7 @@ pub trait Translate {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TranslateResult {
     /// The translation was successful, and the resulting physical address is contained in the `AnyFragment<FrameClass>`.
-    Success(PageMapping),
+    Success(DirectMapping),
     /// The virtual address is not mapped in this address space.
     NotMapped,
     /// An error occurred during the translation process, such as an invalid address or a failure to access the page tables.
@@ -50,7 +50,7 @@ where
             return TranslateResult::NotMapped;
         } else if l3_ent.is_huge() {
             let frame = Frame::from_start_address(l3_ent.addr()).unwrap();
-            return TranslateResult::Success(PageMapping::Large(
+            return TranslateResult::Success(DirectMapping::Large(
                 Page::from_start_address(accessor::build_vaddress(
                     l4,
                     l3,
@@ -72,7 +72,7 @@ where
             return TranslateResult::NotMapped;
         } else if l2_ent.is_huge() {
             let frame = Frame::from_start_address(l2_ent.addr()).unwrap();
-            return TranslateResult::Success(PageMapping::Medium(
+            return TranslateResult::Success(DirectMapping::Medium(
                 Page::from_start_address(accessor::build_vaddress(l4, l3, l2, PageTableIndex::MIN))
                     .unwrap(),
                 frame,
@@ -92,40 +92,9 @@ where
         }
 
         let frame = Frame::from_start_address(l1_ent.addr()).unwrap();
-        TranslateResult::Success(PageMapping::Small(
+        TranslateResult::Success(DirectMapping::Small(
             Page::from_start_address(accessor::build_vaddress(l4, l3, l2, l1)).unwrap(),
             frame,
         ))
-    }
-}
-
-/// A direct mapping between a page and a frame.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PageMapping {
-    /// A mapping between a small page and a small frame.
-    Small(Page<Small>, Frame<Small>),
-    /// A mapping between a medium page and a medium frame.
-    Medium(Page<Medium>, Frame<Medium>),
-    /// A mapping between a large page and a large frame.
-    Large(Page<Large>, Frame<Large>),
-}
-
-impl PageMapping {
-    /// Returns the page associated with this mapping.
-    pub fn page(&self) -> AnyFragment<PageClass> {
-        match self {
-            PageMapping::Small(page, _) => AnyFragment::Small(*page),
-            PageMapping::Medium(page, _) => AnyFragment::Medium(*page),
-            PageMapping::Large(page, _) => AnyFragment::Large(*page),
-        }
-    }
-
-    /// Returns the frame associated with this mapping.
-    pub fn frame(&self) -> AnyFragment<FrameClass> {
-        match self {
-            PageMapping::Small(_, frame) => AnyFragment::Small(*frame),
-            PageMapping::Medium(_, frame) => AnyFragment::Medium(*frame),
-            PageMapping::Large(_, frame) => AnyFragment::Large(*frame),
-        }
     }
 }

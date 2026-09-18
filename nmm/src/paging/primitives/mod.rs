@@ -368,3 +368,50 @@ where
 pub type PhysRange = MemoryRange<PhysAddr>;
 /// A range of virtual memory.
 pub type VirtRange = MemoryRange<VirtAddr>;
+
+/// A direct mapping between a page and a frame.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DirectMapping {
+    /// A mapping between a small page and a small frame.
+    Small(Page<Small>, Frame<Small>),
+    /// A mapping between a medium page and a medium frame.
+    Medium(Page<Medium>, Frame<Medium>),
+    /// A mapping between a large page and a large frame.
+    Large(Page<Large>, Frame<Large>),
+}
+
+impl DirectMapping {
+    /// Returns the page associated with this mapping.
+    pub fn page(&self) -> AnyFragment<PageClass> {
+        match self {
+            DirectMapping::Small(page, _) => AnyFragment::Small(*page),
+            DirectMapping::Medium(page, _) => AnyFragment::Medium(*page),
+            DirectMapping::Large(page, _) => AnyFragment::Large(*page),
+        }
+    }
+
+    /// Returns the frame associated with this mapping.
+    pub fn frame(&self) -> AnyFragment<FrameClass> {
+        match self {
+            DirectMapping::Small(_, frame) => AnyFragment::Small(*frame),
+            DirectMapping::Medium(_, frame) => AnyFragment::Medium(*frame),
+            DirectMapping::Large(_, frame) => AnyFragment::Large(*frame),
+        }
+    }
+
+    /// Creates a new DirectMapping from the given page and frame.
+    pub fn new<S: FragmentSize>(page: Page<S>, frame: Frame<S>) -> Self {
+        match S::SIZE {
+            Small::SIZE => DirectMapping::Small(unsafe { transmute_copy(&page) }, unsafe {
+                transmute_copy(&frame)
+            }),
+            Medium::SIZE => DirectMapping::Medium(unsafe { transmute_copy(&page) }, unsafe {
+                transmute_copy(&frame)
+            }),
+            Large::SIZE => DirectMapping::Large(unsafe { transmute_copy(&page) }, unsafe {
+                transmute_copy(&frame)
+            }),
+            _ => panic!("DirectMapping::new: Invalid fragment size"),
+        }
+    }
+}
