@@ -3,11 +3,15 @@
 use arrayvec::ArrayVec;
 
 use crate::{
-    MapFlags, MemError, arch,
+    MapFlags, MemError, align, arch,
     paging::{
         Address, AddressExt, FragmentManager, FragmentSize, Frame, FullManager, Large, Medium,
-        MemoryFragment, Page, PageTable, PageTableEntry, PageTableIndex, PhysAddr, Small, VirtAddr,
-        index::PageIndexIter, map::Flush, primitives::FrameClass,
+        MemoryFragment, MemoryRange, Page, PageTable, PageTableEntry, PageTableIndex, PhysAddr,
+        Small, VirtAddr,
+        index::PageIndexIter,
+        map::{Flush, GlobalMemoryProvider, MemoryMapper},
+        primitives::{AnyPage, DirectMapping, FrameClass},
+        translate::{Translate, TranslateResult},
     },
 };
 
@@ -476,6 +480,59 @@ fn access_and_clear_table<C>(
     }
 
     err
+}
+
+pub(crate) fn copy_mappings_between_tables<S, D>(
+    src: &S,
+    dst: &mut D,
+    range: MemoryRange<VirtAddr>,
+) -> Result<(), MemError>
+where
+    S: PagetableAccessor,
+    D: PagetableAccessor + MemoryMapper,
+{
+    let range_start = VirtAddr::new(align!(down, range.start().as_u64(), arch::L1_PAGE_SIZE));
+    let range_end = VirtAddr::new(align!(up, range.end().as_u64(), arch::L1_PAGE_SIZE));
+
+    let mut off = 0;
+
+    while range_start + off < range_end {
+        let (mapping, flags) = match src.translate(range.start() + off) {
+            TranslateResult::Success(mapping, flags) => (mapping, flags),
+            TranslateResult::NotMapped => {
+                return Err(MemError::NotMapped(AnyPage::Small(
+                    Page::from_start_address(range.start()).unwrap(),
+                )));
+            }
+            TranslateResult::Error(e) => {
+                return Err(e);
+            }
+        };
+
+        // Make sure the given virt addr is
+        if mapping.page().start_address() != range_start + off {
+            return Err(MemError::InvalidOperation);
+        }
+
+        match mapping {
+            DirectMapping::Small(dst_page, src) => {
+                dst.map_primitive(dst_page, src, flags, &mut GlobalMemoryProvider)?
+                    .flush();
+            }
+            DirectMapping::Medium(dst_page, src) => {
+                dst.map_primitive(dst_page, src, flags, &mut GlobalMemoryProvider)?
+                    .flush();
+            }
+            DirectMapping::Large(dst_page, src) => {
+                dst.map_primitive(dst_page, src, flags, &mut GlobalMemoryProvider)?
+                    .flush();
+            }
+        }
+
+        off += mapping.page().size();
+    }
+
+    Ok(())
 }
 
 struct CleanupCtx<'a, T: PagetableAccessor, M: FullManager<FrameClass>> {
