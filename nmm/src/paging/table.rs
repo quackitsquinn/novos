@@ -114,7 +114,7 @@ impl PageTableEntry {
 
     /// Returns the physical address contained in this page table entry, if it is present and valid.
     pub fn addr(&self) -> PhysAddr {
-        PhysAddr::new(self.value & arch::PHYSICAL_ADDRESS_MAX)
+        PhysAddr::new(self.value & arch::PAGE_TABLE_ENTRY_ADDR_BITS)
     }
 
     /// Returns whether this page table entry is present (i.e., valid and mapped).

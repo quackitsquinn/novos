@@ -168,6 +168,9 @@ pub const RECURSIVE_SLOTS: Range<PageTableIndex> = Range {
     end: PageTableIndex::new(511),
 };
 
+/// The bits used for the address portion of a page table entry.
+pub const PAGE_TABLE_ENTRY_ADDR_BITS: u64 = 0x000fffff_fffff000;
+
 cake::encapsulate_macro!(
     impl_memory_mapper_for,
     _mm_impl_for,

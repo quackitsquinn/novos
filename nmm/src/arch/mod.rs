@@ -70,6 +70,8 @@ pub const USEABLE_RECURSIVE_SLOTS: Range<PageTableIndex> = Range {
     end: RECURSIVE_SLOTS.end,
 };
 
+pub use arch_impl::PAGE_TABLE_ENTRY_ADDR_BITS;
+
 pub(crate) use arch_impl::set_root_table;
 
 /// Validates that the given physical address is valid for the current architecture.
