@@ -1,7 +1,7 @@
 //! Address translation trait
 
 use crate::{
-    MemError,
+    MapFlags, MemError,
     arch::RecursivePageTable,
     paging::{
         Frame, Large, Medium, MemoryFragment, Page, PageTableIndex, Small, VirtAddr,
@@ -21,7 +21,7 @@ pub trait Translate {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TranslateResult {
     /// The translation was successful, and the resulting physical address is contained in the `AnyFragment<FrameClass>`.
-    Success(DirectMapping),
+    Success(DirectMapping, MapFlags),
     /// The virtual address is not mapped in this address space.
     NotMapped,
     /// An error occurred during the translation process, such as an invalid address or a failure to access the page tables.
@@ -50,16 +50,14 @@ where
             return TranslateResult::NotMapped;
         } else if l3_ent.is_huge() {
             let frame = Frame::from_start_address(l3_ent.addr()).unwrap();
-            return TranslateResult::Success(DirectMapping::Large(
-                Page::from_start_address(accessor::build_vaddress(
-                    l4,
-                    l3,
-                    PageTableIndex::MIN,
-                    PageTableIndex::MIN,
-                ))
-                .unwrap(),
-                frame,
-            ));
+            let page = Page::from_start_address(accessor::build_vaddress(
+                l4,
+                l3,
+                PageTableIndex::MIN,
+                PageTableIndex::MIN,
+            ))
+            .unwrap();
+            return TranslateResult::Success(DirectMapping::Large(page, frame), l3_ent.flags());
         }
 
         let l2_table = match self.l2_table(l4, l3) {
@@ -72,11 +70,10 @@ where
             return TranslateResult::NotMapped;
         } else if l2_ent.is_huge() {
             let frame = Frame::from_start_address(l2_ent.addr()).unwrap();
-            return TranslateResult::Success(DirectMapping::Medium(
+            let page =
                 Page::from_start_address(accessor::build_vaddress(l4, l3, l2, PageTableIndex::MIN))
-                    .unwrap(),
-                frame,
-            ));
+                    .unwrap();
+            return TranslateResult::Success(DirectMapping::Medium(page, frame), l2_ent.flags());
         }
 
         let l1_table = match self.l1_table(l4, l3, l2) {
@@ -92,9 +89,7 @@ where
         }
 
         let frame = Frame::from_start_address(l1_ent.addr()).unwrap();
-        TranslateResult::Success(DirectMapping::Small(
-            Page::from_start_address(accessor::build_vaddress(l4, l3, l2, l1)).unwrap(),
-            frame,
-        ))
+        let page = Page::from_start_address(accessor::build_vaddress(l4, l3, l2, l1)).unwrap();
+        TranslateResult::Success(DirectMapping::Small(page, frame), l1_ent.flags())
     }
 }
