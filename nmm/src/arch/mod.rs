@@ -21,7 +21,7 @@ pub type ArchEntryFlags = arch_impl::PageTableFlags;
 /// The API for architecture-specific operations in the memory manager.
 /// This is a wrapper around the architecture-specific API, allowing for a unified interface for architecture-specific operations while still preserving the
 /// ability to include architecture-specific implementations when necessary.
-pub type Mapper = arch_impl::Mapper;
+pub type Mapper = arch_impl::RecursivePageTable<'static>;
 
 /// The start of the higher half in virtual address space.
 pub const HIGHER_HALF_START: VirtAddr = arch_impl::HIGHER_HALF_START;
@@ -58,7 +58,7 @@ pub(crate) use arch_impl::canonicalize_virt;
 
 pub(crate) use arch_impl::PTE_FREE_BIT0;
 
-pub(crate) use arch_impl::pml4_phys;
+pub use arch_impl::pml4_phys;
 
 pub(crate) use arch_impl::RecursivePageTable;
 

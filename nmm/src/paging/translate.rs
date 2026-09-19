@@ -1,5 +1,7 @@
 //! Address translation trait
 
+use cake::log::trace;
+
 use crate::{
     MapFlags, MemError,
     arch::RecursivePageTable,

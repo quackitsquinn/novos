@@ -2,15 +2,13 @@
 
 pub(crate) mod api;
 mod conv;
-mod mapper;
-mod offset;
 mod recursive;
 
 use core::range::Range;
 
 use arrayvec::ArrayVec;
 use cfg_if::cfg_if;
-pub use mapper::Mapper;
+pub use recursive::RecursivePageTable;
 
 use bitflags::bitflags;
 
@@ -21,11 +19,8 @@ use crate::{
         Address, FragmentSize, Frame, MemoryFragment, Page, PageTableEntry, PageTableIndex, Small,
         VirtAddr,
         accessor::{self, PagetableAccessor},
-        map::Flush,
     },
 };
-
-pub(crate) use recursive::RecursivePageTable;
 
 /// The width of virtual addresses in bits for x86_64 architecture.
 pub const VIRTUAL_ADDRESS_WIDTH: u8 = 48;
@@ -129,8 +124,10 @@ pub(crate) const fn canonicalize_virt(addr: u64) -> u64 {
     // sign extend the value, repeating the leftmost bit.
     ((addr << 16) as i64 >> 16) as u64
 }
+/// Returns the physical address of the current PML4 table.
+/// This function reads the. CR3 register to obtain the physical address of the PML4 table.
 
-pub(crate) fn pml4_phys() -> Frame<Small> {
+pub fn pml4_phys() -> Frame<Small> {
     #[cfg(target_arch = "x86_64")]
     {
         use crate::paging::PhysAddr;

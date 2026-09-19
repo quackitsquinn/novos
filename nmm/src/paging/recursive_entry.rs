@@ -56,6 +56,23 @@ impl RecursiveEntryManager {
         }
         self.set_idx(idx as u8, false);
     }
+
+    /// Returns whether this manager is responsible for managing the given index.
+    pub const fn manages(&self, idx: PageTableIndex) -> bool {
+        let idx = match idx.value().checked_sub(self.base.value()) {
+            Some(idx) => idx,
+            None => return false,
+        };
+        idx < self.n_entries as u16
+    }
+    /// Sets the entry at the given index to the specified value (true for reserved, false for free).
+    pub const unsafe fn set_entry(&mut self, idx: PageTableIndex, value: bool) {
+        let idx = idx.value() - self.base.value();
+        if idx >= self.n_entries as u16 {
+            panic!("Index out of bounds");
+        }
+        self.set_idx(idx as u8, value);
+    }
 }
 
 impl Default for RecursiveEntryManager {

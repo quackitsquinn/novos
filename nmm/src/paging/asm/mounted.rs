@@ -22,6 +22,7 @@ use crate::{
 pub struct MountedAddressSpace {
     pub(crate) l4_table_frame: Frame<Small>,
     pub(crate) scratch_page: Page<Large>,
+    pub(crate) is_bootstrap: bool,
     pub(crate) address_space: RecursivePageTable<'static>,
     pub(crate) rem: crate::paging::RecursiveEntryManager,
 }
@@ -128,7 +129,7 @@ pub(super) unsafe fn mount(
     };
     let a_as = asm::active();
     let mut mapper_lock = a_as.mapper.lock_inner_mapper();
-    let pml4 = mapper_lock.root_table_mut();
+    let pml4 = mapper_lock.p4_mut();
     unsafe {
         pml4.set_entry(
             recursive_entry,
@@ -149,6 +150,7 @@ pub(super) unsafe fn mount(
     Ok(MountedAddressSpace {
         l4_table_frame: ias.l4_table_frame,
         scratch_page: ias.scratch_page,
+        is_bootstrap: ias.is_bootstrap,
         address_space: recusive_table,
         rem: ias.rem.clone(),
     })
@@ -180,7 +182,7 @@ unsafe fn unmount_no_consume(
     let recursive_entry = mas.address_space.recursive_index();
     let a_as = asm::active();
     let mut mapper_lock = a_as.mapper.lock_inner_mapper();
-    let pml4 = mapper_lock.root_table_mut();
+    let pml4 = mapper_lock.p4_mut();
     unsafe {
         pml4.set_entry(recursive_entry, PageTableEntry::empty());
     }
@@ -193,7 +195,8 @@ unsafe fn unmount_no_consume(
     Ok(InactiveAddressSpace {
         l4_table_frame: mas.l4_table_frame,
         scratch_page: mas.scratch_page,
-        bootstrap_hhdm_offset: None,
+        is_bootstrap: mas.is_bootstrap,
+        recursive_index: mas.address_space.recursive_index(),
         rem: mas.rem.clone(),
     })
 }

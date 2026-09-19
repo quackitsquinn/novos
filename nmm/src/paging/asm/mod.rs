@@ -1,6 +1,6 @@
 //! Address Space Management (ASM) module for nmm.
 
-use core::mem::transmute;
+use core::mem::{self, transmute};
 
 use cake::{
     MappedMutexGuard, Mutex, MutexGuard, OnceMutex, OnceMutexGuard, OnceRwLock, OnceRwReadGuard,
@@ -9,11 +9,12 @@ use cake::{
 
 use crate::{
     MapFlags, MemError,
-    arch::{self, Mapper, RECURSIVE_SLOT0},
+    arch::{self, Mapper, RECURSIVE_SLOT0, RecursivePageTable},
     bitmap::{PhysicalMemoryManager, VirtualMemoryManager},
     paging::{
         Address, AddressExt, FragmentSize, Frame, Large, MemoryFragment, Page, PageTable,
-        PageTableIndex, RecursiveEntryManager, Small, accessor,
+        PageTableIndex, RecursiveEntryManager, Small,
+        accessor::{self, PagetableAccessor},
         map::{LocalMemoryMapper, MapperMut, MemoryMapper, SizedMemoryMapper},
     },
 };
@@ -43,7 +44,7 @@ impl AddressSpace {
         l4_table_frame: Frame<Small>,
         scratch_page: Page<Large>,
     ) -> Self {
-        let l4_table = mapper.root_table().as_page();
+        let l4_table = mapper.p4().as_page();
         Self {
             mapper: LocalMemoryMapper::new(mapper),
             l4_table_frame,
@@ -58,7 +59,7 @@ impl AddressSpace {
         l4_table_frame: Frame<Small>,
         scratch_page: Page<Large>,
     ) -> Self {
-        let l4_table = mapper.root_table().as_page();
+        let l4_table = mapper.p4().as_page();
         Self {
             mapper: LocalMemoryMapper::new(mapper),
             l4_table_frame,
@@ -134,35 +135,20 @@ pub(crate) unsafe fn release_recursive_slot(idx: PageTableIndex) -> Result<(), M
 pub(crate) fn activate_inactive_space(
     space: inactive::InactiveAddressSpace,
 ) -> Result<(), MemError> {
-    let (mapper, needs_activate) = match space.bootstrap_hhdm_offset {
-        Some(hhdm_offset) => {
-            let pml4_page = space
-                .l4_table_frame
-                .translate_offset(hhdm_offset)
-                .ok_or(MemError::Other("translation out of range"))?;
-            let pml4 = unsafe { &mut *(pml4_page.as_mut_ptr::<PageTable>()) };
-            let mapper = unsafe { Mapper::new_offset(pml4, hhdm_offset) };
-            (mapper, false) // HHDM is only supported during bootstrap, where the kernel will switch to a recursive model as soon as possible. So this is already the active address space.
-        }
-        None => {
-            let pml4_page = const {
-                accessor::build_vaddress(
-                    RECURSIVE_SLOT0,
-                    RECURSIVE_SLOT0,
-                    RECURSIVE_SLOT0,
-                    RECURSIVE_SLOT0,
-                )
-            };
-            let pml4 = unsafe { &mut *(pml4_page.as_mut_ptr::<PageTable>()) };
-            let mapper = unsafe { Mapper::new_recursive(pml4, RECURSIVE_SLOT0) };
-            (mapper, true) // This is a normal inactive address space, so we need to activate it.
-        }
-    };
+    let pml4_page = accessor::build_vaddress(
+        space.recursive_index,
+        space.recursive_index,
+        space.recursive_index,
+        space.recursive_index,
+    );
+    let pml4 = unsafe { &mut *(pml4_page.as_mut_ptr::<PageTable>()) };
+    let mapper = unsafe { RecursivePageTable::new(pml4, space.recursive_index) };
 
     let new_space = AddressSpace::new(mapper, space.l4_table_frame, space.scratch_page);
     unsafe { set_active(new_space) };
 
-    if !needs_activate {
+    if space.is_bootstrap {
+        mem::forget(space);
         return Ok(());
     }
 

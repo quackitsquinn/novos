@@ -4,6 +4,7 @@ use core::convert::Infallible;
 use cake::limine::BaseRevision;
 use cake::limine::{paging::Mode, request::*, response::ExecutableAddressResponse};
 use cake::{LimineRequest, Once};
+use nmm::paging::{Address, VirtAddr};
 
 use crate::STACK_SIZE;
 use crate::{
@@ -29,7 +30,7 @@ static DATE_AT_BOOT: DateAtBootRequest = DateAtBootRequest::new();
 static BOOT_TIMESTAMP: Once<u64> = Once::new();
 
 /// Physical memory offset provided by the bootloader
-pub static PHYSICAL_MEMORY_OFFSET: Once<u64> = Once::new();
+pub static PHYSICAL_MEMORY_OFFSET: Once<VirtAddr> = Once::new();
 
 /// Root System Description Pointer provided by the bootloader
 pub static RSDP_ADDRESS: Once<Option<usize>> = Once::new();
@@ -65,7 +66,7 @@ fn init() -> Result<(), Infallible> {
         .get_response()
         .unwrap()
         .offset();
-    PHYSICAL_MEMORY_OFFSET.call_once(|| offset);
+    PHYSICAL_MEMORY_OFFSET.call_once(|| VirtAddr::new_truncate(offset));
 
     MEMORY_MAP.init(MemoryMap::new);
 

@@ -73,3 +73,14 @@ impl Iterator for PageIndexIter {
         }
     }
 }
+
+impl DoubleEndedIterator for PageIndexIter {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        if self.current < self.end {
+            self.end = PageTableIndex(self.end.value() - 1);
+            Some(self.end)
+        } else {
+            None
+        }
+    }
+}

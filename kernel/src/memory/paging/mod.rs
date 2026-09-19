@@ -26,13 +26,6 @@ pub type KernelPhysFrame = PhysFrame<KernelPageSize>;
 declare_module!("paging", init);
 
 fn init() -> Result<(), Infallible> {
-    let cr3 = Cr3::read();
-    let off = *PHYSICAL_MEMORY_OFFSET
-        .get()
-        .expect("physical memory offset uninitialized");
-    let page_table = unsafe { &mut *((cr3.0.start_address().as_u64() + off) as *mut PageTable) };
-    let offset_table = unsafe { OffsetPageTable::new(page_table, VirtAddr::new(off)) };
-
     Ok(())
 }
 

@@ -1,17 +1,20 @@
+use core::mem;
+
 use cake::log::error;
 
 use crate::{
     MemError,
     paging::{
-        Frame, Large, Page, Small, VirtAddr,
-        asm::{self, mounted},
+        Frame, Large, Page, PageTableIndex, RecursiveEntryManager, Small, VirtAddr,
+        asm::{self, MountedAddressSpace, mounted},
     },
 };
 
 pub struct InactiveAddressSpace {
     pub(crate) mut(super) l4_table_frame: Frame<Small>,
     pub(crate) mut(super) scratch_page: Page<Large>,
-    pub(crate) mut(super) bootstrap_hhdm_offset: Option<VirtAddr>,
+    pub(crate) mut(super) is_bootstrap: bool,
+    pub(crate) mut(super) recursive_index: PageTableIndex,
     pub(crate) mut(super) rem: crate::paging::RecursiveEntryManager,
 }
 
@@ -20,12 +23,19 @@ impl InactiveAddressSpace {
     pub(crate) unsafe fn bootstrap(
         l4_table_frame: Frame<Small>,
         scratch_page: Page<Large>,
-        hhdm_offset: VirtAddr,
+        recursive_index: PageTableIndex,
     ) -> Self {
+        let mut rem = RecursiveEntryManager::default();
+        if rem.manages(recursive_index) {
+            unsafe {
+                rem.set_entry(recursive_index, true);
+            }
+        }
         Self {
             l4_table_frame,
             scratch_page,
-            bootstrap_hhdm_offset: Some(hhdm_offset),
+            is_bootstrap: true,
+            recursive_index,
             rem: crate::paging::RecursiveEntryManager::default(),
         }
     }
@@ -35,11 +45,14 @@ impl InactiveAddressSpace {
         unsafe { crate::paging::asm::zero_frame(l4_table_frame)? };
         let asm = crate::paging::asm::active();
         let scratch_page = asm.scratch_page;
+        let mut rem = RecursiveEntryManager::default();
+        let recursive_index = rem.reserve().unwrap();
         Ok(Self {
             l4_table_frame,
             scratch_page,
-            bootstrap_hhdm_offset: None,
-            rem: crate::paging::RecursiveEntryManager::default(),
+            is_bootstrap: false,
+            recursive_index,
+            rem,
         })
     }
 
@@ -55,19 +68,13 @@ impl InactiveAddressSpace {
         self,
     ) -> Result<crate::paging::asm::mounted::MountedAddressSpace, (crate::paging::MemError, Self)>
     {
-        if self.bootstrap_hhdm_offset.is_some() {
-            error!(
-                "Attempted to mount InactiveAddressSpace during bootstrap phase. This is likely a bug, as the bootstrap address space should not be mounted."
-            );
-            return Err((crate::paging::MemError::InvalidOperation, self));
-        }
         crate::paging::asm::mounted::MountedAddressSpace::try_mount_inactive(self)
     }
 }
 
 impl Drop for InactiveAddressSpace {
     fn drop(&mut self) {
-        if self.bootstrap_hhdm_offset.is_some() {
+        if self.is_bootstrap {
             error!(
                 "Dropping InactiveAddressSpace during bootstrap phase. This is likely a bug, as the bootstrap address space should not be dropped."
             );

@@ -2,11 +2,11 @@ use cake::log::{debug, info};
 
 use crate::{
     InitConfig, MapFlags, MemError, align,
-    arch::{self, L1_PAGE_SIZE, pml4_phys, x86_64::mapper::Mapper},
+    arch::{self, L1_PAGE_SIZE, pml4_phys},
     bitmap::{BitmapBacking, PhysicalMemoryManager, VirtualMemoryManager},
     entry_walker::EntryWalker,
     paging::{
-        Address, AddressExt, Frame, PageTable, Small,
+        Address, AddressExt, Frame, PageTable, Small, accessor,
         asm::{self, AddressSpace, InactiveAddressSpace},
         map::DataAllocator,
         map_from,
@@ -26,10 +26,13 @@ pub(crate) unsafe fn init_unchecked(
 
     let cr3: Frame<Small> = pml4_phys();
     let root: &'static mut PageTable = unsafe {
-        &mut *(cr3
-            .translate_offset(config.offset)
-            .unwrap()
-            .as_mut_ptr::<PageTable>())
+        &mut *(accessor::build_vaddress(
+            config.recursive_idx,
+            config.recursive_idx,
+            config.recursive_idx,
+            config.recursive_idx,
+        )
+        .as_mut_ptr::<PageTable>())
     };
 
     for (i, entry) in root.entries().chunks_exact(4).enumerate() {
@@ -47,7 +50,7 @@ pub(crate) unsafe fn init_unchecked(
     // Initialize the mapper and set it as the active mapper for the system.
     // This is necessary to perform any virtual memory operations, including mapping the scratch space.
     let bootstrap_table =
-        unsafe { InactiveAddressSpace::bootstrap(cr3, config.zero_page, config.offset) };
+        unsafe { InactiveAddressSpace::bootstrap(cr3, config.zero_page, config.recursive_idx) };
     unsafe { bootstrap_table.activate()? };
 
     info!("Found {} bytes of usable memory", walker.usable_memory());

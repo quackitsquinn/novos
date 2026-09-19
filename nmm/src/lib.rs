@@ -30,7 +30,7 @@ use crate::{
     entry_walker::EntryWalker,
     paging::{
         Address, AddressExt, FragmentManager, FragmentSize, Frame, Large, MemoryFragment, Page,
-        PhysAddr, VirtAddr, asm,
+        PageTableIndex, PhysAddr, VirtAddr, asm,
         operation::OperationAllSizes,
         primitives::{AnyFragment, MemoryRange, PageClass, PhysRange, VirtRange},
     },
@@ -51,8 +51,9 @@ pub const MIN_MANAGED_RANGE_SIZE: u64 = arch::L3_PAGE_SIZE + arch::L2_PAGE_SIZE;
 /// The configuration for initializing the memory manager.
 #[derive(Clone, Copy)]
 pub struct InitConfig {
-    /// The virtual address offset where the physical memory is mapped in the virtual address space.
-    pub offset: VirtAddr,
+    /// The recursive index used for the recursive page table mapping. This index is used to access the page tables in a
+    /// recursive manner, allowing for efficient management of virtual memory.
+    pub recursive_idx: PageTableIndex,
     /// A range of virtual memory that the memory manager will manage. This is used for virtual address allocation.
     /// This range is used for virtual address allocation (e.g., for `alloc_virtspace`) and physical memory mapping (e.g., for `alloc_paged`),
     /// as well as internal memory management state.
@@ -68,7 +69,7 @@ pub struct InitConfig {
 impl Debug for InitConfig {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("InitConfig")
-            .field("offset", &self.offset)
+            .field("recursive_idx", &self.recursive_idx)
             .field("managed_range", &self.managed_range)
             .field("zero_page", &self.zero_page)
             .finish()
@@ -80,7 +81,7 @@ impl InitConfig {
     ///
     /// This means the managed range must be at least `arch::L3_PAGE_SIZE` bytes in size, and the scratch page will be the first page in the managed range.
     pub fn find_scratch_page(
-        offset: VirtAddr,
+        recursive_idx: PageTableIndex,
         managed_range: MemoryRange<VirtAddr>,
         memory_map: &'static [&'static memory_map::Entry],
     ) -> Result<Self, MemError> {
@@ -103,7 +104,7 @@ impl InitConfig {
         );
 
         Ok(Self {
-            offset,
+            recursive_idx,
             managed_range,
             zero_page,
             memory_map,
