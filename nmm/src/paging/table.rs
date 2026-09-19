@@ -70,8 +70,15 @@ impl PageTable {
     }
 
     /// Returns whether any entry in this page table is present (i.e., valid and mapped).
-    pub fn any_present(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.entries.iter().any(|entry| entry.is_present())
+    }
+
+    /// Zeros out all entries in the page table, effectively clearing it.
+    pub unsafe fn zero(&mut self) {
+        for entry in unsafe { self.entries_mut() }.iter_mut() {
+            *entry = PageTableEntry::empty();
+        }
     }
 }
 

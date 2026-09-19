@@ -247,7 +247,7 @@ pub fn find_free_parents_for<S: FragmentSize>(
             // The actual page should already be unmapped, so we don't need to remove it ourselves.
             let l1_page = {
                 let l1_table = accessor.l1_table(l4_index, l3_index, l2_index)?;
-                if l1_table.any_present() {
+                if l1_table.is_empty() {
                     return Ok(parents);
                 }
 
@@ -261,7 +261,7 @@ pub fn find_free_parents_for<S: FragmentSize>(
                 unsafe { l2_table.set_entry(l2_index, PageTableEntry::empty()) };
                 unsafe { Flush::flush_page(l1_page) }.flush();
 
-                if l2_table.any_present() {
+                if l2_table.is_empty() {
                     return Ok(parents);
                 }
                 l2_table.as_page()
@@ -279,7 +279,7 @@ pub fn find_free_parents_for<S: FragmentSize>(
         2 => {
             let l2_virt = {
                 let l2_table = accessor.l2_table(l4_index, l3_index)?;
-                if l2_table.any_present() {
+                if l2_table.is_empty() {
                     return Ok(parents);
                 }
 

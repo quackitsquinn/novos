@@ -373,6 +373,15 @@ pub enum MemError {
         /// The virtual address that is mapped to a higher-level page table entry, preventing the requested operation from completing.
         VirtAddr,
     ),
+    /// The requested operation failed because the provided virtual address is mapped to a lower-level page table entry,
+    /// preventing the requested operation from completing.
+    #[error(
+        "The provided virtual address is mapped to a lower-level page table entry, preventing the requested operation from completing: {0:?}"
+    )]
+    MappedToLowerLevel(
+        /// The virtual address that is mapped to a lower-level page table entry, preventing the requested operation from completing.
+        VirtAddr,
+    ),
     /// The requested operation failed because the required resources are unavailable, such as a missing page table or a second address space builder on the same address space.
     #[error("The requested operation failed because the required resources are unavailable: {0}")]
     ResourceUnavailable(&'static str),
@@ -489,6 +498,12 @@ impl Display for MapFlags {
         };
 
         Ok(())
+    }
+}
+
+impl Default for MapFlags {
+    fn default() -> Self {
+        Self::empty()
     }
 }
 /// Aligns the given value up or down to the nearest multiple of the specified alignment. The alignment must be a power of two.

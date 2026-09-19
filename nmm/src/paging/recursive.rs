@@ -1,9 +1,14 @@
+use arrayvec::ArrayVec;
+
 use crate::{
-    MemError,
+    MapFlags, MemError,
     paging::{
-        Address, Large, Medium, PageTable, PageTableIndex, Small, VirtAddr,
+        Address, FragmentManager, Frame, Large, Medium, MemoryFragment, PageTable, PageTableEntry,
+        PageTableIndex, Small, VirtAddr,
         accessor::{self, PagetableAccessor},
-        map::{MemoryMapper, SizedMemoryMapper},
+        map::{Flush, MemoryMapper, SizedMemoryMapper, Unmapped},
+        primitives::AnyPage,
+        table,
     },
 };
 
@@ -34,74 +39,209 @@ impl<'a> RecursivePageTable<'a> {
     pub(crate) fn recursive_index(&self) -> PageTableIndex {
         self.recursive_index
     }
+
+    fn l3_table_or_alloc(
+        &mut self,
+        l4_index: PageTableIndex,
+        table_flags: MapFlags,
+        allocator: &mut impl FragmentManager<Frame<Small>, Small>,
+    ) -> Result<&mut PageTable, MemError> {
+        let l4_entry = self.p4_mut().read_entry(l4_index);
+        if !l4_entry.is_present() {
+            let new_frame = allocator.allocate_fragment()?;
+            unsafe {
+                self.p4_mut()
+                    .set_entry(l4_index, PageTableEntry::new(new_frame, table_flags));
+            }
+            let table = self.l3_table_mut(l4_index)?;
+            unsafe { table.zero() };
+            return Ok(table);
+        }
+        self.l3_table_mut(l4_index)
+    }
+
+    fn l2_table_or_alloc(
+        &mut self,
+        l4_index: PageTableIndex,
+        l3_index: PageTableIndex,
+        table_flags: MapFlags,
+        allocator: &mut impl FragmentManager<Frame<Small>, Small>,
+    ) -> Result<&mut PageTable, MemError> {
+        let l3_table = self.l3_table_or_alloc(l4_index, table_flags, allocator)?;
+        let l3_entry = l3_table.read_entry(l3_index);
+        if !l3_entry.is_present() {
+            let new_frame = allocator.allocate_fragment()?;
+            unsafe {
+                l3_table.set_entry(l3_index, PageTableEntry::new(new_frame, table_flags));
+            }
+            let table = self.l2_table_mut(l4_index, l3_index)?;
+            unsafe { table.zero() };
+            return Ok(table);
+        }
+        self.l2_table_mut(l4_index, l3_index)
+    }
+
+    fn l1_table_or_alloc(
+        &mut self,
+        l4_index: PageTableIndex,
+        l3_index: PageTableIndex,
+        l2_index: PageTableIndex,
+        table_flags: MapFlags,
+        allocator: &mut impl FragmentManager<Frame<Small>, Small>,
+    ) -> Result<&mut PageTable, MemError> {
+        let l2_table = self.l2_table_or_alloc(l4_index, l3_index, table_flags, allocator)?;
+        let l2_entry = l2_table.read_entry(l2_index);
+        if !l2_entry.is_present() {
+            let new_frame = allocator.allocate_fragment()?;
+            unsafe {
+                l2_table.set_entry(l2_index, PageTableEntry::new(new_frame, table_flags));
+            }
+            let table = self.l1_table_mut(l4_index, l3_index, l2_index)?;
+            unsafe { table.zero() };
+            return Ok(table);
+        }
+        self.l1_table_mut(l4_index, l3_index, l2_index)
+    }
 }
 
 impl SizedMemoryMapper<Large> for RecursivePageTable<'_> {
     fn map_primitive<A>(
         &mut self,
-        _dst: super::Page<Large>,
-        _src: super::Frame<Large>,
-        _flags: crate::MapFlags,
-        _parent_table_flags: Option<crate::MapFlags>,
-        _allocator: &mut A,
+        dst: super::Page<Large>,
+        src: super::Frame<Large>,
+        flags: crate::MapFlags,
+        parent_table_flags: Option<crate::MapFlags>,
+        allocator: &mut A,
     ) -> Result<super::map::Flush, crate::MemError>
     where
         A: super::FragmentManager<super::Frame<super::Small>, super::Small>,
     {
-        todo!()
+        let (l4, l3, _, _) = accessor::dissolve_address(dst.start_address());
+
+        let table_flags = parent_table_flags.unwrap_or_default() | MapFlags::WRITABLE;
+        let l3_table = self.l3_table_or_alloc(l4, table_flags, allocator)?;
+        unsafe {
+            l3_table.set_entry(l3, PageTableEntry::new(src, flags));
+        }
+        Ok(unsafe { Flush::flush_page(dst) })
     }
 
     unsafe fn unmap_primitive(
         &mut self,
-        _page: super::Page<Large>,
-    ) -> Result<super::map::Unmapped<Large>, crate::MemError> {
-        todo!()
+        page: super::Page<Large>,
+    ) -> Result<Unmapped<Large>, crate::MemError> {
+        let (l4, l3, _, _) = accessor::dissolve_address(page.start_address());
+        let table = self.l3_table_mut(l4)?;
+        let entry = table.read_entry(l3);
+        if !entry.is_present() {
+            return Err(MemError::NotMapped(AnyPage::Large(page)));
+        } else if !entry.is_huge() {
+            return Err(MemError::MappedToLowerLevel(page.start_address()));
+        }
+        unsafe {
+            table.set_entry(l3, PageTableEntry::empty());
+        }
+
+        Ok(Unmapped::new(
+            Frame::from_start_address(entry.addr()).unwrap(),
+            accessor::find_free_parents_for(page, &mut *self)?,
+            unsafe { Some(Flush::flush_page(page)) },
+            entry.flags(),
+        ))
     }
 }
 
 impl SizedMemoryMapper<Medium> for RecursivePageTable<'_> {
     fn map_primitive<A>(
         &mut self,
-        _dst: super::Page<Medium>,
-        _src: super::Frame<Medium>,
-        _flags: crate::MapFlags,
-        _parent_table_flags: Option<crate::MapFlags>,
-        _allocator: &mut A,
+        dst: super::Page<Medium>,
+        src: super::Frame<Medium>,
+        flags: crate::MapFlags,
+        parent_table_flags: Option<crate::MapFlags>,
+        allocator: &mut A,
     ) -> Result<super::map::Flush, crate::MemError>
     where
         A: super::FragmentManager<super::Frame<super::Small>, super::Small>,
     {
-        todo!()
+        let (l4, l3, l2, _) = accessor::dissolve_address(dst.start_address());
+
+        let table_flags = parent_table_flags.unwrap_or_default() | MapFlags::WRITABLE;
+        let l2_table = self.l2_table_or_alloc(l4, l3, table_flags, allocator)?;
+        unsafe {
+            l2_table.set_entry(l2, PageTableEntry::new(src, flags));
+        }
+        Ok(unsafe { Flush::flush_page(dst) })
     }
 
     unsafe fn unmap_primitive(
         &mut self,
-        _page: super::Page<Medium>,
+        page: super::Page<Medium>,
     ) -> Result<super::map::Unmapped<Medium>, crate::MemError> {
-        todo!()
+        let (l4, l3, l2, _) = accessor::dissolve_address(page.start_address());
+        let table = self.l2_table_mut(l4, l3)?;
+        let entry = table.read_entry(l2);
+        if !entry.is_present() {
+            return Err(MemError::NotMapped(AnyPage::Medium(page)));
+        } else if !entry.is_huge() {
+            return Err(MemError::MappedToLowerLevel(page.start_address()));
+        }
+        unsafe {
+            table.set_entry(l2, PageTableEntry::empty());
+        }
+
+        Ok(Unmapped::new(
+            Frame::from_start_address(entry.addr()).unwrap(),
+            accessor::find_free_parents_for(page, &mut *self)?,
+            unsafe { Some(Flush::flush_page(page)) },
+            entry.flags(),
+        ))
     }
 }
 
 impl SizedMemoryMapper<Small> for RecursivePageTable<'_> {
     fn map_primitive<A>(
         &mut self,
-        _dst: super::Page<Small>,
-        _src: super::Frame<Small>,
-        _flags: crate::MapFlags,
-        _parent_table_flags: Option<crate::MapFlags>,
-        _allocator: &mut A,
+        dst: super::Page<Small>,
+        src: super::Frame<Small>,
+        flags: crate::MapFlags,
+        parent_table_flags: Option<crate::MapFlags>,
+        allocator: &mut A,
     ) -> Result<super::map::Flush, crate::MemError>
     where
         A: super::FragmentManager<super::Frame<super::Small>, super::Small>,
     {
-        todo!()
+        let (l4, l3, l2, l1) = accessor::dissolve_address(dst.start_address());
+
+        let table_flags = parent_table_flags.unwrap_or_default() | MapFlags::WRITABLE;
+        let l1_table = self.l1_table_or_alloc(l4, l3, l2, table_flags, allocator)?;
+        unsafe {
+            l1_table.set_entry(l1, PageTableEntry::new(src, flags));
+        }
+        Ok(unsafe { Flush::flush_page(dst) })
     }
 
     unsafe fn unmap_primitive(
         &mut self,
-        _page: super::Page<Small>,
+        page: super::Page<Small>,
     ) -> Result<super::map::Unmapped<Small>, crate::MemError> {
-        todo!()
+        let (l4, l3, l2, l1) = accessor::dissolve_address(page.start_address());
+        let table = self.l1_table_mut(l4, l3, l2)?;
+        let entry = table.read_entry(l1);
+        if !entry.is_present() {
+            return Err(MemError::NotMapped(AnyPage::Small(page)));
+        } else if !entry.is_huge() {
+            return Err(MemError::MappedToLowerLevel(page.start_address()));
+        }
+        unsafe {
+            table.set_entry(l1, PageTableEntry::empty());
+        }
+
+        Ok(Unmapped::new(
+            Frame::from_start_address(entry.addr()).unwrap(),
+            accessor::find_free_parents_for(page, &mut *self)?,
+            unsafe { Some(Flush::flush_page(page)) },
+            entry.flags(),
+        ))
     }
 }
 
@@ -122,7 +262,7 @@ impl PagetableAccessor for RecursivePageTable<'_> {
             return Err(MemError::PagetableNotPresent);
         }
 
-        Ok(VirtAddr::new(addr_raw))
+        Ok(VirtAddr::new_truncate(addr_raw))
     }
 
     fn read_l2_table(
@@ -144,7 +284,7 @@ impl PagetableAccessor for RecursivePageTable<'_> {
         }
 
         if entry.is_huge() {
-            return Err(MemError::MappedToHigherLevel(VirtAddr::new(
+            return Err(MemError::MappedToHigherLevel(VirtAddr::new_truncate(
                 accessor::build_address(
                     l4_index,
                     l3_index,
@@ -154,7 +294,7 @@ impl PagetableAccessor for RecursivePageTable<'_> {
             )));
         }
 
-        Ok(VirtAddr::new(addr_raw))
+        Ok(VirtAddr::new_truncate(addr_raw))
     }
 
     fn read_l1_table(
@@ -171,12 +311,12 @@ impl PagetableAccessor for RecursivePageTable<'_> {
         }
 
         if entry.is_huge() {
-            return Err(MemError::MappedToHigherLevel(VirtAddr::new(
+            return Err(MemError::MappedToHigherLevel(VirtAddr::new_truncate(
                 accessor::build_address(l4_index, l3_index, l2_index, PageTableIndex::new(0)),
             )));
         }
 
-        Ok(VirtAddr::new(addr_raw))
+        Ok(VirtAddr::new_truncate(addr_raw))
     }
 }
 
