@@ -8,6 +8,7 @@ use x86_64 as arch_impl;
 
 use crate::paging::PageTableIndex;
 use crate::paging::VirtAddr;
+use crate::paging::recursive::RecursivePageTable;
 
 /// Page table entry type for the current architecture.
 /// Currently, this is an alias for `arch::PageEntryType`.
@@ -21,7 +22,8 @@ pub type ArchEntryFlags = arch_impl::PageTableFlags;
 /// The API for architecture-specific operations in the memory manager.
 /// This is a wrapper around the architecture-specific API, allowing for a unified interface for architecture-specific operations while still preserving the
 /// ability to include architecture-specific implementations when necessary.
-pub type Mapper = arch_impl::RecursivePageTable<'static>;
+#[deprecated(note = "Use crate::paging::RecursivePageTable")]
+pub type Mapper = RecursivePageTable<'static>;
 
 /// The start of the higher half in virtual address space.
 pub const HIGHER_HALF_START: VirtAddr = arch_impl::HIGHER_HALF_START;
@@ -47,9 +49,6 @@ pub const L2_PAGE_SIZE: u64 = arch_impl::L2_PAGE_SIZE;
 pub const L3_PAGE_SIZE: u64 = arch_impl::L3_PAGE_SIZE;
 
 // TODO: maybe support x86 in the future? would be cool to watch this run on a xp or 98 era machine
-
-pub(crate) use arch_impl::api::init_unchecked;
-
 pub(crate) use arch_impl::do_flush;
 pub(crate) use arch_impl::do_flush_all;
 
@@ -59,8 +58,6 @@ pub(crate) use arch_impl::canonicalize_virt;
 pub(crate) use arch_impl::PTE_FREE_BIT0;
 
 pub use arch_impl::pml4_phys;
-
-pub(crate) use arch_impl::RecursivePageTable;
 
 pub use arch_impl::RECURSIVE_SLOTS;
 

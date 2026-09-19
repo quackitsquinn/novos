@@ -1,20 +1,14 @@
 //! Architecture-specific types and implementations for x86_64.
 
-pub(crate) mod api;
-mod conv;
-mod recursive;
-
 use core::range::Range;
 
 use arrayvec::ArrayVec;
 use cfg_if::cfg_if;
-pub use recursive::RecursivePageTable;
 
 use bitflags::bitflags;
 
 use crate::{
-    MemError,
-    arch::x86_64::conv::XFrameAllocator,
+    MapFlags, MemError,
     paging::{
         Address, FragmentSize, Frame, MemoryFragment, Page, PageTableEntry, PageTableIndex, Small,
         VirtAddr,
@@ -168,72 +162,57 @@ pub const RECURSIVE_SLOTS: Range<PageTableIndex> = Range {
 /// The bits used for the address portion of a page table entry.
 pub const PAGE_TABLE_ENTRY_ADDR_BITS: u64 = 0x000fffff_fffff000;
 
-cake::encapsulate_macro!(
-    impl_memory_mapper_for,
-    _mm_impl_for,
-    /// Implements the `MemoryMapper` trait for a given type and fragment size.
-    macro_rules! impl_memory_mapper_for {
-        ($ty: ty, $size:ident, $is_huge:literal) => {
-            impl SizedMemoryMapper<$size> for $ty {
-                fn map_primitive<A>(
-                    &mut self,
-                    page: Page<$size>,
-                    frame: Frame<$size>,
-                    flags: MapFlags,
-                    parent_table_flags: Option<MapFlags>,
-                    allocator: &mut A,
-                ) -> Result<Flush, MemError>
-                where
-                    A: FragmentManager<Frame<Small>, Small>,
-                {
-                    let mut x_fa = XFrameAllocator::new(allocator);
-                    let mut flags: PageTableFlags = flags.into();
-
-                    if $is_huge {
-                        flags.insert(PageTableFlags::HUGE_PAGE)
-                    };
-
-                    unsafe {
-                        let _ = self.inner.map_to(
-                            page.into(),
-                            frame.into(),
-                            flags.into(),
-                            &mut x_fa,
-                        )?;
-                    };
-
-                    Ok(unsafe { Flush::flush_page(page) })
-                }
-
-                unsafe fn unmap_primitive(
-                    &mut self,
-                    page: crate::paging::Page<$size>,
-                ) -> Result<Unmapped<$size>, MemError> {
-                    use $crate::paging::primitives::MemoryFragment;
-                    let flags = match self.inner.translate(page.start_address().into()) {
-                        arch_lib::TranslateResult::Mapped { flags, .. } => flags,
-                        arch_lib::TranslateResult::NotMapped => {
-                            return Err(MemError::NotMapped(page.into()));
-                        }
-                        arch_lib::TranslateResult::InvalidFrameAddress(addr) => {
-                            return Err(MemError::InvalidFrameAddress(addr.into()));
-                        }
-                    };
-                    let result = self.inner.unmap(page.into());
-                    match result {
-                        Ok((frame, _)) => Ok(Unmapped::new(
-                            frame.into(),
-                            $crate::paging::accessor::find_free_parents_for(page, self)?,
-                            Some(unsafe { Flush::flush_page(page) }),
-                            flags.into(),
-                        )),
-                        Err(e) => Err(MemError::from_unmap_error(e, page)),
-                    }
-                }
-            }
-        };
+impl From<MapFlags> for PageTableFlags {
+    fn from(value: MapFlags) -> Self {
+        let mut flags = Self::PRESENT;
+        if value.contains(MapFlags::WRITABLE) {
+            flags |= Self::WRITABLE;
+        }
+        if value.contains(MapFlags::USER_ACCESSIBLE) {
+            flags |= Self::USER_ACCESSIBLE;
+        }
+        if !value.contains(MapFlags::EXECUTABLE) {
+            flags |= Self::NO_EXECUTE;
+        }
+        if value.contains(MapFlags::CACHE_DISABLE) {
+            flags |= Self::NO_CACHE;
+        }
+        if value.contains(MapFlags::DEALLOCATE) {
+            flags = flags | Self::from_bits_retain(PTE_FREE_BIT0);
+        }
+        if value.contains(MapFlags::GLOBAL) {
+            flags |= Self::GLOBAL;
+        }
+        flags
     }
-);
+}
+
+impl From<PageTableFlags> for MapFlags {
+    fn from(value: PageTableFlags) -> Self {
+        let mut flags = MapFlags::empty();
+        if value.contains(PageTableFlags::WRITABLE) {
+            flags |= MapFlags::WRITABLE;
+        }
+        if value.contains(PageTableFlags::USER_ACCESSIBLE) {
+            flags |= MapFlags::USER_ACCESSIBLE;
+        }
+        if !value.contains(PageTableFlags::NO_EXECUTE) {
+            flags |= MapFlags::EXECUTABLE;
+        }
+        if value.contains(PageTableFlags::NO_CACHE) {
+            flags |= MapFlags::CACHE_DISABLE;
+        }
+
+        if value.bits() & PTE_FREE_BIT0 != 0 {
+            flags |= MapFlags::DEALLOCATE;
+        }
+
+        if value.contains(PageTableFlags::GLOBAL) {
+            flags |= MapFlags::GLOBAL;
+        }
+        flags
+    }
+}
 
 #[cfg(test)]
 mod tests {

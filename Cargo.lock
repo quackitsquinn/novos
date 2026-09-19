@@ -766,7 +766,6 @@ dependencies = [
  "cfg-if",
  "pastey 0.2.1",
  "thiserror",
- "x86_64",
 ]
 
 [[package]]

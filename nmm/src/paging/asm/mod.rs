@@ -9,13 +9,14 @@ use cake::{
 
 use crate::{
     MapFlags, MemError,
-    arch::{self, Mapper, RECURSIVE_SLOT0, RecursivePageTable},
+    arch::{self, RECURSIVE_SLOT0},
     bitmap::{PhysicalMemoryManager, VirtualMemoryManager},
     paging::{
         Address, AddressExt, FragmentSize, Frame, Large, MemoryFragment, Page, PageTable,
         PageTableIndex, RecursiveEntryManager, Small,
         accessor::{self, PagetableAccessor},
         map::{LocalMemoryMapper, MapperMut, MemoryMapper, SizedMemoryMapper},
+        recursive::RecursivePageTable,
     },
 };
 
@@ -31,7 +32,7 @@ static VIRTUAL_MEMORY_MANAGER: OnceMutex<VirtualMemoryManager<'static>> =
 static PHYSICAL_MEMORY_MANAGER: OnceMutex<PhysicalMemoryManager> = OnceMutex::uninitialized();
 
 pub(crate) struct AddressSpace {
-    pub(crate) mapper: LocalMemoryMapper<arch::Mapper>,
+    pub(crate) mapper: LocalMemoryMapper<RecursivePageTable<'static>>,
     pub mut(crate) l4_table_frame: Frame<Small>,
     pub mut(crate) l4_table: Page<Small>,
     pub mut(crate) scratch_page: Page<Large>,
@@ -40,7 +41,7 @@ pub(crate) struct AddressSpace {
 
 impl AddressSpace {
     pub(crate) fn new(
-        mapper: arch::Mapper,
+        mapper: RecursivePageTable<'static>,
         l4_table_frame: Frame<Small>,
         scratch_page: Page<Large>,
     ) -> Self {
@@ -55,7 +56,7 @@ impl AddressSpace {
     }
 
     pub(crate) fn without_vmm(
-        mapper: arch::Mapper,
+        mapper: RecursivePageTable<'static>,
         l4_table_frame: Frame<Small>,
         scratch_page: Page<Large>,
     ) -> Self {
@@ -69,7 +70,7 @@ impl AddressSpace {
         }
     }
 
-    pub(crate) fn mapper(&self) -> Option<MapperMut<'_, arch::Mapper>> {
+    pub(crate) fn mapper(&self) -> Option<MapperMut<'_, RecursivePageTable<'static>>> {
         if self.l4_table_frame == arch::pml4_phys() {
             Some(self.mapper.get_mapper())
         } else {
@@ -182,7 +183,7 @@ pub trait MappingOwner {
 pub(crate) unsafe fn zero_frame<S>(frame: Frame<S>) -> Result<(), MemError>
 where
     S: FragmentSize,
-    arch::Mapper: SizedMemoryMapper<S>,
+    RecursivePageTable<'static>: SizedMemoryMapper<S>,
 {
     unsafe {
         map_with_scratch_page(frame, MapFlags::WRITABLE, |page| {
@@ -204,7 +205,7 @@ pub(crate) unsafe fn map_with_scratch_page<S, F, R>(
 where
     S: FragmentSize,
     F: FnOnce(Page<S>) -> R,
-    arch::Mapper: SizedMemoryMapper<S>,
+    RecursivePageTable<'static>: SizedMemoryMapper<S>,
 {
     let dst = {
         let active_as = active();

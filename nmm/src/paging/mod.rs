@@ -8,6 +8,7 @@ pub(crate) mod limine;
 pub mod map;
 pub mod operation;
 pub mod primitives;
+pub mod recursive;
 mod recursive_entry;
 mod table;
 pub mod translate;

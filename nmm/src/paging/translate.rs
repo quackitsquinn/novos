@@ -4,7 +4,6 @@ use cake::log::trace;
 
 use crate::{
     MapFlags, MemError,
-    arch::RecursivePageTable,
     paging::{
         Frame, Large, Medium, MemoryFragment, Page, PageTableIndex, Small, VirtAddr,
         accessor::{self, PagetableAccessor, build_vaddress},

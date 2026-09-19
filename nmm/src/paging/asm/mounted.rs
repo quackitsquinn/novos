@@ -4,13 +4,13 @@ use cake::log::error;
 
 use crate::{
     MapFlags, MemError,
-    arch::RecursivePageTable,
     paging::{
         AddressExt, FragmentManager, FragmentSize, Frame, Large, MemoryRange, Page, PageTable,
         PageTableEntry, Small, VirtAddr,
         accessor::{self, PagetableAccessor},
         asm::{self, InactiveAddressSpace, MappingOwner},
         map::{Flush, MemoryMapper, SizedMemoryMapper},
+        recursive::RecursivePageTable,
         recursive_entry,
     },
 };

@@ -42,6 +42,7 @@ compile_error!("Only x86_64 architecture is currently supported.");
 pub mod arch;
 pub mod bitmap;
 pub mod entry_walker;
+mod init;
 pub mod kernel_map;
 pub mod paging;
 
@@ -125,7 +126,7 @@ impl InitConfig {
 ///   This range is used for virtual address allocation (e.g., for `alloc_virtspace`) and physical memory mapping (e.g., for `alloc_paged`),
 ///   as well as internal memory management state.
 pub unsafe fn init(init_config: InitConfig) -> Result<(), MemError> {
-    unsafe { arch::init_unchecked(EntryWalker::new(init_config.memory_map)?, init_config) }
+    unsafe { init::init_unchecked(EntryWalker::new(init_config.memory_map)?, init_config) }
 }
 
 /// A source of physical memory for mapping virtual addresses.
