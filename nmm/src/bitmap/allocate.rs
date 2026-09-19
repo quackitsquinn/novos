@@ -229,7 +229,8 @@ impl<'a> Bitmap<'a> {
 #[cfg(test)]
 mod tests {
     use crate::{
-        arch, bitmap,
+        arch,
+        bitmap::{self, BitmapBacking},
         paging::{FragmentSize, Large, Medium},
     };
 
@@ -238,7 +239,8 @@ mod tests {
     #[test]
     fn test_bits_are_set() {
         let mut data = [0u64; 64];
-        let mut bitmap = unsafe { super::Bitmap::init(&mut data, 64) };
+        let mut bitmap =
+            unsafe { super::Bitmap::init(BitmapBacking::ManuallyManaged(&mut data), 64) };
 
         let check_set = |bitmap: &super::Bitmap, bit_ptr: BitPtr, n_bits: u64, expected: bool| {
             assert_eq!(
@@ -275,7 +277,8 @@ mod tests {
     #[test]
     fn test_all_are_set() {
         let mut data = [0u64; 64];
-        let mut bitmap = unsafe { super::Bitmap::init(&mut data, 64) };
+        let mut bitmap =
+            unsafe { super::Bitmap::init(BitmapBacking::ManuallyManaged(&mut data), 64) };
 
         fn check_all_set(bitmap: &super::Bitmap, bit_ptr: BitPtr, n_bits: u64, expected: bool) {
             println!("checking all_are_set({:?}, {})", bit_ptr, n_bits);
@@ -308,7 +311,8 @@ mod tests {
         const CAP: usize = 0x200000 * 2;
         // move this massive array onto the heap to avoid a stack overflow in debug mode
         let mut data = vec![0; CAP];
-        let mut bitmap = unsafe { super::Bitmap::init(&mut data, 64) };
+        let mut bitmap =
+            unsafe { super::Bitmap::init(BitmapBacking::ManuallyManaged(&mut data), 64) };
 
         let alloc = |bitmap: &mut super::Bitmap, n_bits: u64, align: usize| {
             let res = bitmap.allocate(

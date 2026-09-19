@@ -190,8 +190,8 @@ impl PagetableAccessor for RecursivePageTable<'_> {
         let addr_raw = accessor::build_address(
             self.recursive_index,
             self.recursive_index,
+            self.recursive_index,
             l4_index,
-            PageTableIndex::new(0),
         );
 
         if !self.p4().read_entry(l4_index).is_present() {
@@ -208,9 +208,9 @@ impl PagetableAccessor for RecursivePageTable<'_> {
     ) -> Result<crate::paging::VirtAddr, MemError> {
         let addr_raw = accessor::build_address(
             self.recursive_index,
+            self.recursive_index,
             l4_index,
             l3_index,
-            PageTableIndex::new(0),
         );
 
         let entry = self.l3_table(l4_index)?.read_entry(l3_index);

@@ -546,3 +546,32 @@ fn create_ctx<'a, T: PagetableAccessor, M: FullManager<FrameClass>>(
 ) -> CleanupCtx<'a, T, M> {
     CleanupCtx { accessor, dealloc }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_build_and_dissolve_address() {
+        let l4_idx = PageTableIndex::new(511);
+        let l3_idx = PageTableIndex::new(2);
+        let l2_idx = PageTableIndex::new(3);
+        let l1_idx = PageTableIndex::new(4);
+
+        let addr = ((build_address(l4_idx, l3_idx, l2_idx, l1_idx) as i64) << 16 >> 16) as u64; //Sign extend
+        let (dissolved_l4, dissolved_l3, dissolved_l2, dissolved_l1) =
+            dissolve_address(VirtAddr::new(addr));
+
+        assert_eq!(l4_idx, dissolved_l4);
+        assert_eq!(l3_idx, dissolved_l3);
+        assert_eq!(l2_idx, dissolved_l2);
+        assert_eq!(l1_idx, dissolved_l1);
+
+        let addr = build_vaddress(l4_idx, l3_idx, l2_idx, l1_idx);
+        let (dissolved_l4, dissolved_l3, dissolved_l2, dissolved_l1) = dissolve_address(addr);
+        assert_eq!(l4_idx, dissolved_l4);
+        assert_eq!(l3_idx, dissolved_l3);
+        assert_eq!(l2_idx, dissolved_l2);
+        assert_eq!(l1_idx, dissolved_l1);
+    }
+}

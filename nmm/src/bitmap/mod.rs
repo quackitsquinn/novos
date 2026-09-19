@@ -432,7 +432,8 @@ mod tests {
     #[test]
     fn test_first_clear() {
         let mut data = [0u64; 64];
-        let bitmap = unsafe { super::Bitmap::init(BitmapBacking::ManuallyManaged(&mut data), 64) };
+        let mut bitmap =
+            unsafe { super::Bitmap::init(BitmapBacking::ManuallyManaged(&mut data), 64) };
 
         assert_eq!(bitmap.first_clear(), Some(BitPtr::new(0, 0)));
 
@@ -455,7 +456,7 @@ mod tests {
             ($entry_index:expr, $bit_offset:expr,  $count:expr, $blk:block) => {
                 bitmap.set(BitPtr::new($entry_index as u64, $bit_offset as u8), $count);
                 $blk
-                bitmap.data.fill(0);
+                bitmap.backing.fill(0);
             };
         }
 
@@ -530,7 +531,7 @@ mod tests {
             ($entry_index:expr, $bit_offset:expr,  $count:expr, $blk:block) => {
                 bitmap.clear(BitPtr::new($entry_index as u64, $bit_offset as u8), $count);
                 $blk
-                bitmap.data.fill(u64::MAX);
+                bitmap.backing.fill(u64::MAX);
             };
         }
 
