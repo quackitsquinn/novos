@@ -1,10 +1,10 @@
-
 use cake::log::error;
 
 use crate::{
-    MemError,
+    MapFlags, MemError,
     paging::{
-        Frame, Large, Page, PageTableIndex, RecursiveEntryManager, Small,
+        AddressExt, Frame, Large, MemoryFragment, Page, PageTable, PageTableEntry, PageTableIndex,
+        RecursiveEntryManager, Small,
         asm::{self, mounted},
     },
 };
@@ -39,13 +39,21 @@ impl InactiveAddressSpace {
         }
     }
 
-    pub fn new() -> Result<Self, crate::paging::MemError> {
+    pub fn new(recursive_index: PageTableIndex) -> Result<Self, crate::paging::MemError> {
         let l4_table_frame = crate::reserve_frame()?;
-        unsafe { crate::paging::asm::zero_frame(l4_table_frame)? };
         let asm = crate::paging::asm::active();
         let scratch_page = asm.scratch_page;
-        let mut rem = RecursiveEntryManager::default();
-        let recursive_index = rem.reserve().unwrap();
+        let rem = RecursiveEntryManager::default();
+        unsafe {
+            asm::map_with_scratch_page(l4_table_frame, MapFlags::WRITABLE, |s| {
+                let l4_table = &mut *s.start_address().as_mut_ptr::<PageTable>();
+                l4_table.clear();
+                l4_table.set_entry(
+                    recursive_index,
+                    PageTableEntry::new(l4_table_frame, MapFlags::WRITABLE),
+                );
+            })?;
+        };
         Ok(Self {
             l4_table_frame,
             scratch_page,

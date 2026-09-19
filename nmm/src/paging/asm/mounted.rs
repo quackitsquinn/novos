@@ -5,8 +5,8 @@ use cake::log::error;
 use crate::{
     MapFlags, MemError,
     paging::{
-        AddressExt, FragmentManager, FragmentSize, Frame, Large, MemoryRange, Page, PageTable,
-        PageTableEntry, Small, VirtAddr,
+        AddressExt, FragmentManager, FragmentSize, Frame, Large, MemoryFragment, MemoryRange, Page,
+        PageTable, PageTableEntry, Small, VirtAddr,
         accessor::{self, PagetableAccessor},
         asm::{self, InactiveAddressSpace, MappingOwner},
         map::{Flush, MemoryMapper, SizedMemoryMapper},
@@ -23,6 +23,7 @@ pub struct MountedAddressSpace {
     pub(crate) scratch_page: Page<Large>,
     pub(crate) is_bootstrap: bool,
     pub(crate) address_space: RecursivePageTable<'static>,
+    pub(crate) requested_recursive_index: crate::paging::PageTableIndex,
     pub(crate) rem: crate::paging::RecursiveEntryManager,
 }
 
@@ -138,6 +139,16 @@ pub(super) unsafe fn mount(
     }
     drop(mapper_lock);
     drop(a_as);
+    unsafe {
+        asm::map_with_scratch_page(ias.l4_table_frame, MapFlags::WRITABLE, |s| {
+            let l4_table = &mut *s.start_address().as_mut_ptr::<PageTable>();
+            l4_table.clear();
+            l4_table.set_entry(
+                recursive_entry,
+                PageTableEntry::new(ias.l4_table_frame, MapFlags::WRITABLE),
+            );
+        })?
+    };
     let pml4_vaddr = accessor::build_vaddress(
         recursive_entry,
         recursive_entry,
@@ -152,6 +163,7 @@ pub(super) unsafe fn mount(
         scratch_page: ias.scratch_page,
         is_bootstrap: ias.is_bootstrap,
         address_space: recusive_table,
+        requested_recursive_index: ias.recursive_index,
         rem: ias.rem.clone(),
     })
 }
@@ -192,11 +204,26 @@ unsafe fn unmount_no_consume(
         Ok(_) => {}
         Err(e) => return Err(e),
     }
+
+    // Remove our recursive entry from the L4 table of the mounted address space if it doesn't match the requested recursive index.
+    if recursive_entry != mas.requested_recursive_index {
+        unsafe {
+            asm::map_with_scratch_page(mas.l4_table_frame, MapFlags::WRITABLE, |s| {
+                let l4_table = &mut *s.start_address().as_mut_ptr::<PageTable>();
+                l4_table.clear();
+                l4_table.set_entry(
+                    recursive_entry,
+                    PageTableEntry::new(mas.l4_table_frame, MapFlags::WRITABLE),
+                );
+            })?
+        };
+    }
+
     Ok(InactiveAddressSpace {
         l4_table_frame: mas.l4_table_frame,
         scratch_page: mas.scratch_page,
         is_bootstrap: mas.is_bootstrap,
-        recursive_index: mas.address_space.recursive_index(),
+        recursive_index: mas.requested_recursive_index,
         rem: mas.rem.clone(),
     })
 }

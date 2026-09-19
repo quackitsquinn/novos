@@ -1,11 +1,11 @@
 //! Address Space Management (ASM) module for nmm.
 
-use core::mem::{self, transmute};
-
-use cake::{
-    OnceMutex, OnceMutexGuard, OnceRwLock, OnceRwReadGuard,
-    log::info,
+use core::{
+    cell::RefCell,
+    mem::{self, transmute},
 };
+
+use cake::{OnceMutex, OnceMutexGuard, OnceRwLock, OnceRwReadGuard, log::info};
 
 use crate::{
     MapFlags, MemError,
@@ -36,7 +36,7 @@ pub(crate) struct AddressSpace {
     pub mut(crate) l4_table_frame: Frame<Small>,
     pub mut(crate) l4_table: Page<Small>,
     pub mut(crate) scratch_page: Page<Large>,
-    rem: RecursiveEntryManager,
+    rem: RefCell<RecursiveEntryManager>,
 }
 
 impl AddressSpace {
@@ -51,7 +51,7 @@ impl AddressSpace {
             l4_table_frame,
             scratch_page,
             l4_table,
-            rem: RecursiveEntryManager::default(),
+            rem: RefCell::new(RecursiveEntryManager::default()),
         }
     }
 
@@ -66,7 +66,7 @@ impl AddressSpace {
             l4_table_frame,
             l4_table,
             scratch_page,
-            rem: RecursiveEntryManager::default(),
+            rem: RefCell::new(RecursiveEntryManager::default()),
         }
     }
 
@@ -76,6 +76,18 @@ impl AddressSpace {
         } else {
             None
         }
+    }
+
+    pub fn reserve_recursive_slot(&self) -> Result<PageTableIndex, MemError> {
+        let mut rem = self.rem.borrow_mut();
+        rem.reserve()
+            .ok_or(MemError::Other("no recursive slots available"))
+    }
+
+    pub unsafe fn release_recursive_slot(&self, idx: PageTableIndex) -> Result<(), MemError> {
+        let mut rem = self.rem.borrow_mut();
+        unsafe { rem.release(idx) };
+        Ok(())
     }
 }
 
@@ -120,17 +132,13 @@ pub(crate) fn vmm() -> Result<OnceMutexGuard<'static, VirtualMemoryManager<'stat
 }
 
 pub(crate) fn reserve_recursive_slot() -> Result<PageTableIndex, MemError> {
-    let mut aspace = ADDRESS_SPACE.write();
-    aspace
-        .rem
-        .reserve()
-        .ok_or(MemError::Other("no recursive slots available"))
+    let aspace = active();
+    aspace.reserve_recursive_slot()
 }
 
 pub(crate) unsafe fn release_recursive_slot(idx: PageTableIndex) -> Result<(), MemError> {
-    let mut aspace = ADDRESS_SPACE.write();
-    unsafe { aspace.rem.release(idx) };
-    Ok(())
+    let aspace = active();
+    unsafe { aspace.release_recursive_slot(idx) }
 }
 
 pub(crate) fn activate_inactive_space(
