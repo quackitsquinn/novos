@@ -1,26 +1,17 @@
 use core::{convert::Infallible, mem};
 
-use cake::{ResourceGuard, log::info};
-use nmm::{
-    InitConfig, MapFlags, MapSource,
-    arch::HIGHER_HALF_START,
-    paging::{Address, AddressExt, PageTable, PageTableEntry, PageTableIndex, VirtAddr},
-};
-use x86_64::{
-    VirtAddr as XVirtAddr,
-    registers::control::Cr3,
-    structures::paging::{Page, PageTableFlags, page::PageRangeInclusive},
-};
-
 use crate::{
     declare_module,
-    memory::paging::{KernelPageSize, map::map},
-    requests::{KERNEL_ELF, MEMORY_MAP, PHYSICAL_MEMORY_OFFSET},
+    requests::{MEMORY_MAP, PHYSICAL_MEMORY_OFFSET},
+};
+use cake::log::info;
+use nmm::{
+    InitConfig, MapFlags,
+    paging::{AddressExt, PageTable, PageTableEntry, PageTableIndex},
 };
 
 pub mod allocator;
 pub mod elf_req_data;
-pub mod paging;
 pub mod req_data;
 
 /// Enables or disables allocation debugging based on the ALLOC_DEBUG environment variable.
@@ -38,7 +29,7 @@ fn init() -> Result<(), Infallible> {
     let pml4_vaddr = l4_phys
         .translate_offset(hhdm_offset)
         .expect("Failed to translate PML4 physical address to virtual address");
-    let mut root = unsafe { &mut *(pml4_vaddr.as_mut_ptr::<PageTable>()) };
+    let root = unsafe { &mut *(pml4_vaddr.as_mut_ptr::<PageTable>()) };
     let mut recursive_idx = None;
     let max = PageTableIndex::MAX.value();
     for i in
@@ -64,4 +55,28 @@ fn init() -> Result<(), Infallible> {
     unsafe { nmm::init(init) }.expect("Failed to initialize memory manager");
     info!("Memory manager initialized");
     Ok(())
+}
+
+/// Defines various memory map constants used by the kernel.
+///
+/// KERNEL_* = Kernel memory
+///
+/// KERNEL_HEAP_* = Kernel heap memory
+///
+/// KERNEL_PHYS_MAP_* = Kernel misc memory (e.g virtual/physical memory mapping)
+///
+/// KERNEL_BINARY = Kernel binary memory
+///
+/// HIGHER_HALF_START = Start of the higher half of the kernel memory
+use nmm::kernel_map;
+
+kernel_map! {
+    . = (higher_half + 512 GiB),
+    NMM_MANAGED_RANGE = 2 GiB; align 1 GiB,
+    NMM_ZERO_PAGE = Large; align Large,
+    KERNEL_HEAP = 16 MiB; align 2 MiB,
+    KERNEL_PHYS_MAP = 256 MiB; align 2 MiB,
+    KERNEL_REMAP = 256 MiB; align 2 MiB,
+    FRAMEBUFFER = 2 MiB; align 2 MiB,
+    ADDRESS_SPACE_INFO = 4 KiB; align 4 KiB,
 }
