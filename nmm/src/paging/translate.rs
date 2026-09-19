@@ -1,13 +1,12 @@
 //! Address translation trait
 
-use cake::log::trace;
 
 use crate::{
     MapFlags, MemError,
     paging::{
-        Frame, Large, Medium, MemoryFragment, Page, PageTableIndex, Small, VirtAddr,
-        accessor::{self, PagetableAccessor, build_vaddress},
-        primitives::{AnyFragment, DirectMapping, FrameClass, PageClass},
+        Frame, MemoryFragment, Page, PageTableIndex, VirtAddr,
+        accessor::{self, PagetableAccessor},
+        primitives::DirectMapping,
     },
 };
 

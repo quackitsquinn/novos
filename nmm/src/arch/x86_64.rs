@@ -2,18 +2,11 @@
 
 use core::range::Range;
 
-use arrayvec::ArrayVec;
-use cfg_if::cfg_if;
-
 use bitflags::bitflags;
 
 use crate::{
-    MapFlags, MemError,
-    paging::{
-        Address, FragmentSize, Frame, MemoryFragment, Page, PageTableEntry, PageTableIndex, Small,
-        VirtAddr,
-        accessor::{self, PagetableAccessor},
-    },
+    MapFlags,
+    paging::{Address, Frame, MemoryFragment, PageTableIndex, Small, VirtAddr},
 };
 
 /// The width of virtual addresses in bits for x86_64 architecture.

@@ -21,7 +21,7 @@ use core::{
 extern crate alloc;
 
 use bitflags::bitflags;
-use cake::{limine::memory_map, log::warn};
+use cake::limine::memory_map;
 
 #[doc(hidden)]
 pub use pastey as _pastey;

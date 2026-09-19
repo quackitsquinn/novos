@@ -1,7 +1,7 @@
 use crate::{
     MemError,
     paging::{
-        Address, Large, Medium, PageTable, PageTableIndex, PhysAddr, Small, VirtAddr,
+        Address, Large, Medium, PageTable, PageTableIndex, Small, VirtAddr,
         accessor::{self, PagetableAccessor},
         map::{MemoryMapper, SizedMemoryMapper},
     },
@@ -39,11 +39,11 @@ impl<'a> RecursivePageTable<'a> {
 impl SizedMemoryMapper<Large> for RecursivePageTable<'_> {
     fn map_primitive<A>(
         &mut self,
-        dst: super::Page<Large>,
-        src: super::Frame<Large>,
-        flags: crate::MapFlags,
-        parent_table_flags: Option<crate::MapFlags>,
-        allocator: &mut A,
+        _dst: super::Page<Large>,
+        _src: super::Frame<Large>,
+        _flags: crate::MapFlags,
+        _parent_table_flags: Option<crate::MapFlags>,
+        _allocator: &mut A,
     ) -> Result<super::map::Flush, crate::MemError>
     where
         A: super::FragmentManager<super::Frame<super::Small>, super::Small>,
@@ -53,7 +53,7 @@ impl SizedMemoryMapper<Large> for RecursivePageTable<'_> {
 
     unsafe fn unmap_primitive(
         &mut self,
-        page: super::Page<Large>,
+        _page: super::Page<Large>,
     ) -> Result<super::map::Unmapped<Large>, crate::MemError> {
         todo!()
     }
@@ -62,11 +62,11 @@ impl SizedMemoryMapper<Large> for RecursivePageTable<'_> {
 impl SizedMemoryMapper<Medium> for RecursivePageTable<'_> {
     fn map_primitive<A>(
         &mut self,
-        dst: super::Page<Medium>,
-        src: super::Frame<Medium>,
-        flags: crate::MapFlags,
-        parent_table_flags: Option<crate::MapFlags>,
-        allocator: &mut A,
+        _dst: super::Page<Medium>,
+        _src: super::Frame<Medium>,
+        _flags: crate::MapFlags,
+        _parent_table_flags: Option<crate::MapFlags>,
+        _allocator: &mut A,
     ) -> Result<super::map::Flush, crate::MemError>
     where
         A: super::FragmentManager<super::Frame<super::Small>, super::Small>,
@@ -76,7 +76,7 @@ impl SizedMemoryMapper<Medium> for RecursivePageTable<'_> {
 
     unsafe fn unmap_primitive(
         &mut self,
-        page: super::Page<Medium>,
+        _page: super::Page<Medium>,
     ) -> Result<super::map::Unmapped<Medium>, crate::MemError> {
         todo!()
     }
@@ -85,11 +85,11 @@ impl SizedMemoryMapper<Medium> for RecursivePageTable<'_> {
 impl SizedMemoryMapper<Small> for RecursivePageTable<'_> {
     fn map_primitive<A>(
         &mut self,
-        dst: super::Page<Small>,
-        src: super::Frame<Small>,
-        flags: crate::MapFlags,
-        parent_table_flags: Option<crate::MapFlags>,
-        allocator: &mut A,
+        _dst: super::Page<Small>,
+        _src: super::Frame<Small>,
+        _flags: crate::MapFlags,
+        _parent_table_flags: Option<crate::MapFlags>,
+        _allocator: &mut A,
     ) -> Result<super::map::Flush, crate::MemError>
     where
         A: super::FragmentManager<super::Frame<super::Small>, super::Small>,
@@ -99,7 +99,7 @@ impl SizedMemoryMapper<Small> for RecursivePageTable<'_> {
 
     unsafe fn unmap_primitive(
         &mut self,
-        page: super::Page<Small>,
+        _page: super::Page<Small>,
     ) -> Result<super::map::Unmapped<Small>, crate::MemError> {
         todo!()
     }

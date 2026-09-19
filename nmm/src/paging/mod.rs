@@ -17,7 +17,7 @@ pub(crate) use recursive_entry::RecursiveEntryManager;
 
 pub use table::{PageTable, PageTableEntry};
 
-use cake::log::{trace, warn};
+use cake::log::trace;
 pub use index::PageTableIndex;
 
 use crate::{
@@ -29,7 +29,7 @@ use crate::{
             DataAllocator, Flush, FullProvider, GlobalMemoryProvider, MemoryMapper, PhysLinear,
             SizedMemoryMapper, Unmapped,
         },
-        operation::{Chain, OperationAllSizes, ZeroMemory},
+        operation::OperationAllSizes,
         primitives::{AnyFragment, PageClass, PrimitiveClass, VirtRange},
     },
 };

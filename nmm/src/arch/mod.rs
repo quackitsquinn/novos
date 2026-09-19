@@ -55,17 +55,12 @@ pub(crate) use arch_impl::do_flush_all;
 pub(crate) use arch_impl::canonicalize_phys;
 pub(crate) use arch_impl::canonicalize_virt;
 
-pub(crate) use arch_impl::PTE_FREE_BIT0;
-
 pub use arch_impl::pml4_phys;
 
 pub use arch_impl::RECURSIVE_SLOTS;
 
-pub const RECURSIVE_SLOT0: PageTableIndex = arch_impl::RECURSIVE_SLOTS.start;
-pub const USEABLE_RECURSIVE_SLOTS: Range<PageTableIndex> = Range {
-    start: PageTableIndex::new(RECURSIVE_SLOT0.value() + 1),
-    end: RECURSIVE_SLOTS.end,
-};
+/// The range of usable recursive slots in the page table for the current architecture.
+pub const USEABLE_RECURSIVE_SLOTS: Range<PageTableIndex> = RECURSIVE_SLOTS;
 
 pub use arch_impl::PAGE_TABLE_ENTRY_ADDR_BITS;
 

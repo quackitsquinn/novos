@@ -1,18 +1,14 @@
 use core::{
-    cell::{Cell, Ref, RefCell, RefMut, UnsafeCell},
-    sync::atomic::{AtomicU32, AtomicU64},
+    cell::{Cell, RefCell, RefMut},
+    sync::atomic::AtomicU64,
 };
 
-use cake::log::trace;
 
 use crate::{
     MapFlags, MemError,
-    arch::Mapper,
     paging::{
-        Address, FragmentManager, FragmentSize, Frame, Large, Medium, Page, Small,
-        fragment::GreedyFragmentMapper,
-        map::{Flush, FullProvider, MemoryMapper, MemoryProvider, SizedMemoryMapper, Unmapped},
-        primitives::{AnyFragment, PageClass},
+        Address, FragmentManager, FragmentSize, Frame, Page, Small,
+        map::{Flush, MemoryMapper, SizedMemoryMapper, Unmapped},
     },
 };
 

@@ -1,7 +1,7 @@
 use core::{
     alloc::Layout,
     fmt::Debug,
-    mem::{self, Alignment, MaybeUninit},
+    mem::{Alignment, MaybeUninit},
 };
 
 use cake::{limine::memory_map::EntryType, log::info};
@@ -21,17 +21,18 @@ use crate::{
         PhysAddr, Small,
         map::DataAllocator,
         map_from,
-        operation::ZeroMemory,
         primitives::{FrameClass, MemoryRange},
     },
 };
 
+/// A physical memory manager that uses bitmaps to track the allocation of physical frames.
 #[derive(Debug)]
 pub struct PhysicalMemoryManager {
     bitmaps: &'static mut [BitmapEntry],
 }
 
 impl PhysicalMemoryManager {
+    /// Initializes the physical memory manager with the given memory map and virtual memory manager.
     pub unsafe fn init(
         mut entry_walker: EntryWalker,
         vmm: &mut VirtualMemoryManager,

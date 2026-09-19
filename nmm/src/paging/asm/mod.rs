@@ -3,19 +3,19 @@
 use core::mem::{self, transmute};
 
 use cake::{
-    MappedMutexGuard, Mutex, MutexGuard, OnceMutex, OnceMutexGuard, OnceRwLock, OnceRwReadGuard,
+    OnceMutex, OnceMutexGuard, OnceRwLock, OnceRwReadGuard,
     log::info,
 };
 
 use crate::{
     MapFlags, MemError,
-    arch::{self, RECURSIVE_SLOT0},
+    arch::{self},
     bitmap::{PhysicalMemoryManager, VirtualMemoryManager},
     paging::{
         Address, AddressExt, FragmentSize, Frame, Large, MemoryFragment, Page, PageTable,
         PageTableIndex, RecursiveEntryManager, Small,
-        accessor::{self, PagetableAccessor},
-        map::{LocalMemoryMapper, MapperMut, MemoryMapper, SizedMemoryMapper},
+        accessor::{self},
+        map::{LocalMemoryMapper, MapperMut, SizedMemoryMapper},
         recursive::RecursivePageTable,
     },
 };

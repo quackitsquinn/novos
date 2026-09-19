@@ -13,7 +13,7 @@ use crate::{
         Address, FragmentManager, FragmentSize, Frame, Large, Medium, MemoryFragment, MemoryRange,
         Page, Small, VirtAddr,
         fragment::GreedyFragmentMapper,
-        operation::{self, OperationAllSizes},
+        operation::OperationAllSizes,
         primitives::{AnyFragment, PageClass},
     },
 };

@@ -1,12 +1,11 @@
-use core::mem;
 
 use cake::log::error;
 
 use crate::{
     MemError,
     paging::{
-        Frame, Large, Page, PageTableIndex, RecursiveEntryManager, Small, VirtAddr,
-        asm::{self, MountedAddressSpace, mounted},
+        Frame, Large, Page, PageTableIndex, RecursiveEntryManager, Small,
+        asm::{self, mounted},
     },
 };
 

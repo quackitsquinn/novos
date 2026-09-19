@@ -11,7 +11,6 @@ use crate::{
         asm::{self, InactiveAddressSpace, MappingOwner},
         map::{Flush, MemoryMapper, SizedMemoryMapper},
         recursive::RecursivePageTable,
-        recursive_entry,
     },
 };
 
@@ -54,7 +53,7 @@ impl MountedAddressSpace {
 
     pub fn copy_mappings_from_base(
         &mut self,
-        range: MemoryRange<VirtAddr>,
+        _range: MemoryRange<VirtAddr>,
     ) -> Result<(), MemError> {
         todo!()
     }

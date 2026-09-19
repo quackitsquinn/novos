@@ -7,7 +7,7 @@ use crate::{
     entry_walker::EntryWalker,
     paging::{
         Address, AddressExt, Frame, PageTable, Small, accessor,
-        asm::{self, AddressSpace, InactiveAddressSpace},
+        asm::{self, InactiveAddressSpace},
         map::DataAllocator,
         map_from,
     },
