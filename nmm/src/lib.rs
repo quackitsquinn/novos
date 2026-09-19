@@ -151,13 +151,14 @@ pub fn map(
     dest: MemoryRange<VirtAddr>,
     src: MapSource,
     flags: MapFlags,
+    parent_table_flags: Option<MapFlags>,
     op: &mut impl OperationAllSizes,
 ) -> Result<(), MemError> {
     if let MapSource::Direct(phys_base) = src {
         check_range_phys(phys_base, dest.size() as usize)?;
     }
 
-    unsafe { paging::map_unchecked(dest, src, flags, op) }
+    unsafe { paging::map_unchecked(dest, src, flags, parent_table_flags, op) }
 }
 
 /// Unmaps a virtual address range of the specified size starting from the given virtual base address
@@ -262,6 +263,7 @@ pub fn create_phys_mapping(
             virt_range,
             MapSource::Direct(phys_range.start()),
             flags,
+            None,
             &mut (),
         )
     }?;

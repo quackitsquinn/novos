@@ -180,6 +180,7 @@ cake::encapsulate_macro!(
                     page: Page<$size>,
                     frame: Frame<$size>,
                     flags: MapFlags,
+                    parent_table_flags: Option<MapFlags>,
                     allocator: &mut A,
                 ) -> Result<Flush, MemError>
                 where

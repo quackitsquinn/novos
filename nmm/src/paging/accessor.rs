@@ -516,16 +516,34 @@ where
 
         match mapping {
             DirectMapping::Small(dst_page, src) => {
-                dst.map_primitive(dst_page, src, flags, &mut GlobalMemoryProvider)?
-                    .flush();
+                dst.map_primitive(
+                    dst_page,
+                    src,
+                    flags,
+                    Some(MapFlags::DEALLOCATE),
+                    &mut GlobalMemoryProvider,
+                )?
+                .flush();
             }
             DirectMapping::Medium(dst_page, src) => {
-                dst.map_primitive(dst_page, src, flags, &mut GlobalMemoryProvider)?
-                    .flush();
+                dst.map_primitive(
+                    dst_page,
+                    src,
+                    flags,
+                    Some(MapFlags::DEALLOCATE),
+                    &mut GlobalMemoryProvider,
+                )?
+                .flush();
             }
             DirectMapping::Large(dst_page, src) => {
-                dst.map_primitive(dst_page, src, flags, &mut GlobalMemoryProvider)?
-                    .flush();
+                dst.map_primitive(
+                    dst_page,
+                    src,
+                    flags,
+                    Some(MapFlags::DEALLOCATE),
+                    &mut GlobalMemoryProvider,
+                )?
+                .flush();
             }
         }
 

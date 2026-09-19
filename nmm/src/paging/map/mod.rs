@@ -33,15 +33,22 @@ pub(crate) use local::{LocalMemoryMapper, MapperMut};
 /// and unmapping pages in the memory manager, and it abstracts over the architecture-specific details of how
 /// page tables are manipulated to create mappings.
 pub trait SizedMemoryMapper<S: FragmentSize> {
-    /// Maps the given page to the given frame with the specified flags, using the provided frame allocator
-    /// for any necessary allocations of page tables.
+    /// Maps the given page to the given frame with the specified flags,
+    /// using the provided frame allocator to allocate any necessary intermediate page tables.
     ///
-    /// Returns an error if the mapping operation fails for any reason.
+    /// - `dst`: The virtual page to map.
+    /// - `src`: The physical frame to map to the virtual page.
+    /// - `flags`: The mapping flags to use for the mapping.
+    /// - `parent_table_flags`: Optional flags to use for any parent page tables that need to be allocated. If `None`, default flags will be used.
+    ///                         This is ORed with the default flags, which as of now is only WRITABLE.
+    /// - `allocator`: The frame allocator to use for allocating any necessary intermediate page tables.
+    ///
     fn map_primitive<A>(
         &mut self,
         dst: Page<S>,
         src: Frame<S>,
         flags: MapFlags,
+        parent_table_flags: Option<MapFlags>,
         allocator: &mut A,
     ) -> Result<Flush, MemError>
     where
@@ -60,6 +67,7 @@ pub trait MemoryMapper:
         &mut self,
         range: MemoryRange<VirtAddr>,
         flags: MapFlags,
+        parent_table_flags: Option<MapFlags>,
         provider: &mut P,
         operation: &mut impl OperationAllSizes,
     ) -> Result<(), MemError> {
@@ -76,66 +84,38 @@ pub trait MemoryMapper:
                 AnyFragment::Small(prim) => {
                     let frame = provider.allocate_data()?;
                     unsafe { operation.execute(prim, frame)? };
-                    self.map_primitive(prim, frame, flags, &mut provider.table_allocator())?
-                        .flush();
+                    self.map_primitive(
+                        prim,
+                        frame,
+                        flags,
+                        parent_table_flags,
+                        &mut provider.table_allocator(),
+                    )?
+                    .flush();
                 }
                 AnyFragment::Medium(prim) => {
                     let frame = provider.allocate_data()?;
                     unsafe { operation.execute(prim, frame)? };
-                    self.map_primitive(prim, frame, flags, &mut provider.table_allocator())?
-                        .flush();
+                    self.map_primitive(
+                        prim,
+                        frame,
+                        flags,
+                        parent_table_flags,
+                        &mut provider.table_allocator(),
+                    )?
+                    .flush();
                 }
                 AnyFragment::Large(prim) => {
                     let frame = provider.allocate_data()?;
                     unsafe { operation.execute(prim, frame)? };
-                    self.map_primitive(prim, frame, flags, &mut provider.table_allocator())?
-                        .flush();
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Maps a range of virtual addresses to physical frames, using the provided frame allocator for any necessary allocations of page tables, and executes the given memory mapping operations for each mapping.
-    unsafe fn map_from_with_operation<P>(
-        &mut self,
-        base: VirtAddr,
-        len: u64,
-        flags: MapFlags,
-        provider: &mut P,
-        mut op: impl OperationAllSizes,
-    ) -> Result<(), MemError>
-    where
-        P: FullProvider,
-    {
-        trace!(
-            "Mapping from base address {:x?} with length {:?} and flags {:?}",
-            base.as_u64(),
-            len,
-            flags
-        );
-
-        let mapper = GreedyFragmentMapper::<PageClass>::new(base, len);
-        for frag in mapper {
-            match frag {
-                AnyFragment::Small(prim) => {
-                    let frame = provider.allocate_data()?;
-                    self.map_primitive(prim, frame, flags, &mut provider.table_allocator())?
-                        .flush();
-                    unsafe { op.execute(prim, frame)? };
-                }
-                AnyFragment::Medium(prim) => {
-                    let frame = provider.allocate_data()?;
-                    self.map_primitive(prim, frame, flags, &mut provider.table_allocator())?
-                        .flush();
-                    unsafe { op.execute(prim, frame)? };
-                }
-                AnyFragment::Large(prim) => {
-                    let frame = provider.allocate_data()?;
-                    self.map_primitive(prim, frame, flags, &mut provider.table_allocator())?
-                        .flush();
-                    unsafe { op.execute(prim, frame)? };
+                    self.map_primitive(
+                        prim,
+                        frame,
+                        flags,
+                        parent_table_flags,
+                        &mut provider.table_allocator(),
+                    )?
+                    .flush();
                 }
             }
         }

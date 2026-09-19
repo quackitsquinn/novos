@@ -80,6 +80,7 @@ pub fn map_primitive<S, A>(
     src: Frame<S>,
     dst: Page<S>,
     flags: MapFlags,
+    parent_table_flags: Option<MapFlags>,
     frame_allocator: &mut A,
 ) -> Result<Flush, MemError>
 where
@@ -95,7 +96,7 @@ where
     let active_as = asm::active();
     let mut mapper = active_as.mapper().unwrap();
 
-    mapper.map_primitive(dst, src, flags, frame_allocator)
+    mapper.map_primitive(dst, src, flags, parent_table_flags, frame_allocator)
 }
 
 /// Unmaps a page, returning the frame that was mapped to it before, or an error if the page was not mapped.
@@ -121,6 +122,7 @@ where
 pub(crate) unsafe fn map_from<P>(
     range: MemoryRange<VirtAddr>,
     flags: MapFlags,
+    parent_table_flags: Option<MapFlags>,
     provider: &mut P,
     operation: &mut impl OperationAllSizes,
 ) -> Result<(), MemError>
@@ -137,13 +139,14 @@ where
     let active_as = asm::active();
     let mut mapper = active_as.mapper().unwrap();
 
-    unsafe { mapper.map_from(range, flags, provider, operation) }
+    unsafe { mapper.map_from(range, flags, parent_table_flags, provider, operation) }
 }
 
 pub(crate) unsafe fn map_unchecked(
     dest: MemoryRange<VirtAddr>,
     src: MapSource,
     flags: MapFlags,
+    parent_table_flags: Option<MapFlags>,
     op: &mut impl OperationAllSizes,
 ) -> Result<(), MemError> {
     match src {
@@ -158,6 +161,7 @@ pub(crate) unsafe fn map_unchecked(
                 map_from(
                     dest,
                     flags,
+                    parent_table_flags,
                     &mut PhysLinear(phys_base, &mut GlobalMemoryProvider),
                     op,
                 )?
@@ -172,6 +176,7 @@ pub(crate) unsafe fn map_unchecked(
             return map_from(
                 dest,
                 flags | MapFlags::DEALLOCATE,
+                parent_table_flags,
                 &mut DataAllocator(&mut GlobalMemoryProvider),
                 op,
             );

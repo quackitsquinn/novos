@@ -70,13 +70,14 @@ where
         page: Page<S>,
         frame: Frame<S>,
         flags: MapFlags,
+        parent_table_flags: Option<MapFlags>,
         allocator: &mut A,
     ) -> Result<Flush, MemError>
     where
         A: FragmentManager<Frame<Small>, Small>,
     {
         self.address_space
-            .map_primitive(page, frame, flags, allocator)
+            .map_primitive(page, frame, flags, parent_table_flags, allocator)
     }
 
     unsafe fn unmap_primitive(

@@ -71,6 +71,7 @@ pub(crate) unsafe fn init_unchecked(
         map_from(
             config.managed_range.truncate(n_bytes),
             MapFlags::WRITABLE,
+            None,
             &mut DataAllocator(&mut walker),
             &mut (),
         )?;

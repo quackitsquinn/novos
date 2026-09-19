@@ -69,6 +69,7 @@ where
         dst: Page<S>,
         src: Frame<S>,
         flags: MapFlags,
+        parent_table_flags: Option<MapFlags>,
         allocator: &mut A,
     ) -> Result<Flush, MemError>
     where
@@ -76,7 +77,7 @@ where
     {
         self.inner
             .lock_inner_mapper()
-            .map_primitive(dst, src, flags, allocator)
+            .map_primitive(dst, src, flags, parent_table_flags, allocator)
     }
 
     unsafe fn unmap_primitive(&mut self, page: Page<S>) -> Result<Unmapped<S>, MemError> {

@@ -51,6 +51,7 @@ impl PhysicalMemoryManager {
             map_from(
                 vmem,
                 MapFlags::WRITABLE,
+                None,
                 &mut DataAllocator(&mut entry_walker),
                 &mut (),
             )?
@@ -118,6 +119,7 @@ impl PhysicalMemoryManager {
             map_from(
                 allocated_range,
                 MapFlags::WRITABLE,
+                None,
                 &mut DataAllocator(walker),
                 &mut (),
             )?
