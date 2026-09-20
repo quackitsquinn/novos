@@ -22,6 +22,7 @@ use cake::Once;
 use cake::log::info;
 use interrupts::hardware;
 use kserial::client::get_serial_client;
+use nmm::paging::{Address, VirtAddr};
 
 pub mod context;
 pub mod display;
@@ -41,7 +42,7 @@ pub mod testing;
 pub const STACK_SIZE: u64 = 1 << 15; // 32 KiB
 
 /// The base address of the kernel stack. Set by the function that calls [init_kernel].
-pub static STACK_BASE: Once<u64> = Once::new();
+pub static STACK_BASE: Once<VirtAddr> = Once::new();
 
 /// Halts the CPU indefinitely.
 pub fn hlt_loop() -> ! {
@@ -56,7 +57,7 @@ pub fn hlt_loop() -> ! {
 /// This function should be called from the `_start` function.
 #[unsafe(no_mangle)]
 pub extern "sysv64" fn init_kernel(rsp: u64) -> ! {
-    STACK_BASE.call_once(|| rsp);
+    STACK_BASE.call_once(|| VirtAddr::new(rsp));
     x86_64::instructions::interrupts::disable();
     unsafe {
         init_kernel_services();
