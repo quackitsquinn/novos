@@ -6,9 +6,10 @@ use crate::{
 };
 use cake::log::info;
 use nmm::{
-    InitConfig, MapFlags,
+    InitConfig, MapFlags, MemError,
     paging::{
         Address, AddressExt, MemoryRange, PageTable, PageTableEntry, PageTableIndex, VirtAddr,
+        asm::InactiveAddressSpace,
     },
 };
 
@@ -33,28 +34,64 @@ pub fn kernel_range() -> MemoryRange<VirtAddr> {
     MemoryRange::new(start, end)
 }
 
+pub fn stack_range() -> MemoryRange<VirtAddr> {
+    let stack_base = crate::STACK_BASE.get().expect("STACK_BASE not initialized");
+    let stack_top = *stack_base + crate::STACK_SIZE;
+    MemoryRange::new(*stack_base, stack_top)
+}
+
 declare_module!("memory", init);
 
 fn init() -> Result<(), Infallible> {
-    unsafe { init_nmm() };
+    let recursive_idx = unsafe { init_nmm().unwrap() };
+    map_kernel(recursive_idx).unwrap();
     Ok(())
 }
 
-unsafe fn init_nmm() {
+fn map_kernel(recursive_idx: PageTableIndex) -> Result<(), MemError> {
+    let kernel_range = kernel_range();
+    let stack_range = stack_range();
+
+    let new_as = InactiveAddressSpace::new(recursive_idx)?;
+    let mut builder = match new_as.try_mount() {
+        Ok(mounted) => mounted,
+        Err((e, _table)) => {
+            panic!(
+                "Failed to mount new address space for kernel mapping: {:?}",
+                e
+            );
+        }
+    };
+
+    builder.copy_mappings_from_base(kernel_range)?;
+    builder.copy_mappings_from_base(stack_range)?;
+
+    let new_as = builder
+        .unmount()
+        .expect("Failed to unmount new address space");
+
+    info!("Switching address spaces, hold your breath...");
+    unsafe { new_as.activate()? };
+    info!("Address space switched successfully!");
+    crate::hlt_loop();
+
+    Ok(())
+}
+
+unsafe fn init_nmm() -> Result<PageTableIndex, MemError> {
     let memory_map = MEMORY_MAP.lock_limine();
     let memory_map = memory_map.entries();
-    let recursive_idx = unsafe { find_set_recursive_entry() };
+    let recursive_idx = unsafe { find_set_recursive_entry().unwrap() };
 
-    let init = InitConfig::find_scratch_page(
-        recursive_idx.expect("No free recursive slot found in PML4"),
-        map::nmm_managed_range::RANGE,
-        unsafe { mem::transmute(memory_map) },
-    )
-    .unwrap();
+    let init =
+        InitConfig::find_scratch_page(recursive_idx, map::nmm_managed_range::RANGE, unsafe {
+            mem::transmute(memory_map)
+        })?;
 
     info!("Initializing nmm {:?}", init);
-    unsafe { nmm::init(init) }.expect("Failed to initialize memory manager");
+    unsafe { nmm::init(init) }?;
     info!("Memory manager initialized");
+    Ok(recursive_idx)
 }
 
 const RECURSIVE_RANGE_START: PageTableIndex =

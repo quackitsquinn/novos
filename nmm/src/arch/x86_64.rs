@@ -148,8 +148,8 @@ pub const PTE_FREE_BIT0: u64 = 1 << 9;
 
 /// The first slot in the pml4 table that is reserved for recursive mapping, specifically reserved for mapping of the current address space.
 pub const RECURSIVE_SLOTS: Range<PageTableIndex> = Range {
-    start: PageTableIndex::new(507),
-    end: PageTableIndex::new(511),
+    start: PageTableIndex::new(480),
+    end: PageTableIndex::new(500),
 };
 
 /// The bits used for the address portion of a page table entry.

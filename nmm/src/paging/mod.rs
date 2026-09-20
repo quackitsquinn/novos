@@ -1,6 +1,6 @@
 //! Contains the core types and structures related to paging, such as page table entries, page tables, and the layout of the page table hierarchy. It also defines the virtual and physical address types used by the architecture.
 pub mod accessor;
-pub(crate) mod asm;
+pub mod asm;
 mod fragment;
 pub mod heapless;
 pub mod index;
