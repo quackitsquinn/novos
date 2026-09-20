@@ -22,7 +22,7 @@ pub struct MountedAddressSpace {
     pub(crate) l4_table_frame: Frame<Small>,
     pub(crate) scratch_page: Page<Large>,
     pub(crate) is_bootstrap: bool,
-    pub(crate) address_space: RecursivePageTable<'static>,
+    pub(crate) table: RecursivePageTable<'static>,
     pub(crate) requested_recursive_index: crate::paging::PageTableIndex,
     pub(crate) rem: crate::paging::RecursiveEntryManager,
 }
@@ -68,7 +68,7 @@ impl MountedAddressSpace {
         let a_as = asm::active();
         let mapper_lock = a_as.mapper.lock_inner_mapper();
 
-        accessor::copy_mappings_between_tables(&*mapper_lock, &mut self.address_space, range)
+        accessor::copy_mappings_between_tables(&*mapper_lock, &mut self.table, range)
     }
 }
 
@@ -88,7 +88,7 @@ where
     where
         A: FragmentManager<Frame<Small>, Small>,
     {
-        self.address_space
+        self.table
             .map_primitive(page, frame, flags, parent_table_flags, allocator)
     }
 
@@ -96,7 +96,7 @@ where
         &mut self,
         page: Page<S>,
     ) -> Result<crate::paging::map::Unmapped<S>, MemError> {
-        unsafe { self.address_space.unmap_primitive(page) }
+        unsafe { self.table.unmap_primitive(page) }
     }
 }
 
@@ -104,14 +104,14 @@ impl MemoryMapper for MountedAddressSpace {}
 
 impl PagetableAccessor for MountedAddressSpace {
     fn read_l4_table(&self) -> Result<crate::paging::VirtAddr, MemError> {
-        self.address_space.read_l4_table()
+        self.table.read_l4_table()
     }
 
     fn read_l3_table(
         &self,
         l4_index: crate::paging::PageTableIndex,
     ) -> Result<crate::paging::VirtAddr, MemError> {
-        self.address_space.read_l3_table(l4_index)
+        self.table.read_l3_table(l4_index)
     }
 
     fn read_l2_table(
@@ -119,7 +119,7 @@ impl PagetableAccessor for MountedAddressSpace {
         l4_index: crate::paging::PageTableIndex,
         l3_index: crate::paging::PageTableIndex,
     ) -> Result<crate::paging::VirtAddr, MemError> {
-        self.address_space.read_l2_table(l4_index, l3_index)
+        self.table.read_l2_table(l4_index, l3_index)
     }
 
     fn read_l1_table(
@@ -128,8 +128,7 @@ impl PagetableAccessor for MountedAddressSpace {
         l3_index: crate::paging::PageTableIndex,
         l2_index: crate::paging::PageTableIndex,
     ) -> Result<crate::paging::VirtAddr, MemError> {
-        self.address_space
-            .read_l1_table(l4_index, l3_index, l2_index)
+        self.table.read_l1_table(l4_index, l3_index, l2_index)
     }
 }
 
@@ -174,7 +173,7 @@ pub(super) unsafe fn mount(
         l4_table_frame: ias.l4_table_frame,
         scratch_page: ias.scratch_page,
         is_bootstrap: ias.is_bootstrap,
-        address_space: recusive_table,
+        table: recusive_table,
         requested_recursive_index: ias.recursive_index,
         rem: ias.rem.clone(),
     })
@@ -188,7 +187,7 @@ unsafe fn cleanup_mapped_address_space(
     let mut pmm = asm::pmm();
     unsafe {
         accessor::cleanup_l3(
-            mas.address_space.recursive_index(),
+            mas.table.recursive_index(),
             &mut *mapper_lock,
             &mut *pmm,
             false,
@@ -203,7 +202,7 @@ unsafe fn cleanup_mapped_address_space(
 unsafe fn unmount_no_consume(
     mas: &mut MountedAddressSpace,
 ) -> Result<InactiveAddressSpace, crate::paging::MemError> {
-    let recursive_entry = mas.address_space.recursive_index();
+    let recursive_entry = mas.table.recursive_index();
     let a_as = asm::active();
     let mut mapper_lock = a_as.mapper.lock_inner_mapper();
     let pml4 = mapper_lock.p4_mut();
