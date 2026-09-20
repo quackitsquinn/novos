@@ -135,22 +135,12 @@ impl PagetableAccessor for MountedAddressSpace {
 pub(super) unsafe fn mount(
     ias: &mut InactiveAddressSpace,
 ) -> Result<MountedAddressSpace, crate::paging::MemError> {
-    let recursive_entry = match asm::reserve_recursive_slot() {
-        Ok(entry) => entry,
-        Err(e) => return Err(e),
-    };
-    let a_as = asm::active();
-    let mut mapper_lock = a_as.mapper.lock_inner_mapper();
-    let pml4 = mapper_lock.p4_mut();
+    let recursive_entry = asm::reserve_recursive_slot()?;
+
     unsafe {
-        pml4.set_entry(
-            recursive_entry,
-            PageTableEntry::new(ias.l4_table_frame, MapFlags::WRITABLE),
-        );
+        super::init_recursive_mapping(ias.l4_table_frame, recursive_entry, false)?;
     }
-    drop(mapper_lock);
-    drop(a_as);
-    unsafe { super::init_table(ias.l4_table_frame, recursive_entry, false)? };
+
     let pml4_vaddr = accessor::build_vaddress(
         recursive_entry,
         recursive_entry,

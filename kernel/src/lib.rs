@@ -85,12 +85,12 @@ pub(crate) unsafe fn init_kernel_services() {
     output::MODULE.init();
     requests::MODULE.init();
     panic::MODULE.init();
+    get_serial_client().enable_packet_support();
     cake::init_rng();
     memory::MODULE.init();
     gdt::MODULE.init();
     interrupts::MODULE.init();
     hardware::MODULE.init();
-    get_serial_client().enable_packet_support();
     // {
     //     let e = File::create_file("test.txt").unwrap();
     //     e.write(b"Hello, world!").unwrap();

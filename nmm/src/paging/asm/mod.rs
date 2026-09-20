@@ -15,7 +15,7 @@ use crate::{
         Address, AddressExt, FragmentSize, Frame, Large, MemoryFragment, Page, PageTable,
         PageTableEntry, PageTableIndex, RecursiveEntryManager, Small,
         accessor::{self},
-        map::{LocalMemoryMapper, MapperMut, SizedMemoryMapper},
+        map::{Flush, LocalMemoryMapper, MapperMut, SizedMemoryMapper},
         recursive::RecursivePageTable,
     },
 };
@@ -256,5 +256,29 @@ pub(crate) unsafe fn init_table(
 
             pml4.set_entry(recursive_idx, PageTableEntry::new(l4, MapFlags::WRITABLE));
         })
+    }
+}
+
+pub(crate) unsafe fn init_recursive_mapping(
+    child: Frame<Small>,
+    recursive_idx: PageTableIndex,
+    should_zero_child: bool,
+) -> Result<(), MemError> {
+    unsafe {
+        init_table(child, recursive_idx, should_zero_child)?;
+        let active_as = active();
+        let mut mapper = active_as.mapper.lock_inner_mapper();
+        let p4 = mapper.p4_mut();
+        let entry = p4.read_entry(recursive_idx);
+        if entry.is_present() {
+            return Err(MemError::AlreadyMapped(entry.addr()));
+        }
+
+        p4.set_entry(
+            recursive_idx,
+            PageTableEntry::new(child, MapFlags::WRITABLE),
+        );
+
+        Ok(())
     }
 }
