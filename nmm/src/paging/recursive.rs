@@ -229,9 +229,8 @@ impl SizedMemoryMapper<Small> for RecursivePageTable<'_> {
         let entry = table.read_entry(l1);
         if !entry.is_present() {
             return Err(MemError::NotMapped(AnyPage::Small(page)));
-        } else if !entry.is_huge() {
-            return Err(MemError::MappedToLowerLevel(page.start_address()));
         }
+
         unsafe {
             table.set_entry(l1, PageTableEntry::empty());
         }

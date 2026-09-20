@@ -32,13 +32,22 @@ impl MountedAddressSpace {
         mut ias: InactiveAddressSpace,
     ) -> Result<Self, (crate::paging::MemError, InactiveAddressSpace)> {
         match unsafe { mount(&mut ias) } {
-            Ok(mas) => Ok(mas),
+            Ok(mas) => {
+                mem::forget(ias);
+                Ok(mas)
+            }
             Err(e) => Err((e, ias)),
         }
     }
 
     pub fn unmount(mut self) -> Result<InactiveAddressSpace, crate::paging::MemError> {
-        unsafe { unmount_no_consume(&mut self) }
+        match unsafe { unmount_no_consume(&mut self) } {
+            Ok(ias) => {
+                mem::forget(self);
+                Ok(ias)
+            }
+            Err(e) => Err(e),
+        }
     }
 
     pub fn free(mut self) -> Result<(), crate::paging::MemError> {
@@ -54,9 +63,12 @@ impl MountedAddressSpace {
 
     pub fn copy_mappings_from_base(
         &mut self,
-        _range: MemoryRange<VirtAddr>,
+        range: MemoryRange<VirtAddr>,
     ) -> Result<(), MemError> {
-        todo!()
+        let a_as = asm::active();
+        let mapper_lock = a_as.mapper.lock_inner_mapper();
+
+        accessor::copy_mappings_between_tables(&*mapper_lock, &mut self.address_space, range)
     }
 }
 
