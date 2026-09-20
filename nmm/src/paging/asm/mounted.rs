@@ -150,16 +150,7 @@ pub(super) unsafe fn mount(
     }
     drop(mapper_lock);
     drop(a_as);
-    unsafe {
-        asm::map_with_scratch_page(ias.l4_table_frame, MapFlags::WRITABLE, |s| {
-            let l4_table = &mut *s.start_address().as_mut_ptr::<PageTable>();
-            l4_table.clear();
-            l4_table.set_entry(
-                recursive_entry,
-                PageTableEntry::new(ias.l4_table_frame, MapFlags::WRITABLE),
-            );
-        })?
-    };
+    unsafe { super::init_table(ias.l4_table_frame, recursive_entry, false)? };
     let pml4_vaddr = accessor::build_vaddress(
         recursive_entry,
         recursive_entry,
@@ -167,13 +158,13 @@ pub(super) unsafe fn mount(
         recursive_entry,
     );
     let pml4 = unsafe { &mut *(pml4_vaddr.as_mut_ptr::<PageTable>()) };
-    let recusive_table = unsafe { RecursivePageTable::new(pml4, recursive_entry) };
+    let table = unsafe { RecursivePageTable::new(pml4, recursive_entry) };
 
     Ok(MountedAddressSpace {
         l4_table_frame: ias.l4_table_frame,
         scratch_page: ias.scratch_page,
         is_bootstrap: ias.is_bootstrap,
-        table: recusive_table,
+        table,
         requested_recursive_index: ias.recursive_index,
         rem: ias.rem.clone(),
     })

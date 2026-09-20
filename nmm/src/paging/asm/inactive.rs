@@ -44,16 +44,8 @@ impl InactiveAddressSpace {
         let asm = crate::paging::asm::active();
         let scratch_page = asm.scratch_page;
         let rem = RecursiveEntryManager::default();
-        unsafe {
-            asm::map_with_scratch_page(l4_table_frame, MapFlags::WRITABLE, |s| {
-                let l4_table = &mut *s.start_address().as_mut_ptr::<PageTable>();
-                l4_table.clear();
-                l4_table.set_entry(
-                    recursive_index,
-                    PageTableEntry::new(l4_table_frame, MapFlags::WRITABLE),
-                );
-            })?;
-        };
+        drop(asm);
+        unsafe { super::init_table(l4_table_frame, recursive_index, true)? };
         Ok(Self {
             l4_table_frame,
             scratch_page,

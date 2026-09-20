@@ -13,7 +13,7 @@ use crate::{
     bitmap::{PhysicalMemoryManager, VirtualMemoryManager},
     paging::{
         Address, AddressExt, FragmentSize, Frame, Large, MemoryFragment, Page, PageTable,
-        PageTableIndex, RecursiveEntryManager, Small,
+        PageTableEntry, PageTableIndex, RecursiveEntryManager, Small,
         accessor::{self},
         map::{LocalMemoryMapper, MapperMut, SizedMemoryMapper},
         recursive::RecursivePageTable,
@@ -239,4 +239,22 @@ where
     };
 
     Ok(res)
+}
+
+pub(crate) unsafe fn init_table(
+    l4: Frame<Small>,
+    recursive_idx: PageTableIndex,
+    zero: bool,
+) -> Result<(), MemError> {
+    unsafe {
+        map_with_scratch_page(l4, MapFlags::WRITABLE, |page| {
+            let pml4 = &mut *page.start_address().as_mut_ptr::<PageTable>();
+
+            if zero {
+                pml4.zero();
+            }
+
+            pml4.set_entry(recursive_idx, PageTableEntry::new(l4, MapFlags::WRITABLE));
+        })
+    }
 }
