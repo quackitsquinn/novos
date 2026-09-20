@@ -1,4 +1,4 @@
-use core::{convert::Infallible, mem};
+use core::{convert::Infallible, mem, ptr::addr_of};
 
 use crate::{
     declare_module,
@@ -7,7 +7,9 @@ use crate::{
 use cake::log::info;
 use nmm::{
     InitConfig, MapFlags,
-    paging::{AddressExt, PageTable, PageTableEntry, PageTableIndex},
+    paging::{
+        Address, AddressExt, MemoryRange, PageTable, PageTableEntry, PageTableIndex, VirtAddr,
+    },
 };
 
 pub mod allocator;
@@ -17,33 +19,31 @@ pub mod req_data;
 /// Enables or disables allocation debugging based on the ALLOC_DEBUG environment variable.
 pub const ALLOC_DEBUG: bool = option_env!("ALLOC_DEBUG").is_some();
 
+unsafe extern "C" {
+    #[link_name = "kernel_start"]
+    static KERNEL_START: u8;
+    #[link_name = "kernel_end"]
+    static KERNEL_END: u8;
+}
+
+/// Returns the memory range occupied by the kernel binary in virtual memory.
+pub fn kernel_range() -> MemoryRange<VirtAddr> {
+    let start = unsafe { Address::new(&KERNEL_START as *const u8 as u64) };
+    let end = unsafe { Address::new(&KERNEL_END as *const u8 as u64) };
+    MemoryRange::new(start, end)
+}
+
 declare_module!("memory", init);
 
 fn init() -> Result<(), Infallible> {
-    let hhdm_offset = *PHYSICAL_MEMORY_OFFSET
-        .get()
-        .expect("Physical memory offset not provided by bootloader");
+    unsafe { init_nmm() };
+    Ok(())
+}
+
+unsafe fn init_nmm() {
     let memory_map = MEMORY_MAP.lock_limine();
     let memory_map = memory_map.entries();
-    let l4_phys = nmm::arch::pml4_phys();
-    let pml4_vaddr = l4_phys
-        .translate_offset(hhdm_offset)
-        .expect("Failed to translate PML4 physical address to virtual address");
-    let root = unsafe { &mut *(pml4_vaddr.as_mut_ptr::<PageTable>()) };
-    let mut recursive_idx = None;
-    let max = PageTableIndex::MAX.value();
-    for i in
-        PageTableIndex::iter_range(PageTableIndex::new(max - (max / 4))..PageTableIndex::MAX).rev()
-    {
-        if root.read_entry(i).is_present() {
-            continue;
-        }
-
-        unsafe { root.set_entry(i, PageTableEntry::new(l4_phys, MapFlags::WRITABLE)) };
-
-        recursive_idx = Some(i);
-        break;
-    }
+    let recursive_idx = unsafe { find_set_recursive_entry() };
 
     let init = InitConfig::find_scratch_page(
         recursive_idx.expect("No free recursive slot found in PML4"),
@@ -51,10 +51,33 @@ fn init() -> Result<(), Infallible> {
         unsafe { mem::transmute(memory_map) },
     )
     .unwrap();
+
     info!("Initializing nmm {:?}", init);
     unsafe { nmm::init(init) }.expect("Failed to initialize memory manager");
     info!("Memory manager initialized");
-    Ok(())
+}
+
+const RECURSIVE_RANGE_START: PageTableIndex =
+    PageTableIndex::new(PageTableIndex::MAX.0 - (PageTableIndex::MAX.0 / 4));
+const RECURSIVE_RANGE_END: PageTableIndex =
+    unsafe { PageTableIndex::new_unchecked(PageTableIndex::MAX.0 - 1) };
+
+unsafe fn find_set_recursive_entry() -> Option<PageTableIndex> {
+    let l4_phys = nmm::arch::pml4_phys();
+    let pml4_vaddr = l4_phys
+        .translate_offset(*PHYSICAL_MEMORY_OFFSET.get().unwrap())
+        .expect("Failed to translate PML4 physical address to virtual address");
+    let root = unsafe { &mut *(pml4_vaddr.as_mut_ptr::<PageTable>()) };
+    for i in PageTableIndex::iter_range(RECURSIVE_RANGE_START..RECURSIVE_RANGE_END).rev() {
+        if root.read_entry(i).is_present() {
+            continue;
+        }
+        unsafe {
+            root.set_entry(i, PageTableEntry::new(l4_phys, MapFlags::WRITABLE));
+        }
+        return Some(i);
+    }
+    None
 }
 
 /// Defines various memory map constants used by the kernel.

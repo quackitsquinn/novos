@@ -22,6 +22,7 @@ SECTIONS
     /* Any address in this region will do, but often 0xffffffff80000000 is chosen as */
     /* that is the beginning of the region. */
     . = 0xffffffff80000000;
+    kernel_start = .;
 
     .text : {
         *(.text .text.*)
@@ -67,6 +68,8 @@ SECTIONS
         *(COMMON)
     } :data
 
+    kernel_end = .;
+    
     /* Discard .note.* and .eh_frame* since they may cause issues on some hosts. */
     /* Also discard the program interpreter section since we do not need one. This is */
     /* more or less equivalent to the --no-dynamic-linker linker flag, except that it */

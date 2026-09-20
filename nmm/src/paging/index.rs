@@ -3,7 +3,7 @@
 /// A index into a page table. This value will always be less than the current platform's page table entry count (512 for x86_64).
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
-pub struct PageTableIndex(u16);
+pub struct PageTableIndex(pub mut(super) u16);
 
 impl PageTableIndex {
     /// The minimum valid page table index (0).
