@@ -8,10 +8,10 @@ def pte_phys_addr(pte, offset=0):
 def pte_format_flags(pte):
     flags = "|"
     flags += "R" if pte & 0b1 else "*"
-    flags += "W" if pte & 0b100 else "*"
-    flags += "X" if pte & 0b1 << 63 else "*"
+    flags += "W" if pte & 0b10 else "*"
+    flags += "*" if pte & 0b1 << 63 else "X"
     flags += "|"
-    flags += "U" if pte & 0b10 else "*"
+    flags += "U" if pte & 0b100 else "*"
     flags += "P" if pte & 0b1 << 7 else "*"
     flags += "|"
     flags += "G" if pte & 0b1 << 8 else "*"
@@ -30,12 +30,12 @@ class PTable(gdb.Command):
             print("Prefix the address with pte: to handle it as a page table entry")
             return
 
-        if len(args) == 2:
+        if len(args) >= 2:
             start_index = int(gdb.parse_and_eval(args[1]))
         else:
             start_index = 512 - 16;
 
-        if len(args) == 3:
+        if len(args) >= 3:
             end_index = int(gdb.parse_and_eval(args[2]))
         else:
             end_index = 512
@@ -46,8 +46,8 @@ class PTable(gdb.Command):
         address, address_explicit = res
         if not address_explicit:
             print(f"Using address {hex(address)} extracted from {args[0]}")
-        print((" " * 25) + "|RWN|UP|G|")
-        print((" " * 9) + "|Addr" + (" " * 11) + "|  X|SS| |", end="")
+        print((" " * 25) + "|RWX|UP|G|")
+        print((" " * 9) + "|Addr" + (" " * 11) + "|   |SS| |", end="")
         print()
         for index in batched(range(start_index, end_index), 4):
             print(f"[{index[0]:>3}-{index[-1]:>3}]|", end="")

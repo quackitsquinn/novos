@@ -133,6 +133,12 @@ impl PageTableEntry {
     pub fn is_huge(&self) -> bool {
         self.arch_flags().contains(arch::ArchEntryFlags::HUGE_PAGE)
     }
+
+    /// Sets or clears the huge page flag for this page table entry.
+    pub fn huge(mut self) -> Self {
+        self.value |= arch::ArchEntryFlags::HUGE_PAGE.bits();
+        self
+    }
 }
 
 impl Debug for PageTableEntry {

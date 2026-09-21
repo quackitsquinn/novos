@@ -40,6 +40,15 @@ impl<'a> RecursivePageTable<'a> {
         self.recursive_index
     }
 
+    fn default_parent_flags() -> MapFlags {
+        // There's some weirdness with the way the CPU handles
+        // parent table flags. If the parent isn't writable, all children are read-only,
+        // However, instead of having an EXECUTABLE bit, the CPU (at least on x86_64)
+        // has a "no-execute" or NX bit. The issue is that if the parent is marked as NX,
+        // all children are NX. This caused a GIANT headache and genuinely hours of debugging.
+        MapFlags::WRITABLE | MapFlags::EXECUTABLE
+    }
+
     fn l3_table_or_alloc(
         &mut self,
         l4_index: PageTableIndex,
@@ -118,10 +127,10 @@ impl SizedMemoryMapper<Large> for RecursivePageTable<'_> {
     {
         let (l4, l3, _, _) = accessor::dissolve_address(dst.start_address());
 
-        let table_flags = parent_table_flags.unwrap_or_default() | MapFlags::WRITABLE;
+        let table_flags = parent_table_flags.unwrap_or_default() | Self::default_parent_flags();
         let l3_table = self.l3_table_or_alloc(l4, table_flags, allocator)?;
         unsafe {
-            l3_table.set_entry(l3, PageTableEntry::new(src, flags));
+            l3_table.set_entry(l3, PageTableEntry::new(src, flags).huge());
         }
         Ok(unsafe { Flush::flush_page(dst) })
     }
@@ -165,10 +174,10 @@ impl SizedMemoryMapper<Medium> for RecursivePageTable<'_> {
     {
         let (l4, l3, l2, _) = accessor::dissolve_address(dst.start_address());
 
-        let table_flags = parent_table_flags.unwrap_or_default() | MapFlags::WRITABLE;
+        let table_flags = parent_table_flags.unwrap_or_default() | Self::default_parent_flags();
         let l2_table = self.l2_table_or_alloc(l4, l3, table_flags, allocator)?;
         unsafe {
-            l2_table.set_entry(l2, PageTableEntry::new(src, flags));
+            l2_table.set_entry(l2, PageTableEntry::new(src, flags).huge());
         }
         Ok(unsafe { Flush::flush_page(dst) })
     }
@@ -212,7 +221,7 @@ impl SizedMemoryMapper<Small> for RecursivePageTable<'_> {
     {
         let (l4, l3, l2, l1) = accessor::dissolve_address(dst.start_address());
 
-        let table_flags = parent_table_flags.unwrap_or_default() | MapFlags::WRITABLE;
+        let table_flags = parent_table_flags.unwrap_or_default() | Self::default_parent_flags();
         let l1_table = self.l1_table_or_alloc(l4, l3, l2, table_flags, allocator)?;
         unsafe {
             l1_table.set_entry(l1, PageTableEntry::new(src, flags));
