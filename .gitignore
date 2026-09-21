@@ -13,4 +13,4 @@
 boot_images/
 ## Ignore dev specific files
 gdb.toml
-gdb_scripts/scratchpad.gdb
+gdb_scripts/*_scratchpad.gdb

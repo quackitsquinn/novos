@@ -28,7 +28,7 @@ fn get_gdb_scripts() -> Vec<String> {
             scripts.push(file.path().to_str().unwrap().to_string());
         }
         // Check for scratchpad.gdb (A .gitignore'd file for debugging)
-        if file.file_name() == "scratchpad.gdb" {
+        if file.file_name().to_string_lossy().contains("scratchpad") {
             found_scratchpad = true;
         }
     }
