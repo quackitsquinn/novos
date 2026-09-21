@@ -5,7 +5,10 @@ use core::{
     mem::{self, transmute},
 };
 
-use cake::{OnceMutex, OnceMutexGuard, OnceRwLock, OnceRwReadGuard, log::info};
+use cake::{
+    OnceMutex, OnceMutexGuard, OnceRwLock, OnceRwReadGuard,
+    log::{info, trace},
+};
 
 use crate::{
     MapFlags, MemError,
@@ -154,20 +157,22 @@ pub(crate) fn activate_inactive_space(
     let mapper = unsafe { RecursivePageTable::new(pml4, space.recursive_index) };
 
     let new_space = AddressSpace::new(mapper, space.l4_table_frame, space.scratch_page);
-    unsafe { set_active(new_space) };
+    let l4_frame = new_space.l4_table_frame;
 
+    unsafe { set_active(new_space) };
     if space.is_bootstrap {
-        mem::forget(space);
         return Ok(());
     }
 
+    mem::forget(space);
+
     // Hold our breath..
-    info!(target: "nmm", "Activating new address space with L4 table frame: {:#x}", space.l4_table_frame.start_address().as_u64());
+    info!(target: "nmm", "Activating new address space with L4 table frame: {:#x}", l4_frame.start_address().as_u64());
     unsafe {
-        arch::set_root_table(space.l4_table_frame);
+        arch::set_root_table(l4_frame);
     }
     // Thank god it didn't explode. Now we can breathe again.
-    info!(target: "nmm", "New address space activated with L4 table frame: {:#x}", space.l4_table_frame.start_address().as_u64());
+    info!(target: "nmm", "New address space activated with L4 table frame: {:#x}", l4_frame.start_address().as_u64());
 
     Ok(())
 }
@@ -264,6 +269,11 @@ pub(crate) unsafe fn init_recursive_mapping(
     recursive_idx: PageTableIndex,
     should_zero_child: bool,
 ) -> Result<(), MemError> {
+    trace!(
+        "Initializing recursive mapping for child frame {:#x} at index {:?}",
+        child.start_address().as_u64(),
+        recursive_idx
+    );
     unsafe {
         init_table(child, recursive_idx, should_zero_child)?;
         let active_as = active();

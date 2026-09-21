@@ -1,6 +1,6 @@
 use core::mem;
 
-use cake::log::error;
+use cake::log::{error, info};
 
 use crate::{
     MapFlags, MemError,
@@ -202,11 +202,11 @@ unsafe fn unmount_no_consume(
         unsafe {
             asm::map_with_scratch_page(mas.l4_table_frame, MapFlags::WRITABLE, |s| {
                 let l4_table = &mut *s.start_address().as_mut_ptr::<PageTable>();
-                l4_table.clear();
                 l4_table.set_entry(
-                    recursive_entry,
+                    mas.requested_recursive_index,
                     PageTableEntry::new(mas.l4_table_frame, MapFlags::WRITABLE),
                 );
+                l4_table.set_entry(recursive_entry, PageTableEntry::empty());
             })?
         };
     }
