@@ -39,7 +39,7 @@ pub mod serial;
 pub mod testing;
 
 /// The size of the kernel stack in bytes.
-pub const STACK_SIZE: u64 = 1 << 15; // 32 KiB
+pub const STACK_SIZE: u64 = 1 << 16; // 32 KiB
 
 /// The base address of the kernel stack. Set by the function that calls [init_kernel].
 pub static STACK_BASE: Once<VirtAddr> = Once::new();
@@ -86,11 +86,11 @@ pub(crate) unsafe fn init_kernel_services() {
     output::MODULE.init();
     requests::MODULE.init();
     panic::MODULE.init();
+    interrupts::MODULE.init();
     get_serial_client().enable_packet_support();
     cake::init_rng();
     memory::MODULE.init();
     gdt::MODULE.init();
-    interrupts::MODULE.init();
     hardware::MODULE.init();
     // {
     //     let e = File::create_file("test.txt").unwrap();

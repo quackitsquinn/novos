@@ -35,9 +35,9 @@ pub fn kernel_range() -> MemoryRange<VirtAddr> {
 }
 
 pub fn stack_range() -> MemoryRange<VirtAddr> {
-    let stack_base = crate::STACK_BASE.get().expect("STACK_BASE not initialized");
-    let stack_top = *stack_base + crate::STACK_SIZE;
-    MemoryRange::new(*stack_base, stack_top)
+    let stack_top = *crate::STACK_BASE.get().expect("STACK_BASE not initialized");
+    let stack_base = stack_top - crate::STACK_SIZE;
+    MemoryRange::new(stack_base, stack_top)
 }
 
 declare_module!("memory", init);
