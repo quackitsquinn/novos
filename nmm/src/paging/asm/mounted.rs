@@ -63,12 +63,13 @@ impl MountedAddressSpace {
 
     pub fn copy_mappings_from_base(
         &mut self,
-        range: MemoryRange<VirtAddr>,
+        src_range: MemoryRange<VirtAddr>,
+        dest_range: Option<MemoryRange<VirtAddr>>,
     ) -> Result<(), MemError> {
         let a_as = asm::active();
         let mapper_lock = a_as.mapper.lock_inner_mapper();
 
-        accessor::copy_mappings_between_tables(&*mapper_lock, &mut self.table, range)
+        accessor::copy_mappings(&*mapper_lock, &mut self.table, src_range, dest_range)
     }
 }
 

@@ -30,7 +30,9 @@ use crate::{
     entry_walker::EntryWalker,
     paging::{
         Address, AddressExt, FragmentManager, FragmentSize, Frame, Large, MemoryFragment, Page,
-        PageTableIndex, PhysAddr, VirtAddr, asm,
+        PageTableIndex, PhysAddr, VirtAddr,
+        accessor::CopyMappingError,
+        asm,
         operation::OperationAllSizes,
         primitives::{AnyFragment, MemoryRange, PageClass, PhysRange, VirtRange},
     },
@@ -401,6 +403,9 @@ pub enum MemError {
     /// The requested operation is invalid in the current context, such as attempting to perform an operation that is not allowed or supported.
     #[error("The requested operation is invalid in the current context.")]
     InvalidOperation,
+    /// The requested operation failed due to an error in the copy mappings operation, such as a failure to copy mappings between page tables or address spaces.
+    #[error("The requested operation failed due to an error in the copy mappings operation: {0:?}")]
+    CopyMappingError(#[from] CopyMappingError),
     /// An error that originated from the underlying memory mapping implementation, such as page table manipulation or low-level memory operations.
     #[error("An error occurred during memory management operations: {0}")]
     Other(&'static str),

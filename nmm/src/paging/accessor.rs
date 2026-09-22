@@ -3,7 +3,9 @@
 use arrayvec::ArrayVec;
 
 use crate::{
-    MapFlags, MemError, align, arch,
+    MapFlags,
+    MemError::{self},
+    align, arch,
     paging::{
         Address, AddressExt, FragmentManager, FragmentSize, Frame, FullManager, Large, Medium,
         MemoryFragment, MemoryRange, Page, PageTable, PageTableEntry, PageTableIndex, PhysAddr,
@@ -482,32 +484,48 @@ fn access_and_clear_table<C>(
     err
 }
 
-pub(crate) fn copy_mappings_between_tables<S, D>(
-    src: &S,
-    dst: &mut D,
-    range: MemoryRange<VirtAddr>,
+/// An error that can occur during the copy mappings operation, such as a failure to copy mappings between page tables or address spaces.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
+pub enum CopyMappingError {
+    /// The source and destination ranges have mismatched sizes, which prevents the copy mappings operation from proceeding.
+    #[error("The source and destination ranges have mismatched sizes.")]
+    MismatchedRangeSizes,
+}
+
+pub(crate) fn copy_mappings<S, D>(
+    source_table: &S,
+    dest_table: &mut D,
+    source_range: MemoryRange<VirtAddr>,
+    dest_range: Option<MemoryRange<VirtAddr>>,
 ) -> Result<(), MemError>
 where
     S: PagetableAccessor,
     D: PagetableAccessor + MemoryMapper,
 {
-    let range_start = VirtAddr::new(align!(down, range.start().as_u64(), arch::L1_PAGE_SIZE));
-    let range_end = VirtAddr::new(align!(up, range.end().as_u64(), arch::L1_PAGE_SIZE));
-
-    let mut off = 0;
-
-    for (mapping, flags) in src.present_mappings(MemoryRange::new(range_start, range_end)) {
-        // Make sure the given virt addr is
-        if mapping.page().start_address() != range_start + off {
-            return Err(MemError::InvalidOperation);
+    if let Some(dest_range) = dest_range {
+        if source_range.size() != dest_range.size() {
+            return Err(CopyMappingError::MismatchedRangeSizes.into());
         }
+    }
 
+    let source_range = source_range.align_barriers(Small::ALIGNMENT);
+    let dest_range = dest_range.unwrap_or(source_range);
+
+    for (mapping, flags) in source_table.present_mappings(source_range) {
         fn map<S: FragmentSize, D: SizedMemoryMapper<S>>(
             dst_table: &mut D,
-            dst_page: Page<S>,
+            src_page: Page<S>,
             src_frame: Frame<S>,
             flags: MapFlags,
+            dest_range: MemoryRange<VirtAddr>,
+            source_range: MemoryRange<VirtAddr>,
         ) -> Result<(), MemError> {
+            let src_offset = src_page.start_address().as_u64() - source_range.start().as_u64();
+            let dst_page = Page::<S>::from_start_address(VirtAddr::new(
+                dest_range.start().as_u64() + src_offset,
+            ))
+            .unwrap();
             dst_table
                 .map_primitive(
                     dst_page,
@@ -521,17 +539,15 @@ where
 
         match mapping {
             DirectMapping::Small(dst_page, src) => {
-                map(dst, dst_page, src, flags)?;
+                map(dest_table, dst_page, src, flags, dest_range, source_range)?;
             }
             DirectMapping::Medium(dst_page, src) => {
-                map(dst, dst_page, src, flags)?;
+                map(dest_table, dst_page, src, flags, dest_range, source_range)?;
             }
             DirectMapping::Large(dst_page, src) => {
-                map(dst, dst_page, src, flags)?;
+                map(dest_table, dst_page, src, flags, dest_range, source_range)?;
             }
         }
-
-        off += mapping.page().size();
     }
 
     Ok(())

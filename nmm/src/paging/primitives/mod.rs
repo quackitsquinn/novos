@@ -6,7 +6,10 @@ pub mod paddr;
 pub mod page;
 pub mod vaddr;
 
-use core::{alloc::Layout, mem::transmute_copy};
+use core::{
+    alloc::Layout,
+    mem::{Alignment, transmute_copy},
+};
 
 pub use address::{Address, AddressExt};
 use cake::encapsulate_macro;
@@ -64,23 +67,26 @@ encapsulate_macro!(
 pub impl(crate) trait FragmentSize:
     Sized + Copy + core::fmt::Debug + Eq + PartialEq
 {
-    /// The size of a page for this page size type, in bytes.
+    /// The size of this fragment size type, in bytes.
     const SIZE: u64;
-    /// The number of bits in a page for this page size type.
+    /// The number of bits in this fragment size type.
     const BITS: u64 = Self::SIZE / L1_PAGE_SIZE;
-    /// The name of this page size type, as a string.
+    /// The name of this fragment size type, as a string.
     const NAME: &'static str;
-    /// The layout of a page for this page size type, used for allocation and deallocation.
+    /// The layout for this fragment size type, used for allocation and deallocation.
     const LAYOUT: Layout = match Layout::from_size_align(Self::SIZE as usize, Self::SIZE as usize) {
         Ok(layout) => layout,
         Err(_) => panic!("Invalid layout"),
     };
 
-    /// The level of the page table that this page size type corresponds to.
+    /// The level of the fragment table that this fragment size type corresponds to.
     const LEVEL: u8;
 
-    /// Is this page size type considered a huge page for the current architecture?
+    /// Is this fragment size type considered huge for the current architecture?
     const IS_HUGE: bool = Self::SIZE > L1_PAGE_SIZE;
+
+    /// The alignment of this fragment size type.
+    const ALIGNMENT: Alignment = Alignment::new(Self::SIZE as usize).unwrap();
 }
 
 /// Marker type for small pages, typically 4KB in size for x86_64 architecture.
@@ -361,6 +367,12 @@ where
         self.end =
             A::try_new(new_end).expect("MemoryRange::truncate: `start + new_size` overflowed");
         self
+    }
+
+    pub fn align_barriers(self, align: Alignment) -> Self {
+        let start = A::try_new(align!(up, self.start.as_u64(), align.as_usize() as u64)).unwrap();
+        let end = A::try_new(align!(down, self.end.as_u64(), align.as_usize() as u64)).unwrap();
+        MemoryRange { start, end }
     }
 }
 
