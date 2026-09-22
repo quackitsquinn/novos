@@ -1,4 +1,4 @@
-use core::{convert::Infallible, mem, ptr::addr_of};
+use core::{alloc::Layout, convert::Infallible, mem, ptr::addr_of};
 
 use crate::{
     declare_module,
@@ -63,8 +63,14 @@ fn map_kernel(recursive_idx: PageTableIndex) -> Result<(), MemError> {
         }
     };
 
-    builder.copy_mappings_from_base(kernel_range)?;
-    builder.copy_mappings_from_base(stack_range)?;
+    info!("reserving {:x} bytes for new stack", stack_range.size());
+    let new_stack = nmm::reserve_virtual(
+        Layout::from_size_alignment(stack_range.size() as usize, stack_range.start().alignment())
+            .unwrap(),
+    )?;
+
+    builder.copy_mappings_from_base(kernel_range, None)?;
+    builder.copy_mappings_from_base(stack_range, Some(new_stack))?;
 
     let new_as = builder
         .unmount()

@@ -127,7 +127,10 @@ impl<'a, T: Translate + ?Sized> Iterator for PresentRangeIterator<'a, T> {
         }
 
         match self.table.translate(self.current) {
-            TranslateResult::Success(mapping, flags) => Some((mapping, flags)),
+            TranslateResult::Success(mapping, flags) => {
+                self.current += mapping.size() as u64; // Move to the next page after the current mapping
+                Some((mapping, flags))
+            }
             TranslateResult::NotMapped => {
                 // Move to the next page and try again
                 self.current += Small::SIZE; // Assuming 4KiB pages

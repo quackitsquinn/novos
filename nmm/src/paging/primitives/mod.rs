@@ -411,6 +411,15 @@ impl DirectMapping {
         }
     }
 
+    /// Returns the size of this mapping in bytes.
+    pub fn size(&self) -> u64 {
+        match self {
+            DirectMapping::Small(_, _) => Small::SIZE,
+            DirectMapping::Medium(_, _) => Medium::SIZE,
+            DirectMapping::Large(_, _) => Large::SIZE,
+        }
+    }
+
     /// Creates a new DirectMapping from the given page and frame.
     pub fn new<S: FragmentSize>(page: Page<S>, frame: Frame<S>) -> Self {
         match S::SIZE {
