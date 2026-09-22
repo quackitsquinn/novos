@@ -1,20 +1,33 @@
+use core::{fmt::Debug, iter::Map};
+
 use arrayvec::ArrayVec;
+use cake::log::error;
 
 use crate::{
     MapFlags, MemError,
     paging::{
-        Address, FragmentManager, Frame, Large, Medium, MemoryFragment, PageTable, PageTableEntry,
-        PageTableIndex, Small, VirtAddr,
-        accessor::{self, PagetableAccessor},
+        Address, FragmentManager, FragmentSize, Frame, Large, Medium, MemoryFragment, MemoryRange,
+        PageTable, PageTableEntry, PageTableIndex, Small, VirtAddr,
+        accessor::{self, PagetableAccessor, TablePointer},
         map::{Flush, MemoryMapper, SizedMemoryMapper, Unmapped},
-        primitives::AnyPage,
+        primitives::{AnyPage, DirectMapping},
         table,
+        translate::{Translate, TranslateResult},
     },
 };
 
+/// A recursive page table that allows for mapping and unmapping of pages in a virtual address space.
 pub struct RecursivePageTable<'a> {
     pub(crate) mut(super) root_table: &'a mut PageTable,
     pub(crate) mut(super) recursive_index: PageTableIndex,
+}
+
+impl Debug for RecursivePageTable<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("RecursivePageTable")
+            .field("recursive_index", &self.recursive_index)
+            .finish()
+    }
 }
 
 impl<'a> RecursivePageTable<'a> {
@@ -38,6 +51,34 @@ impl<'a> RecursivePageTable<'a> {
 
     pub(crate) fn recursive_index(&self) -> PageTableIndex {
         self.recursive_index
+    }
+
+    /// Returns the table at the given table pointer, if it exists.
+    pub unsafe fn table(&self, ptr: TablePointer) -> Result<&PageTable, MemError> {
+        let (l4, l3, l2) = ptr.dissolve();
+        match ptr.level() {
+            4 => Ok(self.p4()),
+            3 => self.l3_table(l4),
+            2 => self.l2_table(l4, l3),
+            1 => self.l1_table(l4, l3, l2),
+            _ => unreachable!(),
+        }
+    }
+    /// Returns the table at the given table pointer, if it exists.
+    pub unsafe fn table_mut(&mut self, ptr: TablePointer) -> Result<&mut PageTable, MemError> {
+        let (l4, l3, l2) = ptr.dissolve();
+        match ptr.level() {
+            4 => Ok(self.p4_mut()),
+            3 => self.l3_table_mut(l4),
+            2 => self.l2_table_mut(l4, l3),
+            1 => self.l1_table_mut(l4, l3, l2),
+            _ => unreachable!(),
+        }
+    }
+
+    /// Returns an iterator over
+    pub fn present_mappings(&self, range: MemoryRange<VirtAddr>) -> PresentRangeIterator<'_> {
+        PresentRangeIterator::new(self, range)
     }
 
     fn default_parent_flags() -> MapFlags {
@@ -329,3 +370,45 @@ impl PagetableAccessor for RecursivePageTable<'_> {
 }
 
 impl MemoryMapper for RecursivePageTable<'_> {}
+
+/// An iterator over the present mappings in a given range of virtual addresses.
+#[derive(Debug)]
+pub struct PresentRangeIterator<'a> {
+    table: &'a RecursivePageTable<'a>,
+    range: MemoryRange<VirtAddr>,
+    current: VirtAddr,
+}
+
+impl<'a> PresentRangeIterator<'a> {
+    /// Creates a new iterator over the present mappings in the given range.
+    pub fn new(table: &'a RecursivePageTable<'a>, range: MemoryRange<VirtAddr>) -> Self {
+        Self {
+            table,
+            range,
+            current: range.start(),
+        }
+    }
+}
+
+impl<'a> Iterator for PresentRangeIterator<'a> {
+    type Item = (DirectMapping, MapFlags);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.current >= self.range.end() {
+            return None;
+        }
+
+        match self.table.translate(self.current) {
+            TranslateResult::Success(mapping, flags) => Some((mapping, flags)),
+            TranslateResult::NotMapped => {
+                // Move to the next page and try again
+                self.current += Small::SIZE; // Assuming 4KiB pages
+                self.next()
+            }
+            TranslateResult::Error(e) => {
+                error!("Error while translating address: {:?}", e);
+                None
+            }
+        }
+    }
+}

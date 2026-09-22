@@ -1,10 +1,11 @@
 //! Address translation trait
 
+use cake::log::error;
 
 use crate::{
     MapFlags, MemError,
     paging::{
-        Frame, MemoryFragment, Page, PageTableIndex, VirtAddr,
+        FragmentSize, Frame, MemoryFragment, MemoryRange, Page, PageTableIndex, Small, VirtAddr,
         accessor::{self, PagetableAccessor},
         primitives::DirectMapping,
     },
@@ -15,6 +16,10 @@ pub trait Translate {
     /// Translates a virtual address to a physical address in the context of this address space.
     /// Returns a `TranslateResult` indicating the outcome of the translation.
     fn translate(&self, addr: VirtAddr) -> TranslateResult;
+    /// Returns an iterator over the present mappings in the given range of virtual addresses.
+    fn present_mappings(&self, range: MemoryRange<VirtAddr>) -> PresentRangeIterator<'_, Self> {
+        PresentRangeIterator::new(self, range)
+    }
 }
 
 /// The result of a translation attempt, indicating whether the translation was successful, not mapped, or resulted in an error.
@@ -91,5 +96,47 @@ where
         let frame = Frame::from_start_address(l1_ent.addr()).unwrap();
         let page = Page::from_start_address(accessor::build_vaddress(l4, l3, l2, l1)).unwrap();
         TranslateResult::Success(DirectMapping::Small(page, frame), l1_ent.flags())
+    }
+}
+
+/// An iterator over the present mappings in a given range of virtual addresses.
+#[derive(Debug)]
+pub struct PresentRangeIterator<'a, T: Translate + ?Sized> {
+    table: &'a T,
+    range: MemoryRange<VirtAddr>,
+    current: VirtAddr,
+}
+
+impl<'a, T: Translate + ?Sized> PresentRangeIterator<'a, T> {
+    /// Creates a new iterator over the present mappings in the given range.
+    pub fn new(table: &'a T, range: MemoryRange<VirtAddr>) -> Self {
+        Self {
+            table,
+            range,
+            current: range.start(),
+        }
+    }
+}
+
+impl<'a, T: Translate + ?Sized> Iterator for PresentRangeIterator<'a, T> {
+    type Item = (DirectMapping, MapFlags);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.current >= self.range.end() {
+            return None;
+        }
+
+        match self.table.translate(self.current) {
+            TranslateResult::Success(mapping, flags) => Some((mapping, flags)),
+            TranslateResult::NotMapped => {
+                // Move to the next page and try again
+                self.current += Small::SIZE; // Assuming 4KiB pages
+                self.next()
+            }
+            TranslateResult::Error(e) => {
+                error!("Error while translating address: {:?}", e);
+                None
+            }
+        }
     }
 }

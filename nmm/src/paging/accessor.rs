@@ -9,7 +9,7 @@ use crate::{
         MemoryFragment, MemoryRange, Page, PageTable, PageTableEntry, PageTableIndex, PhysAddr,
         Small, VirtAddr,
         index::PageIndexIter,
-        map::{Flush, GlobalMemoryProvider, MemoryMapper},
+        map::{Flush, GlobalMemoryProvider, MemoryMapper, SizedMemoryMapper},
         primitives::{AnyPage, DirectMapping, FrameClass},
         translate::{Translate, TranslateResult},
     },
@@ -496,54 +496,38 @@ where
 
     let mut off = 0;
 
-    while range_start + off < range_end {
-        let (mapping, flags) = match src.translate(range.start() + off) {
-            TranslateResult::Success(mapping, flags) => (mapping, flags),
-            TranslateResult::NotMapped => {
-                return Err(MemError::NotMapped(AnyPage::Small(
-                    Page::from_start_address(range.start()).unwrap(),
-                )));
-            }
-            TranslateResult::Error(e) => {
-                return Err(e);
-            }
-        };
-
+    for (mapping, flags) in src.present_mappings(MemoryRange::new(range_start, range_end)) {
         // Make sure the given virt addr is
         if mapping.page().start_address() != range_start + off {
             return Err(MemError::InvalidOperation);
         }
 
+        fn map<S: FragmentSize, D: SizedMemoryMapper<S>>(
+            dst_table: &mut D,
+            dst_page: Page<S>,
+            src_frame: Frame<S>,
+            flags: MapFlags,
+        ) -> Result<(), MemError> {
+            dst_table
+                .map_primitive(
+                    dst_page,
+                    src_frame,
+                    flags,
+                    Some(MapFlags::DEALLOCATE),
+                    &mut GlobalMemoryProvider,
+                )
+                .map(|flush| flush.flush())
+        }
+
         match mapping {
             DirectMapping::Small(dst_page, src) => {
-                dst.map_primitive(
-                    dst_page,
-                    src,
-                    flags,
-                    Some(MapFlags::DEALLOCATE),
-                    &mut GlobalMemoryProvider,
-                )?
-                .flush();
+                map(dst, dst_page, src, flags)?;
             }
             DirectMapping::Medium(dst_page, src) => {
-                dst.map_primitive(
-                    dst_page,
-                    src,
-                    flags,
-                    Some(MapFlags::DEALLOCATE),
-                    &mut GlobalMemoryProvider,
-                )?
-                .flush();
+                map(dst, dst_page, src, flags)?;
             }
             DirectMapping::Large(dst_page, src) => {
-                dst.map_primitive(
-                    dst_page,
-                    src,
-                    flags,
-                    Some(MapFlags::DEALLOCATE),
-                    &mut GlobalMemoryProvider,
-                )?
-                .flush();
+                map(dst, dst_page, src, flags)?;
             }
         }
 
