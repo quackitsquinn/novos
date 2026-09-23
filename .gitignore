@@ -14,3 +14,4 @@ boot_images/
 ## Ignore dev specific files
 gdb.toml
 gdb_scripts/*_scratchpad.gdb
+**/__pycache__/

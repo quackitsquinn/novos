@@ -1,14 +1,15 @@
 import gdb
+import phys
 
 class Xp(gdb.Command):
     def __init__(self):
         super().__init__("xp", gdb.COMMAND_DATA)
 
     def invoke(self, arg, from_tty):
-        gdb.execute("maintenance packet Qqemu.PhyMemMode:1", to_string=True)
+        phys.enable_phys_access()
         try:
             gdb.execute("x " + arg)
         finally:
-            gdb.execute("maintenance packet Qqemu.PhyMemMode:0", to_string=True)
+            phys.disable_phys_access()
 
 Xp()

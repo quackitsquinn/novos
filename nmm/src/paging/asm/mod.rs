@@ -147,6 +147,20 @@ pub(crate) unsafe fn release_recursive_slot(idx: PageTableIndex) -> Result<(), M
 pub(crate) fn activate_inactive_space(
     space: inactive::InactiveAddressSpace,
 ) -> Result<(), MemError> {
+    let l4_frame = unsafe { prepare_inactive_space(space)? };
+    unsafe { arch::set_root_table(l4_frame) };
+    Ok(())
+}
+
+/// Prepares NMM to switch to the given address space, allowing the
+/// caller to load the new pagetable however they want.
+///
+/// # Safety
+///
+/// The caller must ensure that no nmm APIs are called between this call and the returned frame being loaded as the root table.
+pub unsafe fn prepare_inactive_space(
+    space: inactive::InactiveAddressSpace,
+) -> Result<Frame<Small>, MemError> {
     let pml4_page = accessor::build_vaddress(
         space.recursive_index,
         space.recursive_index,
@@ -161,22 +175,13 @@ pub(crate) fn activate_inactive_space(
 
     unsafe { set_active(new_space) };
     if space.is_bootstrap {
-        return Ok(());
+        return Ok(l4_frame);
     }
 
     mem::forget(space);
 
-    // Hold our breath..
-    info!(target: "nmm", "Activating new address space with L4 table frame: {:#x}", l4_frame.start_address().as_u64());
-    unsafe {
-        arch::set_root_table(l4_frame);
-    }
-    // Thank god it didn't explode. Now we can breathe again.
-    info!(target: "nmm", "New address space activated with L4 table frame: {:#x}", l4_frame.start_address().as_u64());
-
-    Ok(())
+    Ok(l4_frame)
 }
-
 /// A trait for types that can own a mapping of memory into an address space.
 ///
 /// This trait is used to allow types to map their internal state into an address space, such as the memory manager's internal data structures.

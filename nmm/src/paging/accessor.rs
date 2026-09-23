@@ -510,7 +510,9 @@ where
     }
 
     let source_range = source_range.align_barriers(Small::ALIGNMENT);
-    let dest_range = dest_range.unwrap_or(source_range);
+    let dest_range = dest_range
+        .map(|vr| vr.align_barriers(Small::ALIGNMENT))
+        .unwrap_or(source_range);
 
     for (mapping, flags) in source_table.present_mappings(source_range) {
         fn map<S: FragmentSize, D: SizedMemoryMapper<S>>(

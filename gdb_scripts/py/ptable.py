@@ -1,23 +1,8 @@
 import gdb
+import phys
+import table
 from itertools import batched
 
-def pte_phys_addr(pte, offset=0):
-     res =  (pte & 0x000ffffffffff000) | (offset & 0xfff)
-     return res
-
-def pte_format_flags(pte):
-    flags = "|"
-    flags += "R" if pte & 0b1 else "*"
-    flags += "W" if pte & 0b10 else "*"
-    flags += "*" if pte & 0b1 << 63 else "X"
-    flags += "|"
-    flags += "U" if pte & 0b100 else "*"
-    flags += "P" if pte & 0b1 << 7 else "*"
-    flags += "|"
-    flags += "G" if pte & 0b1 << 8 else "*"
-    flags += "|"
-
-    return flags
 
 class PTable(gdb.Command):
     def __init__(self):
@@ -59,27 +44,24 @@ class PTable(gdb.Command):
 
 
     def print_entry(self, address, index):
-        entry_value = self.read_table_entry(address, index)
-        flags = pte_format_flags(entry_value)
-        addr = pte_phys_addr(entry_value)
+        entry_value = table.read_entry(address, index)
+        flags = table.pte_flags(entry_value)
+        flags = flags.format_with("|{P}{W}{X}|{U}{H}|{G}|")
+        addr = table.pte_phys_addr(entry_value)
         return f"{addr:#014x} {flags}"
         
 
 
     def read_table_entry(self, address, index) -> int:
         entry_address = address + index * 8
-        gdb.execute("maintenance packet Qqemu.PhyMemMode:1", to_string=True)
-        entry_value = gdb.selected_inferior().read_memory(entry_address, 8)
-        gdb.execute("maintenance packet Qqemu.PhyMemMode:0", to_string=True)
-        return int.from_bytes(entry_value, byteorder='little')
+        return int.from_bytes(phys.read(entry_address, 8), byteorder='little')
 
 
 
     def extract_address(self, arg):
         if arg == "cr3":
             try:
-                cr3 = gdb.parse_and_eval("$cr3")
-                return pte_phys_addr(int(cr3)), False
+                return table.read_l4_addr(), False
             except Exception as e:
                 print(f"Error parsing CR3 register: {e}")
                 return None
@@ -88,7 +70,7 @@ class PTable(gdb.Command):
             pte_str = arg[4:]
             try:
                 pte = gdb.parse_and_eval(pte_str)
-                return pte_phys_addr(int(pte)), False
+                return table.pte_phys_addr(int(pte)), False
                 
             except Exception as e:
                 print(f"Error parsing page table entry: {e}")
