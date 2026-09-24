@@ -1,3 +1,4 @@
+//! Entry point for novos.
 #![no_std]
 #![no_main]
 
@@ -12,7 +13,7 @@ fn panic(pi: &core::panic::PanicInfo) -> ! {
 
 #[unsafe(no_mangle)]
 #[unsafe(naked)]
-/// Nova's entry point. This should almost *never* be either called directly or modified.
+/// Entry point. This should almost *never* be either called directly or modified.
 /// This function's only purpose is to call the kernel's initialization function, which will fully take over the system.
 /// This function is naked because we want to make sure there is no stack manipulation before we call into the kernel.
 pub extern "sysv64" fn _start() -> ! {

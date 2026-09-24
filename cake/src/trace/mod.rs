@@ -84,29 +84,31 @@ pub fn read_caller_frame(level: usize) -> Option<StackFrame> {
     unsafe { read_frame(curr) }
 }
 
+/// Returns the root frame of the current thread's call stack.
 #[inline(never)]
 #[cfg(target_arch = "x86_64")]
-fn root_frame() -> *const () {
-    let mut rbp: *const ();
+pub fn root_frame() -> *mut () {
+    let mut rbp: *mut ();
     unsafe {
         asm!("mov {}, rbp", out(reg) rbp);
         // We want the caller's frame, not ours. Traverse a frame up.
-        read_frame(rbp).map_or(core::ptr::null(), |frame| frame.last_frame)
+        read_frame(rbp).map_or(core::ptr::null_mut(), |frame| frame.last_frame)
     }
 }
 
+/// Returns the root frame of the current thread's call stack.
 #[cfg(target_arch = "aarch64")]
-fn root_frame() -> *const () {
-    let mut fp: *const ();
+pub fn root_frame() -> *mut () {
+    let mut fp: *mut ();
     unsafe {
         asm!("mov {}, x29", out(reg) fp);
         // We want the caller's frame, not ours. Traverse a frame up.
-        read_frame(fp).map_or(core::ptr::null(), |frame| frame.last_frame)
+        read_frame(fp).map_or(core::ptr::null_mut(), |frame| frame.last_frame)
     }
 }
 
 #[cfg(target_arch = "x86_64")]
-unsafe fn read_frame(frame: *const ()) -> Option<StackFrame> {
+pub unsafe fn read_frame(frame: *const ()) -> Option<StackFrame> {
     #[derive(Clone, Copy)]
     #[repr(C)]
     struct X86StackFrame {
@@ -127,7 +129,7 @@ unsafe fn read_frame(frame: *const ()) -> Option<StackFrame> {
 }
 
 #[cfg(target_arch = "aarch64")]
-unsafe fn read_frame(frame: *const ()) -> Option<StackFrame> {
+pub unsafe fn read_frame(frame: *const ()) -> Option<StackFrame> {
     #[derive(Clone, Copy)]
     #[repr(C)]
     struct AArch64StackFrame {
@@ -144,4 +146,34 @@ unsafe fn read_frame(frame: *const ()) -> Option<StackFrame> {
         instruction_pointer: frame.lr,
         last_frame: frame.fp as *mut (),
     })
+}
+
+pub unsafe fn write_frame(frame: *mut (), new_frame: StackFrame) {
+    #[cfg(target_arch = "x86_64")]
+    {
+        #[derive(Clone, Copy)]
+        #[repr(C)]
+        struct X86StackFrame {
+            rbp: *const X86StackFrame,
+            rip: *const (),
+        }
+
+        let frame = &mut unsafe { *(frame as *mut X86StackFrame) };
+        frame.rbp = new_frame.last_frame as *const X86StackFrame;
+        frame.rip = new_frame.instruction_pointer;
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    {
+        #[derive(Clone, Copy)]
+        #[repr(C)]
+        struct AArch64StackFrame {
+            fp: *const AArch64StackFrame,
+            lr: *const (),
+        }
+
+        let frame = &mut unsafe { *(frame as *mut AArch64StackFrame) };
+        frame.fp = new_frame.last_frame as *const AArch64StackFrame;
+        frame.lr = new_frame.instruction_pointer;
+    }
 }

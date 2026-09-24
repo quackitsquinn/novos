@@ -370,8 +370,8 @@ where
     }
 
     pub fn align_barriers(self, align: Alignment) -> Self {
-        let start = A::try_new(align!(up, self.start.as_u64(), align.as_usize() as u64)).unwrap();
-        let end = A::try_new(align!(down, self.end.as_u64(), align.as_usize() as u64)).unwrap();
+        let start = A::try_new(align!(down, self.start.as_u64(), align.as_usize() as u64)).unwrap();
+        let end = A::try_new(align!(up, self.end.as_u64(), align.as_usize() as u64)).unwrap();
         MemoryRange { start, end }
     }
 }

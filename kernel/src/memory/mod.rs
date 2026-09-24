@@ -1,15 +1,21 @@
-use core::{alloc::Layout, convert::Infallible, mem, ptr::addr_of};
+use core::{
+    alloc::Layout,
+    arch::asm,
+    convert::Infallible,
+    mem,
+    ptr::{self, addr_of},
+};
 
 use crate::{
     declare_module,
     requests::{MEMORY_MAP, PHYSICAL_MEMORY_OFFSET},
 };
-use cake::log::info;
+use cake::log::{info, trace};
 use nmm::{
     InitConfig, MapFlags, MemError,
     paging::{
-        Address, AddressExt, MemoryRange, PageTable, PageTableEntry, PageTableIndex, VirtAddr,
-        asm::InactiveAddressSpace,
+        Address, AddressExt, MemoryFragment, MemoryRange, PageTable, PageTableEntry,
+        PageTableIndex, VirtAddr, asm::InactiveAddressSpace,
     },
 };
 
@@ -35,7 +41,7 @@ pub fn kernel_range() -> MemoryRange<VirtAddr> {
 }
 
 pub fn stack_range() -> MemoryRange<VirtAddr> {
-    let stack_top = *crate::STACK_BASE.get().expect("STACK_BASE not initialized");
+    let stack_top = *crate::STACK_TOP.get().expect("STACK_BASE not initialized");
     let stack_base = stack_top - crate::STACK_SIZE;
     MemoryRange::new(stack_base, stack_top)
 }
@@ -69,15 +75,73 @@ fn map_kernel(recursive_idx: PageTableIndex) -> Result<(), MemError> {
             .unwrap(),
     )?;
 
+    assert!(new_stack.size() == stack_range.size());
+
+    info!(
+        "Copying kernel mappings with kernel range: {:#x?}",
+        kernel_range
+    );
     builder.copy_mappings_from_base(kernel_range, None)?;
+    info!(
+        "Copying stack mappings from old stack range: {:#x?} to new stack range: {:#x?}",
+        stack_range, new_stack
+    );
     builder.copy_mappings_from_base(stack_range, Some(new_stack))?;
+
+    // Something I didn't initially think of: we have to update the frame pointers.
+    // If a panic happens, it will instantly deref unmapped memory and crash.
+
+    let mut current_frame = cake::trace::root_frame();
+    let mut frame = unsafe { cake::trace::read_frame(current_frame) };
+    while let Some(f) = frame {
+        let old_frame_addr =
+            VirtAddr::from_mut_ptr(f.last_frame).expect("failed to convert frame addr");
+        let stack_offset = stack_range.end().as_u64() - old_frame_addr.as_u64();
+        let new_frame_addr = new_stack.end() - stack_offset;
+        unsafe {
+            cake::trace::write_frame(
+                current_frame,
+                cake::trace::StackFrame {
+                    last_frame: new_frame_addr.as_mut_ptr(),
+                    instruction_pointer: f.instruction_pointer,
+                },
+            );
+        }
+
+        current_frame = f.last_frame;
+        frame = unsafe { cake::trace::read_frame(current_frame) };
+    }
 
     let new_as = builder
         .unmount()
         .expect("Failed to unmount new address space");
 
+    let l4_paddr = unsafe { nmm::paging::asm::prepare_inactive_space(new_as) }?;
     info!("Switching address spaces, hold your breath...");
-    unsafe { new_as.activate()? };
+    trace!(
+        "Switching to new address space with PML4 at physical address: {:#x}",
+        l4_paddr.start_address().as_u64()
+    );
+    unsafe {
+        asm! {
+            "mov r10, rax",        // r10 = old_stack_top
+            "sub r10, rsp",       // r10 = old_stack_top - rsp (the offset of the current stack pointer from the top of the old stack)
+            "mov r9, rcx",        // r9 = new_stack_top
+            "sub r9, r10",        // r9 = new_stack_top - old_stack_offset (the new stack pointer position)
+
+            "mov r10, rax",       // r10 = old_stack_top
+            "sub r10, rbp",       // r10 = old_stack_top - rbp (the offset of the current frame pointer from the top of the old stack)
+            "mov r11, rcx",       // r11 = new_stack_top
+            "sub r11, r10",       // r11 = new_stack_top - old_stack_offset (the new frame pointer position)
+
+            "mov cr3, r8",        // load cr3
+            "mov rsp, r9",        // update stack
+            "mov rbp, r11",       // update frame pointer
+            in("r8") l4_paddr.start_address().as_u64(), // cr3
+            in("rcx") new_stack.end().as_u64(),         // new stack top
+            in("rax") stack_range.end().as_u64(),       // old stack top
+        }
+    }
     info!("Address space switched successfully!");
     crate::hlt_loop();
 
