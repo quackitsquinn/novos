@@ -23,7 +23,7 @@ use cake::Once;
 use cake::log::info;
 use interrupts::hardware;
 use kserial::client::get_serial_client;
-use nmm::paging::{Address, VirtAddr};
+use tmm::paging::{Address, VirtAddr};
 
 pub mod context;
 pub mod display;

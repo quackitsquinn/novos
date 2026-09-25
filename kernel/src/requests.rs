@@ -4,7 +4,7 @@ use core::convert::Infallible;
 use cake::limine::BaseRevision;
 use cake::limine::{paging::Mode, request::*, response::ExecutableAddressResponse};
 use cake::{LimineRequest, Once};
-use nmm::paging::{Address, VirtAddr};
+use tmm::paging::{Address, VirtAddr};
 
 use crate::STACK_SIZE;
 use crate::{

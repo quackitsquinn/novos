@@ -5,10 +5,10 @@ use ::acpi::sdt::madt::{Madt, MadtEntry};
 use cake::log::info;
 use cake::{Once, OnceMutex};
 use modular_bitfield::prelude::*;
-use nmm::MapFlags;
-use nmm::arch::L1_PAGE_SIZE;
-use nmm::paging::primitives::{PhysRange, VirtRange};
-use nmm::paging::{Address, AddressExt, PhysAddr};
+use tmm::MapFlags;
+use tmm::arch::L1_PAGE_SIZE;
+use tmm::paging::primitives::{PhysRange, VirtRange};
+use tmm::paging::{Address, AddressExt, PhysAddr};
 
 use crate::mp::{apic_page_flags, id};
 
@@ -46,7 +46,7 @@ impl IoApic {
 
         let base = *self.base.get().expect("No IOAPIC found in MADT");
         info!("IO APIC base address: {:#x}", base);
-        let map = nmm::create_phys_mapping(
+        let map = tmm::create_phys_mapping(
             PhysRange::new_len(PhysAddr::new(base), L1_PAGE_SIZE),
             MapFlags::CACHE_DISABLE | MapFlags::WRITABLE,
         )

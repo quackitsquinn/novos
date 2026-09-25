@@ -582,12 +582,12 @@ dependencies = [
  "kserial",
  "lazy_static",
  "modular-bitfield",
- "nmm",
  "paste",
  "pic8259",
  "raw-cpuid 11.6.0",
  "rustc-demangle",
  "thiserror",
+ "tmm",
  "uart_16550",
  "x86_64",
 ]
@@ -756,34 +756,6 @@ dependencies = [
  "cfg-if",
  "cfg_aliases",
  "libc",
-]
-
-[[package]]
-name = "nmm"
-version = "0.1.0"
-dependencies = [
- "arrayvec",
- "bitflags 2.10.0",
- "cake",
- "cfg-if",
- "pastey 0.2.1",
- "thiserror",
-]
-
-[[package]]
-name = "novos"
-version = "0.1.0"
-dependencies = [
- "backtrace",
- "ctrlc",
- "jzon",
- "kbuild",
- "kernel",
- "krun",
- "kserial",
- "lazy_static",
- "ovmf-prebuilt",
- "regex",
 ]
 
 [[package]]
@@ -1263,6 +1235,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "tau"
+version = "0.1.0"
+dependencies = [
+ "backtrace",
+ "ctrlc",
+ "jzon",
+ "kbuild",
+ "kernel",
+ "krun",
+ "kserial",
+ "lazy_static",
+ "ovmf-prebuilt",
+ "regex",
+]
+
+[[package]]
 name = "thiserror"
 version = "2.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1280,6 +1268,18 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.100",
+]
+
+[[package]]
+name = "tmm"
+version = "0.1.0"
+dependencies = [
+ "arrayvec",
+ "bitflags 2.10.0",
+ "cake",
+ "cfg-if",
+ "pastey 0.2.1",
+ "thiserror",
 ]
 
 [[package]]

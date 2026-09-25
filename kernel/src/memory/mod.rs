@@ -12,7 +12,7 @@ use crate::{
 };
 use alloc::vec::Vec;
 use cake::log::{info, trace};
-use nmm::{
+use tmm::{
     InitConfig, MapFlags, MemError,
     paging::{
         Address, AddressExt, MemoryFragment, MemoryRange, PageTable, PageTableEntry,
@@ -50,7 +50,7 @@ pub fn stack_range() -> MemoryRange<VirtAddr> {
 declare_module!("memory", init);
 
 fn init() -> Result<(), Infallible> {
-    let recursive_idx = unsafe { init_nmm().unwrap() };
+    let recursive_idx = unsafe { init_tmm().unwrap() };
     map_kernel(recursive_idx).unwrap();
     Ok(())
 }
@@ -71,7 +71,7 @@ fn map_kernel(recursive_idx: PageTableIndex) -> Result<(), MemError> {
     };
 
     info!("reserving {:x} bytes for new stack", stack_range.size());
-    let new_stack = nmm::reserve_virtual(
+    let new_stack = tmm::reserve_virtual(
         Layout::from_size_alignment(stack_range.size() as usize, stack_range.start().alignment())
             .unwrap(),
     )?;
@@ -88,7 +88,7 @@ fn map_kernel(recursive_idx: PageTableIndex) -> Result<(), MemError> {
         stack_range, new_stack
     );
     builder.copy_mappings_from_base(stack_range, Some(new_stack))?;
-    builder.copy_mappings_from_base(map::nmm_managed_range::RANGE, None)?;
+    builder.copy_mappings_from_base(map::tmm_managed_range::RANGE, None)?;
 
     // Something I didn't initially think of: we have to update the frame pointers.
     // If a panic happens, it will instantly deref unmapped memory and crash.
@@ -118,7 +118,7 @@ fn map_kernel(recursive_idx: PageTableIndex) -> Result<(), MemError> {
         .unmount()
         .expect("Failed to unmount new address space");
 
-    let l4_paddr = unsafe { nmm::paging::asm::prepare_inactive_space(new_as) }?;
+    let l4_paddr = unsafe { tmm::paging::asm::prepare_inactive_space(new_as) }?;
     info!("Switching address spaces, hold your breath...");
     trace!(
         "Switching to new address space with PML4 at physical address: {:#x}",
@@ -154,18 +154,18 @@ fn map_kernel(recursive_idx: PageTableIndex) -> Result<(), MemError> {
     Ok(())
 }
 
-unsafe fn init_nmm() -> Result<PageTableIndex, MemError> {
+unsafe fn init_tmm() -> Result<PageTableIndex, MemError> {
     let memory_map = MEMORY_MAP.lock_limine();
     let memory_map = memory_map.entries();
     let recursive_idx = unsafe { find_set_recursive_entry().unwrap() };
 
     let init =
-        InitConfig::find_scratch_page(recursive_idx, map::nmm_managed_range::RANGE, unsafe {
+        InitConfig::find_scratch_page(recursive_idx, map::tmm_managed_range::RANGE, unsafe {
             mem::transmute(memory_map)
         })?;
 
-    info!("Initializing nmm {:?}", init);
-    unsafe { nmm::init(init) }?;
+    info!("Initializing tmm {:?}", init);
+    unsafe { tmm::init(init) }?;
     info!("Memory manager initialized");
     Ok(recursive_idx)
 }
@@ -176,7 +176,7 @@ const RECURSIVE_RANGE_END: PageTableIndex =
     unsafe { PageTableIndex::new_unchecked(PageTableIndex::MAX.0 - 1) };
 
 unsafe fn find_set_recursive_entry() -> Option<PageTableIndex> {
-    let l4_phys = nmm::arch::pml4_phys();
+    let l4_phys = tmm::arch::pml4_phys();
     let pml4_vaddr = l4_phys
         .translate_offset(*PHYSICAL_MEMORY_OFFSET.get().unwrap())
         .expect("Failed to translate PML4 physical address to virtual address");
@@ -204,12 +204,12 @@ unsafe fn find_set_recursive_entry() -> Option<PageTableIndex> {
 /// KERNEL_BINARY = Kernel binary memory
 ///
 /// HIGHER_HALF_START = Start of the higher half of the kernel memory
-use nmm::kernel_map;
+use tmm::kernel_map;
 
 kernel_map! {
     . = (higher_half + 512 GiB),
-    NMM_MANAGED_RANGE = 2 GiB; align 1 GiB,
-    NMM_ZERO_PAGE = Large; align Large,
+    tmm_MANAGED_RANGE = 2 GiB; align 1 GiB,
+    tmm_ZERO_PAGE = Large; align Large,
     KERNEL_HEAP = 16 MiB; align 2 MiB,
     KERNEL_PHYS_MAP = 256 MiB; align 2 MiB,
     KERNEL_REMAP = 256 MiB; align 2 MiB,

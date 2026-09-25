@@ -21,6 +21,6 @@ fn main() {
         PathBuf::try_from(kernel_dir).expect("Failed to convert kernel_dir to PathBuf"),
         limine_cfg,
         PathBuf::try_from("boot_images").expect("Failed to convert  to PathBuf"),
-        "novaos.iso".to_string(),
+        "tau_kernel.iso".to_string(),
     ));
 }

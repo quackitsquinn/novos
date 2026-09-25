@@ -2,8 +2,7 @@
 name = "kbuild"
 version = "0.1.0"
 edition = "2024"
-# Probably changing novos to nova
-description = "Modularized build system for nova"
+description = "Modularized build system for the tau kernel"
 
 [dependencies]
 

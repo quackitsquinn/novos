@@ -93,7 +93,7 @@ pub fn display_enabled() -> bool {
 }
 
 /// Default kernel image path if none is specified.
-pub const DEFAULT_KERNEL_IMAGE_PATH: &str = "boot_images/novaos.iso";
+pub const DEFAULT_KERNEL_IMAGE_PATH: &str = "boot_images/tau_kernel.iso";
 
 /// Returns the kernel image path.
 pub fn kernel_image_path() -> PathBuf {

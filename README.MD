@@ -1,4 +1,4 @@
-# novos: A little kernel written in rust. (so I can learn osdev)
+# tau: A little kernel written in rust. (so I can learn osdev)
 
 
 ## Running the kernel
@@ -148,17 +148,17 @@ This project originally started as [snakian](https://github.com/quackitsquinn/sn
 
 I quickly in that project realized I wanted to do more than just a snake game (that I never even implemented anyways), so that project shifted to more of a general kernel. By that point though, I had made a lot of mistakes in the codebase, so I decided to start over. That's when I started this project. 
 
-This project does a lot differently than snakian. Snakian was almost a word-for-word following of [Philipp Oppermann's blog](https://os.phil-opp.com/). With nova though, I was confident enough to start off with something quite different. I used limine instead of `bootloader`, and implemented stuff with a lot more care and abstraction.
+This project does a lot differently than snakian. Snakian was almost a word-for-word following of [Philipp Oppermann's blog](https://os.phil-opp.com/). With tau though, I was confident enough to start off with something quite different. I used limine instead of `bootloader`, and implemented stuff with a lot more care and abstraction.
 
 ## Personal note
 
-This is the longest I have ever worked on a single project (15 months... holy cow), so I am really proud of this project. Yes, all this knowledge is incredibly niche, but I have learned a lot about the inner workings of computers and operating systems.
+This is the longest I have ever worked on a single project (~~15~~ almost 30!! months... holy cow), so I am really proud of this project. 
 
-Also, Honestly, It's really cool to have gotten to this point when I remember at the start seeing so many resources saying to not even attempt it if you don't have 10 years of experience or like a bachelor's degree in computer science. I am a senior in high school with no formal education in computer science, and I have gotten to this point. I am really proud of myself for that.
+Also, Honestly, It's really cool to have gotten to this point when I remember at the start seeing so many resources saying to not even attempt it if you don't have 10 years of experience or like a bachelor's degree in computer science. I started this when I was a junior in high school with no formal education in computer science, and I have gotten to this point. I am really proud of myself for that.
 
 If your reading this, and you are thinking about starting a project this massive and research-heavy, I say do it. 
 
-It wouldn't hurt to try, and you'd at least learn a lot.
+It wouldn't hurt to try, and you'd at least learn a lot!
 
 
 ## Amazing resources

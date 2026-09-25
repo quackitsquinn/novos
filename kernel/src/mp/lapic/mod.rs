@@ -4,12 +4,12 @@
 //! the Intel® 64 and IA-32 Architectures Software Developer’s Manual
 use cake::Once;
 use cake::log::info;
-use nmm::MapFlags;
-use nmm::arch::L1_PAGE_SIZE;
-use nmm::paging::Address;
-use nmm::paging::AddressExt;
-use nmm::paging::primitives::PhysAddr;
-use nmm::paging::primitives::PhysRange;
+use tmm::MapFlags;
+use tmm::arch::L1_PAGE_SIZE;
+use tmm::paging::Address;
+use tmm::paging::AddressExt;
+use tmm::paging::primitives::PhysAddr;
+use tmm::paging::primitives::PhysRange;
 use x86_64::registers::model_specific::Msr;
 
 use crate::mp::lapic::icr::InterruptCommandRegister;
@@ -62,7 +62,7 @@ impl Lapic {
         let base = unsafe { LAPIC_BASE_MSR.read() } & 0xFFFF_FFFF_FFFF_F000;
         self.base.call_once(|| base);
         info!("LAPIC base address: {:#x}", base);
-        let map = nmm::create_phys_mapping(
+        let map = tmm::create_phys_mapping(
             PhysRange::new_len(PhysAddr::new(base), L1_PAGE_SIZE),
             MapFlags::CACHE_DISABLE | MapFlags::WRITABLE,
         )

@@ -1,4 +1,4 @@
-//! Entry point for novos.
+//! Entry point for the tau kernel.
 #![no_std]
 #![no_main]
 
