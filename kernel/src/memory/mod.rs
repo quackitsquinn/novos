@@ -10,12 +10,13 @@ use crate::{
     declare_module,
     requests::{MEMORY_MAP, PHYSICAL_MEMORY_OFFSET},
 };
+use alloc::vec::Vec;
 use cake::log::{info, trace};
 use nmm::{
     InitConfig, MapFlags, MemError,
     paging::{
         Address, AddressExt, MemoryFragment, MemoryRange, PageTable, PageTableEntry,
-        PageTableIndex, VirtAddr, asm::InactiveAddressSpace,
+        PageTableIndex, VirtAddr, asm::InactiveAddressSpace, heapless::HeaplessAllocator,
     },
 };
 
@@ -87,6 +88,7 @@ fn map_kernel(recursive_idx: PageTableIndex) -> Result<(), MemError> {
         stack_range, new_stack
     );
     builder.copy_mappings_from_base(stack_range, Some(new_stack))?;
+    builder.copy_mappings_from_base(map::nmm_managed_range::RANGE, None)?;
 
     // Something I didn't initially think of: we have to update the frame pointers.
     // If a panic happens, it will instantly deref unmapped memory and crash.
@@ -143,6 +145,10 @@ fn map_kernel(recursive_idx: PageTableIndex) -> Result<(), MemError> {
         }
     }
     info!("Address space switched successfully!");
+
+    let mut test_v = Vec::new_in(HeaplessAllocator::new(MapFlags::WRITABLE));
+    test_v.push(42);
+    drop(test_v);
     crate::hlt_loop();
 
     Ok(())

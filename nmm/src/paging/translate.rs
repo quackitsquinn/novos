@@ -28,7 +28,8 @@ pub enum TranslateResult {
     /// The translation was successful, and the resulting physical address is contained in the `AnyFragment<FrameClass>`.
     Success(DirectMapping, MapFlags),
     /// The virtual address is not mapped in this address space.
-    NotMapped,
+    /// `.0` contains the level of the page table where the mapping was not found (4 for l4, 3 for l3, etc..).
+    NotMapped(u8),
     /// An error occurred during the translation process, such as an invalid address or a failure to access the page tables.
     Error(MemError),
 }
@@ -47,12 +48,13 @@ where
         let (l4, l3, l2, l1) = accessor::dissolve_address(addr);
         let l3_table = match self.l3_table(l4) {
             Ok(table) => table,
+            Err(MemError::NotMapped(_)) => return TranslateResult::NotMapped(4),
             Err(e) => return TranslateResult::Error(e),
         };
 
         let l3_ent = l3_table.read_entry(l3);
         if !l3_ent.is_present() {
-            return TranslateResult::NotMapped;
+            return TranslateResult::NotMapped(3);
         } else if l3_ent.is_huge() {
             let frame = Frame::from_start_address(l3_ent.addr()).unwrap();
             let page = Page::from_start_address(accessor::build_vaddress(
@@ -72,7 +74,7 @@ where
 
         let l2_ent = l2_table.read_entry(l2);
         if !l2_ent.is_present() {
-            return TranslateResult::NotMapped;
+            return TranslateResult::NotMapped(2);
         } else if l2_ent.is_huge() {
             let frame = Frame::from_start_address(l2_ent.addr()).unwrap();
             let page =
@@ -88,7 +90,7 @@ where
 
         let l1_ent = l1_table.read_entry(l1);
         if !l1_ent.is_present() {
-            return TranslateResult::NotMapped;
+            return TranslateResult::NotMapped(1);
         } else if l1_ent.is_huge() {
             return TranslateResult::Error(MemError::InvalidOperation);
         }
@@ -126,20 +128,57 @@ impl<'a, T: Translate + ?Sized> Iterator for PresentRangeIterator<'a, T> {
             return None;
         }
 
-        match self.table.translate(self.current) {
-            TranslateResult::Success(mapping, flags) => {
-                self.current += mapping.size() as u64; // Move to the next page after the current mapping
-                Some((mapping, flags))
-            }
-            TranslateResult::NotMapped => {
-                // Move to the next page and try again
-                self.current += Small::SIZE; // Assuming 4KiB pages
-                self.next()
-            }
-            TranslateResult::Error(e) => {
-                error!("Error while translating address: {:?}", e);
-                None
+        while self.current < self.range.end() {
+            match self.table.translate(self.current) {
+                TranslateResult::Success(mapping, flags) => {
+                    self.current += mapping.size() as u64; // Move to the next page after the current mapping
+                    return Some((mapping, flags));
+                }
+                TranslateResult::NotMapped(lvl) => {
+                    // Move to the next page and try again
+                    match lvl {
+                        4 => {
+                            self.current += accessor::build_address(
+                                PageTableIndex::new(1),
+                                PageTableIndex::MIN,
+                                PageTableIndex::MIN,
+                                PageTableIndex::MIN,
+                            )
+                        }
+                        3 => {
+                            self.current += accessor::build_address(
+                                PageTableIndex::MIN,
+                                PageTableIndex::new(1),
+                                PageTableIndex::MIN,
+                                PageTableIndex::MIN,
+                            )
+                        }
+                        2 => {
+                            self.current += accessor::build_address(
+                                PageTableIndex::MIN,
+                                PageTableIndex::MIN,
+                                PageTableIndex::new(1),
+                                PageTableIndex::MIN,
+                            )
+                        }
+                        1 => {
+                            self.current += accessor::build_address(
+                                PageTableIndex::MIN,
+                                PageTableIndex::MIN,
+                                PageTableIndex::MIN,
+                                PageTableIndex::new(1),
+                            )
+                        }
+                        _ => unreachable!(),
+                    }
+                }
+                TranslateResult::Error(e) => {
+                    error!("Error while translating address: {:?}", e);
+                    return None;
+                }
             }
         }
+
+        None
     }
 }

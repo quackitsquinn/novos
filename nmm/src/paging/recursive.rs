@@ -7,10 +7,10 @@ use crate::{
     MapFlags, MemError,
     paging::{
         Address, FragmentManager, FragmentSize, Frame, Large, Medium, MemoryFragment, MemoryRange,
-        PageTable, PageTableEntry, PageTableIndex, Small, VirtAddr,
+        Page, PageTable, PageTableEntry, PageTableIndex, Small, VirtAddr,
         accessor::{self, PagetableAccessor, TablePointer},
         map::{Flush, MemoryMapper, SizedMemoryMapper, Unmapped},
-        primitives::{AnyPage, DirectMapping},
+        primitives::{AnyPage, DirectMapping, VirtRange},
         table,
         translate::{Translate, TranslateResult},
     },
@@ -74,11 +74,6 @@ impl<'a> RecursivePageTable<'a> {
             1 => self.l1_table_mut(l4, l3, l2),
             _ => unreachable!(),
         }
-    }
-
-    /// Returns an iterator over
-    pub fn present_mappings(&self, range: MemoryRange<VirtAddr>) -> PresentRangeIterator<'_> {
-        PresentRangeIterator::new(self, range)
     }
 
     fn default_parent_flags() -> MapFlags {
@@ -370,45 +365,3 @@ impl PagetableAccessor for RecursivePageTable<'_> {
 }
 
 impl MemoryMapper for RecursivePageTable<'_> {}
-
-/// An iterator over the present mappings in a given range of virtual addresses.
-#[derive(Debug)]
-pub struct PresentRangeIterator<'a> {
-    table: &'a RecursivePageTable<'a>,
-    range: MemoryRange<VirtAddr>,
-    current: VirtAddr,
-}
-
-impl<'a> PresentRangeIterator<'a> {
-    /// Creates a new iterator over the present mappings in the given range.
-    pub fn new(table: &'a RecursivePageTable<'a>, range: MemoryRange<VirtAddr>) -> Self {
-        Self {
-            table,
-            range,
-            current: range.start(),
-        }
-    }
-}
-
-impl<'a> Iterator for PresentRangeIterator<'a> {
-    type Item = (DirectMapping, MapFlags);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.current >= self.range.end() {
-            return None;
-        }
-
-        match self.table.translate(self.current) {
-            TranslateResult::Success(mapping, flags) => Some((mapping, flags)),
-            TranslateResult::NotMapped => {
-                // Move to the next page and try again
-                self.current += Small::SIZE; // Assuming 4KiB pages
-                self.next()
-            }
-            TranslateResult::Error(e) => {
-                error!("Error while translating address: {:?}", e);
-                None
-            }
-        }
-    }
-}
