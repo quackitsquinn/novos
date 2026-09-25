@@ -1,4 +1,4 @@
-# tau: A little kernel written in rust. (so I can learn osdev)
+# τ: A little kernel written in rust. (so I can learn osdev)
 
 
 ## Running the kernel
