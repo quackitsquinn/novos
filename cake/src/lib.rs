@@ -11,7 +11,7 @@ mod oncerw;
 mod owned;
 mod resource;
 pub mod securand;
-pub mod trace;
+pub mod stacktrace;
 
 /* Crate Exports */
 pub use self::limine_request::{

@@ -2,7 +2,7 @@
 
 use core::{convert::Infallible, fmt::Write, panic::PanicInfo};
 
-use cake::{Fuse, trace};
+use cake::{Fuse, stacktrace};
 
 use crate::{
     declare_module, hlt_loop,
@@ -60,7 +60,7 @@ pub fn panic_extended_info(pi: &PanicInfo) {
 }
 
 pub(crate) fn panic_stacktrace() {
-    let stacktrace = trace::collect_stacktrace::<32>();
+    let stacktrace = stacktrace::collect_stacktrace::<32>();
     stacktrace.print(4, kserial::client::writer());
 }
 

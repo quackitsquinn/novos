@@ -7,7 +7,7 @@ use core::{
 use log::{error, trace};
 use spin::{Mutex, MutexGuard, Once};
 
-use crate::trace::{read_caller_frame, sym::resolve_sym};
+use crate::stacktrace::{read_caller_frame, sym::resolve_sym};
 
 /// A mutex that can be initialized once.
 ///

@@ -93,17 +93,17 @@ fn map_kernel(recursive_idx: PageTableIndex) -> Result<(), MemError> {
     // Something I didn't initially think of: we have to update the frame pointers.
     // If a panic happens, it will instantly deref unmapped memory and crash.
 
-    let mut current_frame = cake::trace::root_frame();
-    let mut frame = unsafe { cake::trace::read_frame(current_frame) };
+    let mut current_frame = cake::stacktrace::root_frame();
+    let mut frame = unsafe { cake::stacktrace::read_frame(current_frame) };
     while let Some(f) = frame {
         let old_frame_addr =
             VirtAddr::from_mut_ptr(f.last_frame).expect("failed to convert frame addr");
         let stack_offset = stack_range.end().as_u64() - old_frame_addr.as_u64();
         let new_frame_addr = new_stack.end() - stack_offset;
         unsafe {
-            cake::trace::write_frame(
+            cake::stacktrace::write_frame(
                 current_frame,
-                cake::trace::StackFrame {
+                cake::stacktrace::StackFrame {
                     last_frame: new_frame_addr.as_mut_ptr(),
                     instruction_pointer: f.instruction_pointer,
                 },
@@ -111,7 +111,7 @@ fn map_kernel(recursive_idx: PageTableIndex) -> Result<(), MemError> {
         }
 
         current_frame = f.last_frame;
-        frame = unsafe { cake::trace::read_frame(current_frame) };
+        frame = unsafe { cake::stacktrace::read_frame(current_frame) };
     }
 
     let new_as = builder
