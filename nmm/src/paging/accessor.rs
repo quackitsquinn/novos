@@ -1,6 +1,7 @@
 //! A trait for accessing page tables at different levels in the page table hierarchy.
 
 use arrayvec::ArrayVec;
+use cake::trace_disabled;
 
 use crate::{
     MapFlags,
@@ -528,6 +529,12 @@ where
                 dest_range.start().as_u64() + src_offset,
             ))
             .unwrap();
+            trace_disabled!(
+                "accessor.copy_mappings",
+                "mapping {:?} to {:?}",
+                src_page,
+                dst_page
+            );
             dst_table
                 .map_primitive(
                     dst_page,

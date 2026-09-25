@@ -30,6 +30,9 @@ pub use resource::{ResourceGuard, ResourceMutex};
 pub use securand::{add_entropy_source, init_rng, rng, rng32, rng64};
 pub use spin::lock_api::*;
 pub use spin::{Barrier, Lazy, Once};
+
+#[doc(hidden)]
+pub use kproc as _macro_internal_kproc;
 /// A type alias for a mapped mutex guard.
 pub type MappedMutexGuard<'a, T> = lock_api::MappedMutexGuard<'a, RawMutex, T>;
 
@@ -89,6 +92,18 @@ macro_rules! encapsulate_macro {
     };
 }
 
+/// A macro to log a trace message only if tracing is enabled for the given target.
+#[macro_export]
+macro_rules! trace_disabled {
+    ($target: literal, $($rest:tt)*) => {
+        const TRACE: bool = $crate::_macro_internal_kproc::should_trace_target!($target);
+
+        if TRACE {
+            $crate::log::trace!(target: $target, $($rest)*);
+        }
+    };
+}
+
 /// Gets the current core ID.
 // TODO: Don't use the initial local APIC ID because it may be reconfigured.. I don't know if CpuId can do tht
 #[allow(unreachable_code)]
@@ -102,6 +117,7 @@ pub fn core_id() -> u64 {
     }
     #[cfg(not(target_arch = "x86_64"))]
     return 0;
+
     #[cfg(any(test, feature = "std"))]
     return std::thread::current().id().as_u64().into();
 }

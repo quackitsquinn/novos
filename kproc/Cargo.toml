@@ -7,7 +7,8 @@ description = "Some proc macros for novOS"
 [dependencies]
 proc-macro2 = "1.0.86"
 quote = "1.0.37"
-syn = {version = "2.0.79", features = ["full"]}
+rustix = { version = "1.1.5", features = ["fs"] }
+syn = { version = "2.0.79", features = ["full"] }
 
 [lib]
 proc-macro = true

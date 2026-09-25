@@ -95,6 +95,8 @@ invocation = "gdb"
    - Specifies the path to the QEMU binary to use. If not set, the default `qemu-system-x86_64` will be used.
 - `SMP_CORES`
    - Controls the number of CPU cores to allocate to QEMU.
+- `TAU_TRACE_FEATURES`
+   - This is `QEMU_DEBUG_OPTS`, but specifically for the kernel. target/trace_targets.txt contains a list!
 
 #### `DEBUG`
 Control debugger behavior.

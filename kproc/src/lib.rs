@@ -4,6 +4,7 @@ use syn::parse_macro_input;
 
 mod log_filter;
 mod test;
+mod trace;
 
 /// Attribute macro to mark a function as a test.
 #[proc_macro_attribute]
@@ -24,4 +25,12 @@ pub fn log_filter(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as syn::Expr);
 
     log_filter::derive_log_filter(input)
+}
+
+#[proc_macro]
+pub fn should_trace_target(input: TokenStream) -> TokenStream {
+    // Parse the input tokens into a syntax tree
+    let input = parse_macro_input!(input as syn::LitStr);
+
+    trace::derive_should_trace_target(input)
 }
